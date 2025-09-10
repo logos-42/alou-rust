@@ -1,0 +1,71 @@
+[package]
+name = "alou3-rust"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "High-performance Rust implementation of Alou3 AI agent"
+license = "Apache-2.0"
+
+[dependencies]
+# HTTP client and JSON handling
+reqwest = { version = "0.11", features = ["json", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7"
+
+# Async runtime and utilities
+futures = "0.3"
+async-trait = "0.1"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Environment variables
+dotenv = "0.15"
+
+# Configuration file handling
+toml = "0.8"
+
+# Directory utilities
+dirs = "5.0"
+
+# File system operations
+walkdir = "2.3"
+
+# Process and subprocess handling
+which = "4.4"
+
+# UUID generation
+uuid = { version = "1.0", features = ["v4"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Command line argument parsing
+clap = { version = "4.0", features = ["derive"] }
+
+# Base64 encoding/decoding
+base64 = "0.21"
+
+# URL parsing
+url = "2.4"
+
+# Path manipulation
+pathdiff = "0.2"
+
+# Shell command parsing
+shell-words = "1.1"
+
+# MCP protocol support (暂时注释掉，因为可能不存在)
+# mcp = "0.1"
+
+# OpenAI/DeepSeek API client (暂时注释掉，因为版本被撤回)
+# openai = "0.1"
+
+[dev-dependencies]
+tempfile = "3.0"
+tokio-test = "0.4"

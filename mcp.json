@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem", "/Users"],
+      "timeout": 30000,
+      "trust": true,
+      "description": "文件系统操作工具"
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"],
+      "timeout": 30000,
+      "trust": true,
+      "description": "内存管理工具"
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-fetch"],
+      "timeout": 30000,
+      "trust": true,
+      "description": "网络请求工具"
+    }
+  }
+}
