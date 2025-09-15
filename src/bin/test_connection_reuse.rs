@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::time::Instant;
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use alou::connection_pool::{ConnectionPool, McpServerConfig};
 use anyhow::Result;
 use tracing::info;
 

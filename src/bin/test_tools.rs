@@ -1,4 +1,4 @@
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use alou::connection_pool::{ConnectionPool, McpServerConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use anyhow::Result;
@@ -69,7 +69,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
     println!("1. 列出允许的目录:");
     let result = client_guard.call_tool("list_allowed_directories", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -80,7 +80,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
         "path": "."
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -92,7 +92,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
         "content": "这是一个通过MCP客户端创建的测试文件！\n创建时间: 2025-09-15\n"
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -103,7 +103,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
         "path": "test_mcp_file.txt"
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   文件内容: {}", text);
         }
     }
@@ -114,7 +114,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
         "path": "test_mcp_file.txt"
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -155,7 +155,7 @@ async fn test_memory_tools(pool: &ConnectionPool) -> Result<()> {
         ]
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -172,7 +172,7 @@ async fn test_memory_tools(pool: &ConnectionPool) -> Result<()> {
         ]
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -183,7 +183,7 @@ async fn test_memory_tools(pool: &ConnectionPool) -> Result<()> {
         "query": "MCP"
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -192,7 +192,7 @@ async fn test_memory_tools(pool: &ConnectionPool) -> Result<()> {
     println!("\n4. 读取整个知识图谱:");
     let result = client_guard.call_tool("read_graph", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -212,7 +212,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
     println!("1. 获取网络信息:");
     let result = client_guard.call_tool("get_network_info", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -221,7 +221,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
     println!("\n2. 获取支持的代币列表:");
     let result = client_guard.call_tool("get_supported_tokens", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -232,7 +232,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
         "label": "test_wallet"
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -241,7 +241,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
     println!("\n4. 列出所有钱包:");
     let result = client_guard.call_tool("list_wallets", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -250,7 +250,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
     println!("\n5. 估算Gas费用:");
     let result = client_guard.call_tool("estimate_gas_fees", serde_json::json!({})).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   {}", text);
         }
     }
@@ -262,7 +262,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
         "address": test_address
     })).await?;
     for content in &result.content {
-        if let mcp_client_rs::types::MessageContent::Text { text } = content {
+        if let alou::types::MessageContent::Text { text } = content {
             println!("   地址 {} 验证结果: {}", test_address, text);
         }
     }

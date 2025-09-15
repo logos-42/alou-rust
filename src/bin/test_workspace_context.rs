@@ -1,5 +1,5 @@
-use mcp_client_rs::agent::{Agent, AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
-use mcp_client_rs::connection_pool::ConnectionPool;
+use alou::agent::{Agent, AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
+use alou::connection_pool::ConnectionPool;
 use std::sync::Arc;
 use anyhow::Result;
 
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 
     // 创建智能体
     println!("\n🤖 创建智能体...");
-    let agent = mcp_client_rs::agent::McpAgent::with_connection_pool(config, connection_pool).await?;
+    let agent = alou::agent::McpAgent::with_connection_pool(config, connection_pool).await?;
 
     // 获取workspace上下文信息
     println!("\n📊 Workspace上下文信息:");

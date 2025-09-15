@@ -6,11 +6,11 @@ use tracing::{info, error, warn, debug};
 use tokio;
 use std::time::Duration;
 
-use mcp_client_rs::agent::{
+use alou::agent::{
     Agent, McpAgent, AgentConfig, DeepSeekConfig, BehaviorConfig, 
     WorkspaceConfig, ToolStrategy
 };
-use mcp_client_rs::connection_pool::ConnectionPool;
+use alou::connection_pool::ConnectionPool;
 
 /// 智能体CLI工具
 #[derive(Parser)]

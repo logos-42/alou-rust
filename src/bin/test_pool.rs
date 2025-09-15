@@ -1,4 +1,4 @@
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use alou::connection_pool::{ConnectionPool, McpServerConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

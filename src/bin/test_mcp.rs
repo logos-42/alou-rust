@@ -1,5 +1,5 @@
-use mcp_client_rs::client::ClientBuilder;
-use mcp_client_rs::types::ClientCapabilities;
+use alou::client::ClientBuilder;
+use alou::types::ClientCapabilities;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use anyhow::Result;

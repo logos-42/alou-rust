@@ -3,11 +3,11 @@ use anyhow::Result;
 use tracing::{info, error, warn};
 use tokio;
 
-use mcp_client_rs::agent::{
+use alou::agent::{
     Agent, McpAgent, AgentConfig, DeepSeekConfig, BehaviorConfig, 
     WorkspaceConfig, ToolStrategy
 };
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use alou::connection_pool::{ConnectionPool, McpServerConfig};
 
 /// 测试智能体工具发现和调用能力
 #[tokio::main]

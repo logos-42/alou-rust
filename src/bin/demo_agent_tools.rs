@@ -5,11 +5,11 @@ use tracing::{info, error, warn};
 use tokio;
 use serde_json::json;
 
-use mcp_client_rs::agent::{
+use alou::agent::{
     Agent, McpAgent, AgentConfig, DeepSeekConfig, BehaviorConfig, 
     WorkspaceConfig, ToolStrategy, ToolCall, ToolCallStatus
 };
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use alou::connection_pool::{ConnectionPool, McpServerConfig};
 
 /// 演示智能体工具调用能力
 #[tokio::main]
@@ -107,9 +107,9 @@ async fn demo_file_operations(agent: &mut McpAgent) -> Result<()> {
     // 模拟AI决定调用文件操作工具
     let tool_call = ToolCall {
         name: "read_file".to_string(),
-        arguments: json!({
+        arguments: serde_json::from_value(json!({
             "file_path": "README.md"
-        }),
+        }))?,
         call_id: "file_read_001".to_string(),
         status: ToolCallStatus::Pending,
     };
@@ -140,7 +140,7 @@ async fn demo_memory_operations(agent: &mut McpAgent) -> Result<()> {
     // 模拟AI决定创建记忆实体
     let tool_call = ToolCall {
         name: "create_entities".to_string(),
-        arguments: json!({
+        arguments: serde_json::from_value(json!({
             "entities": [
                 {
                     "name": "智能体演示",
@@ -152,7 +152,7 @@ async fn demo_memory_operations(agent: &mut McpAgent) -> Result<()> {
                     ]
                 }
             ]
-        }),
+        }))?,
         call_id: "memory_create_001".to_string(),
         status: ToolCallStatus::Pending,
     };
@@ -182,9 +182,9 @@ async fn demo_payment_operations(agent: &mut McpAgent) -> Result<()> {
     // 模拟AI决定查询支持的代币
     let tool_call = ToolCall {
         name: "get_supported_tokens".to_string(),
-        arguments: json!({
+        arguments: serde_json::from_value(json!({
             "random_string": "demo"
-        }),
+        }))?,
         call_id: "payment_tokens_001".to_string(),
         status: ToolCallStatus::Pending,
     };

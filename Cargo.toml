@@ -1,12 +1,12 @@
 [package]
-name = "mcp_client_rs"
-version = "0.1.7"
+name = "alou"
+version = "0.1.3"
 edition = "2021"
 description = "Rust client SDK for the Model Context Protocol (MCP)"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/darinkishore/mcp_client_rust"
 documentation = "https://github.com/darinkishore/mcp_client_rust"
-keywords = ["mcp", "client", "protocol", "machine-learning", "ai"]
+keywords = ["mcp", "client", "protocol", "mcp", "ai"]
 categories = ["api-bindings", "development-tools"]
 
 [dependencies]
@@ -26,38 +26,7 @@ uuid = { version = "1.0", features = ["v4"] }
 dirs = "5.0"
 dotenv = "0.15"
 
-[[bin]]
-name = "test-mcp"
-path = "src/bin/test_mcp.rs"
-
-[[bin]]
-name = "test-pool"
-path = "src/bin/test_pool.rs"
-
-[[bin]]
-name = "test-tools"
-path = "src/bin/test_tools.rs"
 
 [[bin]]
 name = "agent-cli"
-path = "src/bin/agent_cli.rs"
-
-[[bin]]
-name = "test-agent-tools"
-path = "src/bin/test_agent_tools.rs"
-
-[[bin]]
-name = "demo-agent-tools"
-path = "src/bin/demo_agent_tools.rs"
-
-[[bin]]
-name = "test-loading"
-path = "src/bin/test_loading.rs"
-
-[[bin]]
-name = "test-connection-reuse"
-path = "src/bin/test_connection_reuse.rs"
-
-[[bin]]
-name = "test-workspace-context"
-path = "src/bin/test_workspace_context.rs"
+path = "src/agent_cli.rs"
