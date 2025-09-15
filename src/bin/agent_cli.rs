@@ -10,7 +10,7 @@ use mcp_client_rs::agent::{
     Agent, McpAgent, AgentConfig, DeepSeekConfig, BehaviorConfig, 
     WorkspaceConfig, ToolStrategy
 };
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
+use mcp_client_rs::connection_pool::ConnectionPool;
 
 /// 智能体CLI工具
 #[derive(Parser)]
@@ -137,25 +137,6 @@ async fn show_loading_animation(message: &str) {
     }
 }
 
-/// 带超时的加载动画
-async fn show_loading_with_timeout(message: &str, timeout: Duration) {
-    let spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-    let mut index = 0;
-    let start_time = std::time::Instant::now();
-    
-    while start_time.elapsed() < timeout {
-        print!("\r{} {}", spinner_chars[index], message);
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        index = (index + 1) % spinner_chars.len();
-    }
-    
-    // 清除加载动画
-    print!("\r{}", " ".repeat(message.len() + 3));
-    print!("\r");
-    std::io::Write::flush(&mut std::io::stdout()).unwrap();
-}
 
 /// 初始化MCP连接池
 async fn init_connection_pool() -> Result<ConnectionPool> {

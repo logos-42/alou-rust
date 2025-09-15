@@ -18,6 +18,7 @@ pub enum Message {
 }
 
 impl Message {
+    #[allow(dead_code)]
     fn message_type(&self) -> &'static str {
         match self {
             Message::Request(_) => "request",

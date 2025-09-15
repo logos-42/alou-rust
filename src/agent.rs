@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::connection_pool::{ConnectionPool, McpServerConfig};
 use crate::workspace_context::WorkspaceContext;
@@ -199,6 +199,7 @@ pub trait Agent: Send + Sync {
 /// 智能体实现
 pub struct McpAgent {
     /// 配置
+    #[allow(dead_code)]
     config: AgentConfig,
     /// 上下文
     context: Arc<RwLock<AgentContext>>,
@@ -450,80 +451,6 @@ impl McpAgent {
         });
     }
 
-    /// 按需发现可用工具
-    async fn discover_tools(&mut self) -> Result<(), Error> {
-        let mut context = self.context.write().await;
-        context.available_tools.clear();
-        
-        // 从连接池获取所有已注册的服务器
-        let servers = self.connection_pool.list_registered_servers().await;
-        let mut server_tool_counts = std::collections::HashMap::new();
-        
-        for server_name in &servers {
-            if let Ok(connection) = self.connection_pool.get_connection(server_name).await {
-                let client = connection.lock().await;
-                
-                // 获取工具列表
-                let tools_request = Request {
-                    jsonrpc: "2.0".to_string(),
-                    id: crate::protocol::RequestId::String(Uuid::new_v4().to_string()),
-                    method: "tools/list".to_string(),
-                    params: None,
-                };
-                
-                match client.request(&tools_request.method, tools_request.params).await {
-                    Ok(response) => {
-                        if let Ok(tools_result) = serde_json::from_value::<serde_json::Value>(response) {
-                            if let Some(tools) = tools_result.get("tools").and_then(|t| t.as_array()) {
-                                let tool_count = tools.len();
-                                server_tool_counts.insert(server_name.to_string(), tool_count);
-                                
-                                for tool in tools {
-                                    if let (Some(name), Some(description)) = (
-                                        tool.get("name").and_then(|n| n.as_str()),
-                                        tool.get("description").and_then(|d| d.as_str())
-                                    ) {
-                                        let tool_info = ToolInfo {
-                                            name: name.to_string(),
-                                            description: description.to_string(),
-                                            input_schema: tool.get("inputSchema").cloned().unwrap_or_default(),
-                                            server: server_name.to_string(),
-                                        };
-                                        context.available_tools.insert(name.to_string(), tool_info);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!("获取服务器 {} 的工具列表失败: {}", server_name, e);
-                        server_tool_counts.insert(server_name.to_string(), 0);
-                    }
-                }
-            } else {
-                server_tool_counts.insert(server_name.to_string(), 0);
-            }
-        }
-        
-        // 输出工具统计信息（替换MCP服务器启动信息）
-        let total_tools = context.available_tools.len();
-        println!("🛠️  已加载 {} 个工具", total_tools);
-        
-        for (server, count) in &server_tool_counts {
-            if *count > 0 {
-                let server_display = match server.as_str() {
-                    "filesystem" => "📁 文件系统",
-                    "memory" => "🧠 知识图谱", 
-                    "payment" => "💰 区块链支付",
-                    "everything" => "🔧 文件查找工具",
-                    _ => server,
-                };
-                println!("   {}: {} 个工具", server_display, count);
-            }
-        }
-        
-        Ok(())
-    }
 
     /// 静默发现可用工具（不输出任何日志）
     async fn discover_tools_silent(&mut self) -> Result<(), Error> {
@@ -539,13 +466,6 @@ impl McpAgent {
                 let client = connection.lock().await;
                 
                 // 获取工具列表
-                let tools_request = Request {
-                    jsonrpc: "2.0".to_string(),
-                    id: crate::protocol::RequestId::String(Uuid::new_v4().to_string()),
-                    method: "tools/list".to_string(),
-                    params: None,
-                };
-                
                 match client.request("tools/list", None).await {
                     Ok(result) => {
                         if let Some(tools) = result.get("tools").and_then(|t| t.as_array()) {

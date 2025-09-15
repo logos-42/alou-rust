@@ -33,6 +33,7 @@ pub struct Client {
     /// An MPSC receiver for reading incoming responses from the transport.
     response_receiver: Arc<Mutex<tokio::sync::mpsc::UnboundedReceiver<Message>>>,
     /// An MPSC sender for sending responses from the transport handler to this client.
+    #[allow(dead_code)]
     response_sender: tokio::sync::mpsc::UnboundedSender<Message>,
     /// To handle shutdown, in stdin/stdout case we also need to shut down subprocess
     subprocess: Option<tokio::process::Child>,
