@@ -264,6 +264,30 @@ pub struct ChatMessage {
     pub role: String,
     /// 内容
     pub content: String,
+    /// 工具调用
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCallMessage>>,
+}
+
+/// 工具调用消息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallMessage {
+    /// 工具调用ID
+    pub id: Option<String>,
+    /// 工具调用类型
+    #[serde(rename = "type")]
+    pub call_type: String,
+    /// 函数调用
+    pub function: FunctionCall,
+}
+
+/// 函数调用
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FunctionCall {
+    /// 函数名称
+    pub name: String,
+    /// 函数参数
+    pub arguments: String,
 }
 
 /// 聊天请求
@@ -469,23 +493,23 @@ impl McpAgent {
                 match client.request("tools/list", None).await {
                     Ok(result) => {
                         if let Some(tools) = result.get("tools").and_then(|t| t.as_array()) {
-                            let tool_count = tools.len();
+                                let tool_count = tools.len();
                             server_tool_counts.insert(server_name.clone(), tool_count);
-                            
+                                
                             // 将工具添加到上下文中
-                            for tool in tools {
+                                for tool in tools {
                                 if let (Some(name), Some(description), Some(input_schema)) = (
-                                    tool.get("name").and_then(|n| n.as_str()),
+                                        tool.get("name").and_then(|n| n.as_str()),
                                     tool.get("description").and_then(|d| d.as_str()),
                                     tool.get("inputSchema")
-                                ) {
-                                    let tool_info = ToolInfo {
-                                        name: name.to_string(),
-                                        description: description.to_string(),
+                                    ) {
+                                        let tool_info = ToolInfo {
+                                            name: name.to_string(),
+                                            description: description.to_string(),
                                         input_schema: input_schema.clone(),
                                         server: server_name.clone(),
-                                    };
-                                    context.available_tools.insert(name.to_string(), tool_info);
+                                        };
+                                        context.available_tools.insert(name.to_string(), tool_info);
                                 }
                             }
                         }
@@ -614,6 +638,7 @@ impl Agent for McpAgent {
             ChatMessage {
                 role: "system".to_string(),
                 content: self.build_system_prompt().await,
+                tool_calls: None,
             }
         ];
         
@@ -629,6 +654,7 @@ impl Agent for McpAgent {
                 messages.push(ChatMessage {
                     role: role.to_string(),
                     content: msg.content.clone(),
+                    tool_calls: None,
                 });
             }
         }
@@ -644,7 +670,80 @@ impl Agent for McpAgent {
         if let Some(choice) = response.choices.first() {
             let response_content = choice.message.content.clone();
             
-            // 更新状态和消息历史
+            // 调试：打印响应内容
+            tracing::debug!("DeepSeek响应内容: {}", response_content);
+            tracing::debug!("是否有工具调用: {:?}", choice.message.tool_calls);
+            
+            // 检查是否有工具调用
+            if let Some(tool_calls) = &choice.message.tool_calls {
+                if !tool_calls.is_empty() {
+                    // 执行工具调用
+                    let mut tool_results = Vec::new();
+                    let mut executed_tool_calls = Vec::new();
+                    
+                    for tool_call in tool_calls {
+                        // 解析工具调用
+                        let name = &tool_call.function.name;
+                        let arguments = &tool_call.function.arguments;
+                        
+                        // 解析参数
+                        let args: HashMap<String, serde_json::Value> = 
+                            serde_json::from_str(arguments).unwrap_or_default();
+                        
+                        let tool_call_info = ToolCall {
+                            name: name.clone(),
+                            arguments: args,
+                            call_id: tool_call.id.clone().unwrap_or_default(),
+                            status: ToolCallStatus::Pending,
+                        };
+                        
+                        // 执行工具
+                        match self.execute_tool(&tool_call_info).await {
+                            Ok(result) => {
+                                tool_results.push(format!("工具 {} 执行成功: {}", name, result));
+                                executed_tool_calls.push(ToolCall {
+                                    name: name.clone(),
+                                    arguments: tool_call_info.arguments,
+                                    call_id: tool_call_info.call_id,
+                                    status: ToolCallStatus::Success,
+                                });
+                            }
+                            Err(e) => {
+                                tool_results.push(format!("工具 {} 执行失败: {}", name, e));
+                                executed_tool_calls.push(ToolCall {
+                                    name: name.clone(),
+                                    arguments: tool_call_info.arguments,
+                                    call_id: tool_call_info.call_id,
+                                    status: ToolCallStatus::Failed(e.to_string()),
+                                });
+                            }
+                        }
+                    }
+                    
+                    // 将工具结果添加到消息历史
+                    {
+                        let mut context = self.context.write().await;
+                        context.state = AgentState::Idle;
+                        
+                        let tool_result_message = AgentMessage {
+                            id: Uuid::new_v4().to_string(),
+                            message_type: MessageType::ToolResult,
+                            content: tool_results.join("\n"),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            tool_calls: executed_tool_calls,
+                        };
+                        context.message_history.push(tool_result_message);
+                    }
+                    
+                    // 返回工具执行结果
+                    return Ok(tool_results.join("\n"));
+                }
+            }
+            
+            // 没有工具调用，直接返回响应
             {
                 let mut context = self.context.write().await;
                 context.state = AgentState::Idle;
