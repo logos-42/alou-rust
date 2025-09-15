@@ -1,0 +1,63 @@
+[package]
+name = "mcp_client_rs"
+version = "0.1.7"
+edition = "2021"
+description = "Rust client SDK for the Model Context Protocol (MCP)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/darinkishore/mcp_client_rust"
+documentation = "https://github.com/darinkishore/mcp_client_rust"
+keywords = ["mcp", "client", "protocol", "machine-learning", "ai"]
+categories = ["api-bindings", "development-tools"]
+
+[dependencies]
+serde = { version = "1.0.216", features = ["derive"] }
+serde_json = "^1.0.137"
+tokio = { version = "1.42.0", features = ["full"] }
+async-trait = "0.1.85"
+thiserror = "2.0.9"
+futures = "0.3"
+tracing = "0.1"
+async-stream = "0.3.6"
+clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0"
+tracing-subscriber = "0.3"
+reqwest = { version = "0.11", features = ["json"] }
+uuid = { version = "1.0", features = ["v4"] }
+dirs = "5.0"
+dotenv = "0.15"
+
+[[bin]]
+name = "test-mcp"
+path = "src/bin/test_mcp.rs"
+
+[[bin]]
+name = "test-pool"
+path = "src/bin/test_pool.rs"
+
+[[bin]]
+name = "test-tools"
+path = "src/bin/test_tools.rs"
+
+[[bin]]
+name = "agent-cli"
+path = "src/bin/agent_cli.rs"
+
+[[bin]]
+name = "test-agent-tools"
+path = "src/bin/test_agent_tools.rs"
+
+[[bin]]
+name = "demo-agent-tools"
+path = "src/bin/demo_agent_tools.rs"
+
+[[bin]]
+name = "test-loading"
+path = "src/bin/test_loading.rs"
+
+[[bin]]
+name = "test-connection-reuse"
+path = "src/bin/test_connection_reuse.rs"
+
+[[bin]]
+name = "test-workspace-context"
+path = "src/bin/test_workspace_context.rs"

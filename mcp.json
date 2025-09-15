@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\",
+        "D:\\",
+        "E:\\"
+      ]
+    },
+    "payment-npm": {
+      "command": "blockchain-payment-mcp",
+      "args": [],
+      "env": {
+        "PRIVATE_KEY": "1655aad5f3b8e80ac2bd4383d3ac8bbab3ec928645c7342e568b394193efdf2c",
+        "DEFAULT_NETWORK": "base_sepolia",
+        "DEBUG": "false",
+        "LOG_LEVEL": "ERROR",
+        "PYTHONUNBUFFERED": "1",
+        "MAX_TRANSACTION_VALUE": "10"
+      }
+    },
+    "everything": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-everything"
+      ]
+    },
+    "memory": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
+    }
+  }
+} 

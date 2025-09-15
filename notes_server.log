@@ -1,0 +1,29 @@
+2025-09-15 10:32:45,450 - mcp.server.lowlevel.server - DEBUG - Initializing server 'notes_simple'
+2025-09-15 10:32:45,451 - mcp.server.lowlevel.server - DEBUG - Registering handler for ListResourcesRequest
+2025-09-15 10:32:45,452 - mcp.server.lowlevel.server - DEBUG - Registering handler for ReadResourceRequest
+2025-09-15 10:32:45,452 - mcp.server.lowlevel.server - DEBUG - Registering handler for PromptListRequest
+2025-09-15 10:32:45,452 - mcp.server.lowlevel.server - DEBUG - Registering handler for GetPromptRequest
+2025-09-15 10:32:45,452 - mcp.server.lowlevel.server - DEBUG - Registering handler for ListToolsRequest
+2025-09-15 10:32:45,452 - mcp.server.lowlevel.server - DEBUG - Registering handler for CallToolRequest
+2025-09-15 10:32:45,453 - asyncio - DEBUG - Using proactor: IocpProactor
+2025-09-15 10:32:45,454 - notes-server - INFO - Starting notes server...
+2025-09-15 10:32:45,496 - notes-server - INFO - Server streams initialized
+2025-09-15 10:32:45,497 - notes-server - DEBUG - Initialization options: server_name='notes_simple' server_version='0.1.0' capabilities=ServerCapabilities(experimental={}, logging=None, prompts=PromptsCapability(listChanged=False), resources=ResourcesCapability(subscribe=False, listChanged=False), tools=ToolsCapability(listChanged=False), completions=None) instructions=None
+2025-09-15 10:32:45,507 - mcp.server.lowlevel.server - DEBUG - Received message: root=InitializedNotification(method='notifications/initialized', params=None, jsonrpc='2.0')
+2025-09-15 10:32:45,508 - mcp.server.lowlevel.server - DEBUG - Received message: <mcp.shared.session.RequestResponder object at 0x0000023D5814F110>
+2025-09-15 10:32:45,509 - mcp.server.lowlevel.server - INFO - Processing request of type CallToolRequest
+2025-09-15 10:32:45,509 - mcp.server.lowlevel.server - DEBUG - Dispatching request of type CallToolRequest
+2025-09-15 10:32:45,509 - mcp.server.lowlevel.server - DEBUG - Tool cache miss for add-note, refreshing cache
+2025-09-15 10:32:45,510 - notes-server - INFO - Listing available tools
+2025-09-15 10:32:45,510 - notes-server - DEBUG - Returning tools: ['add-note']
+2025-09-15 10:32:45,513 - notes-server - INFO - Calling tool 'add-note' with arguments: {'content': 'Note content', 'name': 'listed-note'}
+2025-09-15 10:32:45,514 - notes-server - INFO - Added new note 'listed-note' with content length: 12
+2025-09-15 10:32:45,515 - notes-server - DEBUG - Sent resource list changed notification
+2025-09-15 10:32:45,518 - mcp.server.lowlevel.server - DEBUG - Response sent
+2025-09-15 10:32:45,520 - mcp.server.lowlevel.server - DEBUG - Received message: <mcp.shared.session.RequestResponder object at 0x0000023D5814FC50>
+2025-09-15 10:32:45,520 - mcp.server.lowlevel.server - INFO - Processing request of type ListResourcesRequest
+2025-09-15 10:32:45,521 - mcp.server.lowlevel.server - DEBUG - Dispatching request of type ListResourcesRequest
+2025-09-15 10:32:45,521 - notes-server - INFO - Listing resources - current notes count: 1
+2025-09-15 10:32:45,522 - notes-server - DEBUG - Returning resources: ['Note: listed-note']
+2025-09-15 10:32:45,522 - mcp.server.lowlevel.server - DEBUG - Response sent
+2025-09-15 10:32:45,524 - notes-server - INFO - Server shutting down
