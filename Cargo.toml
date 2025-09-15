@@ -6,7 +6,7 @@ description = "智能自动化工作流系统 - 基于Rust和Model Context Proto
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/your-username/alou-rust"
 documentation = "https://docs.rs/alou"
-keywords = ["mcp", "client", "protocol", "ai", "agent", "automation", "workflow", "deepseek"]
+keywords = ["mcp", "client", "protocol", "ai", "agent"]
 categories = ["api-bindings", "development-tools", "command-line-utilities"]
 authors = ["Your Name <your.email@example.com>"]
 

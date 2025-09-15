@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use anyhow::Result;
 use tracing::info;
-use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct McpConfig {
@@ -63,7 +62,7 @@ async fn test_filesystem_tools(pool: &ConnectionPool) -> Result<()> {
     println!("{}", "=".repeat(50));
     
     let client = pool.get_connection("filesystem").await?;
-    let mut client_guard = client.lock().await;
+    let client_guard = client.lock().await;
     
     // 1. 列出允许的目录
     println!("1. 列出允许的目录:");
@@ -128,7 +127,7 @@ async fn test_memory_tools(pool: &ConnectionPool) -> Result<()> {
     println!("{}", "=".repeat(50));
     
     let client = pool.get_connection("memory").await?;
-    let mut client_guard = client.lock().await;
+    let client_guard = client.lock().await;
     
     // 1. 创建实体
     println!("1. 创建知识图谱实体:");
@@ -206,7 +205,7 @@ async fn test_payment_tools(pool: &ConnectionPool) -> Result<()> {
     println!("{}", "=".repeat(50));
     
     let client = pool.get_connection("payment-npm").await?;
-    let mut client_guard = client.lock().await;
+    let client_guard = client.lock().await;
     
     // 1. 获取网络信息
     println!("1. 获取网络信息:");

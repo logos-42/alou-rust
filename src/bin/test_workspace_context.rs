@@ -1,4 +1,4 @@
-use alou::agent::{Agent, AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
+use alou::agent::{AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
 use alou::connection_pool::ConnectionPool;
 use std::sync::Arc;
 use anyhow::Result;
