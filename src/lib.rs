@@ -1,10 +1,12 @@
-//! # Model Context Protocol (MCP) Rust SDK
+//! # Alou - 智能自动化工作流系统
 //!
-//! This SDK provides a Rust implementation of the Model Context Protocol (MCP), a protocol designed
-//! for communication between AI models and their runtime environments. The SDK supports both client
-//! and server implementations via a stdio-based transport layer.
+//! 一个基于Rust和Model Context Protocol (MCP)的智能自动化工作流系统，集成了DeepSeek API，
+//! 提供强大的上下文感知和工具调用能力。
 //!
-//! Located at https://github.com/darinkishore/mcp_client_rust
+//! 这个库提供了完整的MCP协议实现，支持AI模型与其运行环境之间的通信。
+//! 支持客户端和服务器实现，通过stdio传输层进行通信。
+//!
+//! 项目地址: https://github.com/your-username/alou-rust
 //!
 //! ## Features
 //!
