@@ -41,3 +41,14 @@ Cargo.toml.orig
 
 # 其他开发工具配置
 .repo_ignore
+
+# 特定文件
+.env.example
+.gitignore
+.repo_ignore
+Cargo.toml.orig
+agent_config.json
+mcp.json
+notes_server.log
+TODO.md
+test_mcp_file.txt
