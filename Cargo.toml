@@ -32,9 +32,10 @@ dotenv = "0.15"
 name = "agent-cli"
 path = "src/agent_cli.rs"
 
-[[bin]]
-name = "test_agent_tools"
-path = "src/bin/test_agent_tools.rs"
+# TaskFlow模块已移除，test_agent_tools不再可用
+# [[bin]]
+# name = "test_agent_tools"
+# path = "src/bin/test_agent_tools.rs"
 
 [[bin]]
 name = "list_tools"

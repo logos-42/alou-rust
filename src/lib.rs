@@ -64,8 +64,6 @@ pub mod transport;
 pub mod types;
 /// Workspace context for managing project directories
 pub mod workspace_context;
-/// Task flow management system
-pub mod task_flow;
 
 // Re-export commonly used types for convenience
 pub use error::Error;
