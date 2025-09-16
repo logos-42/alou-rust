@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
     // 获取工具schema
-    let tools_schema = {
+    let _tools_schema = {
         // 这里我们需要访问智能体的内部状态来获取工具schema
         // 由于McpAgent没有公开方法获取tools_schema，我们需要通过反射或者其他方式
         // 让我们先打印一下智能体的状态
