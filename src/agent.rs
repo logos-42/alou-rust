@@ -232,6 +232,40 @@ impl DeepSeekClient {
             max_tokens: Some(self.config.max_tokens),
             temperature: Some(self.config.temperature),
             stream: Some(false),
+            tools: None,
+        };
+        
+        let response = self.client
+            .post(&format!("{}/chat/completions", self.config.base_url))
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+            
+        if !response.status().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(Error::Other(format!("API请求失败: {}", error_text)));
+        }
+        
+        let chat_response: ChatResponse = response
+            .json()
+            .await
+            .map_err(|e| Error::Other(e.to_string()))?;
+            
+        Ok(chat_response)
+    }
+    
+    /// 发送带工具的聊天请求
+    pub async fn chat_with_tools(&self, messages: Vec<ChatMessage>, tools: Vec<serde_json::Value>) -> Result<ChatResponse, Error> {
+        let request = ChatRequest {
+            model: self.config.model.clone(),
+            messages,
+            max_tokens: Some(self.config.max_tokens),
+            temperature: Some(self.config.temperature),
+            stream: Some(false),
+            tools: Some(tools),
         };
         
         let response = self.client
@@ -303,6 +337,9 @@ struct ChatRequest {
     temperature: Option<f32>,
     /// 是否流式响应
     stream: Option<bool>,
+    /// 工具定义
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<serde_json::Value>>,
 }
 
 /// 聊天响应
@@ -659,13 +696,31 @@ impl Agent for McpAgent {
             }
         }
         
+        // 构建工具调用schema
+        let tools_schema = {
+            let context = self.context.read().await;
+            context.available_tools
+                .values()
+                .map(|tool| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": tool.input_schema
+                        }
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+        
         // 调用DeepSeek API
         {
             let mut context = self.context.write().await;
             context.state = AgentState::WaitingForAPI;
         }
         
-        let response = self.deepseek_client.chat(messages).await?;
+        let response = self.deepseek_client.chat_with_tools(messages, tools_schema).await?;
         
         if let Some(choice) = response.choices.first() {
             let response_content = choice.message.content.clone();

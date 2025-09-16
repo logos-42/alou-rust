@@ -31,3 +31,23 @@ dotenv = "0.15"
 [[bin]]
 name = "agent-cli"
 path = "src/agent_cli.rs"
+
+[[bin]]
+name = "test_agent_tools"
+path = "src/bin/test_agent_tools.rs"
+
+[[bin]]
+name = "list_tools"
+path = "src/bin/list_tools.rs"
+
+[[bin]]
+name = "test_create_directory"
+path = "src/bin/test_create_directory.rs"
+
+[[bin]]
+name = "quick_test"
+path = "src/bin/quick_test.rs"
+
+[[bin]]
+name = "test_agent_fixed"
+path = "src/bin/test_agent_fixed.rs"
