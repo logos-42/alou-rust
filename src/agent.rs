@@ -301,6 +301,9 @@ pub struct ChatMessage {
     /// 工具调用
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<ToolCallMessage>>,
+    /// 工具结果（用于tool角色）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
 }
 
 /// 工具调用消息
@@ -676,6 +679,7 @@ impl Agent for McpAgent {
                 role: "system".to_string(),
                 content: self.build_system_prompt().await,
                 tool_calls: None,
+                tool_call_id: None,
             }
         ];
         
@@ -683,23 +687,44 @@ impl Agent for McpAgent {
         {
             let context = self.context.read().await;
             for msg in &context.message_history {
-                let role = match msg.message_type {
-                    MessageType::UserInput => "user",
-                    MessageType::AgentResponse => "assistant",
+                match msg.message_type {
+                    MessageType::UserInput => {
+                        messages.push(ChatMessage {
+                            role: "user".to_string(),
+                            content: msg.content.clone(),
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                    }
+                    MessageType::AgentResponse => {
+                        // 只传递没有工具调用的Assistant消息，避免API错误
+                        if msg.tool_calls.is_empty() {
+                            messages.push(ChatMessage {
+                                role: "assistant".to_string(),
+                                content: msg.content.clone(),
+                                tool_calls: None,
+                                tool_call_id: None,
+                            });
+                        }
+                        // 跳过包含工具调用的消息，因为我们需要对应的Tool结果消息
+                        // 但当前实现无法正确处理Tool消息格式，所以跳过以避免API错误
+                    }
+                    MessageType::ToolResult => {
+                        // 工具结果作为tool消息发送给AI（符合DeepSeek API规范）
+                        // 注意：这里我们需要找到对应的工具调用ID
+                        // 由于我们无法直接关联，暂时跳过工具结果
+                        // 这样AI仍然可以基于工具调用历史做出决策
+                        continue;
+                    }
                     _ => continue,
-                };
-                messages.push(ChatMessage {
-                    role: role.to_string(),
-                    content: msg.content.clone(),
-                    tool_calls: None,
-                });
+                }
             }
         }
         
         // 构建工具调用schema
         let tools_schema = {
             let context = self.context.read().await;
-            context.available_tools
+            let schema = context.available_tools
                 .values()
                 .map(|tool| {
                     serde_json::json!({
@@ -711,7 +736,10 @@ impl Agent for McpAgent {
                         }
                     })
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            
+            tracing::debug!("发送给DeepSeek的工具schema: {}", serde_json::to_string_pretty(&schema).unwrap_or_default());
+            schema
         };
         
         // 调用DeepSeek API
@@ -728,6 +756,7 @@ impl Agent for McpAgent {
             // 调试：打印响应内容
             tracing::debug!("DeepSeek响应内容: {}", response_content);
             tracing::debug!("是否有工具调用: {:?}", choice.message.tool_calls);
+            tracing::debug!("完整响应: {}", serde_json::to_string_pretty(&choice.message).unwrap_or_default());
             
             // 检查是否有工具调用
             if let Some(tool_calls) = &choice.message.tool_calls {
@@ -743,7 +772,15 @@ impl Agent for McpAgent {
                         
                         // 解析参数
                         let args: HashMap<String, serde_json::Value> = 
-                            serde_json::from_str(arguments).unwrap_or_default();
+                            match serde_json::from_str(arguments) {
+                                Ok(args) => args,
+                                Err(e) => {
+                                    tracing::error!("工具调用参数解析失败: {}, 原始参数: {}", e, arguments);
+                                    HashMap::new()
+                                }
+                            };
+                        
+                        tracing::debug!("工具调用: {}, 参数: {:?}", name, args);
                         
                         let tool_call_info = ToolCall {
                             name: name.clone(),
@@ -788,9 +825,25 @@ impl Agent for McpAgent {
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap()
                                 .as_secs(),
-                            tool_calls: executed_tool_calls,
+                            tool_calls: executed_tool_calls.clone(),
                         };
                         context.message_history.push(tool_result_message);
+                    }
+                    
+                    // 将工具执行结果作为AI响应添加到消息历史中（不包含工具调用）
+                    {
+                        let mut context = self.context.write().await;
+                        let agent_message = AgentMessage {
+                            id: Uuid::new_v4().to_string(),
+                            message_type: MessageType::AgentResponse,
+                            content: format!("{} 工具执行结果: {}", response_content, tool_results.join("; ")),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                            tool_calls: Vec::new(), // 不保存工具调用，避免API错误
+                        };
+                        context.message_history.push(agent_message);
                     }
                     
                     // 返回工具执行结果
