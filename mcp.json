@@ -1,15 +1,6 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "command": "npx.cmd",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "C:\\",
-        "D:\\",
-        "E:\\"
-      ]
-    },
+
     "payment-npm": {
       "command": "blockchain-payment-mcp",
       "args": [],
@@ -22,13 +13,7 @@
         "MAX_TRANSACTION_VALUE": "10"
       }
     },
-    "everything": {
-      "command": "npx.cmd",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-everything"
-      ]
-    },
+    
     "memory": {
       "command": "npx.cmd",
       "args": [

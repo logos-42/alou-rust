@@ -229,29 +229,53 @@ impl McpAgent {
     /// 构建系统提示
     async fn build_system_prompt(&self) -> String {
         let context = self.context.read().await;
-        let workspace_dirs = context.workspace_context.get_directories();
-        let workspace_root = workspace_dirs
-            .first()
-            .map(|d| d.to_string_lossy().to_string())
-            .unwrap_or_else(|| ".".to_string());
+        // 使用压缩的工作空间信息
+        let workspace_root = context.workspace_context.get_compressed_info();
         
-        // 使用现有的MCP系统提示词
+        // 使用简化的MCP系统提示词
         let base_prompt = crate::prompts::get_mcp_system_prompt(&workspace_root);
         
-        // 添加可用工具信息
-        let tools_info = context.available_tools
+        // 只添加关键工具信息（最多3个最常用的）
+        let essential_tools: Vec<String> = context.available_tools
             .values()
-            .map(|tool| format!("- {}: {}", tool.name, tool.description))
-            .collect::<Vec<_>>()
-            .join("\n");
+            .take(3) // 进一步限制工具数量以减少token
+            .map(|tool| format!("{}", tool.name)) // 只显示工具名，不显示描述
+            .collect();
+        
+        let tools_info = if essential_tools.is_empty() {
+            "加载中...".to_string()
+        } else {
+            essential_tools.join(", ")
+        };
         
         format!(
-            "{}\n\n# 当前可用工具\n{}\n\n# 重要：工具使用要求\n- 你必须使用可用的工具来完成用户的请求\n- 对于文件操作（创建文件夹、创建文件等），必须调用相应的工具\n- 不要只是描述要做什么，而是实际执行工具调用\n- 每个操作都需要使用对应的工具函数\n\n# 智能体状态\n当前状态: {:?}\n当前任务: {}",
+            "{}\n\n工具: {}", // 极简格式
             base_prompt,
-            tools_info,
-            context.state,
-            context.current_task.as_deref().unwrap_or("无")
+            tools_info
         )
+    }
+    
+    /// 压缩消息历史以防止token溢出
+    async fn compress_message_history(&mut self) -> Result<(), Error> {
+        const MAX_HISTORY_SIZE: usize = 5; // 减少到5条消息
+        
+        let mut context = self.context.write().await;
+        if context.message_history.len() > MAX_HISTORY_SIZE {
+            // 保留最近的消息，删除旧的消息
+            let keep_from = context.message_history.len() - MAX_HISTORY_SIZE;
+            context.message_history.drain(0..keep_from);
+            
+            // 进一步压缩保留的消息内容
+            for message in &mut context.message_history {
+                if message.content.len() > 200 {
+                    message.content = format!("{}...[已截断]", &message.content[..200]);
+                }
+            }
+            
+            tracing::info!("压缩消息历史，保留最近{}条消息", MAX_HISTORY_SIZE);
+        }
+        
+        Ok(())
     }
 }
 
@@ -302,6 +326,9 @@ impl Agent for McpAgent {
             }
             
             tracing::info!("对话循环第 {} 轮，当前输入: {}", iteration, current_input);
+            
+            // 在每轮对话开始前压缩消息历史以防止token溢出
+            self.compress_message_history().await?;
             
             // 静默检查工具是否已加载，如果没有则等待后台加载或手动加载
             {
