@@ -6,7 +6,7 @@ set -e
 # 配置变量
 APP_NAME="alou-pay"
 APP_DIR="/opt/${APP_NAME}"
-SERVER_IP="140.179.151.58"  # 你的云服务器IP
+SERVER_IP="47.118.21.137"  # 你的云服务器IP
 BACKEND_PORT=3001
 
 echo "🚀 开始云服务器部署..."
@@ -45,7 +45,7 @@ build_application() {
     # 构建后端
     echo "📦 构建 Rust 后端..."
     source $HOME/.cargo/env 2>/dev/null || true
-    cargo build --release --bin agent-http-server
+    cargo build --release --bin agent_http_server
     
     # 构建前端
     echo "🎨 构建 Vue 前端..."
@@ -64,7 +64,7 @@ deploy_files() {
     sudo chown -R $USER:$USER ${APP_DIR}
     
     # 部署后端
-    cp target/release/agent-http-server ${APP_DIR}/backend/
+    cp target/release/agent_http_server ${APP_DIR}/backend/
     cp agent_config.json ${APP_DIR}/backend/ 2>/dev/null || echo "⚠️ 使用默认agent配置"
     cp mcp.json ${APP_DIR}/backend/ 2>/dev/null || echo "⚠️ 使用默认mcp配置"
     
@@ -72,7 +72,7 @@ deploy_files() {
     cat > ${APP_DIR}/backend/.env << EOF
 PORT=${BACKEND_PORT}
 RUST_LOG=info
-DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-your-api-key-here}
+DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-69244d21fb1f4481bd4b36ed9bb59b18}
 EOF
     
     # 部署前端
@@ -90,7 +90,7 @@ configure_services() {
 module.exports = {
   apps: [{
     name: 'alou-backend',
-    script: '${APP_DIR}/backend/agent-http-server',
+    script: '${APP_DIR}/backend/agent_http_server',
     cwd: '${APP_DIR}/backend',
     env_file: '${APP_DIR}/backend/.env',
     instances: 1,

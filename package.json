@@ -1,0 +1,29 @@
+{
+  "name": "alou-rust-agent-worker",
+  "version": "0.1.4",
+  "description": "Alou Rust Agent running on Cloudflare Workers",
+  "main": "pkg/alou.js",
+  "scripts": {
+    "build": "wasm-pack build --target bundler --out-dir pkg --features workers",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:production": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "tail": "wrangler tail",
+    "setup": "./scripts/setup_workers.sh"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {},
+  "keywords": [
+    "rust",
+    "wasm",
+    "cloudflare-workers",
+    "ai",
+    "agent",
+    "mcp"
+  ],
+  "author": "liuyuanjie <2844169590@qq.com>",
+  "license": "MIT OR Apache-2.0"
+}

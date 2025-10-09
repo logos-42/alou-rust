@@ -151,6 +151,8 @@ mod tests {
     use futures::{Stream, StreamExt};
     use std::{pin::Pin, time::Duration};
     use tokio::sync::{broadcast, mpsc};
+    use crate::Notification;
+    use crate::protocol::RequestId;
 
     struct TestHandler {
         init_delay: Duration,

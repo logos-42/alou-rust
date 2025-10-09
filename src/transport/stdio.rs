@@ -59,7 +59,17 @@ where
                         }
                         let message = match serde_json::from_str::<Message>(trimmed) {
                             Ok(m) => Ok(m),
-                            Err(err) => Err(Error::Serialization(err.to_string())),
+                            Err(err) => {
+                                // 检查是否是JSON-RPC消息格式
+                                if trimmed.starts_with('{') && trimmed.ends_with('}') {
+                                    tracing::warn!("Failed to parse JSON message: {} - Raw content: {}", err, trimmed);
+                                    Err(Error::Serialization(format!("{} - Raw: {}", err, trimmed)))
+                                } else {
+                                    // 非JSON格式的消息（可能是日志），直接忽略
+                                    tracing::debug!("Ignoring non-JSON message: {}", trimmed);
+                                    continue;
+                                }
+                            },
                         };
 
                         let _ = sender_clone.send(message);

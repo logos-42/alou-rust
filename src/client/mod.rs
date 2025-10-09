@@ -140,9 +140,9 @@ impl Client {
         // Send request
         self.transport.send(Message::Request(request)).await?;
 
-        // Wait for a matching response (by request ID) or a 30s timeout
+        // Wait for a matching response (by request ID) or a 120s timeout
         let mut rx = self.response_receiver.lock().await;
-        match tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        match tokio::time::timeout(std::time::Duration::from_secs(120), async {
             while let Some(message) = rx.recv().await {
                 match message {
                     Message::Response(response) if response.id == id => {
@@ -184,9 +184,9 @@ impl Client {
         {
             Ok(result) => result,
             Err(_) => {
-                tracing::error!("Request to '{}' timed out after 30 seconds", method);
+                tracing::error!("Request to '{}' timed out after 120 seconds", method);
                 Err(Error::Other(format!(
-                    "Request to '{method}' timed out after 30 seconds"
+                    "Request to '{method}' timed out after 120 seconds"
                 )))
             }
         }

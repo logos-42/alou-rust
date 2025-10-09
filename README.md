@@ -1,6 +1,6 @@
 # Alou Rust - 自动化工作流智能体
 
-一个基于Rust和Model Context Protocol (MCP)的智能支付区块链自动化工作流系统，集成了DeepSeek API，提供强大的上下文感知和工具调用能力。
+一个基于Rust和Model Context Protocol (MCP)的智能自动化工作流系统，集成了DeepSeek API，提供强大的上下文感知和工具调用能力。
 
 ## ✨ 最新更新
 
@@ -202,7 +202,14 @@ export RUST_LOG="info"  # debug, info, warn, error
 ```json
 {
   "mcpServers": {
-    
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/path/to/allowed/directory"
+      ]
+    },
     "memory": {
       "command": "npx",
       "args": [
@@ -218,17 +225,15 @@ export RUST_LOG="info"  # debug, info, warn, error
 ```json
 {
   "mcpServers": {
-   "payment-npm": {
-      "command": "blockchain-payment-mcp",
-      "args": [],
-      "env": {
-        "PRIVATE_KEY": "key",
-        "DEFAULT_NETWORK": "base_sepolia",
-        "DEBUG": "false",
-        "LOG_LEVEL": "ERROR",
-        "PYTHONUNBUFFERED": "1",
-        "MAX_TRANSACTION_VALUE": "10"
-      }
+    "filesystem": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:\\",
+        "D:\\",
+        "E:\\"
+      ]
     },
     "memory": {
       "command": "npx.cmd",

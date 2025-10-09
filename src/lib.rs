@@ -65,6 +65,16 @@ pub mod types;
 /// Workspace context for managing project directories
 pub mod workspace_context;
 
+// Authentication and database modules
+/// Data models for users and sessions
+pub mod models;
+/// Database connection and management
+pub mod db;
+/// Authentication logic (JWT, OAuth, middleware)
+pub mod auth;
+/// API endpoints
+pub mod api;
+
 // Re-export commonly used types for convenience
 pub use error::Error;
 pub use protocol::{Notification, Request, Response};
