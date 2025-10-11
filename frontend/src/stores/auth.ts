@@ -29,7 +29,84 @@ export const useAuthStore = defineStore('auth', () => {
   async function init() {
     const token = Cookies.get('access_token')
     if (token) {
-      await checkAuth()
+      // 检查是否是钱包登录
+      const walletAddress = localStorage.getItem('wallet_address')
+      if (walletAddress && token.startsWith('wallet_')) {
+        // 恢复钱包登录状态
+        user.value = {
+          id: walletAddress,
+          email: walletAddress + '@wallet.local',
+          name: walletAddress.slice(0, 6) + '...' + walletAddress.slice(-4),
+          avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${walletAddress}`,
+          created_at: new Date().toISOString()
+        }
+        isAuthenticated.value = true
+      } else {
+        await checkAuth()
+      }
+    }
+  }
+
+  /**
+   * Login with crypto wallet (private key or mnemonic)
+   */
+  async function loginWithWallet(credentials: { privateKey?: string; mnemonic?: string }) {
+    try {
+      isLoading.value = true
+      error.value = null
+
+      // 在实际应用中，这里应该使用Web3库（如ethers.js）来验证钱包凭证
+      // 并生成钱包地址作为用户标识
+      
+      // 暂时模拟登录成功，将凭证存储在localStorage中
+      // 注意：在生产环境中不应该直接存储私钥或助记词
+      
+      let address = ''
+      if (credentials.privateKey) {
+        // 这里应该使用ethers.js从私钥派生地址
+        // import { ethers } from 'ethers'
+        // const wallet = new ethers.Wallet(credentials.privateKey)
+        // address = wallet.address
+        
+        // 临时模拟地址生成
+        address = '0x' + credentials.privateKey.slice(-40)
+        localStorage.setItem('wallet_type', 'privateKey')
+      } else if (credentials.mnemonic) {
+        // 这里应该使用ethers.js从助记词派生地址
+        // const wallet = ethers.Wallet.fromMnemonic(credentials.mnemonic)
+        // address = wallet.address
+        
+        // 临时模拟地址生成
+        const words = credentials.mnemonic.split(/\s+/)
+        address = '0x' + words.join('').slice(0, 40).padEnd(40, '0')
+        localStorage.setItem('wallet_type', 'mnemonic')
+      } else {
+        throw new Error('需要提供私钥或助记词')
+      }
+
+      // 创建模拟的token和用户信息
+      const mockToken = 'wallet_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+      const mockUser: User = {
+        id: address,
+        email: address + '@wallet.local',
+        name: address.slice(0, 6) + '...' + address.slice(-4),
+        avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+        created_at: new Date().toISOString()
+      }
+
+      // 保存token和用户信息
+      Cookies.set('access_token', mockToken, { expires: 7 })
+      localStorage.setItem('wallet_address', address)
+      
+      user.value = mockUser
+      isAuthenticated.value = true
+
+      return { user: mockUser, token: mockToken }
+    } catch (err: any) {
+      error.value = err.message || '钱包登录失败'
+      throw err
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -176,6 +253,8 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = false
       Cookies.remove('access_token')
       Cookies.remove('refresh_token')
+      localStorage.removeItem('wallet_address')
+      localStorage.removeItem('wallet_type')
     }
   }
 
@@ -198,6 +277,7 @@ export const useAuthStore = defineStore('auth', () => {
     userAvatar,
     // Actions
     init,
+    loginWithWallet,
     loginWithGoogle,
     handleGoogleCallback,
     checkAuth,

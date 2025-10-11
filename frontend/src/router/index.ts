@@ -21,13 +21,13 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: false },
     },
     {
       path: '/wallet',
       name: 'wallet',
       component: () => import('../views/WalletView.vue').catch(() => import('../views/HomeView.vue')),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: false },
     },
     {
       path: '/about',

@@ -43,9 +43,6 @@ rand = "0.8.5"
 name = "agent-cli"
 path = "src/agent_cli.rs"
 
-
-
-
 [[bin]]
 name = "list_tools"
 path = "src/bin/list_tools.rs"

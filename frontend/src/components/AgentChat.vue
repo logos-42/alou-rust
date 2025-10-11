@@ -18,6 +18,32 @@
             <span v-if="isDarkMode">🌞</span>
             <span v-else>🌙</span>
           </button>
+          
+          <button 
+            v-if="!authStore.isAuthenticated" 
+            @click="goToLogin" 
+            class="login-btn"
+          >
+            <span>🔐</span>
+            <span>登录</span>
+          </button>
+          
+          <div v-else class="user-menu">
+            <button @click="toggleUserMenu" class="user-btn">
+              <span>👤</span>
+              <span>{{ authStore.userName }}</span>
+            </button>
+            <div v-if="showUserMenu" class="user-dropdown">
+              <button @click="goToWallet" class="menu-item">
+                <span>💰</span>
+                <span>钱包管理</span>
+              </button>
+              <button @click="handleLogout" class="menu-item">
+                <span>🚪</span>
+                <span>退出登录</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </nav>
@@ -120,6 +146,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 interface Message {
   id: string
@@ -148,6 +175,8 @@ const isDarkMode = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const messageInput = ref<HTMLTextAreaElement>()
 const router = useRouter()
+const authStore = useAuthStore()
+const showUserMenu = ref(false)
 
 // API配置 - 适配云服务器
 const API_BASE_URL = import.meta.env.PROD 
@@ -283,6 +312,25 @@ function newPage() {
 
 function toggleDarkMode() {
   isDarkMode.value = !isDarkMode.value
+}
+
+function goToLogin() {
+  router.push('/login')
+}
+
+function goToWallet() {
+  showUserMenu.value = false
+  router.push('/wallet')
+}
+
+function toggleUserMenu() {
+  showUserMenu.value = !showUserMenu.value
+}
+
+async function handleLogout() {
+  showUserMenu.value = false
+  await authStore.logout()
+  // 不需要跳转，因为主页不需要登录
 }
 
 function newLine() {
@@ -474,6 +522,85 @@ function scrollToBottom() {
 .theme-toggle:hover {
   background: var(--border-color);
   transform: scale(1.05);
+}
+
+.login-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.login-btn:hover {
+  background: var(--primary-hover);
+  transform: scale(1.05);
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-btn {
+  background: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.user-btn:hover {
+  background: var(--border-color);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+.menu-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: var(--secondary-color);
+}
+
+.menu-item:not(:last-child) {
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* 聊天容器 */
