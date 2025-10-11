@@ -1,5 +1,4 @@
-import { globalIgnores } from 'eslint/config'
-import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
+import vueTsEslintConfig from '@vue/eslint-config-typescript'
 import pluginVue from 'eslint-plugin-vue'
 import pluginVitest from '@vitest/eslint-plugin'
 import pluginPlaywright from 'eslint-plugin-playwright'
@@ -11,12 +10,12 @@ import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 // configureVueProject({ scriptLangs: ['ts', 'tsx'] })
 // More info at https://github.com/vuejs/eslint-config-typescript/#advanced-setup
 
-export default defineConfigWithVueTs(
+export default [
   {
     ignores: ['**/dist/**', '**/dist-ssr/**', '**/coverage/**'],
   },
-  pluginVue.configs['flat/essential'],
-  vueTsConfigs.recommended,
+  ...pluginVue.configs['flat/essential'],
+  ...vueTsEslintConfig(),
   {
     ...pluginVitest.configs.recommended,
     files: ['src/**/__tests__/*'],
@@ -27,4 +26,4 @@ export default defineConfigWithVueTs(
   },
   ...pluginOxlint.configs['flat/recommended'],
   skipFormatting,
-)
+]

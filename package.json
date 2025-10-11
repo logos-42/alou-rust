@@ -15,7 +15,16 @@
   "devDependencies": {
     "wrangler": "^3.0.0"
   },
-  "dependencies": {},
+  "dependencies": {
+    "pinia": "^3.0.3",
+    "vue": "^3.5.18",
+    "vue-router": "^4.5.1",
+    "axios": "^1.6.0",
+    "js-cookie": "^3.0.5",
+    "@wagmi/core": "^2.13.0",
+    "@wagmi/connectors": "^5.0.0",
+    "viem": "^2.18.0"
+  },
   "keywords": [
     "rust",
     "wasm",
@@ -24,6 +33,6 @@
     "agent",
     "mcp"
   ],
-  "author": "liuyuanjie <2844169590@qq.com>",
+  "author": "liuyuanjie <yuanjieliu65@gmail.com>",
   "license": "MIT OR Apache-2.0"
 }
