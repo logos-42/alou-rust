@@ -401,12 +401,19 @@ function scrollToBottom() {
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   color: var(--text-primary);
   transition: all 0.3s ease;
+  overflow: hidden;
 }
 
 /* Dark模式变量 */
@@ -425,16 +432,18 @@ function scrollToBottom() {
 
 /* 顶部导航 */
 .top-nav {
+  width: 100%;
   background: var(--background);
   border-bottom: 1px solid var(--border-color);
-  padding: 1rem 2rem;
+  padding: 1rem 0;
   box-shadow: var(--shadow);
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .nav-content {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 0 clamp(1rem, 3vw, 3rem);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -608,6 +617,7 @@ function scrollToBottom() {
 
 /* 聊天容器 */
 .chat-container {
+  width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -617,6 +627,7 @@ function scrollToBottom() {
 
 /* 消息区域 */
 .messages-area {
+  width: 100%;
   flex: 1;
   overflow-y: auto;
   scroll-behavior: smooth;
@@ -633,8 +644,10 @@ function scrollToBottom() {
 }
 
 .welcome-content {
-  max-width: 600px;
+  max-width: 800px;
+  width: 100%;
   text-align: center;
+  padding: 0 2rem;
 }
 
 .welcome-icon {
@@ -671,9 +684,11 @@ function scrollToBottom() {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-top: 2rem;
+  max-width: 800px;
+  width: 100%;
 }
 
 .quick-action-btn {
@@ -708,6 +723,18 @@ function scrollToBottom() {
   display: flex;
   animation: fadeInUp 0.3s ease;
   padding: 2rem 0;
+  min-height: 100px;
+}
+
+.message-wrapper.user {
+  background: var(--background);
+  justify-content: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.message-wrapper.assistant {
+  background: var(--surface);
+  justify-content: center;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -715,26 +742,18 @@ function scrollToBottom() {
   border-bottom: none;
 }
 
-.message-wrapper.user {
-  background: var(--background);
-  justify-content: center;
-}
-
-.message-wrapper.assistant {
-  background: var(--surface);
-  justify-content: center;
-}
-
 .message-bubble {
   width: 100%;
-  max-width: 800px;
-  padding: 0 2rem;
+  max-width: 100%;
+  padding: 0 clamp(1rem, 5vw, 4rem);
   word-wrap: break-word;
 }
 
 .message-content {
-  line-height: 1.6;
-  font-size: 0.95rem;
+  line-height: 1.8;
+  font-size: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
 .message-content :deep(strong) {
@@ -819,17 +838,19 @@ function scrollToBottom() {
 
 /* 输入区域 */
 .input-area {
+  width: 100%;
   background: var(--background);
   border-top: 1px solid var(--border-color);
-  padding: 1.25rem 1rem;
+  padding: 1.25rem 0;
   display: flex;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .input-container {
   width: 100%;
-  max-width: 900px;
-  padding: 0 1rem;
+  max-width: 100%;
+  padding: 0 clamp(1rem, 5vw, 4rem);
 }
 
 .input-wrapper {
@@ -1035,6 +1056,12 @@ function scrollToBottom() {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+  .message-content {
+    max-width: 100%;
+  }
+}
+
 @media (max-width: 768px) {
   .top-nav {
     padding: 1rem;
@@ -1072,9 +1099,17 @@ function scrollToBottom() {
   .message-bubble {
     padding: 0 1rem;
   }
+
+  .message-content {
+    font-size: 0.95rem;
+  }
   
   .input-area {
     padding: 1rem;
+  }
+
+  .input-container {
+    padding: 0 1rem;
   }
 
   .quick-actions {

@@ -3,7 +3,9 @@ import AgentChat from '../components/AgentChat.vue'
 </script>
 
 <template>
-  <main>
-    <AgentChat />
-  </main>
+  <AgentChat />
 </template>
+
+<style scoped>
+/* No styles needed - AgentChat handles its own sizing */
+</style>
