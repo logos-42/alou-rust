@@ -31,7 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (token) {
       // 检查是否是钱包登录
       const walletAddress = localStorage.getItem('wallet_address')
-      if (walletAddress && token.startsWith('wallet_')) {
+      if (walletAddress && (token.startsWith('wallet_') || token.startsWith('web3_'))) {
         // 恢复钱包登录状态
         user.value = {
           id: walletAddress,
@@ -48,7 +48,49 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Login with crypto wallet (private key or mnemonic)
+   * Login with Web3 wallet (MetaMask, WalletConnect, etc.)
+   */
+  async function loginWithWeb3Wallet(walletInfo: { 
+    address: string
+    chainId: string
+    walletType: string
+  }) {
+    try {
+      isLoading.value = true
+      error.value = null
+
+      const { address, chainId, walletType } = walletInfo
+
+      // 创建用户信息
+      const mockToken = 'web3_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+      const mockUser: User = {
+        id: address.toLowerCase(),
+        email: address.toLowerCase() + '@wallet.local',
+        name: address.slice(0, 6) + '...' + address.slice(-4),
+        avatar_url: `https://api.dicebear.com/7.x/identicon/svg?seed=${address}`,
+        created_at: new Date().toISOString()
+      }
+
+      // 保存token和用户信息
+      Cookies.set('access_token', mockToken, { expires: 7 })
+      localStorage.setItem('wallet_address', address)
+      localStorage.setItem('wallet_type', walletType)
+      localStorage.setItem('wallet_chain_id', chainId)
+      
+      user.value = mockUser
+      isAuthenticated.value = true
+
+      return { user: mockUser, token: mockToken }
+    } catch (err: any) {
+      error.value = err.message || 'Web3钱包登录失败'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Login with crypto wallet (private key or mnemonic) - Legacy method
    */
   async function loginWithWallet(credentials: { privateKey?: string; mnemonic?: string }) {
     try {
@@ -255,6 +297,7 @@ export const useAuthStore = defineStore('auth', () => {
       Cookies.remove('refresh_token')
       localStorage.removeItem('wallet_address')
       localStorage.removeItem('wallet_type')
+      localStorage.removeItem('wallet_chain_id')
     }
   }
 
@@ -277,6 +320,7 @@ export const useAuthStore = defineStore('auth', () => {
     userAvatar,
     // Actions
     init,
+    loginWithWeb3Wallet,
     loginWithWallet,
     loginWithGoogle,
     handleGoogleCallback,

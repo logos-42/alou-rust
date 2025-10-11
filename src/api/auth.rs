@@ -9,6 +9,7 @@ use warp::{reject, reply, Rejection, Reply};
 
 use crate::auth::google_oauth::GoogleOAuth;
 use crate::auth::jwt::{generate_token, verify_token};
+use crate::auth::wallet::{WalletNonce, verify_signature};
 use crate::models::session::Session;
 use crate::models::user::{CreateUser, PublicUser, User};
 
@@ -49,6 +50,24 @@ pub struct VerifyResponse {
 
 #[derive(Debug, Serialize)]
 pub struct MessageResponse {
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WalletNonceRequest {
+    pub address: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WalletNonceResponse {
+    pub nonce: String,
+    pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WalletVerifyRequest {
+    pub address: String,
+    pub signature: String,
     pub message: String,
 }
 
@@ -307,6 +326,144 @@ pub async fn logout_all_handler(user_id: Uuid, pool: PgPool) -> Result<impl Repl
 
     let response = MessageResponse {
         message: "Logged out from all devices".to_string(),
+    };
+
+    Ok(reply::json(&response))
+}
+
+// ============================================
+// Wallet Authentication Handlers
+// ============================================
+
+/// POST /api/auth/wallet/nonce
+/// Generate a nonce for wallet authentication
+pub async fn wallet_nonce_handler(
+    body: WalletNonceRequest,
+) -> Result<impl Reply, Rejection> {
+    // Validate address format
+    let address = body.address.to_lowercase();
+    if !address.starts_with("0x") || address.len() != 42 {
+        return Err(reject::custom(ApiError {
+            message: "Invalid Ethereum address format".to_string(),
+        }));
+    }
+
+    // Generate nonce
+    let wallet_nonce = WalletNonce::new(address);
+    
+    let response = WalletNonceResponse {
+        nonce: wallet_nonce.nonce.clone(),
+        message: format!(
+            "Please sign this message to authenticate:\n\n{}",
+            wallet_nonce.get_message()
+        ),
+    };
+
+    Ok(reply::json(&response))
+}
+
+/// POST /api/auth/wallet/verify
+/// Verify wallet signature and authenticate user
+pub async fn wallet_verify_handler(
+    body: WalletVerifyRequest,
+    pool: PgPool,
+    jwt_secret: String,
+    jwt_expiration_hours: i64,
+    refresh_token_expiration_days: i64,
+) -> Result<impl Reply, Rejection> {
+    // Validate address format
+    let address = body.address.to_lowercase();
+    if !address.starts_with("0x") || address.len() != 42 {
+        return Err(reject::custom(ApiError {
+            message: "Invalid Ethereum address format".to_string(),
+        }));
+    }
+
+    // Verify signature
+    let signature_valid = verify_signature(&body.message, &body.signature, &address)
+        .map_err(|e| {
+            reject::custom(ApiError {
+                message: format!("Signature verification failed: {}", e),
+            })
+        })?;
+
+    if !signature_valid {
+        return Err(reject::custom(ApiError {
+            message: "Invalid signature".to_string(),
+        }));
+    }
+
+    // Find or create user by wallet address
+    let email = format!("{}@wallet.local", address);
+    
+    let user = match User::find_by_email(&pool, &email).await {
+        Ok(Some(existing_user)) => {
+            // Update last login
+            User::update_last_login(&pool, existing_user.id)
+                .await
+                .map_err(|e| {
+                    reject::custom(ApiError {
+                        message: format!("Failed to update last login: {}", e),
+                    })
+                })?;
+            existing_user
+        }
+        Ok(None) => {
+            // Create new user with wallet address
+            let new_user = CreateUser {
+                email: email.clone(),
+                google_id: None,
+                name: Some(format!("{}...{}", &address[0..6], &address[address.len()-4..])),
+                avatar_url: Some(format!(
+                    "https://api.dicebear.com/7.x/identicon/svg?seed={}",
+                    address
+                )),
+            };
+
+            User::create(&pool, new_user).await.map_err(|e| {
+                reject::custom(ApiError {
+                    message: format!("Failed to create user: {}", e),
+                })
+            })?
+        }
+        Err(e) => {
+            return Err(reject::custom(ApiError {
+                message: format!("Database error: {}", e),
+            }));
+        }
+    };
+
+    // Generate JWT tokens
+    let access_token = generate_token(user.id, &user.email, &jwt_secret, jwt_expiration_hours)
+        .map_err(|e| {
+            reject::custom(ApiError {
+                message: format!("Failed to generate token: {}", e),
+            })
+        })?;
+
+    let refresh_token =
+        generate_token(user.id, &user.email, &jwt_secret, refresh_token_expiration_days * 24)
+            .map_err(|e| {
+                reject::custom(ApiError {
+                    message: format!("Failed to generate refresh token: {}", e),
+                })
+            })?;
+
+    // Store refresh token in database
+    Session::create(&pool, user.id, refresh_token.clone(), refresh_token_expiration_days)
+        .await
+        .map_err(|e| {
+            reject::custom(ApiError {
+                message: format!("Failed to store session: {}", e),
+            })
+        })?;
+
+    // Return tokens and user info
+    let response = AuthResponse {
+        access_token,
+        refresh_token,
+        expires_in: jwt_expiration_hours * 3600,
+        user: user.into(),
     };
 
     Ok(reply::json(&response))

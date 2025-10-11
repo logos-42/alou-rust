@@ -50,16 +50,26 @@
 
     <!-- 主聊天容器 -->
     <div class="chat-container">
-      <div class="chat-window">
-        <!-- 消息区域 -->
-        <div class="messages-area" ref="messagesContainer">
+      <!-- 消息区域 -->
+      <div class="messages-area" ref="messagesContainer">
           <div v-if="messages.length === 0" class="welcome-screen">
             <div class="welcome-content">
               <div class="welcome-icon">🚀</div>
               <h2>欢迎使用Alou智能助手</h2>
               <p>我是区块链支付的AI助手，很高兴为您提供智能服务。</p>
-              <div class="feature-badges">
-            
+              <div class="quick-actions">
+                <button class="quick-action-btn" @click="sendQuickMessage('帮我查询钱包余额')">
+                  <span class="action-icon">💰</span>
+                  <span>查询钱包余额</span>
+                </button>
+                <button class="quick-action-btn" @click="sendQuickMessage('如何发送代币？')">
+                  <span class="action-icon">📤</span>
+                  <span>发送代币</span>
+                </button>
+                <button class="quick-action-btn" @click="sendQuickMessage('查看交易历史')">
+                  <span class="action-icon">📊</span>
+                  <span>交易历史</span>
+                </button>
               </div>
             </div>
           </div>
@@ -92,50 +102,38 @@
               </div>
             </div>
           </div>
-        </div>
+      </div>
 
-        <!-- 输入区域 -->
-        <div class="input-area">
-          <div class="input-container">
-            <div class="input-wrapper">
-              <textarea
-                v-model="currentMessage"
-                @keydown.enter.exact.prevent="sendMessage"
-                @keydown.enter.shift.exact="newLine"
-                @input="adjustTextareaHeight"
-                placeholder="输入您的问题...（Enter发送，Shift+Enter换行）"
-                ref="messageInput"
-                class="message-input"
-                rows="1"
-              ></textarea>
-              
-              <div class="button-group">
-                <button 
-                  @click="newPage" 
-                  class="new-btn"
-                  title="新建页面"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z"/>
-                  </svg>
-                </button>
-                
-                <button 
-                  @click="sendMessage" 
-                  :disabled="!currentMessage.trim()"
-                  class="send-btn"
-                  title="发送消息"
-                >
-                  <svg v-if="!isLoading" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                  </svg>
-                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="loading-icon">
-                    <path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
+      <!-- 输入区域 - 固定在底部 -->
+      <div class="input-area">
+        <div class="input-container">
+          <div class="input-wrapper">
+            <textarea
+              v-model="currentMessage"
+              @keydown.enter.exact.prevent="sendMessage"
+              @keydown.enter.shift.exact="newLine"
+              @input="adjustTextareaHeight"
+              placeholder="输入您的问题...（Enter发送，Shift+Enter换行）"
+              ref="messageInput"
+              class="message-input"
+              rows="1"
+            ></textarea>
             
+            <div class="button-group">
+              <button 
+                @click="sendMessage" 
+                :disabled="!currentMessage.trim() || isLoading"
+                class="send-btn"
+                title="发送消息"
+              >
+                <svg v-if="!isLoading" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="loading-icon">
+                  <path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -331,6 +329,11 @@ async function handleLogout() {
   showUserMenu.value = false
   await authStore.logout()
   // 不需要跳转，因为主页不需要登录
+}
+
+function sendQuickMessage(message: string) {
+  currentMessage.value = message
+  sendMessage()
 }
 
 function newLine() {
@@ -607,50 +610,50 @@ function scrollToBottom() {
 .chat-container {
   flex: 1;
   display: flex;
-  justify-content: center;
-  padding: 2rem;
-  overflow: hidden;
-}
-
-.chat-window {
-  width: 100%;
-  max-width: 800px;
-  background: var(--background);
-  border-radius: 1.5rem;
-  box-shadow: var(--shadow-lg);
-  display: flex;
   flex-direction: column;
-  height: 100%;
   overflow: hidden;
+  background: var(--surface);
 }
 
 /* 消息区域 */
 .messages-area {
   flex: 1;
   overflow-y: auto;
-  padding: 2rem;
   scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
 }
 
 .welcome-screen {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  text-align: center;
+  padding: 2rem;
 }
 
 .welcome-content {
-  max-width: 500px;
+  max-width: 600px;
+  text-align: center;
 }
 
 .welcome-icon {
   font-size: 4rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .welcome-content h2 {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 700;
   margin: 0 0 1rem 0;
   background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
@@ -660,61 +663,73 @@ function scrollToBottom() {
 }
 
 .welcome-content p {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   color: var(--text-secondary);
-  margin: 0 0 2rem 0;
+  margin: 0 0 2.5rem 0;
   line-height: 1.6;
 }
 
-.feature-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  justify-content: center;
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
 }
 
-.badge {
-  background: var(--secondary-color);
-  color: var(--text-secondary);
-  padding: 0.5rem 1rem;
-  border-radius: 2rem;
-  font-size: 0.875rem;
+.quick-action-btn {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-primary);
+  font-size: 0.95rem;
   font-weight: 500;
+}
+
+.quick-action-btn:hover {
+  background: var(--secondary-color);
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.action-icon {
+  font-size: 2rem;
 }
 
 /* 消息样式 */
 .message-wrapper {
-  margin-bottom: 1.5rem;
   display: flex;
   animation: fadeInUp 0.3s ease;
+  padding: 2rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.message-wrapper:last-child {
+  border-bottom: none;
 }
 
 .message-wrapper.user {
-  justify-content: flex-end;
+  background: var(--background);
+  justify-content: center;
 }
 
 .message-wrapper.assistant {
-  justify-content: flex-start;
+  background: var(--surface);
+  justify-content: center;
 }
 
 .message-bubble {
-  max-width: 75%;
-  padding: 1rem 1.25rem;
-  border-radius: 1.5rem;
-  position: relative;
+  width: 100%;
+  max-width: 800px;
+  padding: 0 2rem;
   word-wrap: break-word;
-}
-
-.message-wrapper.user .message-bubble {
-  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
-  color: white;
-  border-bottom-right-radius: 0.5rem;
-}
-
-.message-wrapper.assistant .message-bubble {
-  background: var(--secondary-color);
-  color: var(--text-primary);
-  border-bottom-left-radius: 0.5rem;
 }
 
 .message-content {
@@ -806,27 +821,33 @@ function scrollToBottom() {
 .input-area {
   background: var(--background);
   border-top: 1px solid var(--border-color);
-  padding: 1.5rem 2rem;
+  padding: 1.25rem 1rem;
+  display: flex;
+  justify-content: center;
 }
 
 .input-container {
-  max-width: 100%;
+  width: 100%;
+  max-width: 900px;
+  padding: 0 1rem;
 }
 
 .input-wrapper {
   display: flex;
-  gap: 0.75rem;
+  gap: 1rem;
   align-items: flex-end;
-  background: var(--surface);
+  background: var(--background);
   border: 2px solid var(--border-color);
-  border-radius: 1.5rem;
-  padding: 0.75rem 1rem;
+  border-radius: 1.75rem;
+  padding: 1rem 1.5rem;
   transition: all 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  min-height: 64px;
 }
 
 .input-wrapper:focus-within {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
 }
 
 .message-input {
@@ -837,10 +858,11 @@ function scrollToBottom() {
   resize: none;
   font-family: inherit;
   font-size: 1rem;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--text-primary);
-  min-height: 24px;
-  max-height: 120px;
+  min-height: 48px;
+  max-height: 200px;
+  padding: 8px 0;
 }
 
 .message-input::placeholder {
@@ -849,43 +871,23 @@ function scrollToBottom() {
 
 .button-group {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
-}
-
-.new-btn {
-  background: var(--secondary-color);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.new-btn:hover {
-  background: var(--border-color);
-  transform: scale(1.05);
 }
 
 .send-btn {
   background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 50%;
+  border-radius: 0.875rem;
   width: 44px;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
 .send-btn:hover:not(:disabled) {
@@ -895,6 +897,7 @@ function scrollToBottom() {
 
 .send-btn:disabled {
   background: var(--text-secondary);
+  opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
@@ -1038,47 +1041,44 @@ function scrollToBottom() {
   }
   
   .nav-content {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
+    gap: 0.75rem;
   }
   
   .logo-section {
-    justify-content: center;
+    flex: 1;
   }
   
   .app-title {
     font-size: 1.25rem;
   }
-  
-  .chat-container {
-    padding: 1rem;
+
+  .nav-controls {
+    gap: 0.5rem;
   }
   
-  .chat-window {
-    border-radius: 1rem;
+  .status-badge span {
+    display: none;
+  }
+
+  .login-btn span:last-child,
+  .user-btn span:last-child {
+    display: none;
   }
   
-  .messages-area {
-    padding: 1rem;
+  .message-wrapper {
+    padding: 1.5rem 0;
   }
-  
+
   .message-bubble {
-    max-width: 85%;
+    padding: 0 1rem;
   }
   
   .input-area {
     padding: 1rem;
   }
-  
-  .input-options {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  
-  .option-toggle {
-    justify-content: center;
+
+  .quick-actions {
+    grid-template-columns: 1fr;
   }
 }
 
