@@ -30,7 +30,7 @@ warp = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
 
 # 数据库
-sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres", "chrono", "uuid"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid"] }
 
 # 认证
 oauth2 = "4.4"

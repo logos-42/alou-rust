@@ -77,7 +77,7 @@ impl InvitationCode {
         num: usize,
     ) -> Result<Vec<String>, sqlx::Error> {
         let mut codes = Vec::with_capacity(num);
-        let mut tx = pool.begin().await?;
+        let tx = pool.begin().await?;
 
         for _ in 0..num {
             let code = generate_invitation_code();
