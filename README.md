@@ -1,9 +1,13 @@
-# Alou Rust - 自动化工作流智能体
+# Alou Rust - 高性能AI智能体
 
-一个基于Rust和Model Context Protocol (MCP)的智能自动化工作流系统，集成了DeepSeek API，提供强大的上下文感知和工具调用能力。
+这是Alou3项目的Rust语言重新实现版本，提供更快的运行速度和更好的性能。该项目是一个在终端运行的AI智能体，支持MCP工具集成和DeepSeek API。
 
 ## ✨ 最新更新
 
+- **✅ 架构重构**：从复杂的McpAgent重构为简化的Adapter架构
+- **✅ 代码简化**：代码量从~1468行减少到~240行（减少83%）
+- **✅ DeepSeek API集成**：直接HTTP调用DeepSeek API，提升响应速度
+- **✅ 性能优化**：移除复杂逻辑，专注核心功能
 - **✅ 工具调用修复**：完全修复了智能体工具调用解析和执行逻辑
 - **✅ 后台加载优化**：实现了静默的后台MCP服务器加载，提升启动速度
 - **✅ Windows兼容性**：优化了Windows系统下的MCP服务器配置
@@ -35,94 +39,42 @@
 
 ## 🏗️ 架构设计
 
+### 新架构（简化版）
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   DeepSeek API  │    │   MCP Agent      │    │  MCP Servers    │
+│   DeepSeek API  │    │   Adapter        │    │  MCP Servers    │
 │                 │◄──►│                  │◄──►│                 │
-│ • Chat API      │    │ • Context Mgmt   │    │ • Filesystem    │
-│ • Tool Calling  │    │ • Tool Discovery │    │ • Memory        │
-│ • Streaming     │    │ • Workflow Exec  │    │ • Network       │
+│ • HTTP Client   │    │ • Context Mgmt   │    │ • Memory        │
+│ • Direct Call   │    │ • Config Source  │    │ • Payment       │
+│ • Fast Response │    │ • State Mgmt     │    │ • Blockchain    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
                                 │
                                 ▼
                        ┌──────────────────┐
                        │  Connection Pool │
                        │                  │
-                       │ • Multi-server   │
-                       │ • Health Check   │
-                       │ • Auto-reconnect │
+                       │ • Config Only    │
+                       │ • MCP Discovery  │
+                       │ • Server Mgmt    │
                        └──────────────────┘
 ```
 
+### 性能提升
+- **代码量减少83%**：从~1468行减少到~240行
+- **启动速度提升**：移除复杂初始化逻辑
+- **响应速度提升**：直接HTTP调用，无中间层
+- **内存使用优化**：简化状态管理
+
 ## 📦 核心组件
 
-### 智能体 (Agent)
-```rust
-use mcp_client_rs::agent::{McpAgent, AgentConfig, DeepSeekConfig};
-
-let config = AgentConfig {
-    deepseek: DeepSeekConfig {
-        base_url: "https://api.deepseek.com".to_string(),
-        api_key: "your-api-key".to_string(),
-        model: "deepseek-chat".to_string(),
-        max_tokens: 4000,
-        temperature: 0.7,
-    },
-    behavior: BehaviorConfig {
-        max_retries: 3,
-        timeout_seconds: 30,
-        verbose_logging: true,
-        tool_strategy: ToolStrategy::Auto,
-    },
-    workspace: WorkspaceConfig {
-        directories: vec![".".to_string()],
-        smart_detection: true,
-        exclude_patterns: vec!["target".to_string()],
-    },
-};
-
-let mut agent = McpAgent::new(config).await?;
-agent.initialize().await?;
-let response = agent.process_input("分析当前项目结构并生成报告").await?;
-```
-
+### 智能体 (Adapter)
 ### 连接池 (ConnectionPool)
-```rust
-use mcp_client_rs::connection_pool::{ConnectionPool, McpServerConfig};
-
-let pool = ConnectionPool::new();
-
-// 注册MCP服务器
-pool.register_server("filesystem".to_string(), McpServerConfig {
-    command: "uvx".to_string(),
-    args: vec!["mcp-server-filesystem".to_string()],
-    directory: Some(".".to_string()),
-    env: None,
-}).await;
-
-// 获取连接
-let client = pool.get_connection("filesystem").await?;
-```
-
 ### 工作区上下文 (WorkspaceContext)
-```rust
-use mcp_client_rs::workspace_context::WorkspaceContextFactory;
-
-// 智能检测工作区
-let context = WorkspaceContextFactory::create_smart();
-
-// 自定义工作区
-let context = WorkspaceContextFactory::create_custom(vec![
-    PathBuf::from("/path/to/project1"),
-    PathBuf::from("/path/to/project2"),
-]);
-```
-
 ## 🛠️ 使用方法
 
 ### 基本使用
 ```rust
-use mcp_client_rs::agent::{McpAgent, AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
+use alou::agent::{Adapter, AgentConfig, DeepSeekConfig, BehaviorConfig, WorkspaceConfig, ToolStrategy};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -135,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             base_url: "https://api.deepseek.com".to_string(),
             api_key: std::env::var("DEEPSEEK_API_KEY")?,
             model: "deepseek-chat".to_string(),
-            max_tokens: 4000,
+            max_tokens: 2000,
             temperature: 0.7,
         },
         behavior: BehaviorConfig {
@@ -151,12 +103,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     };
     
-    // 创建并初始化智能体
-    let mut agent = McpAgent::new(config).await?;
-    agent.initialize().await?;
+    // 创建并初始化适配器
+    let mut adapter = Adapter::new(config).await?;
+    adapter.initialize().await?;
     
     // 处理用户输入
-    let response = agent.process_input("帮我分析这个Rust项目的代码结构").await?;
+    let response = adapter.process_input("帮我分析这个Rust项目的代码结构").await?;
     println!("智能体响应: {}", response);
     
     Ok(())
@@ -164,23 +116,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 ### 高级配置
-```rust
-// 自定义工具策略
-let config = AgentConfig {
-    // ... 其他配置
-    behavior: BehaviorConfig {
-        tool_strategy: ToolStrategy::Priority(vec![
-            "filesystem".to_string(),
-            "memory".to_string(),
-            "network".to_string(),
-        ]),
-        // ... 其他配置
-    },
-    // ... 其他配置
-};
-```
-
 ## 🔧 环境配置
+
+### 配置文件
+复制 `config.example.json` 为 `agent_config.json` 并填入您的配置：
+
+```bash
+cp config.example.json agent_config.json
+```
 
 ### 环境变量
 ```bash
@@ -193,6 +136,30 @@ export ALOU_WORKSPACE_DIRS="/path/to/project1,/path/to/project2"  # 可选
 
 # 日志配置
 export RUST_LOG="info"  # debug, info, warn, error
+```
+
+### 配置示例
+```json
+{
+  "deepseek": {
+    "base_url": "https://api.deepseek.com",
+    "api_key": "your-deepseek-api-key-here",
+    "model": "deepseek-chat",
+    "max_tokens": 2000,
+    "temperature": 0.7
+  },
+  "behavior": {
+    "max_retries": 3,
+    "timeout_seconds": 30,
+    "verbose_logging": true,
+    "tool_strategy": "Auto"
+  },
+  "workspace": {
+    "directories": ["."],
+    "smart_detection": true,
+    "exclude_patterns": ["target", "node_modules"]
+  }
+}
 ```
 
 ### MCP服务器配置
@@ -252,7 +219,7 @@ export RUST_LOG="info"  # debug, info, warn, error
 
 1. **克隆项目**
 ```bash
-git clone https://github.com/your-username/alou-rust.git
+git clone https://github.com/logos-42/alou-rust.git
 cd alou-rust
 ```
 
@@ -263,6 +230,11 @@ cargo build
 
 3. **配置环境**
 ```bash
+# 复制配置模板
+cp config.example.json agent_config.json
+
+# 编辑配置文件，填入您的DeepSeek API密钥
+# 或者设置环境变量
 export DEEPSEEK_API_KEY="your-api-key"
 ```
 
@@ -273,6 +245,9 @@ cargo run --bin agent-cli chat
 
 # 测试模式
 cargo run --bin agent-cli test --message "列出当前目录内容"
+
+# 测试适配器
+cargo run --bin test_adapter --quiet test --message "你好，请介绍一下你的功能"
 
 # 静默模式（减少日志输出）
 cargo run --bin agent-cli chat --quiet
