@@ -3,7 +3,21 @@ use serde::{Deserialize, Serialize};
 use async_trait::async_trait;
 use crate::error::Error;
 use crate::workspace_context::WorkspaceContext;
-use super::deepseek::DeepSeekConfig;
+
+/// DeepSeek API配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeepSeekConfig {
+    /// API基础URL
+    pub base_url: String,
+    /// API密钥
+    pub api_key: String,
+    /// 模型名称
+    pub model: String,
+    /// 最大token数
+    pub max_tokens: u32,
+    /// 温度参数
+    pub temperature: f32,
+}
 
 /// 智能体配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

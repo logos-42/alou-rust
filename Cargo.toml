@@ -38,6 +38,9 @@ jsonwebtoken = "9.2"
 bcrypt = "0.15"
 rand = "0.8.5"
 
+# Claude Agent SDK
+claude-agent-sdk = "0.1.1"
+
 
 [[bin]]
 name = "agent-cli"
@@ -48,5 +51,5 @@ name = "list_tools"
 path = "src/bin/list_tools.rs"
 
 [[bin]]
-name = "agent_http_server"
-path = "src/bin/agent_http_server.rs"
+name = "test_adapter"
+path = "src/bin/test_adapter.rs"

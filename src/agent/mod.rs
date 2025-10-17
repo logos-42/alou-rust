@@ -1,11 +1,10 @@
-pub mod deepseek;
 pub mod types;
-pub mod core;
+pub mod adapter;
 
 // 重新导出常用类型
-pub use deepseek::{DeepSeekClient, DeepSeekConfig, ChatMessage, ChatResponse};
 pub use types::{
-    Agent, AgentConfig, AgentContext, AgentState, AgentMessage, MessageType,
-    ToolCall, ToolCallStatus, ToolInfo, BehaviorConfig, WorkspaceConfig, ToolStrategy
+    Agent, AgentConfig, AgentContext, AgentState, AgentMessage, MessageType, 
+    ToolCall, ToolCallStatus, ToolInfo, BehaviorConfig, WorkspaceConfig, ToolStrategy,
+    DeepSeekConfig
 };
-pub use core::McpAgent;
+pub use adapter::Adapter;

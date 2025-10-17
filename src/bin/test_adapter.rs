@@ -1,29 +1,27 @@
+// ============================================
+// 测试Claude Agent适配器
+// ============================================
+
 use std::env;
 use std::sync::Arc;
 use clap::{Parser, Subcommand};
 use anyhow::Result;
-use tracing::{info, error, warn, debug};
-use tokio;
-use std::time::Duration;
+use tracing::{info, error, warn};
 
 use alou::agent::{
-    Agent, Adapter, AgentConfig, DeepSeekConfig, BehaviorConfig,
+    Agent, Adapter, AgentConfig, DeepSeekConfig, BehaviorConfig, 
     WorkspaceConfig, ToolStrategy
 };
 use alou::connection_pool::ConnectionPool;
 
-/// 智能体CLI工具
+/// 测试Claude Agent适配器
 #[derive(Parser)]
-#[command(name = "agent-cli")]
-#[command(about = "智能体CLI工具，使用MCP工具和DeepSeek API")]
+#[command(name = "test-adapter")]
+#[command(about = "测试Claude Agent适配器")]
 struct Cli {
     /// 静默模式，减少日志输出
     #[arg(short, long)]
     quiet: bool,
-    
-    /// 清洁模式，隐藏所有技术细节，只显示用户界面
-    #[arg(long)]
-    clean: bool,
     
     #[command(subcommand)]
     command: Commands,
@@ -31,13 +29,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// 启动交互式智能体
-    Chat {
-        /// 配置文件路径
-        #[arg(short, long, default_value = "agent_config.json")]
-        config: String,
-    },
-    /// 测试智能体功能
+    /// 测试适配器功能
     Test {
         /// 测试消息
         #[arg(short, long, default_value = "你好，请介绍一下你的功能")]
@@ -121,137 +113,33 @@ fn save_config(config: &AgentConfig, config_path: &str) -> Result<()> {
     Ok(())
 }
 
-/// 简单的加载动画
-async fn show_loading_animation(message: &str) {
-    let spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-    let mut index = 0;
-    
-    print!("\r{} {}", spinner_chars[index], message);
-    std::io::Write::flush(&mut std::io::stdout()).unwrap();
-    
-    loop {
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        index = (index + 1) % spinner_chars.len();
-        print!("\r{} {}", spinner_chars[index], message);
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
-    }
-}
-
-
 /// 初始化MCP连接池
 async fn init_connection_pool() -> Result<ConnectionPool> {
-    // 创建空的连接池，服务器配置将在agent初始化时注册
     let pool = ConnectionPool::new();
     Ok(pool)
 }
 
-/// 启动交互式聊天
-async fn start_chat(config_path: &str) -> Result<()> {
+/// 测试适配器功能
+async fn test_adapter(config_path: &str, message: &str) -> Result<()> {
     let config = load_config(config_path)?;
     
     // 初始化连接池
     let connection_pool = Arc::new(init_connection_pool().await?);
     
-    // 创建智能体（使用指定的连接池）
-    let mut agent = Adapter::with_connection_pool(config, connection_pool.clone()).await?;
+    // 创建适配器
+    let mut adapter = Adapter::with_connection_pool(config, connection_pool.clone()).await?;
     
-    // 显示启动信息
-    println!("🚀 正在启动Alou智能助手...");
-    
-    // 初始化智能体
-    agent.initialize().await?;
-    
-    // 显示欢迎界面
-    println!("\n✨ Alou智能助手已就绪！");
-    println!("💡 输入 'exit' 或 'quit' 退出程序");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-    
-    // 简单的交互循环
-    loop {
-        print!("👤 我: ");
-        std::io::Write::flush(&mut std::io::stdout())?;
-        
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-        
-        if input.is_empty() {
-            continue;
-        }
-        
-        if input == "exit" || input == "quit" {
-            println!("\n👋 感谢使用Alou智能助手，再见！");
-            break;
-        }
-        
-        // 显示加载动画
-        let loading_handle = tokio::spawn(async {
-            show_loading_animation("🤔 正在思考，请稍候...").await;
-        });
-        
-        // 处理API调用
-        let result = agent.process_input(input).await;
-        
-        // 停止加载动画
-        loading_handle.abort();
-        
-        // 清除加载动画行
-        print!("\r{}", " ".repeat(50));
-        print!("\r");
-        std::io::Write::flush(&mut std::io::stdout()).unwrap();
-        
-        match result {
-            Ok(response) => {
-                println!("🧠 Alou: {}", response);
-            }
-            Err(e) => {
-                error!("处理输入时出错: {}", e);
-            }
-        }
-    }
-    
-    // 优雅关闭连接
-    if let Err(e) = connection_pool.close_all_connections().await {
-        debug!("关闭连接时出现错误: {}", e);
-    }
-    
-    Ok(())
-}
-
-/// 测试智能体功能
-async fn test_agent(config_path: &str, message: &str) -> Result<()> {
-    let config = load_config(config_path)?;
-    
-    // 初始化连接池
-    let connection_pool = Arc::new(init_connection_pool().await?);
-    
-    // 创建智能体（使用指定的连接池）
-    let mut agent = Adapter::with_connection_pool(config, connection_pool.clone()).await?;
-    
-    // 初始化智能体
-    agent.initialize().await?;
+    // 初始化适配器
+    adapter.initialize().await?;
     
     info!("测试消息: {}", message);
     
-    // 显示加载动画
-    let loading_handle = tokio::spawn(async {
-        show_loading_animation("🤔 正在思考，请稍候...").await;
-    });
-    
     // 处理API调用
-    let result = agent.process_input(message).await;
-    
-    // 停止加载动画
-    loading_handle.abort();
-    
-    // 清除加载动画行
-    print!("\r{}", " ".repeat(50));
-    print!("\r");
-    std::io::Write::flush(&mut std::io::stdout()).unwrap();
+    let result = adapter.process_input(message).await;
     
     match result {
         Ok(response) => {
-            println!("智能体响应: {}", response);
+            println!("适配器响应: {}", response);
         }
         Err(e) => {
             error!("测试失败: {}", e);
@@ -283,14 +171,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     
     // 根据模式设置日志级别
-    if cli.clean {
-        // 清洁模式：完全隐藏所有日志，只显示用户界面
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::ERROR)
-            .with_target(false)
-            .with_ansi(false)
-            .init();
-    } else if cli.quiet {
+    if cli.quiet {
         // 静默模式：只显示错误
         tracing_subscriber::fmt()
             .with_max_level(tracing::Level::ERROR)
@@ -298,9 +179,9 @@ async fn main() -> Result<()> {
             .with_ansi(false)
             .init();
     } else {
-        // 正常模式：只显示重要信息，隐藏所有技术细节和调试信息
+        // 正常模式：显示重要信息
         tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::WARN)
+            .with_max_level(tracing::Level::INFO)
             .with_target(false)
             .with_ansi(true)
             .with_thread_ids(false)
@@ -311,11 +192,8 @@ async fn main() -> Result<()> {
     }
     
     match cli.command {
-        Commands::Chat { config } => {
-            start_chat(&config).await?;
-        }
         Commands::Test { message, config } => {
-            test_agent(&config, &message).await?;
+            test_adapter(&config, &message).await?;
         }
         Commands::Init { output } => {
             init_config(&output)?;
