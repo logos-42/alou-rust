@@ -56,7 +56,7 @@ impl WalletNonce {
 /// Verify Ethereum signature
 /// This is a simplified version. In production, use a proper library like ethers-rs
 pub fn verify_signature(
-    message: &str,
+    _message: &str,
     signature: &str,
     expected_address: &str,
 ) -> Result<bool, String> {
