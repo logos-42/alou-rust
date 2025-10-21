@@ -1,6 +1,6 @@
 [package]
 name = "alou"
-version = "0.1.4"
+version = "0.1.6"
 edition = "2021"
 description = "智能自动化工作流系统 - 基于Rust和Model Context Protocol (MCP)的智能体"
 license = "MIT OR Apache-2.0"
