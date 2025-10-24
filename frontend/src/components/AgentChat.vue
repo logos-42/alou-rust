@@ -155,12 +155,18 @@ interface Message {
 }
 
 interface AgentResponse {
-  response: string
-  status: string
-  timestamp: number
+  content?: string
+  response?: string
+  status?: string
+  timestamp?: number
   session_id?: string
   source?: string
   error?: string
+  tool_calls?: Array<{
+    id: string
+    name: string
+    result: any
+  }>
 }
 
 // 响应式数据
@@ -176,10 +182,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 const showUserMenu = ref(false)
 
-// API配置 - 适配云服务器
-const API_BASE_URL = import.meta.env.PROD 
-  ? '' // 生产环境使用相对路径（通过Nginx代理）
-  : 'http://localhost:3001' // 开发环境直接连接后端
+// API配置 - 连接到alou-edge Worker
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.alou.onl'
 const sessionId = ref(`frontend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
 
 // 生命周期
@@ -239,19 +243,15 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
+    const response = await fetch(`${API_BASE_URL}/api/agent/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: messageToSend,
         session_id: sessionId.value,
-        context: {
-          frontend: 'vue3',
-          theme: isDarkMode.value ? 'dark' : 'light',
-          timestamp: new Date().toISOString()
-        }
+        message: messageToSend,
+        wallet_address: null
       })
     })
 
@@ -261,9 +261,9 @@ async function sendMessage() {
       const assistantMessage: Message = {
         id: `assistant_${Date.now()}`,
         type: 'assistant',
-        content: agentData.response,
+        content: agentData.content || agentData.response || '收到响应',
         timestamp: agentData.timestamp || Date.now(),
-        source: agentData.source
+        source: agentData.source || 'alou-edge'
       }
 
       messages.value.push(assistantMessage)

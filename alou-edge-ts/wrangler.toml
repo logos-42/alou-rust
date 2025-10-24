@@ -1,0 +1,22 @@
+name = "alou-edge-ts"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "alou-edge-dev"
+database_id = "placeholder"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "placeholder"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "placeholder"

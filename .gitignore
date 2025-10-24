@@ -99,3 +99,4 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 .aider*
 .env
+node_modules

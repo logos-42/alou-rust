@@ -6,7 +6,7 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 import Cookies from 'js-cookie'
 
 // API base URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.alou.onl'
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
