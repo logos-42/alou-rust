@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alou Pay - Web3 AI Agent</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        .header {
+            margin-bottom: 40px;
+        }
+        .logo {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .status-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        .status-label {
+            font-weight: 500;
+        }
+        .status-value {
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .loading {
+            display: none;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚀 Alou Pay</div>
+            <div class="subtitle">Web3 AI Agent Platform</div>
+        </div>
+
+        <div class="status-card">
+            <h2>系统状态</h2>
+            <div class="status-item">
+                <span class="status-label">前端状态</span>
+                <span class="status-value success">✅ 运行中</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">后端API</span>
+                <span class="status-value" id="api-status">检查中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">API地址</span>
+                <span class="status-value">https://alou-edge.yuanjieliu65.workers.dev</span>
+            </div>
+        </div>
+
+        <div class="status-card">
+            <h2>可用功能</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px;">
+                    <h3>🤖 AI Agent</h3>
+                    <p>智能对话助手</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px;">
+                    <h3>⛓️ 区块链工具</h3>
+                    <p>查询余额、构建交易</p>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 10px;">
+                    <h3>💳 支付处理</h3>
+                    <p>安全的支付流程</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-card">
+            <h2>快速操作</h2>
+            <a href="https://alou-edge.yuanjieliu65.workers.dev/api/health" class="btn" target="_blank">
+                🔍 健康检查
+            </a>
+            <a href="https://alou-edge.yuanjieliu65.workers.dev/api/status" class="btn" target="_blank">
+                📊 系统状态
+            </a>
+            <button class="btn" onclick="testAPI()">
+                🧪 测试API
+            </button>
+        </div>
+
+        <div id="test-result" class="status-card" style="display: none;">
+            <h2>API测试结果</h2>
+            <pre id="test-output" style="text-align: left; background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; overflow-x: auto;"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'https://alou-edge.yuanjieliu65.workers.dev';
+        
+        // 检查API状态
+        async function checkAPIStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('api-status').innerHTML = '<span class="success">✅ 连接正常</span>';
+                } else {
+                    document.getElementById('api-status').innerHTML = '<span class="error">❌ 连接异常</span>';
+                }
+            } catch (error) {
+                document.getElementById('api-status').innerHTML = '<span class="error">❌ 连接失败</span>';
+            }
+        }
+
+        // 测试API
+        async function testAPI() {
+            const resultDiv = document.getElementById('test-result');
+            const outputDiv = document.getElementById('test-output');
+            
+            resultDiv.style.display = 'block';
+            outputDiv.textContent = '测试中...';
+            
+            try {
+                const [healthResponse, statusResponse] = await Promise.all([
+                    fetch(`${API_BASE}/api/health`),
+                    fetch(`${API_BASE}/api/status`)
+                ]);
+                
+                const healthData = await healthResponse.json();
+                const statusData = await statusResponse.json();
+                
+                const result = {
+                    timestamp: new Date().toISOString(),
+                    health: {
+                        status: healthResponse.status,
+                        data: healthData
+                    },
+                    status: {
+                        status: statusResponse.status,
+                        data: statusData
+                    }
+                };
+                
+                outputDiv.textContent = JSON.stringify(result, null, 2);
+            } catch (error) {
+                outputDiv.textContent = `错误: ${error.message}`;
+            }
+        }
+
+        // 页面加载时检查API状态
+        window.addEventListener('load', checkAPIStatus);
+    </script>
+</body>
+</html>

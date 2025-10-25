@@ -1,0 +1,486 @@
+openapi: 3.0.3
+info:
+  title: Alou Edge API
+  description: Web3 AI Agent API running on Cloudflare Workers
+  version: 0.1.0
+  contact:
+    name: Alou Edge Support
+    email: support@alou-edge.com
+  license:
+    name: MIT OR Apache-2.0
+
+servers:
+  - url: https://alou-edge.workers.dev
+    description: Production server
+  - url: https://alou-edge-staging.workers.dev
+    description: Staging server
+  - url: http://localhost:8787
+    description: Local development server
+
+tags:
+  - name: Health
+    description: Service health and status
+  - name: Session
+    description: Chat session management
+  - name: Wallet
+    description: Wallet authentication
+  - name: Agent
+    description: AI agent interactions
+  - name: MCP
+    description: MCP tool operations
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Check if the service is running
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/session:
+    post:
+      tags: [Session]
+      summary: Create session
+      description: Create a new chat session
+      operationId: createSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+
+  /api/session/{session_id}:
+    get:
+      tags: [Session]
+      summary: Get session
+      description: Get session history
+      operationId: getSession
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionHistoryResponse'
+        '404':
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+    delete:
+      tags: [Session]
+      summary: Clear session
+      description: Clear a session and its history
+      operationId: clearSession
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Session cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/wallet/nonce/{address}:
+    get:
+      tags: [Wallet]
+      summary: Get nonce
+      description: Get a nonce for wallet signature
+      operationId: getNonce
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Wallet address (Ethereum or Solana)
+      responses:
+        '200':
+          description: Nonce generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NonceResponse'
+
+  /api/wallet/verify:
+    post:
+      tags: [Wallet]
+      summary: Verify signature
+      description: Verify wallet signature and get JWT token
+      operationId: verifySignature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifySignatureRequest'
+      responses:
+        '200':
+          description: Signature verified
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          description: Invalid signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/wallet/me:
+    get:
+      tags: [Wallet]
+      summary: Get current user
+      description: Get current authenticated user info
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+
+  /api/agent/chat:
+    post:
+      tags: [Agent]
+      summary: Chat with agent
+      description: Send a message to the AI agent
+      operationId: chatWithAgent
+      security:
+        - BearerAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/agent/stream:
+    post:
+      tags: [Agent]
+      summary: Stream agent response
+      description: Stream agent responses using Server-Sent Events
+      operationId: streamAgentResponse
+      security:
+        - BearerAuth: []
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /api/mcp/tools:
+    get:
+      tags: [MCP]
+      summary: List MCP tools
+      description: Get list of available MCP tools
+      operationId: listMcpTools
+      responses:
+        '200':
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpToolsResponse'
+
+  /api/mcp/call:
+    post:
+      tags: [MCP]
+      summary: Call MCP tool
+      description: Call an MCP tool directly
+      operationId: callMcpTool
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpCallRequest'
+      responses:
+        '200':
+          description: Tool result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpCallResponse'
+
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        timestamp:
+          type: integer
+          format: int64
+        version:
+          type: string
+          example: 0.1.0
+
+    CreateSessionRequest:
+      type: object
+      properties:
+        wallet_address:
+          type: string
+          description: Optional wallet address
+
+    SessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        created_at:
+          type: integer
+          format: int64
+
+    SessionHistoryResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        wallet_address:
+          type: string
+        created_at:
+          type: integer
+          format: int64
+        updated_at:
+          type: integer
+          format: int64
+
+    Message:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+
+    NonceResponse:
+      type: object
+      properties:
+        nonce:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+
+    VerifySignatureRequest:
+      type: object
+      required:
+        - address
+        - signature
+        - message
+        - chain
+      properties:
+        address:
+          type: string
+        signature:
+          type: string
+        message:
+          type: string
+        chain:
+          type: string
+          enum: [ethereum, solana]
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expires_at:
+          type: integer
+          format: int64
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    UserInfo:
+      type: object
+      properties:
+        wallet_address:
+          type: string
+        chain:
+          type: string
+
+    UserInfoResponse:
+      type: object
+      properties:
+        wallet_address:
+          type: string
+        chain:
+          type: string
+        authenticated:
+          type: boolean
+
+
+    ChatRequest:
+      type: object
+      required:
+        - session_id
+        - message
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        message:
+          type: string
+
+    ChatResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        tool_calls:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        timestamp:
+          type: integer
+          format: int64
+
+    ToolCall:
+      type: object
+      properties:
+        tool:
+          type: string
+        arguments:
+          type: object
+        result:
+          type: object
+
+    McpToolsResponse:
+      type: object
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/McpTool'
+
+    McpTool:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        input_schema:
+          type: object
+
+    McpCallRequest:
+      type: object
+      required:
+        - tool
+        - arguments
+      properties:
+        tool:
+          type: string
+        arguments:
+          type: object
+
+    McpCallResponse:
+      type: object
+      properties:
+        result:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object

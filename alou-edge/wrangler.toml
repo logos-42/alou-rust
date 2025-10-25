@@ -1,0 +1,87 @@
+name = "alou-edge"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "cargo build --target wasm32-unknown-unknown --release"
+
+[[rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = true
+
+[vars]
+ENVIRONMENT = "development"
+AI_PROVIDER = "deepseek"
+AI_MODEL = "deepseek-chat"
+
+# D1 Database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "alou-edge-dev"
+database_id = "ea73e830-b195-4ad8-9dea-f61677f3714c"
+
+# KV Namespaces
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "7842a26c3e754cf99e54ea706f01ad6e"
+preview_id = "8ea65c9f41a34706992c3c77048f3155"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "41a7073e13e84444a37f044f8467a50c"
+
+[[kv_namespaces]]
+binding = "NONCES"
+id = "e0f682098b73485b940f1176417f417a"
+
+# Secrets (set with: wrangler secret put <NAME>)
+# AI_API_KEY - API key for the selected AI provider (DeepSeek/Qwen/OpenAI/Claude)
+# JWT_SECRET - Secret for JWT token signing
+# ETH_RPC_URL - Ethereum RPC endpoint (e.g., Infura, Alchemy)
+# SOL_RPC_URL - Solana RPC endpoint
+
+# Production environment
+[env.production]
+name = "alou-edge-prod"
+vars = { ENVIRONMENT = "production" }
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "alou-edge-prod"
+database_id = "placeholder-create-with-wrangler"
+
+[[env.production.kv_namespaces]]
+binding = "SESSIONS"
+id = "placeholder-create-with-wrangler"
+
+[[env.production.kv_namespaces]]
+binding = "CACHE"
+id = "placeholder-create-with-wrangler"
+
+[[env.production.kv_namespaces]]
+binding = "NONCES"
+id = "placeholder-create-with-wrangler"
+
+# Staging environment
+[env.staging]
+name = "alou-edge-staging"
+vars = { ENVIRONMENT = "staging" }
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "alou-edge-staging"
+database_id = "placeholder-create-with-wrangler"
+
+[[env.staging.kv_namespaces]]
+binding = "SESSIONS"
+id = "placeholder-create-with-wrangler"
+
+[[env.staging.kv_namespaces]]
+binding = "CACHE"
+id = "placeholder-create-with-wrangler"
+
+[[env.staging.kv_namespaces]]
+binding = "NONCES"
+id = "placeholder-create-with-wrangler"
