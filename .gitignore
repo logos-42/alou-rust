@@ -100,3 +100,9 @@ fabric.properties
 .aider*
 .env
 node_modules
+
+# 根目录特定忽略
+/.kiro/
+/.github/
+/.vs/
+/node_modules/
