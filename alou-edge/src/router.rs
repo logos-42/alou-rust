@@ -370,8 +370,11 @@ impl Router {
             }
         };
         
+        console_log!("Creating session with wallet_address: {:?}", body.wallet_address);
+        
         match self.session_manager.create_session(body.wallet_address).await {
             Ok(session_id) => {
+                console_log!("Session created: {}", session_id);
                 let response = CreateSessionResponse { session_id };
                 json_response(&response)
             }
@@ -578,20 +581,35 @@ impl Router {
         
         // Priority: request body > JWT token > session binding
         // First, try to get wallet from request body or JWT
+        console_log!("Chat request - session_id: {}, wallet_address from body: {:?}", body.session_id, body.wallet_address);
+        
         let wallet_address = body.wallet_address
             .or_else(|| self.extract_wallet_from_token(req).ok());
         
+        console_log!("Wallet address after body/jwt: {:?}", wallet_address);
+        
         // If still no wallet address, try to get from session
         let wallet_address = match wallet_address {
-            Some(addr) => Some(addr),
+            Some(addr) => {
+                console_log!("Using wallet from body/jwt: {}", addr);
+                Some(addr)
+            },
             None => {
                 // Try to get from session
                 match self.session_manager.get_session(&body.session_id).await {
-                    Ok(session) => session.wallet_address,
-                    Err(_) => None,
+                    Ok(session) => {
+                        console_log!("Wallet from session: {:?}", session.wallet_address);
+                        session.wallet_address
+                    },
+                    Err(_) => {
+                        console_log!("No wallet found anywhere");
+                        None
+                    },
                 }
             }
         };
+        
+        console_log!("Final wallet_address being passed to agent: {:?}", wallet_address);
         
         // Handle message
         match agent_core
