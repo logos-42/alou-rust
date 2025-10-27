@@ -228,6 +228,11 @@ impl Router {
     /// Route request to appropriate handler
     async fn route_request(&self, req: &mut Request, method: &Method, path: &str) -> Result<Response> {
         match (method, path) {
+            // Root endpoint
+            (Method::Get, "/") => {
+                self.handle_root().await
+            }
+            
             // Health and status endpoints
             (Method::Get, "/api/health") => {
                 self.handle_health().await
@@ -302,6 +307,23 @@ impl Router {
                 json_response_with_status(&error_response, 404)
             }
         }
+    }
+    
+    /// GET / - Root endpoint
+    async fn handle_root(&self) -> Result<Response> {
+        let response = serde_json::json!({
+            "name": "Alou Edge",
+            "version": env!("CARGO_PKG_VERSION"),
+            "description": "Web3 AI Agent on Cloudflare Workers",
+            "endpoints": {
+                "health": "/api/health",
+                "status": "/api/status",
+                "session": "/api/session",
+                "agent": "/api/agent/chat",
+                "blockchain": "/api/blockchain/*"
+            }
+        });
+        json_response(&response)
     }
     
     /// GET /api/health - Health check endpoint
