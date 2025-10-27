@@ -1,6 +1,9 @@
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use worker::{console_log, Fetch, Method, RequestInit};
 use crate::utils::error::{AloudError, Result};
+use crate::agent::context::AgentContext;
+use crate::mcp::registry::McpTool;
 
 /// Query tool for blockchain data
 pub struct QueryTool {
@@ -175,5 +178,68 @@ impl QueryTool {
 
         serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse response error: {}", e)))
+    }
+}
+
+#[async_trait(?Send)]
+impl McpTool for QueryTool {
+    fn name(&self) -> &str {
+        "query_blockchain"
+    }
+    
+    fn description(&self) -> &str {
+        "Query blockchain data including ETH balance, ERC20 token balance, and Solana balance"
+    }
+    
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["eth_balance", "erc20_balance", "sol_balance"],
+                    "description": "Type of query to perform"
+                },
+                "address": {
+                    "type": "string",
+                    "description": "Wallet address to query"
+                },
+                "token_address": {
+                    "type": "string",
+                    "description": "ERC20 token contract address (required for erc20_balance)"
+                }
+            },
+            "required": ["action", "address"]
+        })
+    }
+    
+    async fn execute(&self, args: Value, _context: &AgentContext) -> Result<Value> {
+        let action = args.get("action")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing action".to_string()))?;
+        
+        let address = args.get("address")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing address".to_string()))?;
+        
+        match action {
+            "eth_balance" => {
+                let balance = self.get_eth_balance(address).await?;
+                Ok(json!({ "balance": balance }))
+            }
+            "erc20_balance" => {
+                let token_address = args.get("token_address")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| AloudError::InvalidInput("Missing token_address".to_string()))?;
+                
+                let balance = self.get_erc20_balance(token_address, address).await?;
+                Ok(json!({ "balance": balance }))
+            }
+            "sol_balance" => {
+                let balance = self.get_sol_balance(address).await?;
+                Ok(json!({ "balance": balance }))
+            }
+            _ => Err(AloudError::InvalidInput(format!("Unknown action: {}", action)))
+        }
     }
 }

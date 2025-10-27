@@ -278,7 +278,7 @@ impl Router {
             _ => {
                 console_log!("Route not found: {} {}", method.to_string(), path);
                 let error_response = ErrorResponse {
-                    error: format!("Route not found: {} {}", method.to_string(), path),
+                    error: format!("Route not found: {} {}", method, path),
                 };
                 Ok(Response::from_json(&error_response)?.with_status(404))
             }

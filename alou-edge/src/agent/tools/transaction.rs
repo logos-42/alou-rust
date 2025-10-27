@@ -1,7 +1,10 @@
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use worker::{console_log, Fetch, Method, RequestInit};
 use crate::utils::error::{AloudError, Result};
+use crate::agent::context::AgentContext;
+use crate::mcp::registry::McpTool;
 
 /// Transaction builder tool
 pub struct TransactionTool {
@@ -243,5 +246,72 @@ impl TransactionTool {
 
         serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse response error: {}", e)))
+    }
+}
+
+#[async_trait(?Send)]
+impl McpTool for TransactionTool {
+    fn name(&self) -> &str {
+        "build_transaction"
+    }
+    
+    fn description(&self) -> &str {
+        "Build blockchain transactions for Ethereum and Solana networks"
+    }
+    
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "chain": {
+                    "type": "string",
+                    "enum": ["eth", "sol"],
+                    "description": "Blockchain network"
+                },
+                "from": {
+                    "type": "string",
+                    "description": "Sender address"
+                },
+                "to": {
+                    "type": "string",
+                    "description": "Recipient address"
+                },
+                "value": {
+                    "type": "number",
+                    "description": "Amount to send (in ETH for Ethereum, SOL for Solana)"
+                }
+            },
+            "required": ["chain", "from", "to", "value"]
+        })
+    }
+    
+    async fn execute(&self, args: Value, _context: &AgentContext) -> Result<Value> {
+        let chain = args.get("chain")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing chain".to_string()))?;
+        
+        let from = args.get("from")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing from".to_string()))?;
+        
+        let to = args.get("to")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing to".to_string()))?;
+        
+        let value = args.get("value")
+            .and_then(|v| v.as_f64())
+            .ok_or_else(|| AloudError::InvalidInput("Missing value".to_string()))?;
+        
+        match chain {
+            "eth" => {
+                let tx_data = self.build_eth_transaction(from, to, value).await?;
+                Ok(json!({ "transaction": tx_data }))
+            }
+            "sol" => {
+                let tx_data = self.build_sol_transaction(from, to, value).await?;
+                Ok(json!({ "transaction": tx_data }))
+            }
+            _ => Err(AloudError::InvalidInput(format!("Unsupported chain: {}", chain)))
+        }
     }
 }

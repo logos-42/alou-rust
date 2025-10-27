@@ -8,3 +8,8 @@ pub mod contract;
 
 pub use echo::EchoTool;
 pub use proxy::ProxyTool;
+pub use wallet_auth::WalletAuthTool;
+pub use crate::agent::tools::QueryTool;
+pub use crate::agent::tools::TransactionTool;
+pub use crate::agent::tools::BroadcastTool;
+// pub use contract::ContractTool;

@@ -12,7 +12,7 @@ use router::Router;
 use storage::kv::KvStore;
 use agent::{AgentCore, SessionManager};
 use mcp::{McpRegistry, McpExecutor, McpBridge, McpConnectionPool};
-use mcp::tools::EchoTool;
+use mcp::tools::{EchoTool, WalletAuthTool, QueryTool, TransactionTool, BroadcastTool};
 
 /// Worker main entry point
 /// 
@@ -109,7 +109,7 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     
     // Create KV store wrappers
     let sessions_store = KvStore::new(sessions_kv.clone());
-    let _cache_store = KvStore::new(cache_kv);
+    let _cache_store = KvStore::new(cache_kv); // Reserved for future use
     let nonces_store = KvStore::new(nonces_kv);
     
     // ========================================
@@ -184,12 +184,20 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     registry.register(Arc::new(EchoTool));
     console_log!("  ✓ Registered EchoTool");
     
-    // TODO: Register additional tools as they are implemented
-    // registry.register(Arc::new(WalletAuthTool::new(nonces_store.clone())));
-    // registry.register(Arc::new(QueryTool::new(cache_store.clone(), eth_rpc_url, solana_rpc_url)));
-    // registry.register(Arc::new(TransactionTool::new(eth_rpc_url, solana_rpc_url)));
-    // registry.register(Arc::new(BroadcastTool::new(eth_rpc_url, solana_rpc_url)));
-    // registry.register(Arc::new(ContractTool::new(cache_store.clone(), eth_rpc_url)));
+    // Register blockchain tools
+    registry.register(Arc::new(WalletAuthTool::new(nonces_store.clone(), jwt_secret.clone())));
+    console_log!("  ✓ Registered WalletAuthTool");
+    
+    if let (Some(ref eth_rpc), Some(ref sol_rpc)) = (&eth_rpc_url, &solana_rpc_url) {
+        registry.register(Arc::new(QueryTool::new(eth_rpc.clone(), sol_rpc.clone())));
+        console_log!("  ✓ Registered QueryTool");
+        
+        registry.register(Arc::new(TransactionTool::new(eth_rpc.clone(), sol_rpc.clone())));
+        console_log!("  ✓ Registered TransactionTool");
+        
+        registry.register(Arc::new(BroadcastTool::new(eth_rpc.clone(), sol_rpc.clone())));
+        console_log!("  ✓ Registered BroadcastTool");
+    }
     
     console_log!("  ✓ MCP registry initialized with {} tools", registry.list_tools().len());
     

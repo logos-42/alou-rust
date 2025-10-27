@@ -112,30 +112,27 @@ impl McpExecutor {
     fn validate_args(&self, args: &Value, schema: &Value) -> Result<()> {
         // Basic validation: check if args is an object when schema expects object
         if let Some(schema_type) = schema.get("type").and_then(|v| v.as_str()) {
-            match schema_type {
-                "object" => {
-                    if !args.is_object() {
-                        return Err(AloudError::InvalidToolArgs(
-                            "Expected object arguments".to_string(),
-                        ));
-                    }
-                    
-                    // Check required fields
-                    if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
-                        let args_obj = args.as_object().unwrap();
-                        for req_field in required {
-                            if let Some(field_name) = req_field.as_str() {
-                                if !args_obj.contains_key(field_name) {
-                                    return Err(AloudError::InvalidToolArgs(format!(
-                                        "Missing required field: {}",
-                                        field_name
-                                    )));
-                                }
+            if schema_type == "object" {
+                if !args.is_object() {
+                    return Err(AloudError::InvalidToolArgs(
+                        "Expected object arguments".to_string(),
+                    ));
+                }
+                
+                // Check required fields
+                if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
+                    let args_obj = args.as_object().unwrap();
+                    for req_field in required {
+                        if let Some(field_name) = req_field.as_str() {
+                            if !args_obj.contains_key(field_name) {
+                                return Err(AloudError::InvalidToolArgs(format!(
+                                    "Missing required field: {}",
+                                    field_name
+                                )));
                             }
                         }
                     }
                 }
-                _ => {}
             }
         }
         

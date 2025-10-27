@@ -1,36 +1,53 @@
-// TypeScript Worker入口文件
+// TypeScript Worker入口文件 - AI Agent 实现
+
+// Cloudflare Workers types
+interface Env {
+  AI_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
+  AI_PROVIDER?: string;
+  AI_MODEL?: string;
+  ENVIRONMENT?: string;
+  JWT_SECRET?: string;
+  ETH_RPC_URL?: string;
+  SOL_RPC_URL?: string;
+  SESSIONS?: any; // KVNamespace
+  CACHE?: any; // KVNamespace
+  NONCES?: any; // KVNamespace
+}
+
+// CORS headers for all responses
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 export default {
-  async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
     try {
       // 处理CORS预检请求
       if (request.method === 'OPTIONS') {
         return new Response(null, {
           status: 200,
           headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            ...corsHeaders,
             'Access-Control-Max-Age': '86400',
           }
         });
       }
 
-      // 简单的健康检查端点
+      console.log(`[${new Date().toISOString()}] ${request.method} ${new URL(request.url).pathname}`);
+
       const url = new URL(request.url);
       
-      // CORS headers for all responses
-      const corsHeaders = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      };
-      
+      // 健康检查
       if (url.pathname === '/api/health') {
         return new Response(JSON.stringify({
           status: 'ok',
-          message: 'alou-edge worker is running',
+          message: 'alou-edge worker is running (TypeScript fallback)',
           timestamp: new Date().toISOString(),
-          environment: env.ENVIRONMENT || 'development'
+          environment: env.ENVIRONMENT || 'development',
+          mode: 'typescript-fallback'
         }), {
           headers: { 
             'Content-Type': 'application/json',
@@ -39,10 +56,12 @@ export default {
         });
       }
       
+      // 状态检查
       if (url.pathname === '/api/status') {
         return new Response(JSON.stringify({
           status: 'running',
           version: '1.0.0',
+          mode: 'typescript-fallback',
           features: ['ai-agent', 'blockchain-tools', 'payment-processing']
         }), {
           headers: { 
@@ -52,31 +71,71 @@ export default {
         });
       }
       
-      // 聊天API端点
+      // 聊天API端点 - 调用真实AI
       if (url.pathname === '/api/agent/chat' && request.method === 'POST') {
         try {
           const body = await request.json();
-          const { session_id, message, wallet_address } = body;
+          const { session_id, message } = body;
           
-          // 简单的AI响应逻辑
-          let response = '';
-          if (message.toLowerCase().includes('hello') || message.toLowerCase().includes('你好')) {
-            response = '你好！我是Alou智能助手，很高兴为您服务！我可以帮助您：\n\n• 查询钱包余额\n• 发送代币交易\n• 查看交易历史\n• 解答区块链相关问题\n\n请告诉我您需要什么帮助？';
-          } else if (message.toLowerCase().includes('balance') || message.toLowerCase().includes('余额')) {
-            response = '要查询钱包余额，请提供您的钱包地址。我可以帮您查询ETH和ERC-20代币的余额。\n\n请发送您的钱包地址，格式如：0x...';
-          } else if (message.toLowerCase().includes('send') || message.toLowerCase().includes('发送')) {
-            response = '要发送代币，我需要以下信息：\n\n• 发送方钱包地址\n• 接收方钱包地址\n• 代币类型（ETH或ERC-20代币地址）\n• 发送数量\n\n请提供这些信息，我会帮您构建交易。';
-          } else if (message.toLowerCase().includes('transaction') || message.toLowerCase().includes('交易')) {
-            response = '我可以帮您：\n\n• 构建交易数据\n• 广播交易到区块链\n• 查询交易状态\n• 查看交易历史\n\n请告诉我您想要进行哪种操作？';
-          } else {
-            response = `我收到了您的消息："${message}"\n\n作为Alou智能助手，我可以帮助您：\n\n• 💰 查询钱包余额\n• 📤 发送代币交易\n• 📊 查看交易历史\n• 🔍 解答区块链问题\n\n请告诉我您需要什么帮助？`;
+          // 调用AI API (DeepSeek)
+          const aiApiKey = env.AI_API_KEY || env.CLAUDE_API_KEY;
+          const aiProvider = env.AI_PROVIDER || 'deepseek';
+          const aiModel = env.AI_MODEL || 'deepseek-chat';
+          
+          if (!aiApiKey) {
+            throw new Error('AI_API_KEY not configured');
           }
+
+          console.log(`→ Calling ${aiProvider} API with model ${aiModel}`);
+          
+          // 构建AI请求
+          const aiEndpoint = aiProvider === 'deepseek' 
+            ? 'https://api.deepseek.com/v1/chat/completions'
+            : aiProvider === 'qwen'
+            ? 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+            : 'https://api.openai.com/v1/chat/completions';
+
+          const aiResponse = await fetch(aiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${aiApiKey}`,
+            },
+            body: JSON.stringify({
+              model: aiModel,
+              messages: [
+                {
+                  role: 'system',
+                  content: '你是Alou智能助手，一个专业的Web3和区块链AI助手。你可以帮助用户查询钱包余额、构建交易、解答区块链问题。请用友好、专业的方式回答用户问题。'
+                },
+                {
+                  role: 'user',
+                  content: message
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 2000,
+            }),
+          });
+
+          if (!aiResponse.ok) {
+            const errorText = await aiResponse.text();
+            console.error('AI API error:', errorText);
+            throw new Error(`AI API returned ${aiResponse.status}: ${errorText}`);
+          }
+
+          const aiData = await aiResponse.json();
+          const content = aiData.choices?.[0]?.message?.content || '抱歉，我现在无法回答。';
+          
+          console.log('✓ AI response received');
           
           return new Response(JSON.stringify({
-            content: response,
+            content,
             session_id: session_id || `session_${Date.now()}`,
             timestamp: Date.now(),
-            source: 'alou-edge-ts'
+            source: 'ai-powered',
+            provider: aiProvider,
+            model: aiModel
           }), {
             headers: { 
               'Content-Type': 'application/json',
@@ -84,11 +143,12 @@ export default {
             }
           });
         } catch (error) {
+          console.error('Chat error:', error);
           return new Response(JSON.stringify({
             content: '抱歉，处理您的请求时出现了错误。请稍后重试。',
+            error: error instanceof Error ? error.message : 'Unknown error',
             session_id: 'error',
             timestamp: Date.now(),
-            source: 'error'
           }), {
             status: 500,
             headers: { 
@@ -116,6 +176,7 @@ export default {
       // 默认响应
       return new Response(JSON.stringify({
         message: 'Welcome to alou-edge API',
+        mode: 'typescript-fallback',
         endpoints: [
           '/api/health',
           '/api/status',
@@ -139,9 +200,7 @@ export default {
         status: 500,
         headers: { 
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          ...corsHeaders
         }
       });
     }

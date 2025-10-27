@@ -119,6 +119,7 @@ struct ClaudeRequestMessage {
 
 /// Claude API response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Some fields are for future use
 struct ClaudeApiResponse {
     id: String,
     #[serde(rename = "type")]

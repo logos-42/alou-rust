@@ -3,18 +3,21 @@ main = "index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-[build]
-command = "cargo build --target wasm32-unknown-unknown --release"
+# Disable Rust build for now - using pure TypeScript
+# [build]
+# command = "cargo build --target wasm32-unknown-unknown --release"
 
-[[rules]]
-type = "CompiledWasm"
-globs = ["**/*.wasm"]
-fallthrough = true
+# [[rules]]
+# type = "CompiledWasm"
+# globs = ["**/*.wasm"]
+# fallthrough = true
 
 [vars]
 ENVIRONMENT = "development"
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-chat"
+ETH_RPC_URL = "https://eth.llamarpc.com"
+SOL_RPC_URL = "https://api.mainnet-beta.solana.com"
 
 # D1 Database binding
 [[d1_databases]]

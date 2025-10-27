@@ -6,4 +6,5 @@ pub mod payment;
 pub use query::QueryTool;
 pub use transaction::TransactionTool;
 pub use broadcast::BroadcastTool;
-pub use payment::PaymentTool;
+// PaymentTool not used yet
+// pub use payment::PaymentTool;

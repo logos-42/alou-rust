@@ -1,7 +1,10 @@
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use worker::{console_log, Fetch, Method, RequestInit};
 use crate::utils::error::{AloudError, Result};
+use crate::agent::context::AgentContext;
+use crate::mcp::registry::McpTool;
 
 /// Broadcast tool for sending signed transactions
 pub struct BroadcastTool {
@@ -197,5 +200,56 @@ impl BroadcastTool {
 
         serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse response error: {}", e)))
+    }
+}
+
+#[async_trait(?Send)]
+impl McpTool for BroadcastTool {
+    fn name(&self) -> &str {
+        "broadcast_transaction"
+    }
+    
+    fn description(&self) -> &str {
+        "Broadcast signed transactions to Ethereum and Solana networks"
+    }
+    
+    fn input_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "chain": {
+                    "type": "string",
+                    "enum": ["eth", "sol"],
+                    "description": "Blockchain network"
+                },
+                "signed_tx": {
+                    "type": "string",
+                    "description": "Signed transaction data"
+                }
+            },
+            "required": ["chain", "signed_tx"]
+        })
+    }
+    
+    async fn execute(&self, args: Value, _context: &AgentContext) -> Result<Value> {
+        let chain = args.get("chain")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing chain".to_string()))?;
+        
+        let signed_tx = args.get("signed_tx")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::InvalidInput("Missing signed_tx".to_string()))?;
+        
+        match chain {
+            "eth" => {
+                let tx_hash = self.broadcast_eth_transaction(signed_tx).await?;
+                Ok(json!({ "tx_hash": tx_hash }))
+            }
+            "sol" => {
+                let tx_hash = self.broadcast_sol_transaction(signed_tx).await?;
+                Ok(json!({ "tx_hash": tx_hash }))
+            }
+            _ => Err(AloudError::InvalidInput(format!("Unsupported chain: {}", chain)))
+        }
     }
 }

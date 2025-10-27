@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use worker::console_log;
-use crate::utils::error::{AloudError, Result};
+use crate::utils::error::Result;
 
 /// Payment tool for blockchain payments (simplified from MCP server)
 pub struct PaymentTool {
@@ -36,7 +36,7 @@ impl PaymentTool {
         console_log!("Getting balance for {} (token: {:?})", address, token_symbol);
         
         // 使用 RPC 调用查询余额
-        let request_body = if token_symbol.is_some() {
+        let _request_body = if token_symbol.is_some() {
             // ERC20 token balance
             json!({
                 "jsonrpc": "2.0",
@@ -90,7 +90,7 @@ impl PaymentTool {
     pub async fn get_transaction_status(&self, tx_hash: &str) -> Result<Value> {
         console_log!("Getting transaction status for {}", tx_hash);
         
-        let request_body = json!({
+        let _request_body = json!({
             "jsonrpc": "2.0",
             "method": "eth_getTransactionReceipt",
             "params": [tx_hash],
