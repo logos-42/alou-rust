@@ -576,11 +576,21 @@ impl Router {
             }
         };
         
-        // Optional: Extract wallet address from Authorization header if not in body
-        let wallet_address = if body.wallet_address.is_some() {
-            body.wallet_address
-        } else {
-            self.extract_wallet_from_token(req).ok()
+        // Priority: request body > JWT token > session binding
+        // First, try to get wallet from request body or JWT
+        let wallet_address = body.wallet_address
+            .or_else(|| self.extract_wallet_from_token(req).ok());
+        
+        // If still no wallet address, try to get from session
+        let wallet_address = match wallet_address {
+            Some(addr) => Some(addr),
+            None => {
+                // Try to get from session
+                match self.session_manager.get_session(&body.session_id).await {
+                    Ok(session) => session.wallet_address,
+                    Err(_) => None,
+                }
+            }
         };
         
         // Handle message

@@ -52,34 +52,39 @@
     <div class="chat-container">
       <!-- 消息区域 -->
       <div class="messages-area" ref="messagesContainer">
-          <div v-if="messages.length === 0" class="welcome-screen">
-            <div class="welcome-content">
-              <div class="welcome-icon">🚀</div>
-              <h2>欢迎使用Alou智能助手</h2>
-              <p>我是区块链支付的AI助手，很高兴为您提供智能服务。</p>
-              <div class="quick-actions">
-                <button class="quick-action-btn" @click="sendQuickMessage('帮我查询钱包余额')">
-                  <span class="action-icon">💰</span>
-                  <span>查询钱包余额</span>
-                </button>
-                <button class="quick-action-btn" @click="sendQuickMessage('如何发送代币？')">
-                  <span class="action-icon">📤</span>
-                  <span>发送代币</span>
-                </button>
-                <button class="quick-action-btn" @click="sendQuickMessage('查看交易历史')">
-                  <span class="action-icon">📊</span>
-                  <span>交易历史</span>
-                </button>
+          <!-- 封面欢迎屏幕 - 带淡入淡出过渡 -->
+          <Transition name="fade">
+            <div v-if="showWelcomeScreen" class="welcome-screen">
+              <div class="welcome-content">
+                <div class="welcome-icon">🚀</div>
+                <h2>欢迎使用Alou智能助手</h2>
+                <p>我是区块链支付的AI助手，很高兴为您提供智能服务。</p>
+                <div class="quick-actions">
+                  <button class="quick-action-btn" @click="sendQuickMessage('帮我查询钱包余额')">
+                    <span class="action-icon">💰</span>
+                    <span>查询钱包余额</span>
+                  </button>
+                  <button class="quick-action-btn" @click="sendQuickMessage('如何发送代币？')">
+                    <span class="action-icon">📤</span>
+                    <span>发送代币</span>
+                  </button>
+                  <button class="quick-action-btn" @click="sendQuickMessage('查看交易历史')">
+                    <span class="action-icon">📊</span>
+                    <span>交易历史</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </Transition>
 
-          <div 
-            v-for="message in messages" 
-            :key="message.id"
-            class="message-wrapper"
-            :class="message.type"
-          >
+          <!-- 消息列表 -->
+          <TransitionGroup name="message" tag="div">
+            <div 
+              v-for="message in messages" 
+              :key="message.id"
+              class="message-wrapper"
+              :class="message.type"
+            >
             <div class="message-bubble">
               <div class="message-content" v-html="formatMessage(message.content)"></div>
               <div class="message-footer">
@@ -87,7 +92,8 @@
                 <span v-if="message.source" class="source-tag">{{ formatSource(message.source) }}</span>
               </div>
             </div>
-          </div>
+            </div>
+          </TransitionGroup>
           
           <!-- 加载指示器 -->
           <div v-if="isLoading" class="message-wrapper assistant">
@@ -142,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
@@ -181,13 +187,15 @@ const messageInput = ref<HTMLTextAreaElement>()
 const router = useRouter()
 const authStore = useAuthStore()
 const showUserMenu = ref(false)
+const showWelcomeScreen = ref(true) // 封面显示状态
 
 // API配置 - 连接到alou-edge Worker
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.alou.onl'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 const sessionId = ref(`frontend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
+const isSessionReady = ref(false)
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   // 检查系统主题偏好
   const savedTheme = localStorage.getItem('alou-theme')
   if (savedTheme) {
@@ -196,9 +204,57 @@ onMounted(() => {
     isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
   }
   
-  checkConnection()
-  addWelcomeMessage()
+  await checkConnection()
+  await createSession()
+  isSessionReady.value = true
+  // 不再自动添加欢迎消息，使用封面
+  
+  // 监听钱包切换事件
+  window.addEventListener('wallet-changed', handleWalletChanged)
 })
+
+// 钱包切换处理函数
+const handleWalletChanged = async (event: Event) => {
+  const customEvent = event as CustomEvent<{ address: string }>
+  console.log('Wallet changed, recreating session...', customEvent.detail.address)
+  
+  // 清空当前对话
+  messages.value = []
+  showWelcomeScreen.value = true
+  
+  // 重新创建 session
+  await createSession()
+  isSessionReady.value = true
+}
+
+// 清理事件监听器
+onUnmounted(() => {
+  window.removeEventListener('wallet-changed', handleWalletChanged as EventListener)
+})
+
+// 创建会话
+async function createSession() {
+  try {
+    const walletAddress = localStorage.getItem('wallet_address')
+    
+    const response = await fetch(`${API_BASE_URL}/api/session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        wallet_address: walletAddress || undefined
+      })
+    })
+    if (response.ok) {
+      const data = await response.json()
+      sessionId.value = data.session_id
+      console.log('Session created with wallet:', walletAddress, 'session_id:', sessionId.value)
+    }
+  } catch (error) {
+    console.error('Failed to create session:', error)
+  }
+}
 
 // 监听主题变化
 watch(isDarkMode, (newValue) => {
@@ -226,6 +282,19 @@ async function checkConnection() {
 
 async function sendMessage() {
   if (!currentMessage.value.trim() || isLoading.value) return
+  
+  // 确保 session 已准备好
+  if (!isSessionReady.value) {
+    await createSession()
+    isSessionReady.value = true
+  }
+  
+  // 触发封面淡出动画
+  if (showWelcomeScreen.value) {
+    showWelcomeScreen.value = false
+    // 等待淡出动画完成后再添加消息
+    await new Promise(resolve => setTimeout(resolve, 400))
+  }
 
   const userMessage: Message = {
     id: `user_${Date.now()}`,
@@ -243,6 +312,8 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
+    const walletAddress = localStorage.getItem('wallet_address')
+    
     const response = await fetch(`${API_BASE_URL}/api/agent/chat`, {
       method: 'POST',
       headers: {
@@ -251,7 +322,7 @@ async function sendMessage() {
       body: JSON.stringify({
         session_id: sessionId.value,
         message: messageToSend,
-        wallet_address: null
+        wallet_address: walletAddress || undefined
       })
     })
 
@@ -332,9 +403,23 @@ async function handleLogout() {
   // 不需要跳转，因为主页不需要登录
 }
 
-function sendQuickMessage(message: string) {
+async function sendQuickMessage(message: string) {
+  // 确保 session 已准备好
+  if (!isSessionReady.value) {
+    console.log('Waiting for session to be ready...')
+    await createSession()
+    isSessionReady.value = true
+  }
+  
+  // 触发封面淡出动画
+  if (showWelcomeScreen.value) {
+    showWelcomeScreen.value = false
+    // 等待淡出动画完成
+    await new Promise(resolve => setTimeout(resolve, 400))
+  }
+  
   currentMessage.value = message
-  sendMessage()
+  await sendMessage()
 }
 
 function newLine() {
@@ -1141,5 +1226,64 @@ function scrollToBottom() {
 
 .messages-area::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+/* 淡入淡出过渡动画 - 用于封面 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.fade-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.fade-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+/* 消息过渡动画 - 用于消息列表 */
+.message-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.message-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+
+.message-enter-to {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.message-leave-active {
+  transition: all 0.2s ease-in;
+}
+
+.message-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.message-leave-to {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.9);
+}
+
+.message-move {
+  transition: transform 0.3s ease;
 }
 </style>

@@ -22,6 +22,23 @@ impl PromptMode {
         }
     }
     
+    pub fn system_prompt_with_wallet(&self, wallet_address: Option<&str>) -> String {
+        let base_prompt = self.system_prompt();
+        
+        if let Some(address) = wallet_address {
+            format!(
+                "{}\n\n=== 当前钱包信息 ===\n已连接钱包地址：{}\n\n你可以直接使用该地址查询余额、发送交易等操作，无需再询问用户钱包地址。",
+                base_prompt,
+                address
+            )
+        } else {
+            format!(
+                "{}\n\n=== 钱包状态 ===\n当前未连接钱包。如需执行链上操作（如查询余额、发送交易），请先提示用户连接钱包。",
+                base_prompt
+            )
+        }
+    }
+    
     pub fn detect_from_message(message: &str) -> Self {
         let message_lower = message.to_lowercase();
         

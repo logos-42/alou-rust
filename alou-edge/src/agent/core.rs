@@ -101,7 +101,6 @@ impl AgentCore {
     ) -> Result<AgentResponse> {
         // Detect prompt mode from user message
         let prompt_mode = PromptMode::detect_from_message(message);
-        let system_prompt = prompt_mode.system_prompt();
         
         // Add user message to session
         self.session_manager
@@ -114,23 +113,29 @@ impl AgentCore {
         // Get session to extract chain info
         let session = self.session_manager.get_session(session_id).await?;
         
+        // Get wallet address from parameter or session
+        let wallet = wallet_address.or(session.wallet_address);
+        
         // Create agent context
-        let context = if let Some(wallet) = wallet_address.or(session.wallet_address) {
+        let context = if let Some(w) = wallet.clone() {
             AgentContext {
                 session_id: session_id.to_string(),
-                wallet_address: Some(wallet),
+                wallet_address: Some(w),
                 chain: None, // TODO: Extract from session or JWT
             }
         } else {
             AgentContext::new(session_id.to_string())
         };
         
+        // Use dynamic system prompt based on wallet status
+        let system_prompt = prompt_mode.system_prompt_with_wallet(wallet.as_deref());
+        
         // Convert history to Claude messages
         let mut messages = self.history_to_claude_messages(&history);
         
         // Prepend system message if this is the first message in the conversation
         if messages.is_empty() || !messages.iter().any(|m| m.role == "system") {
-            messages.insert(0, ClaudeMessage::text("system", system_prompt.to_string()));
+            messages.insert(0, ClaudeMessage::text("system", system_prompt));
         }
         
         // Get available tools

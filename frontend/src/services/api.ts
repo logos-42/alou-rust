@@ -7,7 +7,7 @@ import Cookies from 'js-cookie'
 
 // API base URL - use local dev server in development
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://api.alou.onl')
+  (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({

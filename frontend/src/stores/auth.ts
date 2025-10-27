@@ -79,6 +79,11 @@ export const useAuthStore = defineStore('auth', () => {
       
       user.value = mockUser
       isAuthenticated.value = true
+      
+      // 触发钱包切换事件
+      window.dispatchEvent(new CustomEvent('wallet-changed', { 
+        detail: { address: address.toLowerCase() } 
+      }))
 
       return { user: mockUser, token: mockToken }
     } catch (err: any) {
@@ -142,6 +147,11 @@ export const useAuthStore = defineStore('auth', () => {
       
       user.value = mockUser
       isAuthenticated.value = true
+      
+      // 触发钱包切换事件
+      window.dispatchEvent(new CustomEvent('wallet-changed', { 
+        detail: { address: address.toLowerCase() } 
+      }))
 
       return { user: mockUser, token: mockToken }
     } catch (err: any) {
