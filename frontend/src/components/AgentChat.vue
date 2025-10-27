@@ -272,7 +272,8 @@ async function sendMessage() {
         sessionId.value = agentData.session_id
       }
     } else {
-      throw new Error(`HTTP ${response.status}`)
+      const errorData = await response.json().catch(() => ({ error: '未知错误' }))
+      throw new Error(`HTTP ${response.status}: ${errorData.error || response.statusText}`)
     }
   } catch (error) {
     const errorMessage: Message = {
@@ -630,13 +631,13 @@ function scrollToBottom() {
   width: 100%;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   scroll-behavior: smooth;
-  display: flex;
-  flex-direction: column;
+  padding: 1rem 0;
 }
 
 .welcome-screen {
-  flex: 1;
+  min-height: calc(100vh - 300px);
   display: flex;
   align-items: center;
   justify-content: center;
