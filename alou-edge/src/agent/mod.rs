@@ -6,6 +6,8 @@ pub mod providers;
 pub mod ai_client;
 pub mod tools;
 pub mod blockchain_agent;
+pub mod prompts;
 
 pub use core::AgentCore;
 pub use session::SessionManager;
+pub use prompts::PromptMode;

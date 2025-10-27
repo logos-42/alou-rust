@@ -5,6 +5,7 @@ use crate::agent::context::AgentContext;
 use crate::agent::session::{SessionManager, Message};
 use crate::agent::claude_client::{ClaudeClient, ClaudeMessage, ClaudeTool, ToolUse};
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
+use crate::agent::prompts::PromptMode;
 use crate::mcp::executor::{McpExecutor, ToolCall};
 use crate::utils::error::{AloudError, Result};
 
@@ -97,6 +98,10 @@ impl AgentCore {
         message: &str,
         wallet_address: Option<String>,
     ) -> Result<AgentResponse> {
+        // Detect prompt mode from user message
+        let prompt_mode = PromptMode::detect_from_message(message);
+        let system_prompt = prompt_mode.system_prompt();
+        
         // Add user message to session
         self.session_manager
             .add_message(session_id, "user", message)
@@ -121,6 +126,11 @@ impl AgentCore {
         
         // Convert history to Claude messages
         let mut messages = self.history_to_claude_messages(&history);
+        
+        // Prepend system message if this is the first message in the conversation
+        if messages.is_empty() || !messages.iter().any(|m| m.role == "system") {
+            messages.insert(0, ClaudeMessage::text("system", system_prompt.to_string()));
+        }
         
         // Get available tools
         let tools = self.get_claude_tools();
