@@ -722,38 +722,30 @@ function scrollToBottom() {
 .message-wrapper {
   display: flex;
   animation: fadeInUp 0.3s ease;
-  padding: 2rem 0;
-  min-height: 100px;
+  padding: 1.5rem clamp(1rem, 5vw, 4rem);
 }
 
 .message-wrapper.user {
   background: var(--background);
-  justify-content: center;
-  border-bottom: 1px solid var(--border-color);
+  justify-content: flex-start;
 }
 
 .message-wrapper.assistant {
   background: var(--surface);
-  justify-content: center;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.message-wrapper:last-child {
-  border-bottom: none;
+  justify-content: flex-start;
 }
 
 .message-bubble {
   width: 100%;
-  max-width: 100%;
-  padding: 0 clamp(1rem, 5vw, 4rem);
+  max-width: 1400px;
   word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .message-content {
   line-height: 1.8;
   font-size: 1rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .message-content :deep(strong) {
@@ -1093,11 +1085,7 @@ function scrollToBottom() {
   }
   
   .message-wrapper {
-    padding: 1.5rem 0;
-  }
-
-  .message-bubble {
-    padding: 0 1rem;
+    padding: 1.5rem 1rem;
   }
 
   .message-content {
