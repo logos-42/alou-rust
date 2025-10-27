@@ -233,7 +233,8 @@ impl AgentCore {
             // If no tool calls, we're done
             if response.tool_calls.is_empty() {
                 console_log!("AgentCore: Final response, content length: {}", response.content.len());
-                console_log!("AgentCore: Content preview: {}", &response.content[..response.content.len().min(100)]);
+                let preview = response.content.chars().take(100).collect::<String>();
+                console_log!("AgentCore: Content preview: {}", preview);
                 
                 // Add assistant response to session
                 self.session_manager

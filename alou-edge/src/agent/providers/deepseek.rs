@@ -195,10 +195,11 @@ impl AiProvider for DeepSeekProvider {
             .await
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
         
-        console_log!("DeepSeek: Raw response: {}", &response_text[..response_text.len().min(500)]);
+        let preview = response_text.chars().take(500).collect::<String>();
+        console_log!("DeepSeek: Raw response: {}", preview);
         
         let deepseek_response: DeepSeekResponse = serde_json::from_str(&response_text)
-            .map_err(|e| AloudError::AgentError(format!("Parse error: {}", e)))?;
+            .map_err(|e| AloudError::AgentError(format!("Parse error: {} | Response: {}", e, response_text)))?;
         
         console_log!("DeepSeek: Parsed response, {} choices", deepseek_response.choices.len());
         
@@ -207,8 +208,12 @@ impl AiProvider for DeepSeekProvider {
             .first()
             .ok_or_else(|| AloudError::AgentError("No choices in response".to_string()))?;
         
+        console_log!("DeepSeek: Choice finish_reason: {}", choice.finish_reason);
+        console_log!("DeepSeek: Message content is_some: {}", choice.message.content.is_some());
+        
         let content = choice.message.content.clone().unwrap_or_default();
-        console_log!("DeepSeek: Content length: {}, content: {}", content.len(), &content[..content.len().min(100)]);
+        let content_preview = content.chars().take(100).collect::<String>();
+        console_log!("DeepSeek: Content length: {}, content: '{}'", content.len(), content_preview);
         
         let tool_calls: Vec<AiToolCall> = choice
             .message
