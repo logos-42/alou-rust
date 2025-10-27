@@ -12,7 +12,7 @@ use router::Router;
 use storage::kv::KvStore;
 use agent::{AgentCore, SessionManager};
 use mcp::{McpRegistry, McpExecutor, McpBridge, McpConnectionPool};
-use mcp::tools::{EchoTool, WalletAuthTool, QueryTool, TransactionTool, BroadcastTool};
+use mcp::tools::{EchoTool, WalletAuthTool, QueryTool, TransactionTool, BroadcastTool, WorkflowTool};
 
 /// Worker main entry point
 /// 
@@ -184,6 +184,10 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     // Register built-in tools
     registry.register(Arc::new(EchoTool));
     console_log!("  ✓ Registered EchoTool");
+    
+    // Register workflow tool
+    registry.register(Arc::new(WorkflowTool::new()));
+    console_log!("  ✓ Registered WorkflowTool");
     
     // Register blockchain tools
     registry.register(Arc::new(WalletAuthTool::new(nonces_store.clone(), jwt_secret.clone())));
