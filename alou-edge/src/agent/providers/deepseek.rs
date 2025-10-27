@@ -104,6 +104,7 @@ impl AiProvider for DeepSeekProvider {
         tools: Option<Vec<AiTool>>,
     ) -> Result<AiResponse> {
         console_log!("DeepSeek: Sending request to {}", DEEPSEEK_API_URL);
+        console_log!("DeepSeek: Model: {}, Messages: {}", self.model, messages.len());
         
         let deepseek_messages: Vec<DeepSeekMessage> = messages
             .into_iter()
@@ -194,8 +195,12 @@ impl AiProvider for DeepSeekProvider {
             .await
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
         
+        console_log!("DeepSeek: Raw response: {}", &response_text[..response_text.len().min(500)]);
+        
         let deepseek_response: DeepSeekResponse = serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse error: {}", e)))?;
+        
+        console_log!("DeepSeek: Parsed response, {} choices", deepseek_response.choices.len());
         
         let choice = deepseek_response
             .choices
@@ -203,6 +208,7 @@ impl AiProvider for DeepSeekProvider {
             .ok_or_else(|| AloudError::AgentError("No choices in response".to_string()))?;
         
         let content = choice.message.content.clone().unwrap_or_default();
+        console_log!("DeepSeek: Content length: {}, content: {}", content.len(), &content[..content.len().min(100)]);
         
         let tool_calls: Vec<AiToolCall> = choice
             .message
