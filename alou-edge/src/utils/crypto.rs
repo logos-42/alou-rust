@@ -169,7 +169,7 @@ pub fn generate_nonce() -> String {
     let mut bytes = [0u8; 32];
     let _ = getrandom(&mut bytes).map_err(|_| {
         // Fallback to timestamp-based nonce if getrandom fails
-        let timestamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+        let timestamp = crate::utils::time::now_timestamp_nanos();
         bytes[..8].copy_from_slice(&timestamp.to_le_bytes());
     });
     

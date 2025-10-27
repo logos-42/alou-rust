@@ -3,11 +3,16 @@ main = "index.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Disable Rust build for now - using pure TypeScript
+# Rust WASM build disabled due to time API issues in WASM environment
+# Use TypeScript implementation for now
 # [build]
-# command = "cargo build --target wasm32-unknown-unknown --release"
+# command = "worker-build --release"
 
-# [[rules]]
+# [build.upload]
+# format = "modules"
+# main = "./build/worker/shim.mjs"
+
+# [[build.upload.rules]]
 # type = "CompiledWasm"
 # globs = ["**/*.wasm"]
 # fallthrough = true

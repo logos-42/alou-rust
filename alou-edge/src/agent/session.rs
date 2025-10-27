@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::Utc;
 use crate::storage::kv::KvStore;
 use crate::utils::error::{AloudError, Result};
 
@@ -22,7 +21,7 @@ impl Message {
         Self {
             role,
             content,
-            timestamp: Utc::now().timestamp(),
+            timestamp: crate::utils::time::now_timestamp(),
             tool_call_id: None,
         }
     }
@@ -46,7 +45,7 @@ pub struct Session {
 
 impl Session {
     pub fn new(session_id: String, wallet_address: Option<String>) -> Self {
-        let now = Utc::now().timestamp();
+        let now = crate::utils::time::now_timestamp();
         Self {
             session_id,
             wallet_address,
@@ -64,7 +63,7 @@ impl Session {
         }
         
         self.messages.push(message);
-        self.updated_at = Utc::now().timestamp();
+        self.updated_at = crate::utils::time::now_timestamp();
     }
 }
 

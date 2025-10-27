@@ -289,7 +289,7 @@ impl Router {
     async fn handle_health(&self) -> Result<Response> {
         let response = HealthResponse {
             status: "healthy".to_string(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: crate::utils::time::now_rfc3339(),
         };
         Response::from_json(&response)
     }
@@ -313,7 +313,7 @@ impl Router {
                 },
             },
             metrics: self.metrics.snapshot(),
-            timestamp: chrono::Utc::now().to_rfc3339(),
+            timestamp: crate::utils::time::now_rfc3339(),
         };
         Response::from_json(&response)
     }

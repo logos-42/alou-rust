@@ -4,7 +4,6 @@ use crate::storage::kv::KvStore;
 use crate::web3::signer::verify_signature;
 use jwt_simple::prelude::*;
 use serde::{Deserialize, Serialize};
-use chrono::Utc;
 
 /// JWT Claims for wallet authentication
 #[derive(Debug, Serialize, Deserialize)]
@@ -40,7 +39,7 @@ impl WalletAuth {
     /// Nonce is stored in KV with 5 minute TTL
     pub async fn generate_nonce_for_address(&self, address: &str) -> Result<String> {
         let nonce = generate_nonce();
-        let now = Utc::now().timestamp();
+        let now = crate::utils::time::now_timestamp();
         let expires_at = now + 300; // 5 minutes
         
         let auth_nonce = AuthNonce {
@@ -73,7 +72,7 @@ impl WalletAuth {
             .ok_or_else(|| AloudError::AuthError("Nonce not found".to_string()))?;
         
         // Check if nonce is expired
-        let now = Utc::now().timestamp();
+        let now = crate::utils::time::now_timestamp();
         if now > auth_nonce.expires_at {
             return Err(AloudError::NonceExpired);
         }
@@ -102,13 +101,13 @@ impl WalletAuth {
     /// Create a JWT token for authenticated wallet
     /// Token is valid for 24 hours
     pub fn create_token(&self, wallet_address: &str, chain: ChainType) -> Result<String> {
-        let now = Utc::now();
+        let now_ts = crate::utils::time::now_timestamp();
         
         let claims = WalletClaims {
             wallet_address: wallet_address.to_string(),
             chain: chain.as_str().to_string(),
-            exp: now.timestamp() + 86400, // 24 hours
-            iat: now.timestamp(),
+            exp: now_ts + 86400, // 24 hours
+            iat: now_ts,
         };
         
         let claims_jwt = Claims::with_custom_claims(claims, Duration::from_hours(24));

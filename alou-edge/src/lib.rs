@@ -39,7 +39,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     // Log incoming request with timestamp
     console_log!(
         "[{}] {} {}",
-        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"),
+        crate::utils::time::now_formatted(),
         req.method().to_string(),
         req.path()
     );

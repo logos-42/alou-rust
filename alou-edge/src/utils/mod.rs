@@ -3,6 +3,7 @@ pub mod crypto;
 pub mod metrics;
 pub mod batch;
 pub mod async_lock;
+pub mod time;
 
 // Re-exports for convenience (may be unused in lib.rs but used by other modules)
 #[allow(unused_imports)]
