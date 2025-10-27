@@ -4,6 +4,7 @@ use worker::console_log;
 use crate::utils::error::Result;
 
 /// Payment tool for blockchain payments (simplified from MCP server)
+#[allow(dead_code)]
 pub struct PaymentTool {
     eth_rpc_url: String,
 }
@@ -32,6 +33,7 @@ impl PaymentTool {
     }
 
     /// Get balance (ETH or token)
+    #[allow(dead_code)]
     pub async fn get_balance(&self, address: &str, token_symbol: Option<&str>) -> Result<Value> {
         console_log!("Getting balance for {} (token: {:?})", address, token_symbol);
         
@@ -67,6 +69,7 @@ impl PaymentTool {
     }
 
     /// Send transaction (simplified - returns unsigned transaction data)
+    #[allow(dead_code)]
     pub async fn prepare_transaction(
         &self,
         to: &str,
@@ -87,6 +90,7 @@ impl PaymentTool {
     }
 
     /// Get transaction status
+    #[allow(dead_code)]
     pub async fn get_transaction_status(&self, tx_hash: &str) -> Result<Value> {
         console_log!("Getting transaction status for {}", tx_hash);
         
@@ -122,6 +126,7 @@ impl PaymentTool {
     }
 
     /// Validate Ethereum address
+    #[allow(dead_code)]
     pub fn validate_address(&self, address: &str) -> bool {
         // 简单验证：0x 开头，42 个字符
         address.starts_with("0x") && address.len() == 42

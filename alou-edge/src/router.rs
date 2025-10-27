@@ -1,4 +1,4 @@
-use worker::*;
+﻿use worker::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use crate::agent::session::SessionManager;
@@ -8,6 +8,25 @@ use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::utils::metrics::MetricsCollector;
 use crate::web3::auth::WalletAuth;
+
+// Helper function to create JSON response with UTF-8 charset
+fn json_response<T: Serialize>(data: &T) -> Result<Response> {
+    let json = serde_json::to_string(data)
+        .map_err(|e| worker::Error::RustError(format!("JSON serialization error: {}", e)))?;
+    
+    let mut response = Response::ok(json)?;
+    response.headers_mut().set("Content-Type", "application/json; charset=utf-8")?;
+    Ok(response)
+}
+
+fn json_response_with_status<T: Serialize>(data: &T, status: u16) -> Result<Response> {
+    let json = serde_json::to_string(data)
+        .map_err(|e| worker::Error::RustError(format!("JSON serialization error: {}", e)))?;
+    
+    let mut response = Response::ok(json)?.with_status(status);
+    response.headers_mut().set("Content-Type", "application/json; charset=utf-8")?;
+    Ok(response)
+}
 
 #[derive(Deserialize)]
 struct CreateSessionRequest {
@@ -280,7 +299,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Route not found: {} {}", method, path),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(404))
+                json_response_with_status(&error_response, 404)
             }
         }
     }
@@ -291,7 +310,7 @@ impl Router {
             status: "healthy".to_string(),
             timestamp: crate::utils::time::now_rfc3339(),
         };
-        Response::from_json(&response)
+        json_response(&response)
     }
     
     /// GET /api/status - Service status endpoint
@@ -315,7 +334,7 @@ impl Router {
             metrics: self.metrics.snapshot(),
             timestamp: crate::utils::time::now_rfc3339(),
         };
-        Response::from_json(&response)
+        json_response(&response)
     }
     
     async fn handle_create_session(&self, req: &mut Request) -> Result<Response> {
@@ -332,13 +351,13 @@ impl Router {
         match self.session_manager.create_session(body.wallet_address).await {
             Ok(session_id) => {
                 let response = CreateSessionResponse { session_id };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -346,19 +365,19 @@ impl Router {
     async fn handle_get_session(&self, session_id: &str) -> Result<Response> {
         match self.session_manager.get_session(session_id).await {
             Ok(session) => {
-                Response::from_json(&session)
+                json_response(&session)
             }
             Err(AloudError::InvalidInput(_)) => {
                 let error_response = ErrorResponse {
                     error: format!("Session not found: {}", session_id),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(404))
+                json_response_with_status(&error_response, 404)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -372,7 +391,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -384,7 +403,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Wallet authentication not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -394,13 +413,13 @@ impl Router {
                     nonce: nonce.clone(),
                     message: format!("Sign this message to authenticate: {}", nonce),
                 };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -412,7 +431,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Wallet authentication not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -422,7 +441,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -432,7 +451,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -449,25 +468,25 @@ impl Router {
                     wallet_address: body.address,
                     chain: body.chain,
                 };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(AloudError::InvalidSignature) => {
                 let error_response = ErrorResponse {
                     error: "Invalid signature".to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(401))
+                json_response_with_status(&error_response, 401)
             }
             Err(AloudError::NonceExpired) => {
                 let error_response = ErrorResponse {
                     error: "Nonce expired".to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(401))
+                json_response_with_status(&error_response, 401)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -479,7 +498,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Wallet authentication not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -492,7 +511,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Missing Authorization header".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(401));
+                return json_response_with_status(&error_response, 401);
             }
         };
         
@@ -502,13 +521,13 @@ impl Router {
                     wallet_address,
                     chain: chain.as_str().to_string(),
                 };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: format!("Invalid token: {}", e),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(401))
+                json_response_with_status(&error_response, 401)
             }
         }
     }
@@ -520,7 +539,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Agent not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -531,7 +550,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -553,13 +572,13 @@ impl Router {
                     session_id: response.session_id,
                     tool_calls: response.tool_calls,
                 };
-                Response::from_json(&chat_response)
+                json_response(&chat_response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -570,7 +589,7 @@ impl Router {
         let error_response = ErrorResponse {
             error: "Streaming not yet implemented. Use /api/agent/chat instead.".to_string(),
         };
-        Ok(Response::from_json(&error_response)?.with_status(501))
+        json_response_with_status(&error_response, 501)
     }
     
     /// Extract wallet address from Authorization token (optional)
@@ -603,7 +622,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Blockchain tools not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -628,7 +647,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -645,7 +664,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Unsupported chain: {}", body.chain),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -656,13 +675,13 @@ impl Router {
                     chain: body.chain,
                     balance,
                 };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -674,7 +693,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Transaction tools not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -692,7 +711,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -704,7 +723,7 @@ impl Router {
                         let error_response = ErrorResponse {
                             error: e.to_string(),
                         };
-                        return Ok(Response::from_json(&error_response)?.with_status(500));
+                        return json_response_with_status(&error_response, 500);
                     }
                 }
             }
@@ -715,7 +734,7 @@ impl Router {
                         let error_response = ErrorResponse {
                             error: e.to_string(),
                         };
-                        return Ok(Response::from_json(&error_response)?.with_status(500));
+                        return json_response_with_status(&error_response, 500);
                     }
                 }
             }
@@ -723,11 +742,11 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Unsupported chain: {}", body.chain),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
-        Response::from_json(&tx_data)
+        json_response(&tx_data)
     }
     
     async fn handle_broadcast_transaction(&self, req: &mut Request) -> Result<Response> {
@@ -737,7 +756,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Broadcast tools not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -759,7 +778,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -774,7 +793,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Unsupported chain: {}", body.chain),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
@@ -784,13 +803,13 @@ impl Router {
                     tx_hash,
                     chain: body.chain,
                 };
-                Response::from_json(&response)
+                json_response(&response)
             }
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
@@ -802,7 +821,7 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: "Broadcast tools not configured".to_string(),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(500));
+                return json_response_with_status(&error_response, 500);
             }
         };
         
@@ -825,18 +844,20 @@ impl Router {
                 let error_response = ErrorResponse {
                     error: format!("Unsupported chain: {}", chain),
                 };
-                return Ok(Response::from_json(&error_response)?.with_status(400));
+                return json_response_with_status(&error_response, 400);
             }
         };
         
         match receipt {
-            Ok(receipt) => Response::from_json(&receipt),
+            Ok(receipt) => json_response(&receipt),
             Err(e) => {
                 let error_response = ErrorResponse {
                     error: e.to_string(),
                 };
-                Ok(Response::from_json(&error_response)?.with_status(500))
+                json_response_with_status(&error_response, 500)
             }
         }
     }
 }
+
+

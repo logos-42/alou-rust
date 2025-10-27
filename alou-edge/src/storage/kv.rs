@@ -134,6 +134,7 @@ impl KvStore {
     }
     
     /// Get with cache-aside pattern: try cache first, then fallback
+    #[allow(dead_code)]
     pub async fn get_or_compute<T, F, Fut>(
         &self,
         key: &str,
@@ -160,6 +161,7 @@ impl KvStore {
     }
     
     /// Batch get operation for multiple keys
+    #[allow(dead_code)]
     pub async fn get_batch<T>(&self, keys: &[String]) -> Result<Vec<Option<T>>>
     where
         T: for<'de> Deserialize<'de>,
@@ -174,6 +176,7 @@ impl KvStore {
     }
     
     /// Invalidate cache by prefix (useful for clearing related data)
+    #[allow(dead_code)]
     pub async fn invalidate_prefix(&self, prefix: &str) -> Result<usize> {
         let keys = self.list(prefix, Some(1000)).await?;
         let count = keys.len();

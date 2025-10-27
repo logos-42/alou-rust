@@ -1,6 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
+#[allow(dead_code)]
 pub enum AloudError {
     // Agent errors
     #[error("Agent error: {0}")]

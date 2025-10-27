@@ -79,6 +79,7 @@ impl McpRegistry {
     }
     
     /// Get the number of registered tools
+    #[allow(dead_code)]
     pub fn tool_count(&self) -> usize {
         self.tools.len()
     }

@@ -21,6 +21,7 @@ impl McpBridge {
     }
     
     /// Create a new MCP bridge with default pool
+    #[allow(dead_code)]
     pub fn with_defaults() -> Self {
         Self::new(Arc::new(McpConnectionPool::with_defaults()))
     }
@@ -69,6 +70,7 @@ impl McpBridge {
     }
     
     /// Get a reference to the registry
+    #[allow(dead_code)]
     pub fn registry(&self) -> Arc<crate::utils::async_lock::RwLock<McpRegistry>> {
         self.registry.clone()
     }
@@ -86,12 +88,14 @@ impl McpBridge {
     }
     
     /// Get the total number of registered tools
+    #[allow(dead_code)]
     pub async fn tool_count(&self) -> usize {
         let registry = self.registry.read().await;
         registry.tool_count()
     }
     
     /// Register a local tool (not from an MCP server)
+    #[allow(dead_code)]
     pub async fn register_local_tool(&self, tool: Arc<dyn crate::mcp::registry::McpTool>) {
         let mut registry = self.registry.write().await;
         registry.register(tool);

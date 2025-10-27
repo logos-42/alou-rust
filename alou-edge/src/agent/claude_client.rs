@@ -145,6 +145,7 @@ enum ResponseContent {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct Usage {
     input_tokens: u32,
     output_tokens: u32,
