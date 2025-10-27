@@ -42,14 +42,8 @@ impl BlockchainAgent {
         console_log!("Processing message: {}", user_message);
         
         let messages = vec![
-            AiMessage {
-                role: "system".to_string(),
-                content: "You are a blockchain assistant. You can help users query balances, build transactions, and broadcast transactions on Ethereum and Solana networks.".to_string(),
-            },
-            AiMessage {
-                role: "user".to_string(),
-                content: user_message.to_string(),
-            },
+            AiMessage::text("system", "You are a blockchain assistant. You can help users query balances, build transactions, and broadcast transactions on Ethereum and Solana networks.".to_string()),
+            AiMessage::text("user", user_message.to_string()),
         ];
         
         let tools = self.get_available_tools();

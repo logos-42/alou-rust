@@ -143,19 +143,42 @@ impl AgentCore {
                 let ai_messages: Vec<AiMessage> = messages
                     .iter()
                     .map(|m| {
-                        // Extract text content from ContentBlocks
-                        let content = m.content
-                            .iter()
-                            .filter_map(|block| match block {
-                                crate::agent::claude_client::ContentBlock::Text { text } => Some(text.clone()),
-                                _ => None,
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
+                        // Extract text content and tool calls from ContentBlocks
+                        let mut text_parts = Vec::new();
+                        let mut tool_uses = Vec::new();
+                        let mut tool_result_id = None;
                         
-                        AiMessage {
-                            role: m.role.clone(),
-                            content,
+                        for block in &m.content {
+                            match block {
+                                crate::agent::claude_client::ContentBlock::Text { text } => {
+                                    text_parts.push(text.clone());
+                                },
+                                crate::agent::claude_client::ContentBlock::ToolUse { id, name, input } => {
+                                    tool_uses.push(crate::agent::ai_client::AiToolCall {
+                                        id: id.clone(),
+                                        name: name.clone(),
+                                        arguments: input.clone(),
+                                    });
+                                },
+                                crate::agent::claude_client::ContentBlock::ToolResult { tool_use_id, content } => {
+                                    tool_result_id = Some(tool_use_id.clone());
+                                    text_parts.push(content.clone());
+                                },
+                            }
+                        }
+                        
+                        let content = text_parts.join("\n");
+                        
+                        // Build appropriate message type
+                        if let Some(tool_id) = tool_result_id {
+                            // This is a tool result message
+                            AiMessage::tool_result(tool_id, content)
+                        } else if !tool_uses.is_empty() {
+                            // This is an assistant message with tool calls
+                            AiMessage::assistant_with_tools(content, tool_uses)
+                        } else {
+                            // Regular text message
+                            AiMessage::text(&m.role, content)
                         }
                     })
                     .collect();
@@ -214,7 +237,21 @@ impl AgentCore {
             let tool_results = self.execute_tool_calls(&response.tool_calls, &context).await;
             
             // Add assistant message with tool calls to history
-            if !response.content.is_empty() {
+            // For providers that need it (like DeepSeek), we need to include the tool calls in the assistant message
+            if self.ai_client.is_some() {
+                // For unified AI client (DeepSeek, etc.), add assistant message with tool calls
+                let mut assistant_msg = ClaudeMessage::text("assistant", response.content.clone());
+                // Add tool use blocks for Claude compatibility
+                for tool_use in &response.tool_calls {
+                    assistant_msg.content.push(crate::agent::claude_client::ContentBlock::ToolUse {
+                        id: tool_use.id.clone(),
+                        name: tool_use.name.clone(),
+                        input: tool_use.input.clone(),
+                    });
+                }
+                messages.push(assistant_msg);
+            } else if !response.content.is_empty() {
+                // For Claude client, just add text
                 messages.push(ClaudeMessage::text("assistant", response.content.clone()));
             }
             
@@ -223,7 +260,7 @@ impl AgentCore {
                 let result_str = serde_json::to_string(&result.result)
                     .unwrap_or_else(|_| "{}".to_string());
                 
-                // Add to Claude messages (using user role for tool results as per Claude API)
+                // Add to Claude messages (using tool result format)
                 messages.push(ClaudeMessage::with_tool_result(
                     "user",
                     tool_use.id.clone(),

@@ -32,6 +32,24 @@ struct DeepSeekRequest {
 struct DeepSeekMessage {
     role: String,
     content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<DeepSeekToolCallInMessage>>,
+}
+
+#[derive(Serialize)]
+struct DeepSeekToolCallInMessage {
+    id: String,
+    #[serde(rename = "type")]
+    call_type: String,
+    function: DeepSeekFunctionCallInMessage,
+}
+
+#[derive(Serialize)]
+struct DeepSeekFunctionCallInMessage {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Serialize)]
@@ -89,9 +107,26 @@ impl AiProvider for DeepSeekProvider {
         
         let deepseek_messages: Vec<DeepSeekMessage> = messages
             .into_iter()
-            .map(|m| DeepSeekMessage {
-                role: m.role,
-                content: m.content,
+            .map(|m| {
+                let tool_calls_in_msg = m.tool_calls.map(|tcs| {
+                    tcs.into_iter()
+                        .map(|tc| DeepSeekToolCallInMessage {
+                            id: tc.id,
+                            call_type: "function".to_string(),
+                            function: DeepSeekFunctionCallInMessage {
+                                name: tc.name,
+                                arguments: serde_json::to_string(&tc.arguments).unwrap_or_default(),
+                            },
+                        })
+                        .collect()
+                });
+                
+                DeepSeekMessage {
+                    role: m.role,
+                    content: m.content,
+                    tool_call_id: m.tool_call_id,
+                    tool_calls: tool_calls_in_msg,
+                }
             })
             .collect();
         

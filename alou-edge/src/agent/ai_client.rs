@@ -19,6 +19,44 @@ pub trait AiProvider {
 pub struct AiMessage {
     pub role: String,
     pub content: String,
+    /// Tool call ID (for tool result messages)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    /// Tool calls (for assistant messages with tool calls)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<AiToolCall>>,
+}
+
+impl AiMessage {
+    /// Create a simple text message
+    pub fn text(role: &str, content: String) -> Self {
+        Self {
+            role: role.to_string(),
+            content,
+            tool_call_id: None,
+            tool_calls: None,
+        }
+    }
+    
+    /// Create a tool result message
+    pub fn tool_result(tool_call_id: String, content: String) -> Self {
+        Self {
+            role: "tool".to_string(),
+            content,
+            tool_call_id: Some(tool_call_id),
+            tool_calls: None,
+        }
+    }
+    
+    /// Create an assistant message with tool calls
+    pub fn assistant_with_tools(content: String, tool_calls: Vec<AiToolCall>) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content,
+            tool_call_id: None,
+            tool_calls: Some(tool_calls),
+        }
+    }
 }
 
 /// Unified tool format
