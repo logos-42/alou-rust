@@ -8,7 +8,6 @@ use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::utils::metrics::MetricsCollector;
 use crate::web3::auth::WalletAuth;
-use std::time::Instant;
 
 #[derive(Deserialize)]
 struct CreateSessionRequest {
@@ -136,7 +135,7 @@ impl Router {
     }
     
     pub async fn handle(&self, mut req: Request, _env: Env) -> Result<Response> {
-        let start_time = Instant::now();
+        let start_time = crate::utils::time::now_timestamp_millis();
         let path = req.path();
         let method = req.method();
         
@@ -160,14 +159,15 @@ impl Router {
         let result = self.route_request(&mut req, &method, &path).await;
         
         // Calculate request duration
-        let duration = start_time.elapsed();
-        let duration_us = duration.as_micros() as u64;
+        let end_time = crate::utils::time::now_timestamp_millis();
+        let duration_us = ((end_time - start_time) * 1000) as u64; // Convert ms to microseconds
         
         // Record metrics
         let success = result.as_ref().map(|r| r.status_code() < 400).unwrap_or(false);
         self.metrics.record_request(&path, success, duration_us);
         
         // Log response
+        let duration_ms = (end_time - start_time) as f64;
         match &result {
             Ok(response) => {
                 console_log!(
@@ -175,7 +175,7 @@ impl Router {
                     method.to_string(),
                     path,
                     response.status_code(),
-                    duration.as_secs_f64() * 1000.0
+                    duration_ms
                 );
             }
             Err(e) => {
@@ -184,7 +184,7 @@ impl Router {
                     method.to_string(),
                     path,
                     e,
-                    duration.as_secs_f64() * 1000.0
+                    duration_ms
                 );
             }
         }
@@ -196,7 +196,7 @@ impl Router {
             let response_headers = r.headers_mut();
             let _ = response_headers.set(
                 "X-Response-Time",
-                &format!("{:.2}ms", duration.as_secs_f64() * 1000.0)
+                &format!("{:.2}ms", duration_ms)
             );
             let _ = response_headers.set(
                 "X-Request-ID",

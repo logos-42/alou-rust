@@ -110,11 +110,33 @@ impl WalletAuth {
             iat: now_ts,
         };
         
-        let claims_jwt = Claims::with_custom_claims(claims, Duration::from_hours(24));
+        // Manually create JWT to avoid jwt_simple's time functions
+        use serde_json::json;
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
         
-        let token = self.jwt_key.authenticate(claims_jwt)
-            .map_err(|e| AloudError::AuthError(format!("Failed to create token: {}", e)))?;
+        let header = json!({
+            "alg": "HS256",
+            "typ": "JWT"
+        });
         
+        let header_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_string(&header).unwrap());
+        let payload_b64 = URL_SAFE_NO_PAD.encode(serde_json::to_string(&claims).unwrap());
+        
+        let message = format!("{}.{}", header_b64, payload_b64);
+        
+        // Sign with HMAC-SHA256
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        type HmacSha256 = Hmac<Sha256>;
+        
+        let key_bytes = self.jwt_key.to_bytes();
+        let mut mac = HmacSha256::new_from_slice(&key_bytes)
+            .map_err(|e| AloudError::AuthError(format!("HMAC error: {}", e)))?;
+        mac.update(message.as_bytes());
+        let signature = mac.finalize().into_bytes();
+        let signature_b64 = URL_SAFE_NO_PAD.encode(&signature[..]);
+        
+        let token = format!("{}.{}", message, signature_b64);
         Ok(token)
     }
     
