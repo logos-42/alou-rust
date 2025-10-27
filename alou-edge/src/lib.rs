@@ -165,12 +165,13 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     }
     
     let solana_rpc_url = env.secret("SOLANA_RPC_URL")
+        .or_else(|_| env.secret("SOL_RPC_URL"))
         .map(|s| s.to_string())
         .ok();
     if solana_rpc_url.is_some() {
-        console_log!("  ✓ SOLANA_RPC_URL loaded");
+        console_log!("  ✓ SOL_RPC_URL loaded");
     } else {
-        console_log!("  ℹ SOLANA_RPC_URL not configured (optional)");
+        console_log!("  ℹ SOL_RPC_URL not configured (optional)");
     }
     
     // ========================================
