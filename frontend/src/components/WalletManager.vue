@@ -5,20 +5,20 @@
       <div class="nav-content">
         <div class="logo-section">
           <div class="logo">💰</div>
-          <h1 class="app-title">钱包管理</h1>
+          <h1 class="app-title">{{ t('walletManagement') }}</h1>
         </div>
         
         <div class="nav-controls">
-          <button @click="toggleDarkMode" class="theme-toggle" title="切换主题">
+          <button @click="toggleDarkMode" class="theme-toggle" :title="t('theme')">
             <span v-if="isDarkMode">🌞</span>
             <span v-else>🌙</span>
           </button>
           
-          <button @click="goBack" class="back-btn" title="返回聊天">
+          <button @click="goBack" class="back-btn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z"/>
             </svg>
-            返回
+            {{ t('back') }}
           </button>
         </div>
       </div>
@@ -26,199 +26,170 @@
 
     <!-- 主内容区域 -->
     <div class="wallet-container">
-      <div class="wallet-window">
+      <div class="wallet-content">
         
-        <!-- 钱包概览 -->
-        <div class="wallet-overview">
-          <h2>钱包概览</h2>
-          <div class="wallet-stats">
-            <div class="stat-card">
-              <div class="stat-icon">🔗</div>
-              <div class="stat-info">
-                <div class="stat-label">当前网络</div>
-                <div class="stat-value">{{ currentNetwork }}</div>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">💳</div>
-              <div class="stat-info">
-                <div class="stat-label">钱包数量</div>
-                <div class="stat-value">{{ walletCount }}</div>
-              </div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-icon">⚡</div>
-              <div class="stat-info">
-                <div class="stat-label">连接状态</div>
-                <div class="stat-value" :class="connectionStatus">{{ statusText }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- 连接钱包 -->
+        <WalletConnect
+          v-if="!connectedWallet"
+          @connect-metamask="connectMetaMask"
+          @connect-walletconnect="connectWalletConnect"
+        />
 
-        <!-- 钱包列表 -->
-        <div class="wallet-list">
-          <div class="section-header">
-            <h3>我的钱包</h3>
-          </div>
-          
-          <div v-if="wallets.length === 0" class="empty-state">
-            <div class="empty-icon">💼</div>
-            <h4>还没有钱包</h4>
-            <p>请使用"添加私钥"功能来加载你的钱包</p>
-          </div>
-          
-          <div v-else class="wallet-cards">
-            <div 
-              v-for="wallet in wallets" 
-              :key="wallet.label"
-              class="wallet-card"
-              :class="{ active: wallet.isActive }"
-            >
-              <div class="wallet-header">
-                <div class="wallet-info">
-                  <div class="wallet-label">{{ wallet.label }}</div>
-                  <div class="wallet-address">{{ formatAddress(wallet.address) }}</div>
-                </div>
-                <div class="wallet-actions">
-                  <button 
-                    @click="addPrivateKey" 
-                    class="action-btn primary"
-                  >
-                    添加私钥
-                  </button>
-                  <button @click="removeWallet(wallet.label)" class="action-btn danger">
-                    删除
-                  </button>
-                </div>
-              </div>
-              <div class="wallet-balance">
-                <div class="balance-item">
-                  <span class="balance-label">ETH</span>
-                  <span class="balance-value">{{ wallet.ethBalance || '0.0' }}</span>
-                </div>
-                <div class="balance-item">
-                  <span class="balance-label">USDC</span>
-                  <span class="balance-value">{{ wallet.usdcBalance || '0.0' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- 已连接钱包 -->
+        <div v-else class="wallet-info-section">
+          <WalletOverview
+            :wallet="connectedWallet"
+            :current-network="currentNetwork"
+            :network-name="getNetworkName(currentNetwork)"
+            :eth-price="ethPrice"
+            @disconnect="disconnectWallet"
+          />
 
-        <!-- 网络设置 -->
-        <div class="network-settings">
-          <h3>网络设置</h3>
-          <div class="network-selector">
-            <label v-for="network in networks" :key="network.value" class="network-option">
-              <input 
-                type="radio" 
-                :value="network.value" 
-                v-model="currentNetwork"
-                @change="switchNetwork"
-              >
-              <span class="network-info">
-                <span class="network-name">{{ network.name }}</span>
-                <span class="network-desc">{{ network.description }}</span>
-              </span>
-            </label>
-          </div>
-        </div>
+          <NetworkSelector
+            :networks="networks"
+            :current-network="currentNetwork"
+            @switch-network="switchToNetwork"
+          />
 
-        <!-- 操作日志 -->
-        <div class="operation-log">
-          <h3>操作日志</h3>
-          <div class="log-list">
-            <div v-if="logs.length === 0" class="empty-log">
-              暂无操作记录
-            </div>
-            <div v-else>
-              <div 
-                v-for="log in logs" 
-                :key="log.id"
-                class="log-item"
-                :class="log.type"
-              >
-                <div class="log-icon">
-                  <span v-if="log.type === 'success'">✅</span>
-                  <span v-else-if="log.type === 'error'">❌</span>
-                  <span v-else>ℹ️</span>
-                </div>
-                <div class="log-content">
-                  <div class="log-message">{{ log.message }}</div>
-                  <div class="log-time">{{ formatTime(log.timestamp) }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <TransactionList
+            :transactions="transactions"
+            :is-refreshing="isRefreshing"
+            @refresh="refreshTransactions"
+            @view-transaction="viewTransaction"
+          />
 
+          <AgentWallets :wallets="agentWallets" />
+
+          <ContractWallet
+            :contract-wallet="contractWallet"
+            @create="createContractWallet"
+            @deposit="depositToContract"
+            @withdraw="withdrawFromContract"
+            @manage="manageContract"
+          />
+
+          <SignatureModal
+            :show="!!signatureRequest"
+            :request="signatureRequest || defaultRequest"
+            :is-signing="isSigning"
+            @confirm="confirmSignature"
+            @cancel="cancelSignature"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from '@/composables/useI18n'
+import { blockchainService } from '@/services/blockchain.service'
+import WalletConnect from './wallet/WalletConnect.vue'
+import WalletOverview from './wallet/WalletOverview.vue'
+import NetworkSelector from './wallet/NetworkSelector.vue'
+import TransactionList from './wallet/TransactionList.vue'
+import ContractWallet from './wallet/ContractWallet.vue'
+import SignatureModal from './wallet/SignatureModal.vue'
+import AgentWallets from './wallet/AgentWallets.vue'
 
-interface Wallet {
-  label: string
+interface ConnectedWallet {
   address: string
-  isActive: boolean
-  ethBalance?: string
-  usdcBalance?: string
-}
-
-interface Log {
-  id: string
-  type: 'success' | 'error' | 'info'
-  message: string
-  timestamp: number
+  ethBalance: string
+  usdcBalance: string
 }
 
 interface Network {
-  value: string
+  chainId: string
   name: string
-  description: string
+  type: string
+  icon: string
+  rpcUrl: string
 }
+
+interface Transaction {
+  hash: string
+  type: 'send' | 'receive' | 'contract'
+  from: string
+  to: string
+  value: string
+  token: string
+  timestamp: number
+  status: 'confirmed' | 'pending' | 'failed'
+}
+
+interface ContractWallet {
+  address: string
+  balance: string
+}
+
+interface SignatureRequest {
+  from: string
+  to: string
+  value: string
+  token: string
+  gasFee: string
+  data?: string
+}
+
+const router = useRouter()
+const { t } = useI18n()
 
 // 响应式数据
 const isDarkMode = ref(false)
-const connectionStatus = ref<'connected' | 'disconnected' | 'error'>('disconnected')
-const statusText = ref('连接中...')
-const currentNetwork = ref('ethereum_sepolia')
-const wallets = ref<Wallet[]>([])
-const logs = ref<Log[]>([])
+const connectedWallet = ref<ConnectedWallet | null>(null)
+const currentNetwork = ref('0x1')
+const transactions = ref<Transaction[]>([])
+const contractWallet = ref<ContractWallet | null>(null)
+const signatureRequest = ref<SignatureRequest | null>(null)
+const isSigning = ref(false)
+const isRefreshing = ref(false)
+const ethPrice = ref(2000)
+const agentWallets = ref<any[]>([])
+
+const defaultRequest: SignatureRequest = {
+  from: '',
+  to: '',
+  value: '0',
+  token: 'ETH',
+  gasFee: '0'
+}
 
 const networks: Network[] = [
-  { value: 'ethereum_sepolia', name: 'Ethereum Sepolia', description: '以太坊测试网' },
-  { value: 'base_sepolia', name: 'Base Sepolia', description: 'Base测试网' },
-  { value: 'polygon_amoy', name: 'Polygon Amoy', description: 'Polygon测试网' },
-  { value: 'ethereum_mainnet', name: 'Ethereum Mainnet', description: '以太坊主网' },
-  { value: 'base_mainnet', name: 'Base Mainnet', description: 'Base主网' },
+  { chainId: '0xaa36a7', name: 'Ethereum Sepolia', type: 'Testnet', icon: '🔷', rpcUrl: 'https://sepolia.infura.io/v3/' },
+  { chainId: '0x14a34', name: 'Base Sepolia', type: 'Testnet', icon: '🔵', rpcUrl: 'https://sepolia.base.org' },
+  { chainId: '0x13882', name: 'Polygon Amoy', type: 'Testnet', icon: '🟣', rpcUrl: 'https://rpc-amoy.polygon.technology' },
+  { chainId: '0x1', name: 'Ethereum Mainnet', type: 'Mainnet', icon: '💎', rpcUrl: 'https://mainnet.infura.io/v3/' },
+  { chainId: '0x2105', name: 'Base Mainnet', type: 'Mainnet', icon: '🔷', rpcUrl: 'https://mainnet.base.org' },
 ]
-
-// 计算属性
-const walletCount = computed(() => wallets.value.length)
 
 // 生命周期
 onMounted(() => {
-  // 检查系统主题偏好
   const savedTheme = localStorage.getItem('alou-theme')
-  if (savedTheme) {
-    isDarkMode.value = savedTheme === 'dark'
-  } else {
-    isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
-  }
+  isDarkMode.value = savedTheme === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches
   
-  loadWallets()
-  checkConnection()
+  checkWalletConnection()
+  
+  // Listen to network changes
+  window.addEventListener('network-changed', handleNetworkChanged as EventListener)
+  
+  // Listen to wallet network changes from MetaMask
+  if (typeof window.ethereum !== 'undefined') {
+    window.ethereum.on('chainChanged', (chainId: string) => {
+      currentNetwork.value = chainId
+      localStorage.setItem('wallet_chain_id', chainId)
+    })
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('network-changed', handleNetworkChanged as EventListener)
 })
 
 // 方法
 function goBack() {
-  // 返回到聊天页面
-  window.history.back()
+  router.push('/')
 }
 
 function toggleDarkMode() {
@@ -226,195 +197,244 @@ function toggleDarkMode() {
   localStorage.setItem('alou-theme', isDarkMode.value ? 'dark' : 'light')
 }
 
-async function checkConnection() {
+async function connectMetaMask() {
   try {
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/health`)
-    if (response.ok) {
-      connectionStatus.value = 'connected'
-      statusText.value = '已连接'
-    } else {
-      connectionStatus.value = 'error'
-      statusText.value = `错误 ${response.status}`
+    if (typeof window.ethereum === 'undefined') {
+      alert(t('installMetaMask'))
+      return
     }
+
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+    const address = accounts[0]
+    
+    // Get real balance from blockchain
+    const balanceInfo = await blockchainService.getBalance(address)
+    
+    connectedWallet.value = {
+      address,
+      ethBalance: balanceInfo?.balance || '0.0',
+      usdcBalance: '0.0'
+    }
+    
+    // Get current network
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' })
+    currentNetwork.value = chainId
+    
+    localStorage.setItem('wallet_address', address)
+    localStorage.setItem('wallet_chain_id', chainId)
+    window.dispatchEvent(new CustomEvent('wallet-changed', { detail: { address } }))
+    
+    await loadTransactions()
+    await loadAgentWallets()
+    
   } catch (error) {
-    connectionStatus.value = 'disconnected'
-    statusText.value = '连接失败'
+    console.error('Failed to connect MetaMask:', error)
+    alert(t('connectionFailed'))
   }
 }
 
-async function loadWallets() {
-  // 这里应该调用MCP API获取钱包列表
-  // 暂时使用模拟数据
-  wallets.value = [
+async function connectWalletConnect() {
+  alert(t('walletConnectComingSoon'))
+}
+
+function checkWalletConnection() {
+  const savedAddress = localStorage.getItem('wallet_address')
+  if (savedAddress && typeof window.ethereum !== 'undefined') {
+    connectMetaMask()
+  }
+}
+
+function disconnectWallet() {
+  connectedWallet.value = null
+  localStorage.removeItem('wallet_address')
+  window.dispatchEvent(new CustomEvent('wallet-changed', { detail: { address: null } }))
+}
+
+async function switchToNetwork(network: Network) {
+  if (!window.ethereum) return
+  
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: network.chainId }],
+    })
+    currentNetwork.value = network.chainId
+  } catch (error: any) {
+    if (error.code === 4902) {
+      try {
+        await window.ethereum!.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: network.chainId,
+            chainName: network.name,
+            rpcUrls: [network.rpcUrl],
+          }],
+        })
+        currentNetwork.value = network.chainId
+      } catch (addError) {
+        console.error('Failed to add network:', addError)
+      }
+    }
+  }
+}
+
+function getNetworkName(chainId: string): string {
+  const network = networks.find(n => n.chainId === chainId)
+  return network ? network.name : 'Unknown Network'
+}
+
+async function loadTransactions() {
+  transactions.value = [
     {
-      label: '主钱包',
-      address: '0x308339a0C2fA14475EC42fbF0b8Fae239b293b52',
-      isActive: true,
-      ethBalance: '0.001751919051897896',
-      usdcBalance: '0.0'
+      hash: '0x1234...5678',
+      type: 'send',
+      from: connectedWallet.value!.address,
+      to: '0xabcd...efgh',
+      value: '0.1',
+      token: 'ETH',
+      timestamp: Date.now() - 3600000,
+      status: 'confirmed'
+    },
+    {
+      hash: '0x8765...4321',
+      type: 'receive',
+      from: '0xijkl...mnop',
+      to: connectedWallet.value!.address,
+      value: '0.05',
+      token: 'ETH',
+      timestamp: Date.now() - 7200000,
+      status: 'confirmed'
     }
   ]
 }
 
+async function refreshTransactions() {
+  isRefreshing.value = true
+  await loadTransactions()
+  setTimeout(() => {
+    isRefreshing.value = false
+  }, 1000)
+}
 
-async function switchWallet(label: string) {
+function viewTransaction(tx: Transaction) {
+  window.open(`https://etherscan.io/tx/${tx.hash}`, '_blank')
+}
+
+async function createContractWallet() {
   try {
-    // 调用MCP API切换钱包
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `切换钱包到 ${label}`,
-        session_id: 'wallet_manager'
-      })
-    })
-    
-    if (response.ok) {
-      // 更新活跃状态
-      wallets.value.forEach(wallet => {
-        wallet.isActive = wallet.label === label
-      })
-      addLog('success', `已切换到钱包: ${label}`)
-    } else {
-      addLog('error', '切换钱包失败')
+    contractWallet.value = {
+      address: '0xContract...Wallet',
+      balance: '0.0'
     }
+    alert(t('contractWalletCreated'))
   } catch (error) {
-    addLog('error', `切换钱包时出错: ${error}`)
+    console.error('Failed to create contract wallet:', error)
+    alert(t('createFailed'))
   }
 }
 
-async function removeWallet(label: string) {
-  if (!confirm(`确定要删除钱包 "${label}" 吗？`)) return
+async function depositToContract() {
+  const amount = prompt(t('enterDepositAmount'))
+  if (!amount) return
+  
+  signatureRequest.value = {
+    from: connectedWallet.value!.address,
+    to: contractWallet.value!.address,
+    value: amount,
+    token: 'ETH',
+    gasFee: '0.001'
+  }
+}
+
+async function withdrawFromContract() {
+  const amount = prompt(t('enterWithdrawAmount'))
+  if (!amount) return
+  
+  signatureRequest.value = {
+    from: contractWallet.value!.address,
+    to: connectedWallet.value!.address,
+    value: amount,
+    token: 'ETH',
+    gasFee: '0.001'
+  }
+}
+
+function manageContract() {
+  alert(t('contractManagementComingSoon'))
+}
+
+async function confirmSignature() {
+  if (!signatureRequest.value || !window.ethereum) return
+  
+  isSigning.value = true
   
   try {
-    // 调用MCP API删除钱包
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `请使用remove_wallet工具删除标签为"${label}"的钱包`,
-        session_id: 'wallet_manager'
-      })
+    const txHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{
+        from: signatureRequest.value.from,
+        to: signatureRequest.value.to,
+        value: '0x' + (parseFloat(signatureRequest.value.value) * 1e18).toString(16),
+      }],
     })
     
-    if (response.ok) {
-      const result = await response.json()
-      wallets.value = wallets.value.filter(wallet => wallet.label !== label)
-      addLog('success', `已删除钱包: ${label}`)
-    } else {
-      addLog('error', '删除钱包失败')
-    }
+    alert(t('transactionSent') + ': ' + txHash)
+    signatureRequest.value = null
+    
+    await connectMetaMask()
+    await loadTransactions()
+    
   } catch (error) {
-    addLog('error', `删除钱包时出错: ${error}`)
+    console.error('Transaction failed:', error)
+    alert(t('transactionFailed'))
+  } finally {
+    isSigning.value = false
   }
 }
 
-async function addPrivateKey() {
-  const privateKey = prompt('请输入私钥（带0x前缀或不带都可以）:')
-  if (!privateKey) return
+function cancelSignature() {
+  signatureRequest.value = null
+}
+
+function handleNetworkChanged(event: CustomEvent<{ chainId: string; network: Network }>) {
+  console.log('Network changed:', event.detail)
+  currentNetwork.value = event.detail.chainId
   
-  // 确保私钥格式正确（添加0x前缀）
-  const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`
+  // Refresh balance after network change
+  if (connectedWallet.value) {
+    refreshWalletBalance()
+  }
+  
+  const networkName = getNetworkName(event.detail.chainId)
+  console.log(`Switched to ${networkName}`)
+}
+
+async function refreshWalletBalance() {
+  if (!connectedWallet.value) return
   
   try {
-    // 调用后端API更新mcp.json中的私钥
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/update-private-key`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        private_key: formattedKey
-      })
-    })
-    
-    if (response.ok) {
-      const result = await response.json()
-      addLog('success', `私钥已更新到mcp.json: ${formattedKey.slice(0, 10)}...`)
-      
-      // 重新启动MCP服务以加载新私钥
-      await restartMcpService()
-      
-      // 重新加载钱包信息
-      loadWallets()
-    } else {
-      addLog('error', '私钥更新失败')
+    const balanceInfo = await blockchainService.getBalance(connectedWallet.value.address)
+    if (balanceInfo) {
+      connectedWallet.value.ethBalance = balanceInfo.balance
     }
   } catch (error) {
-    addLog('error', `设置私钥时出错: ${error}`)
+    console.error('Failed to refresh balance:', error)
   }
 }
 
-async function restartMcpService() {
+async function loadAgentWallets() {
   try {
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/restart-mcp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
-    })
-    
-    if (response.ok) {
-      addLog('success', 'MCP服务已重启，新私钥已生效')
-    } else {
-      addLog('error', 'MCP服务重启失败，请手动重启')
-    }
+    const sessionId = localStorage.getItem('session_id') || 'default'
+    const wallets = await blockchainService.listAgentWallets(sessionId)
+    agentWallets.value = wallets
+    console.log('Loaded agent wallets:', wallets)
   } catch (error) {
-    addLog('error', '无法重启MCP服务，请手动重启')
-  }
-}
-
-async function switchNetwork() {
-  try {
-    // 调用MCP API切换网络
-    const API_BASE_URL = import.meta.env.PROD ? '' : 'http://localhost:3001'
-    const response = await fetch(`${API_BASE_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: `切换网络到 ${currentNetwork.value}`,
-        session_id: 'wallet_manager'
-      })
-    })
-    
-    if (response.ok) {
-      addLog('success', `已切换到网络: ${currentNetwork.value}`)
-      loadWallets() // 重新加载钱包余额
-    } else {
-      addLog('error', '切换网络失败')
-    }
-  } catch (error) {
-    addLog('error', `切换网络时出错: ${error}`)
-  }
-}
-
-function formatAddress(address: string): string {
-  if (address.length <= 10) return address
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
-}
-
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleString('zh-CN')
-}
-
-function addLog(type: 'success' | 'error' | 'info', message: string) {
-  logs.value.unshift({
-    id: `log_${Date.now()}`,
-    type,
-    message,
-    timestamp: Date.now()
-  })
-  
-  // 限制日志数量
-  if (logs.value.length > 50) {
-    logs.value = logs.value.slice(0, 50)
+    console.error('Failed to load agent wallets:', error)
   }
 }
 </script>
 
 <style scoped>
-/* CSS变量定义 */
 .wallet-manager {
   --primary-color: #6366f1;
   --primary-hover: #5855eb;
@@ -430,15 +450,21 @@ function addLog(type: 'success' | 'error' | 'info', message: string) {
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   color: var(--text-primary);
   transition: all 0.3s ease;
+  overflow: hidden;
 }
 
-/* Dark模式变量 */
 .wallet-manager.dark-mode {
   --primary-color: #818cf8;
   --primary-hover: #6366f1;
@@ -452,18 +478,19 @@ function addLog(type: 'success' | 'error' | 'info', message: string) {
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
-/* 顶部导航 */
 .top-nav {
+  width: 100%;
   background: var(--background);
   border-bottom: 1px solid var(--border-color);
-  padding: 1rem 2rem;
+  padding: 1rem 0;
   box-shadow: var(--shadow);
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .nav-content {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 0 clamp(1rem, 3vw, 3rem);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -477,10 +504,6 @@ function addLog(type: 'success' | 'error' | 'info', message: string) {
 
 .logo {
   font-size: 2rem;
-  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .app-title {
@@ -499,429 +522,80 @@ function addLog(type: 'success' | 'error' | 'info', message: string) {
   gap: 1rem;
 }
 
-.theme-toggle, .back-btn {
+.theme-toggle {
   background: var(--secondary-color);
   border: none;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
+  font-size: 1.25rem;
   transition: all 0.3s ease;
-  color: var(--text-primary);
 }
 
-.theme-toggle:hover, .back-btn:hover {
+.theme-toggle:hover {
   background: var(--border-color);
   transform: scale(1.05);
 }
 
-/* 主容器 */
+.back-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.back-btn:hover {
+  background: var(--primary-hover);
+  transform: scale(1.05);
+}
+
 .wallet-container {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  padding: 2rem;
-  overflow-y: auto;
-}
-
-.wallet-window {
   width: 100%;
-  max-width: 1000px;
-  background: var(--background);
-  border-radius: 1.5rem;
-  box-shadow: var(--shadow-lg);
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-/* 钱包概览 */
-.wallet-overview h2 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.wallet-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.stat-card {
-  background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.stat-icon {
-  font-size: 2rem;
-}
-
-.stat-info {
   flex: 1;
-}
-
-.stat-label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.stat-value {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.stat-value.connected {
-  color: var(--success-color);
-}
-
-.stat-value.error {
-  color: var(--error-color);
-}
-
-/* 钱包列表 */
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.section-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.create-btn {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.create-btn:hover {
-  background: var(--primary-hover);
-  transform: scale(1.05);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 2rem;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.empty-state h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  color: var(--text-primary);
-}
-
-.empty-state p {
-  margin: 0 0 2rem 0;
-  line-height: 1.6;
-}
-
-.primary-btn {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  padding: 0.75rem 2rem;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.primary-btn:hover {
-  background: var(--primary-hover);
-  transform: scale(1.05);
-}
-
-.wallet-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.wallet-card {
-  background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-}
-
-.wallet-card.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-}
-
-.wallet-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-}
-
-.wallet-info {
-  flex: 1;
-}
-
-.wallet-label {
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.wallet-address {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.wallet-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.action-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 0.5rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.3s ease;
-}
-
-.action-btn:hover:not(:disabled) {
-  background: var(--secondary-color);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.action-btn:disabled {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-  cursor: not-allowed;
-}
-
-.action-btn.primary {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-
-.action-btn.primary:hover {
-  background: var(--primary-hover);
-  border-color: var(--primary-hover);
-}
-
-.action-btn.danger:hover:not(:disabled) {
-  border-color: var(--error-color);
-  color: var(--error-color);
-}
-
-.wallet-balance {
-  display: flex;
-  gap: 2rem;
-}
-
-.balance-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.balance-label {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.balance-value {
-  font-size: 1.125rem;
-  font-weight: 600;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-/* 网络设置 */
-.network-settings h3 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.network-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.network-option {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.network-option:hover {
-  border-color: var(--primary-color);
-}
-
-.network-option input[type="radio"] {
-  margin: 0;
-}
-
-.network-option input[type="radio"]:checked + .network-info {
-  color: var(--primary-color);
-}
-
-.network-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.network-name {
-  font-weight: 500;
-}
-
-.network-desc {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-/* 操作日志 */
-.operation-log h3 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.log-list {
-  max-height: 300px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.empty-log {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-secondary);
+.wallet-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem clamp(1rem, 3vw, 3rem);
 }
 
-.log-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  margin-bottom: 0.5rem;
-  transition: all 0.3s ease;
+.wallet-info-section {
+  animation: fadeIn 0.5s ease;
 }
 
-.log-item.success {
-  background: rgba(16, 185, 129, 0.1);
-  border-left: 3px solid var(--success-color);
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.log-item.error {
-  background: rgba(239, 68, 68, 0.1);
-  border-left: 3px solid var(--error-color);
-}
-
-.log-item.info {
-  background: rgba(59, 130, 246, 0.1);
-  border-left: 3px solid #3b82f6;
-}
-
-.log-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.log-content {
-  flex: 1;
-}
-
-.log-message {
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-}
-
-.log-time {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-/* 响应式设计 */
 @media (max-width: 768px) {
-  .top-nav {
+  .wallet-content {
     padding: 1rem;
   }
   
-  .nav-content {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .wallet-container {
-    padding: 1rem;
-  }
-  
-  .wallet-window {
-    padding: 1.5rem;
-  }
-  
-  .wallet-stats {
-    grid-template-columns: 1fr;
-  }
-  
-  .wallet-header {
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .wallet-actions {
-    align-self: stretch;
-  }
-  
-  .wallet-balance {
-    flex-direction: column;
-    gap: 1rem;
+  .app-title {
+    font-size: 1.25rem;
   }
 }
 </style>

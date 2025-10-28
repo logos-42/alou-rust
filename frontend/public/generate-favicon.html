@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Generate Favicon</title>
+</head>
+
+<body>
+    <canvas id="canvas" width="32" height="32"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // 绘制爱心
+        ctx.fillStyle = '#ff6b9d';
+        ctx.beginPath();
+
+        // 爱心路径
+        const x = 16, y = 12, size = 10;
+        ctx.moveTo(x, y + size / 4);
+        ctx.bezierCurveTo(x, y, x - size / 2, y - size / 2, x - size, y + size / 4);
+        ctx.bezierCurveTo(x - size, y + size / 2, x - size / 2, y + size, x, y + size * 1.5);
+        ctx.bezierCurveTo(x + size / 2, y + size, x + size, y + size / 2, x + size, y + size / 4);
+        ctx.bezierCurveTo(x + size, y - size / 2, x + size / 2, y, x, y + size / 4);
+
+        ctx.fill();
+
+        // 下载
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'favicon-32x32.png';
+            a.click();
+        });
+
+        document.body.innerHTML = '<h2>Favicon generated! Check your downloads.</h2><p>Replace frontend/public/favicon.ico with the downloaded file.</p>';
+    </script>
+</body>
+
+</html>

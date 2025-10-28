@@ -1,0 +1,26 @@
+{
+  "name": "alou-edge",
+  "version": "0.1.0",
+  "description": "Alou Edge - Web3 AI Agent on Cloudflare Workers",
+  "main": "index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "cargo build --target wasm32-unknown-unknown --release",
+    "test": "cargo test"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "web3",
+    "ai-agent",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT OR Apache-2.0",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^4.45.0"
+  }
+}

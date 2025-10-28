@@ -4,7 +4,7 @@
       "command": "npx.cmd",
       "args": ["-y", "blockchain-payment-mcp"],
       "env": {
-        "PRIVATE_KEY": "0x1655aad5f3b8e80ac2bd4383d3ac8bbab3ec928645c7342e568b394193efdf2c",
+       
         "DEFAULT_NETWORK": "ethereum_mainnet",
         "DEBUG": "true",
         "LOG_LEVEL": "INFO",
