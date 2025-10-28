@@ -48,7 +48,7 @@ function handleLanguageChange(event: Event) {
 <style scoped>
 .settings-btn {
   position: fixed;
-  bottom: 1.5rem;
+  bottom: 6rem;
   left: 1.5rem;
   width: 48px;
   height: 48px;
@@ -73,7 +73,7 @@ function handleLanguageChange(event: Event) {
 
 .settings-panel {
   position: fixed;
-  bottom: 5rem;
+  bottom: 7.5rem;
   left: 1.5rem;
   width: 300px;
   background: var(--background);
@@ -174,7 +174,7 @@ function handleLanguageChange(event: Event) {
 
 @media (max-width: 768px) {
   .settings-btn {
-    bottom: 1rem;
+    bottom: 5.5rem;
     left: 1rem;
     width: 44px;
     height: 44px;
@@ -185,7 +185,7 @@ function handleLanguageChange(event: Event) {
     left: 1rem;
     right: 1rem;
     width: auto;
-    bottom: 4rem;
+    bottom: 5.5rem;
   }
 }
 </style>

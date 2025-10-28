@@ -12,7 +12,7 @@ use router::Router;
 use storage::kv::KvStore;
 use agent::{AgentCore, SessionManager};
 use mcp::{McpRegistry, McpExecutor, McpBridge, McpConnectionPool};
-use mcp::tools::{EchoTool, WalletAuthTool, WalletManagerTool, QueryTool, TransactionTool, BroadcastTool, WorkflowTool};
+use mcp::tools::{EchoTool, WalletAuthTool, WalletManagerTool, AgentWalletTool, QueryTool, TransactionTool, BroadcastTool, WorkflowTool};
 
 /// Worker main entry point
 /// 
@@ -195,6 +195,9 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     
     registry.register(Arc::new(WalletManagerTool::new()));
     console_log!("  ✓ Registered WalletManagerTool");
+    
+    registry.register(Arc::new(AgentWalletTool::new(sessions_store.clone())));
+    console_log!("  ✓ Registered AgentWalletTool");
     
     if let (Some(ref eth_rpc), Some(ref sol_rpc)) = (&eth_rpc_url, &solana_rpc_url) {
         registry.register(Arc::new(QueryTool::new(eth_rpc.clone(), sol_rpc.clone())));

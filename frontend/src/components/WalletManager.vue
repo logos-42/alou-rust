@@ -58,6 +58,8 @@
             @view-transaction="viewTransaction"
           />
 
+          <AgentWallets :wallets="agentWallets" />
+
           <ContractWallet
             :contract-wallet="contractWallet"
             @create="createContractWallet"
@@ -83,12 +85,14 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from '@/composables/useI18n'
+import { blockchainService } from '@/services/blockchain.service'
 import WalletConnect from './wallet/WalletConnect.vue'
 import WalletOverview from './wallet/WalletOverview.vue'
 import NetworkSelector from './wallet/NetworkSelector.vue'
 import TransactionList from './wallet/TransactionList.vue'
 import ContractWallet from './wallet/ContractWallet.vue'
 import SignatureModal from './wallet/SignatureModal.vue'
+import AgentWallets from './wallet/AgentWallets.vue'
 
 interface ConnectedWallet {
   address: string
@@ -142,6 +146,7 @@ const signatureRequest = ref<SignatureRequest | null>(null)
 const isSigning = ref(false)
 const isRefreshing = ref(false)
 const ethPrice = ref(2000)
+const agentWallets = ref<any[]>([])
 
 const defaultRequest: SignatureRequest = {
   from: '',
@@ -202,23 +207,25 @@ async function connectMetaMask() {
     const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
     const address = accounts[0]
     
-    const balance = await window.ethereum.request({
-      method: 'eth_getBalance',
-      params: [address, 'latest']
-    })
-    
-    const ethBalance = (parseInt(balance, 16) / 1e18).toFixed(6)
+    // Get real balance from blockchain
+    const balanceInfo = await blockchainService.getBalance(address)
     
     connectedWallet.value = {
       address,
-      ethBalance,
+      ethBalance: balanceInfo?.balance || '0.0',
       usdcBalance: '0.0'
     }
     
+    // Get current network
+    const chainId = await window.ethereum.request({ method: 'eth_chainId' })
+    currentNetwork.value = chainId
+    
     localStorage.setItem('wallet_address', address)
+    localStorage.setItem('wallet_chain_id', chainId)
     window.dispatchEvent(new CustomEvent('wallet-changed', { detail: { address } }))
     
     await loadTransactions()
+    await loadAgentWallets()
     
   } catch (error) {
     console.error('Failed to connect MetaMask:', error)
@@ -244,6 +251,8 @@ function disconnectWallet() {
 }
 
 async function switchToNetwork(network: Network) {
+  if (!window.ethereum) return
+  
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
@@ -253,7 +262,7 @@ async function switchToNetwork(network: Network) {
   } catch (error: any) {
     if (error.code === 4902) {
       try {
-        await window.ethereum.request({
+        await window.ethereum!.request({
           method: 'wallet_addEthereumChain',
           params: [{
             chainId: network.chainId,
@@ -355,7 +364,7 @@ function manageContract() {
 }
 
 async function confirmSignature() {
-  if (!signatureRequest.value) return
+  if (!signatureRequest.value || !window.ethereum) return
   
   isSigning.value = true
   
@@ -391,9 +400,37 @@ function handleNetworkChanged(event: CustomEvent<{ chainId: string; network: Net
   console.log('Network changed:', event.detail)
   currentNetwork.value = event.detail.chainId
   
-  // Optionally show a notification
+  // Refresh balance after network change
+  if (connectedWallet.value) {
+    refreshWalletBalance()
+  }
+  
   const networkName = getNetworkName(event.detail.chainId)
   console.log(`Switched to ${networkName}`)
+}
+
+async function refreshWalletBalance() {
+  if (!connectedWallet.value) return
+  
+  try {
+    const balanceInfo = await blockchainService.getBalance(connectedWallet.value.address)
+    if (balanceInfo) {
+      connectedWallet.value.ethBalance = balanceInfo.balance
+    }
+  } catch (error) {
+    console.error('Failed to refresh balance:', error)
+  }
+}
+
+async function loadAgentWallets() {
+  try {
+    const sessionId = localStorage.getItem('session_id') || 'default'
+    const wallets = await blockchainService.listAgentWallets(sessionId)
+    agentWallets.value = wallets
+    console.log('Loaded agent wallets:', wallets)
+  } catch (error) {
+    console.error('Failed to load agent wallets:', error)
+  }
 }
 </script>
 

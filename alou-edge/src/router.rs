@@ -280,6 +280,10 @@ impl Router {
                 self.handle_agent_stream(req).await
             }
             
+            (Method::Post, "/api/agent/wallet") => {
+                self.handle_agent_wallet(req).await
+            }
+            
             // Blockchain query endpoints
             (Method::Post, "/api/blockchain/balance") => {
                 self.handle_blockchain_balance(req).await
@@ -640,6 +644,65 @@ impl Router {
             error: "Streaming not yet implemented. Use /api/agent/chat instead.".to_string(),
         };
         json_response_with_status(&error_response, 501)
+    }
+    
+    async fn handle_agent_wallet(&self, req: &mut Request) -> Result<Response> {
+        #[derive(Deserialize)]
+        struct AgentWalletRequest {
+            session_id: String,
+            action: String,
+            chain: Option<String>,
+            transaction: Option<Value>,
+            balance: Option<String>,
+        }
+        
+        let body: AgentWalletRequest = match req.json().await {
+            Ok(body) => body,
+            Err(e) => {
+                let error_response = ErrorResponse {
+                    error: format!("Invalid request body: {}", e),
+                };
+                return json_response_with_status(&error_response, 400);
+            }
+        };
+        
+        // Build tool args
+        let mut args = json!({
+            "action": body.action
+        });
+        
+        if let Some(chain) = body.chain {
+            args["chain"] = json!(chain);
+        }
+        
+        if let Some(transaction) = body.transaction {
+            args["transaction"] = transaction;
+        }
+        
+        if let Some(balance) = body.balance {
+            args["balance"] = json!(balance);
+        }
+        
+        // Create context
+        let context = AgentContext::new(body.session_id.clone(), None);
+        
+        // Execute tool
+        if let Some(executor) = &self.mcp_executor {
+            match executor.execute_tool("agent_wallet", args, &context).await {
+                Ok(result) => json_response(&result),
+                Err(e) => {
+                    let error_response = ErrorResponse {
+                        error: format!("Failed to execute agent_wallet tool: {}", e),
+                    };
+                    json_response_with_status(&error_response, 500)
+                }
+            }
+        } else {
+            let error_response = ErrorResponse {
+                error: "MCP executor not configured".to_string(),
+            };
+            json_response_with_status(&error_response, 500)
+        }
     }
     
     /// Extract wallet address from Authorization token (optional)
