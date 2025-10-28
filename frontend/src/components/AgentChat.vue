@@ -1,179 +1,58 @@
 <template>
   <div class="chat-app" :class="{ 'dark-mode': isDarkMode }">
-    <!-- 顶部导航栏 -->
-    <nav class="top-nav">
-      <div class="nav-content">
-        <div class="logo-section">
-          <div class="logo">💖</div>
-          <h1 class="app-title">{{ t('appTitle') }}</h1>
-        </div>
-        
-        <div class="nav-controls">
-          <div class="status-badge" :class="connectionStatus">
-            <div class="status-dot"></div>
-            <span>{{ connectionStatus === 'connected' ? t('connected') : connectionStatus === 'disconnected' ? t('disconnected') : t('connecting') }}</span>
-          </div>
-          
-          <button @click="toggleDarkMode" class="theme-toggle" title="切换主题">
-            <span v-if="isDarkMode">🌞</span>
-            <span v-else>🌙</span>
-          </button>
-          
-          <button 
-            v-if="!authStore.isAuthenticated" 
-            @click="goToLogin" 
-            class="login-btn"
-          >
-            <span>🔐</span>
-            <span>{{ t('login') }}</span>
-          </button>
-          
-          <div v-else class="user-menu">
-            <button @click="toggleUserMenu" class="user-btn">
-              <span>👤</span>
-              <span>{{ authStore.userName }}</span>
-            </button>
-            <div v-if="showUserMenu" class="user-dropdown">
-              <button @click="goToWallet" class="menu-item">
-                <span>💰</span>
-                <span>{{ t('walletManagement') }}</span>
-              </button>
-              <button @click="handleLogout" class="menu-item">
-                <span>🚪</span>
-                <span>{{ t('logout') }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <ChatHeader
+      :connection-status="connectionStatus"
+      :is-dark-mode="isDarkMode"
+      :is-authenticated="authStore.isAuthenticated"
+      :user-name="authStore.userName"
+      @toggle-theme="toggleDarkMode"
+      @go-to-login="goToLogin"
+      @go-to-wallet="goToWallet"
+      @logout="handleLogout"
+    />
 
-    <!-- 主聊天容器 -->
     <div class="chat-container">
-      <!-- 消息区域 -->
       <div class="messages-area" ref="messagesContainer">
-          <!-- 封面欢迎屏幕 - 带淡入淡出过渡 -->
-          <Transition name="fade">
-            <div v-if="showWelcomeScreen" class="welcome-screen">
-              <div class="welcome-content">
-                <div class="welcome-icon">🚀</div>
-                <h2>欢迎使用Alou智能助手</h2>
-                <p>我是区块链支付的AI助手，很高兴为您提供智能服务。</p>
-                <div class="quick-actions">
-                  <button class="quick-action-btn" @click="sendQuickMessage('帮我查询钱包余额')">
-                    <span class="action-icon">💰</span>
-                    <span>查询钱包余额</span>
-                  </button>
-                  <button class="quick-action-btn" @click="sendQuickMessage('如何发送代币？')">
-                    <span class="action-icon">📤</span>
-                    <span>发送代币</span>
-                  </button>
-                  <button class="quick-action-btn" @click="sendQuickMessage('查看交易历史')">
-                    <span class="action-icon">📊</span>
-                    <span>交易历史</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Transition>
+        <WelcomeScreen
+          :show="showWelcomeScreen"
+          @quick-message="sendQuickMessage"
+        />
 
-          <!-- 消息列表 -->
-          <TransitionGroup name="message" tag="div">
-            <div 
-              v-for="message in messages" 
-              :key="message.id"
-              class="message-wrapper"
-              :class="message.type"
-            >
-            <div class="message-bubble">
-              <div class="message-content" v-html="formatMessage(message.content)"></div>
-              <div class="message-footer">
-                <span class="timestamp">{{ formatTime(message.timestamp) }}</span>
-                <span v-if="message.source" class="source-tag">{{ formatSource(message.source) }}</span>
-              </div>
-            </div>
-            </div>
-          </TransitionGroup>
-          
-          <!-- 加载指示器 -->
-          <div v-if="isLoading" class="message-wrapper assistant">
-            <div class="message-bubble loading">
-              <div class="typing-animation">
-                <div class="typing-dots">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <span class="typing-text">AI正在思考中...</span>
-              </div>
-            </div>
-          </div>
+        <MessageList
+          :messages="messages"
+          :is-loading="isLoading"
+          ref="messageListRef"
+        />
       </div>
 
-      <!-- 设置按钮 - 左下角 -->
-      <button @click="toggleSettings" class="settings-btn" title="设置">
-        <span>⚙️</span>
-      </button>
+      <SettingsPanel
+        :show="showSettings"
+        :language="currentLanguage"
+        @toggle="toggleSettings"
+        @change-language="changeLanguage"
+      />
 
-      <!-- 设置面板 -->
-      <div v-if="showSettings" class="settings-panel">
-        <div class="settings-header">
-          <h3>设置</h3>
-          <button @click="toggleSettings" class="close-btn">✕</button>
-        </div>
-        <div class="settings-content">
-          <div class="setting-item">
-            <label>语言 / Language</label>
-            <select v-model="currentLanguage" @change="changeLanguage" class="language-select">
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <!-- 输入区域 - 固定在底部 -->
-      <div class="input-area">
-        <div class="input-container">
-          <div class="input-wrapper">
-            <textarea
-              v-model="currentMessage"
-              @keydown.enter.exact.prevent="sendMessage"
-              @keydown.enter.shift.exact="newLine"
-              @input="adjustTextareaHeight"
-              placeholder="输入您的问题...（Enter发送，Shift+Enter换行）"
-              ref="messageInput"
-              class="message-input"
-              rows="1"
-            ></textarea>
-            
-            <div class="button-group">
-              <button 
-                @click="sendMessage" 
-                :disabled="!currentMessage.trim() || isLoading"
-                class="send-btn"
-                title="发送消息"
-              >
-                <svg v-if="!isLoading" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-                </svg>
-                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="loading-icon">
-                  <path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ChatInput
+        v-model="currentMessage"
+        :is-loading="isLoading"
+        @send="sendMessage"
+        @new-line="newLine"
+        ref="chatInputRef"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/composables/useI18n'
+import ChatHeader from './ChatHeader.vue'
+import WelcomeScreen from './WelcomeScreen.vue'
+import MessageList from './MessageList.vue'
+import ChatInput from './ChatInput.vue'
+import SettingsPanel from './SettingsPanel.vue'
 
 interface Message {
   id: string
@@ -203,25 +82,23 @@ const messages = ref<Message[]>([])
 const currentMessage = ref('')
 const isLoading = ref(false)
 const connectionStatus = ref<'connected' | 'disconnected' | 'error'>('disconnected')
-const statusText = ref('连接中...')
 const isDarkMode = ref(false)
 const messagesContainer = ref<HTMLElement>()
-const messageInput = ref<HTMLTextAreaElement>()
+const messageListRef = ref()
+const chatInputRef = ref()
 const router = useRouter()
 const authStore = useAuthStore()
-const { t, currentLanguage, setLanguage, initLanguage } = useI18n()
-const showUserMenu = ref(false)
+const { currentLanguage, setLanguage, initLanguage } = useI18n()
 const showSettings = ref(false)
-const showWelcomeScreen = ref(true) // 封面显示状态
+const showWelcomeScreen = ref(true)
 
-// API配置 - 连接到alou-edge Worker
+// API配置
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 const sessionId = ref(`frontend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`)
 const isSessionReady = ref(false)
 
 // 生命周期
 onMounted(async () => {
-  // 检查系统主题偏好
   const savedTheme = localStorage.getItem('alou-theme')
   if (savedTheme) {
     isDarkMode.value = savedTheme === 'dark'
@@ -229,38 +106,34 @@ onMounted(async () => {
     isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
   }
   
-  // 初始化语言设置
   initLanguage()
-  
   await checkConnection()
   await createSession()
   isSessionReady.value = true
-  // 不再自动添加欢迎消息，使用封面
   
-  // 监听钱包切换事件
   window.addEventListener('wallet-changed', handleWalletChanged)
 })
 
-// 钱包切换处理函数
-const handleWalletChanged = async (event: Event) => {
-  const customEvent = event as CustomEvent<{ address: string }>
-  console.log('Wallet changed, recreating session...', customEvent.detail.address)
-  
-  // 清空当前对话
-  messages.value = []
-  showWelcomeScreen.value = true
-  
-  // 重新创建 session
-  await createSession()
-  isSessionReady.value = true
-}
-
-// 清理事件监听器
 onUnmounted(() => {
   window.removeEventListener('wallet-changed', handleWalletChanged as EventListener)
 })
 
-// 创建会话
+watch(isDarkMode, (newValue) => {
+  localStorage.setItem('alou-theme', newValue ? 'dark' : 'light')
+})
+
+// 方法
+const handleWalletChanged = async (event: Event) => {
+  const customEvent = event as CustomEvent<{ address: string }>
+  console.log('Wallet changed, recreating session...', customEvent.detail.address)
+  
+  messages.value = []
+  showWelcomeScreen.value = true
+  
+  await createSession()
+  isSessionReady.value = true
+}
+
 async function createSession() {
   try {
     const walletAddress = localStorage.getItem('wallet_address')
@@ -277,33 +150,23 @@ async function createSession() {
     if (response.ok) {
       const data = await response.json()
       sessionId.value = data.session_id
-      console.log('Session created with wallet:', walletAddress, 'session_id:', sessionId.value)
+      console.log('Session created:', sessionId.value)
     }
   } catch (error) {
     console.error('Failed to create session:', error)
   }
 }
 
-// 监听主题变化
-watch(isDarkMode, (newValue) => {
-  localStorage.setItem('alou-theme', newValue ? 'dark' : 'light')
-})
-
-// 方法
 async function checkConnection() {
   try {
     const response = await fetch(`${API_BASE_URL}/api/health`)
     if (response.ok) {
-      const health = await response.json()
       connectionStatus.value = 'connected'
-      statusText.value = '已连接'
     } else {
       connectionStatus.value = 'error'
-      statusText.value = `错误 ${response.status}`
     }
   } catch (error) {
     connectionStatus.value = 'disconnected'
-    statusText.value = '连接失败'
     console.error('Connection check failed:', error)
   }
 }
@@ -311,16 +174,13 @@ async function checkConnection() {
 async function sendMessage() {
   if (!currentMessage.value.trim() || isLoading.value) return
   
-  // 确保 session 已准备好
   if (!isSessionReady.value) {
     await createSession()
     isSessionReady.value = true
   }
   
-  // 触发封面淡出动画
   if (showWelcomeScreen.value) {
     showWelcomeScreen.value = false
-    // 等待淡出动画完成后再添加消息
     await new Promise(resolve => setTimeout(resolve, 400))
   }
 
@@ -387,70 +247,20 @@ async function sendMessage() {
     isLoading.value = false
     await nextTick()
     scrollToBottom()
-    adjustTextareaHeight()
+    if (chatInputRef.value) {
+      chatInputRef.value.adjustHeight()
+    }
   }
-}
-
-function addWelcomeMessage() {
-  const welcomeMessage: Message = {
-    id: 'welcome',
-    type: 'assistant',
-    content: `👋 **欢迎使用Alou智能助手！💰 区块链支付** - 支持ETH和ERC-20代币\n•  完整的区块链功能\n\n💬 请输入您的问题，我会尽力帮助您！`,
-    timestamp: Date.now(),
-    source: 'system'
-  }
-  messages.value.push(welcomeMessage)
-}
-
-
-function newPage() {
-  // 跳转到钱包管理页面
-  router.push('/wallet')
-}
-
-function toggleDarkMode() {
-  isDarkMode.value = !isDarkMode.value
-}
-
-function toggleSettings() {
-  showSettings.value = !showSettings.value
-}
-
-function changeLanguage() {
-  setLanguage(currentLanguage.value as 'zh' | 'en')
-}
-
-function goToLogin() {
-  router.push('/login')
-}
-
-function goToWallet() {
-  showUserMenu.value = false
-  router.push('/wallet')
-}
-
-function toggleUserMenu() {
-  showUserMenu.value = !showUserMenu.value
-}
-
-async function handleLogout() {
-  showUserMenu.value = false
-  await authStore.logout()
-  // 不需要跳转，因为主页不需要登录
 }
 
 async function sendQuickMessage(message: string) {
-  // 确保 session 已准备好
   if (!isSessionReady.value) {
-    console.log('Waiting for session to be ready...')
     await createSession()
     isSessionReady.value = true
   }
   
-  // 触发封面淡出动画
   if (showWelcomeScreen.value) {
     showWelcomeScreen.value = false
-    // 等待淡出动画完成
     await new Promise(resolve => setTimeout(resolve, 400))
   }
   
@@ -462,39 +272,28 @@ function newLine() {
   currentMessage.value += '\n'
 }
 
-function adjustTextareaHeight() {
-  if (messageInput.value) {
-    messageInput.value.style.height = 'auto'
-    messageInput.value.style.height = Math.min(messageInput.value.scrollHeight, 120) + 'px'
-  }
+function toggleDarkMode() {
+  isDarkMode.value = !isDarkMode.value
 }
 
-function formatMessage(content: string): string {
-  return content
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-    .replace(/•/g, '<span class="bullet">•</span>')
+function toggleSettings() {
+  showSettings.value = !showSettings.value
 }
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  })
+function changeLanguage(lang: string) {
+  setLanguage(lang as 'zh' | 'en')
 }
 
-function formatSource(source: string): string {
-  const sourceMap: Record<string, string> = {
-    'wasm-core': 'WASM',
-    'edge-worker-proxy': 'Edge',
-    'http-backend-fallback': 'Backend',
-    'system': 'System',
-    'test': 'Test',
-    'error': 'Error'
-  }
-  return sourceMap[source] || source
+function goToLogin() {
+  router.push('/login')
+}
+
+function goToWallet() {
+  router.push('/wallet')
+}
+
+async function handleLogout() {
+  await authStore.logout()
 }
 
 function scrollToBottom() {
@@ -507,7 +306,6 @@ function scrollToBottom() {
 </script>
 
 <style scoped>
-/* CSS变量定义 */
 .chat-app {
   --primary-color: #6366f1;
   --primary-hover: #5855eb;
@@ -538,7 +336,6 @@ function scrollToBottom() {
   overflow: hidden;
 }
 
-/* Dark模式变量 */
 .chat-app.dark-mode {
   --primary-color: #818cf8;
   --primary-hover: #6366f1;
@@ -552,192 +349,6 @@ function scrollToBottom() {
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
 }
 
-/* 顶部导航 */
-.top-nav {
-  width: 100%;
-  background: var(--background);
-  border-bottom: 1px solid var(--border-color);
-  padding: 1rem 0;
-  box-shadow: var(--shadow);
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-.nav-content {
-  width: 100%;
-  padding: 0 clamp(1rem, 3vw, 3rem);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.logo-section {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.logo {
-  font-size: 2rem;
-  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.app-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.nav-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.status-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 2rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  background: var(--secondary-color);
-  color: var(--text-secondary);
-}
-
-.status-badge.connected {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
-}
-
-.status-badge.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error-color);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-secondary);
-}
-
-.status-badge.connected .status-dot {
-  background: var(--success-color);
-  animation: pulse 2s infinite;
-}
-
-.status-badge.error .status-dot {
-  background: var(--error-color);
-}
-
-.theme-toggle {
-  background: var(--secondary-color);
-  border: none;
-  border-radius: 50%;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 1.25rem;
-  transition: all 0.3s ease;
-}
-
-.theme-toggle:hover {
-  background: var(--border-color);
-  transform: scale(1.05);
-}
-
-.login-btn {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-}
-
-.login-btn:hover {
-  background: var(--primary-hover);
-  transform: scale(1.05);
-}
-
-.user-menu {
-  position: relative;
-}
-
-.user-btn {
-  background: var(--secondary-color);
-  border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  transition: all 0.3s ease;
-}
-
-.user-btn:hover {
-  background: var(--border-color);
-}
-
-.user-dropdown {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  background: var(--background);
-  border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-lg);
-  min-width: 200px;
-  z-index: 100;
-  overflow: hidden;
-}
-
-.menu-item {
-  width: 100%;
-  background: transparent;
-  border: none;
-  padding: 0.875rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  transition: all 0.2s ease;
-  text-align: left;
-}
-
-.menu-item:hover {
-  background: var(--secondary-color);
-}
-
-.menu-item:not(:last-child) {
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* 聊天容器 */
 .chat-container {
   width: 100%;
   flex: 1;
@@ -747,579 +358,11 @@ function scrollToBottom() {
   background: var(--surface);
 }
 
-/* 消息区域 */
 .messages-area {
   width: 100%;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
-  padding: 1rem 0;
-}
-
-.welcome-screen {
-  min-height: calc(100vh - 300px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.welcome-content {
-  max-width: 800px;
-  width: 100%;
-  text-align: center;
-  padding: 0 2rem;
-}
-
-.welcome-icon {
-  font-size: 4rem;
-  margin-bottom: 1.5rem;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-.welcome-content h2 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin: 0 0 1rem 0;
-  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.welcome-content p {
-  font-size: 1.25rem;
-  color: var(--text-secondary);
-  margin: 0 0 2.5rem 0;
-  line-height: 1.6;
-}
-
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-top: 2rem;
-  max-width: 800px;
-  width: 100%;
-}
-
-.quick-action-btn {
-  background: var(--background);
-  border: 1px solid var(--border-color);
-  border-radius: 1rem;
-  padding: 1.25rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.quick-action-btn:hover {
-  background: var(--secondary-color);
-  border-color: var(--primary-color);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
-}
-
-.action-icon {
-  font-size: 2rem;
-}
-
-/* 消息样式 */
-.message-wrapper {
-  display: flex;
-  animation: fadeInUp 0.3s ease;
-  padding: 0.75rem clamp(1rem, 5vw, 4rem);
-}
-
-.message-wrapper.user {
-  background: var(--background);
-  justify-content: flex-start;
-}
-
-.message-wrapper.assistant {
-  background: var(--surface);
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  width: 100%;
-  max-width: 1400px;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.message-content {
-  line-height: 1.8;
-  font-size: 1rem;
-  width: 100%;
-}
-
-.message-content :deep(strong) {
-  font-weight: 600;
-}
-
-.message-content :deep(em) {
-  font-style: italic;
-  opacity: 0.9;
-}
-
-.message-content :deep(code) {
-  background: rgba(0, 0, 0, 0.1);
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.375rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.875rem;
-}
-
-.message-content :deep(.bullet) {
-  color: var(--primary-color);
-  font-weight: bold;
-  margin-right: 0.25rem;
-}
-
-.message-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.75rem;
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
-
-.source-tag {
-  background: rgba(0, 0, 0, 0.1);
-  padding: 0.125rem 0.5rem;
-  border-radius: 1rem;
-  font-size: 0.625rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* 加载动画 */
-.message-bubble.loading {
-  background: var(--secondary-color);
-  color: var(--text-primary);
-}
-
-.typing-animation {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.typing-dots {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.typing-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  animation: typing 1.4s infinite ease-in-out;
-}
-
-.typing-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-.typing-text {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-}
-
-/* 输入区域 */
-.input-area {
-  width: 100%;
-  background: var(--background);
-  border-top: 1px solid var(--border-color);
-  padding: 1.25rem 0;
-  display: flex;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.input-container {
-  width: 100%;
-  max-width: 100%;
-  padding: 0 clamp(1rem, 5vw, 4rem);
-}
-
-.input-wrapper {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-  background: var(--background);
-  border: 2px solid var(--border-color);
-  border-radius: 1.75rem;
-  padding: 1rem 1.5rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  min-height: 64px;
-}
-
-.input-wrapper:focus-within {
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
-}
-
-.message-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  resize: none;
-  font-family: inherit;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--text-primary);
-  min-height: 48px;
-  max-height: 200px;
-  padding: 8px 0;
-}
-
-.message-input::placeholder {
-  color: var(--text-secondary);
-}
-
-.button-group {
-  display: flex;
-  align-items: center;
-}
-
-.send-btn {
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 0.875rem;
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-bottom: 2px;
-}
-
-.send-btn:hover:not(:disabled) {
-  background: var(--primary-hover);
-  transform: scale(1.05);
-}
-
-.send-btn:disabled {
-  background: var(--text-secondary);
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.loading-icon {
-  animation: spin 1s linear infinite;
-}
-
-/* 输入选项 */
-.input-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1rem;
-  gap: 1rem;
-}
-
-.option-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.option-toggle input[type="checkbox"] {
-  display: none;
-}
-
-.toggle-slider {
-  width: 44px;
-  height: 24px;
-  background: var(--border-color);
-  border-radius: 12px;
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-.toggle-slider::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: white;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.option-toggle input:checked + .toggle-slider {
-  background: var(--primary-color);
-}
-
-.option-toggle input:checked + .toggle-slider::after {
-  transform: translateX(20px);
-}
-
-.toggle-label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.option-btn {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 0.75rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.3s ease;
-}
-
-.option-btn:hover {
-  background: var(--secondary-color);
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.test-btn {
-  color: var(--success-color);
-  border-color: var(--success-color);
-}
-
-.test-btn:hover {
-  background: rgba(16, 185, 129, 0.1);
-}
-
-/* 动画 */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes typing {
-  0%, 60%, 100% {
-    transform: scale(1);
-    opacity: 0.5;
-  }
-  30% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
-  .message-content {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .top-nav {
-    padding: 1rem;
-  }
-  
-  .nav-content {
-    gap: 0.75rem;
-  }
-  
-  .logo-section {
-    flex: 1;
-  }
-  
-  .app-title {
-    font-size: 1.25rem;
-  }
-
-  .nav-controls {
-    gap: 0.5rem;
-  }
-  
-  .status-badge span {
-    display: none;
-  }
-
-  .login-btn span:last-child,
-  .user-btn span:last-child {
-    display: none;
-  }
-  
-  .message-wrapper {
-    padding: 1.5rem 1rem;
-  }
-
-  .message-content {
-    font-size: 0.95rem;
-  }
-  
-  .input-area {
-    padding: 1rem;
-  }
-
-  .input-container {
-    padding: 0 1rem;
-  }
-
-  .quick-actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .welcome-content h2 {
-    font-size: 1.5rem;
-  }
-  
-  .welcome-content p {
-    font-size: 1rem;
-  }
-  
-  .feature-badges {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .message-bubble {
-    max-width: 90%;
-  }
-}
-
-/* 滚动条样式 */
-.messages-area::-webkit-scrollbar {
-  width: 6px;
-}
-
-.messages-area::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.messages-area::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 3px;
-}
-
-.messages-area::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-}
-
-/* 淡入淡出过渡动画 - 用于封面 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.95);
-}
-
-.fade-enter-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.fade-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.95);
-}
-
-/* 消息过渡动画 - 用于消息列表 */
-.message-enter-active {
-  transition: all 0.3s ease-out;
-}
-
-.message-enter-from {
-  opacity: 0;
-  transform: translateY(20px) scale(0.95);
-}
-
-.message-enter-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.message-leave-active {
-  transition: all 0.2s ease-in;
-}
-
-.message-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-.message-leave-to {
-  opacity: 0;
-  transform: translateY(-20px) scale(0.9);
-}
-
-.message-move {
-  transition: transform 0.3s ease;
 }
 </style>
