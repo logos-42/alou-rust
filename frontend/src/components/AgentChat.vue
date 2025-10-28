@@ -4,7 +4,7 @@
     <nav class="top-nav">
       <div class="nav-content">
         <div class="logo-section">
-          <div class="logo">🤖</div>
+          <div class="logo">💖</div>
           <h1 class="app-title">Alou智能助手</h1>
         </div>
         
@@ -110,6 +110,28 @@
           </div>
       </div>
 
+      <!-- 设置按钮 - 左下角 -->
+      <button @click="toggleSettings" class="settings-btn" title="设置">
+        <span>⚙️</span>
+      </button>
+
+      <!-- 设置面板 -->
+      <div v-if="showSettings" class="settings-panel">
+        <div class="settings-header">
+          <h3>设置</h3>
+          <button @click="toggleSettings" class="close-btn">✕</button>
+        </div>
+        <div class="settings-content">
+          <div class="setting-item">
+            <label>语言 / Language</label>
+            <select v-model="currentLanguage" @change="changeLanguage" class="language-select">
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       <!-- 输入区域 - 固定在底部 -->
       <div class="input-area">
         <div class="input-container">
@@ -148,9 +170,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/composables/useI18n'
 
 interface Message {
   id: string
@@ -186,7 +209,9 @@ const messagesContainer = ref<HTMLElement>()
 const messageInput = ref<HTMLTextAreaElement>()
 const router = useRouter()
 const authStore = useAuthStore()
+const { t, currentLanguage, setLanguage, initLanguage } = useI18n()
 const showUserMenu = ref(false)
+const showSettings = ref(false)
 const showWelcomeScreen = ref(true) // 封面显示状态
 
 // API配置 - 连接到alou-edge Worker
@@ -808,7 +833,7 @@ function scrollToBottom() {
 .message-wrapper {
   display: flex;
   animation: fadeInUp 0.3s ease;
-  padding: 1.5rem clamp(1rem, 5vw, 4rem);
+  padding: 0.75rem clamp(1rem, 5vw, 4rem);
 }
 
 .message-wrapper.user {
