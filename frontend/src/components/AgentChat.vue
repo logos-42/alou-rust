@@ -5,13 +5,13 @@
       <div class="nav-content">
         <div class="logo-section">
           <div class="logo">💖</div>
-          <h1 class="app-title">Alou智能助手</h1>
+          <h1 class="app-title">{{ t('appTitle') }}</h1>
         </div>
         
         <div class="nav-controls">
           <div class="status-badge" :class="connectionStatus">
             <div class="status-dot"></div>
-            <span>{{ statusText }}</span>
+            <span>{{ connectionStatus === 'connected' ? t('connected') : connectionStatus === 'disconnected' ? t('disconnected') : t('connecting') }}</span>
           </div>
           
           <button @click="toggleDarkMode" class="theme-toggle" title="切换主题">
@@ -25,7 +25,7 @@
             class="login-btn"
           >
             <span>🔐</span>
-            <span>登录</span>
+            <span>{{ t('login') }}</span>
           </button>
           
           <div v-else class="user-menu">
@@ -36,11 +36,11 @@
             <div v-if="showUserMenu" class="user-dropdown">
               <button @click="goToWallet" class="menu-item">
                 <span>💰</span>
-                <span>钱包管理</span>
+                <span>{{ t('walletManagement') }}</span>
               </button>
               <button @click="handleLogout" class="menu-item">
                 <span>🚪</span>
-                <span>退出登录</span>
+                <span>{{ t('logout') }}</span>
               </button>
             </div>
           </div>
@@ -229,6 +229,9 @@ onMounted(async () => {
     isDarkMode.value = window.matchMedia('(prefers-color-scheme: dark)').matches
   }
   
+  // 初始化语言设置
+  initLanguage()
+  
   await checkConnection()
   await createSession()
   isSessionReady.value = true
@@ -407,6 +410,14 @@ function newPage() {
 
 function toggleDarkMode() {
   isDarkMode.value = !isDarkMode.value
+}
+
+function toggleSettings() {
+  showSettings.value = !showSettings.value
+}
+
+function changeLanguage() {
+  setLanguage(currentLanguage.value as 'zh' | 'en')
 }
 
 function goToLogin() {
