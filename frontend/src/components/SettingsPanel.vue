@@ -48,15 +48,15 @@ function handleLanguageChange(event: Event) {
 <style scoped>
 .settings-btn {
   position: fixed;
-  bottom: 2rem;
-  left: 2rem;
-  width: 56px;
-  height: 56px;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: var(--primary-color);
   color: white;
   border: none;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   cursor: pointer;
   box-shadow: var(--shadow-lg);
   transition: all 0.3s ease;
@@ -73,9 +73,9 @@ function handleLanguageChange(event: Event) {
 
 .settings-panel {
   position: fixed;
-  bottom: 6rem;
-  left: 2rem;
-  width: 320px;
+  bottom: 5rem;
+  left: 1.5rem;
+  width: 300px;
   background: var(--background);
   border: 1px solid var(--border-color);
   border-radius: 1rem;
@@ -174,18 +174,18 @@ function handleLanguageChange(event: Event) {
 
 @media (max-width: 768px) {
   .settings-btn {
-    bottom: 1.5rem;
-    left: 1.5rem;
-    width: 48px;
-    height: 48px;
-    font-size: 1.25rem;
+    bottom: 1rem;
+    left: 1rem;
+    width: 44px;
+    height: 44px;
+    font-size: 1.125rem;
   }
 
   .settings-panel {
     left: 1rem;
     right: 1rem;
     width: auto;
-    bottom: 5rem;
+    bottom: 4rem;
   }
 }
 </style>

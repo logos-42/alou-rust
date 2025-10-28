@@ -68,7 +68,7 @@ defineExpose({ textarea, adjustHeight })
   width: 100%;
   background: var(--background);
   border-top: 1px solid var(--border-color);
-  padding: 1.25rem 0;
+  padding: 0.875rem 0;
   display: flex;
   justify-content: center;
   flex-shrink: 0;
@@ -82,15 +82,15 @@ defineExpose({ textarea, adjustHeight })
 
 .input-wrapper {
   display: flex;
-  gap: 1rem;
+  gap: 0.875rem;
   align-items: flex-end;
   background: var(--background);
   border: 2px solid var(--border-color);
-  border-radius: 1.75rem;
-  padding: 1rem 1.5rem;
+  border-radius: 1.5rem;
+  padding: 0.75rem 1.25rem;
   transition: all 0.3s ease;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  min-height: 64px;
+  min-height: 52px;
 }
 
 .input-wrapper:focus-within {
@@ -105,12 +105,12 @@ defineExpose({ textarea, adjustHeight })
   outline: none;
   resize: none;
   font-family: inherit;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.9375rem;
+  line-height: 1.5;
   color: var(--text-primary);
-  min-height: 48px;
-  max-height: 200px;
-  padding: 8px 0;
+  min-height: 36px;
+  max-height: 150px;
+  padding: 6px 0;
 }
 
 .message-input::placeholder {
@@ -126,16 +126,16 @@ defineExpose({ textarea, adjustHeight })
   background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 0.875rem;
-  width: 44px;
-  height: 44px;
+  border-radius: 0.75rem;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 
 .send-btn:hover:not(:disabled) {

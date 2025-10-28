@@ -5,8 +5,14 @@
       <stop offset="100%" style="stop-color:#c44569;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <path d="M50,85 C50,85 15,60 15,40 C15,25 25,15 35,15 C42,15 47,20 50,25 C53,20 58,15 65,15 C75,15 85,25 85,40 C85,60 50,85 50,85 Z" 
+  <!-- 背景圆形 -->
+  <circle cx="50" cy="50" r="48" fill="#1e293b"/>
+  <!-- 爱心 -->
+  <path d="M50,75 C50,75 25,55 25,40 C25,30 32,25 38,25 C43,25 47,28 50,32 C53,28 57,25 62,25 C68,25 75,30 75,40 C75,55 50,75 50,75 Z" 
         fill="url(#heartGradient)" 
-        stroke="#c44569" 
-        stroke-width="2"/>
+        stroke="#ff6b9d" 
+        stroke-width="1.5"/>
+  <!-- 星星装饰 -->
+  <circle cx="65" cy="30" r="3" fill="#ffd700" opacity="0.8"/>
+  <circle cx="72" cy="42" r="2" fill="#ffd700" opacity="0.6"/>
 </svg>

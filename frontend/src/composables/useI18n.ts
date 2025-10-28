@@ -1,11 +1,14 @@
 import { ref, computed } from 'vue'
-import { messages, type Language, type MessageKey } from '@/i18n/messages'
+import { messages, walletMessages, type Language, type MessageKey } from '@/i18n/messages'
 
 const currentLanguage = ref<Language>('zh')
 
 export function useI18n() {
   const t = (key: MessageKey): string => {
-    return messages[currentLanguage.value][key] || key
+    const zhMessages = { ...messages.zh, ...walletMessages.zh }
+    const enMessages = { ...messages.en, ...walletMessages.en }
+    const currentMessages = currentLanguage.value === 'zh' ? zhMessages : enMessages
+    return currentMessages[key] || key
   }
 
   const setLanguage = (lang: Language) => {

@@ -12,7 +12,7 @@ use router::Router;
 use storage::kv::KvStore;
 use agent::{AgentCore, SessionManager};
 use mcp::{McpRegistry, McpExecutor, McpBridge, McpConnectionPool};
-use mcp::tools::{EchoTool, WalletAuthTool, QueryTool, TransactionTool, BroadcastTool, WorkflowTool};
+use mcp::tools::{EchoTool, WalletAuthTool, WalletManagerTool, QueryTool, TransactionTool, BroadcastTool, WorkflowTool};
 
 /// Worker main entry point
 /// 
@@ -192,6 +192,9 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     // Register blockchain tools
     registry.register(Arc::new(WalletAuthTool::new(nonces_store.clone(), jwt_secret.clone())));
     console_log!("  ✓ Registered WalletAuthTool");
+    
+    registry.register(Arc::new(WalletManagerTool::new()));
+    console_log!("  ✓ Registered WalletManagerTool");
     
     if let (Some(ref eth_rpc), Some(ref sol_rpc)) = (&eth_rpc_url, &solana_rpc_url) {
         registry.register(Arc::new(QueryTool::new(eth_rpc.clone(), sol_rpc.clone())));

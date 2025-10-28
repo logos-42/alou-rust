@@ -80,7 +80,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from '@/composables/useI18n'
 import WalletConnect from './wallet/WalletConnect.vue'
@@ -165,6 +165,21 @@ onMounted(() => {
   isDarkMode.value = savedTheme === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches
   
   checkWalletConnection()
+  
+  // Listen to network changes
+  window.addEventListener('network-changed', handleNetworkChanged as EventListener)
+  
+  // Listen to wallet network changes from MetaMask
+  if (typeof window.ethereum !== 'undefined') {
+    window.ethereum.on('chainChanged', (chainId: string) => {
+      currentNetwork.value = chainId
+      localStorage.setItem('wallet_chain_id', chainId)
+    })
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('network-changed', handleNetworkChanged as EventListener)
 })
 
 // 方法
@@ -370,6 +385,15 @@ async function confirmSignature() {
 
 function cancelSignature() {
   signatureRequest.value = null
+}
+
+function handleNetworkChanged(event: CustomEvent<{ chainId: string; network: Network }>) {
+  console.log('Network changed:', event.detail)
+  currentNetwork.value = event.detail.chainId
+  
+  // Optionally show a notification
+  const networkName = getNetworkName(event.detail.chainId)
+  console.log(`Switched to ${networkName}`)
 }
 </script>
 

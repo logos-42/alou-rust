@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Favicon Generator</title>
+</head>
+<body>
+    <h2>Alou Favicon Generator</h2>
+    <canvas id="canvas" width="256" height="256"></canvas>
+    <br><br>
+    <button onclick="downloadPNG()">Download PNG (256x256)</button>
+    <button onclick="downloadICO()">Download ICO</button>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 绘制背景
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.arc(128, 128, 120, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 绘制爱心
+        const gradient = ctx.createLinearGradient(0, 0, 256, 256);
+        gradient.addColorStop(0, '#ff6b9d');
+        gradient.addColorStop(1, '#c44569');
+        
+        ctx.fillStyle = gradient;
+        ctx.strokeStyle = '#ff6b9d';
+        ctx.lineWidth = 4;
+        
+        // 爱心路径
+        ctx.beginPath();
+        ctx.moveTo(128, 200);
+        
+        // 左侧曲线
+        ctx.bezierCurveTo(128, 200, 64, 150, 64, 110);
+        ctx.bezierCurveTo(64, 80, 85, 64, 105, 64);
+        ctx.bezierCurveTo(118, 64, 125, 72, 128, 85);
+        
+        // 右侧曲线
+        ctx.bezierCurveTo(131, 72, 138, 64, 151, 64);
+        ctx.bezierCurveTo(171, 64, 192, 80, 192, 110);
+        ctx.bezierCurveTo(192, 150, 128, 200, 128, 200);
+        
+        ctx.fill();
+        ctx.stroke();
+        
+        // 绘制星星
+        function drawStar(x, y, radius, opacity) {
+            ctx.fillStyle = `rgba(255, 215, 0, ${opacity})`;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        drawStar(170, 80, 8, 0.8);
+        drawStar(190, 110, 5, 0.6);
+        
+        function downloadPNG() {
+            const link = document.createElement('a');
+            link.download = 'favicon.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        function downloadICO() {
+            // 创建多个尺寸的canvas
+            const sizes = [16, 32, 48, 64];
+            alert('请先下载PNG，然后使用在线工具转换为ICO格式\n推荐: https://www.favicon-generator.org/');
+        }
+    </script>
+</body>
+</html>

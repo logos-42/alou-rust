@@ -48,6 +48,7 @@ import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/composables/useI18n'
+import { walletService, type WalletInstruction } from '@/services/wallet.service'
 import ChatHeader from './ChatHeader.vue'
 import WelcomeScreen from './WelcomeScreen.vue'
 import MessageList from './MessageList.vue'
@@ -75,6 +76,7 @@ interface AgentResponse {
     name: string
     result: any
   }>
+  wallet_instructions?: WalletInstruction[]
 }
 
 // 响应式数据
@@ -132,6 +134,56 @@ const handleWalletChanged = async (event: Event) => {
   
   await createSession()
   isSessionReady.value = true
+}
+
+/**
+ * Handle tool calls from agent response
+ */
+async function handleToolCalls(toolCalls: Array<{ id: string; name: string; result: any }>) {
+  for (const toolCall of toolCalls) {
+    if (toolCall.name === 'wallet_manager' && toolCall.result) {
+      const result = toolCall.result
+      
+      // Check if there's a wallet instruction to execute
+      if (result.instruction) {
+        try {
+          console.log('Executing wallet instruction:', result.instruction)
+          
+          if (result.action === 'switch_network' && result.network) {
+            // Execute network switch
+            const success = await walletService.switchNetwork(result.network)
+            
+            if (success) {
+              // Add system message about network switch
+              const systemMessage: Message = {
+                id: `system_${Date.now()}`,
+                type: 'assistant',
+                content: `✅ 已成功切换到 ${result.network.name} (${result.network.type})`,
+                timestamp: Date.now(),
+                source: 'system'
+              }
+              messages.value.push(systemMessage)
+            }
+          } else {
+            // Execute other wallet instructions
+            await walletService.executeInstruction(result.instruction)
+          }
+        } catch (error) {
+          console.error('Failed to execute wallet instruction:', error)
+          
+          // Add error message
+          const errorMessage: Message = {
+            id: `error_${Date.now()}`,
+            type: 'assistant',
+            content: `❌ 钱包操作失败：${error instanceof Error ? error.message : '未知错误'}`,
+            timestamp: Date.now(),
+            source: 'error'
+          }
+          messages.value.push(errorMessage)
+        }
+      }
+    }
+  }
 }
 
 async function createSession() {
@@ -216,6 +268,11 @@ async function sendMessage() {
 
     if (response.ok) {
       const agentData: AgentResponse = await response.json()
+      
+      // Handle wallet instructions from agent
+      if (agentData.tool_calls) {
+        await handleToolCalls(agentData.tool_calls)
+      }
       
       const assistantMessage: Message = {
         id: `assistant_${Date.now()}`,

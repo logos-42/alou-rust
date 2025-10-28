@@ -51,7 +51,7 @@ export const messages = {
 }
 
 export type Language = 'zh' | 'en'
-export type MessageKey = keyof typeof messages.zh
+export type MessageKey = keyof typeof messages.zh | keyof typeof walletMessages.zh
 
 // 钱包相关翻译
 export const walletMessages = {
