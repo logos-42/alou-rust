@@ -1,13 +1,15 @@
 ﻿use worker::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use crate::agent::session::SessionManager;
 use crate::agent::core::AgentCore;
 use crate::agent::tools::{QueryTool, TransactionTool, BroadcastTool};
+use crate::web3::auth::WalletAuth;
 use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::utils::metrics::MetricsCollector;
-use crate::web3::auth::WalletAuth;
+use crate::agent::context::AgentContext;
+use crate::mcp::registry::McpTool;
 
 // Helper function to create JSON response with UTF-8 charset
 fn json_response<T: Serialize>(data: &T) -> Result<Response> {
@@ -684,25 +686,18 @@ impl Router {
         }
         
         // Create context
-        let context = AgentContext::new(body.session_id.clone(), None);
+        let context = AgentContext {
+            session_id: body.session_id.clone(),
+            wallet_address: None,
+            chain: None,
+        };
         
-        // Execute tool
-        if let Some(executor) = &self.mcp_executor {
-            match executor.execute_tool("agent_wallet", args, &context).await {
-                Ok(result) => json_response(&result),
-                Err(e) => {
-                    let error_response = ErrorResponse {
-                        error: format!("Failed to execute agent_wallet tool: {}", e),
-                    };
-                    json_response_with_status(&error_response, 500)
-                }
-            }
-        } else {
-            let error_response = ErrorResponse {
-                error: "MCP executor not configured".to_string(),
-            };
-            json_response_with_status(&error_response, 500)
-        }
+        // Execute tool directly - we'll need to get KV from environment
+        // For now, let's return an error since we need proper KV setup
+        let error_response = ErrorResponse {
+            error: "Agent wallet tool requires KV store setup".to_string(),
+        };
+        json_response_with_status(&error_response, 500)
     }
     
     /// Extract wallet address from Authorization token (optional)

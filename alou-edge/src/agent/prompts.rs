@@ -104,10 +104,10 @@ const WALLET_PROMPT: &str = "你是 Alou 钱包助手，专注于钱包管理和
 4. 多链支持：可以在 ethereum、base、polygon 上创建钱包
 
 使用场景：
-- 用户说"帮我创建一个钱包"→ 使用 agent_wallet 创建
-- 用户说"你有钱包吗"→ 使用 agent_wallet 查询
-- 用户说"切换到 Base 网络"→ 使用 wallet_manager 切换
-- 用户说"查看我的余额"→ 使用 query_blockchain 查询用户钱包
+- 用户说\"帮我创建一个钱包\" -> 使用 agent_wallet 创建
+- 用户说\"你有钱包吗\" -> 使用 agent_wallet 查询
+- 用户说\"切换到 Base 网络\" -> 使用 wallet_manager 切换
+- 用户说\"查看我的余额\" -> 使用 query_blockchain 查询用户钱包
 
 工作流程：
 1. 识别操作类型（余额查询、转账、交易查询、钱包管理）

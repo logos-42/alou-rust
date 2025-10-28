@@ -4,6 +4,7 @@ use crate::agent::context::AgentContext;
 use crate::mcp::registry::McpTool;
 use crate::storage::kv::KvStore;
 use crate::utils::error::{AloudError, Result};
+use worker::js_sys::Math;
 
 /// Agent Wallet Tool
 /// Allows the agent to create and manage its own wallets
@@ -20,7 +21,8 @@ impl AgentWalletTool {
     /// Generate a new wallet for the agent
     async fn create_wallet(&self, session_id: &str, chain: &str) -> Result<Value> {
         // Generate a random wallet address (in production, use proper key generation)
-        let wallet_address = format!("0x{:040x}", rand::random::<u128>());
+        let random_num = Math::random() * 1e38;
+        let wallet_address = format!("0x{:040x}", random_num as u128);
         
         let wallet_data = json!({
             "address": wallet_address,
@@ -32,7 +34,7 @@ impl AgentWalletTool {
         
         // Store wallet in KV
         let key = format!("agent_wallet:{}:{}", session_id, chain);
-        self.kv.put(&key, &wallet_data.to_string()).await?;
+        self.kv.put(&key, &wallet_data.to_string(), None).await?;
         
         Ok(wallet_data)
     }
@@ -41,10 +43,10 @@ impl AgentWalletTool {
     async fn get_wallet(&self, session_id: &str, chain: &str) -> Result<Option<Value>> {
         let key = format!("agent_wallet:{}:{}", session_id, chain);
         
-        match self.kv.get(&key).await? {
+        match self.kv.get::<String>(&key).await? {
             Some(data) => {
                 let wallet: Value = serde_json::from_str(&data)
-                    .map_err(|e| AloudError::ParseError(format!("Failed to parse wallet data: {}", e)))?;
+                    .map_err(|e| AloudError::CacheError(format!("Failed to parse wallet data: {}", e)))?;
                 Ok(Some(wallet))
             }
             None => Ok(None)
@@ -69,9 +71,9 @@ impl AgentWalletTool {
     async fn record_transaction(&self, session_id: &str, chain: &str, tx_data: Value) -> Result<()> {
         let key = format!("agent_wallet:{}:{}", session_id, chain);
         
-        if let Some(data) = self.kv.get(&key).await? {
+        if let Some(data) = self.kv.get::<String>(&key).await? {
             let mut wallet: Value = serde_json::from_str(&data)
-                .map_err(|e| AloudError::ParseError(format!("Failed to parse wallet data: {}", e)))?;
+                .map_err(|e| AloudError::CacheError(format!("Failed to parse wallet data: {}", e)))?;
             
             // Add transaction to history
             if let Some(txs) = wallet.get_mut("transactions").and_then(|v| v.as_array_mut()) {
@@ -84,7 +86,7 @@ impl AgentWalletTool {
             }
             
             // Update wallet
-            self.kv.put(&key, &wallet.to_string()).await?;
+            self.kv.put(&key, &wallet.to_string(), None).await?;
         }
         
         Ok(())
@@ -94,14 +96,14 @@ impl AgentWalletTool {
     async fn update_balance(&self, session_id: &str, chain: &str, balance: &str) -> Result<()> {
         let key = format!("agent_wallet:{}:{}", session_id, chain);
         
-        if let Some(data) = self.kv.get(&key).await? {
+        if let Some(data) = self.kv.get::<String>(&key).await? {
             let mut wallet: Value = serde_json::from_str(&data)
-                .map_err(|e| AloudError::ParseError(format!("Failed to parse wallet data: {}", e)))?;
+                .map_err(|e| AloudError::CacheError(format!("Failed to parse wallet data: {}", e)))?;
             
             wallet["balance"] = json!(balance);
             wallet["last_updated"] = json!(chrono::Utc::now().timestamp());
             
-            self.kv.put(&key, &wallet.to_string()).await?;
+            self.kv.put(&key, &wallet.to_string(), None).await?;
         }
         
         Ok(())
@@ -164,7 +166,7 @@ impl McpTool for AgentWalletTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidToolArgs("Missing 'action' field".to_string()))?;
         
-        let session_id = context.session_id();
+        let session_id = &context.session_id;
         
         match action {
             "create_wallet" => {
