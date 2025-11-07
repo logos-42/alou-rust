@@ -674,7 +674,7 @@ function triggerMcp() {
   position: relative;
   flex: 1;
   display: grid;
-  grid-template-columns: 300px 1fr auto;
+  grid-template-columns: 300px 1fr;
   overflow: hidden;
 }
 
@@ -712,7 +712,7 @@ function triggerMcp() {
 
 @media (max-width: 1280px) {
   .workspace {
-    grid-template-columns: 240px 1fr auto;
+    grid-template-columns: 240px 1fr;
   }
 }
 

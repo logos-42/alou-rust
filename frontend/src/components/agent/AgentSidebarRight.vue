@@ -146,16 +146,24 @@ function formatLogDetail(log: InteractionLog) {
 <style scoped>
 
 .sidebar-right {
-  position: relative;
-  width: 340px;
+  --sidebar-width: 340px;
+  --sidebar-peek: 64px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
   background: var(--surface);
   border-left: 1px solid var(--border-color);
-  transition: width 0.3s ease;
-  overflow: hidden;
+  overflow: visible;
+  transform: translateX(0);
+  transition: transform 0.32s ease, box-shadow 0.32s ease;
+  box-shadow: var(--shadow);
 }
 
 .sidebar-right.collapsed {
-  width: 64px;
+  transform: translateX(calc(var(--sidebar-width) - var(--sidebar-peek)));
+  box-shadow: none;
 }
 
 .collapse-toggle {
@@ -166,15 +174,24 @@ function formatLogDetail(log: InteractionLog) {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: none;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
   line-height: 1;
+  color: var(--text-primary);
+  z-index: 5;
+}
+
+.app-shell.dark-mode .collapse-toggle {
+  background: rgba(30, 41, 59, 0.96);
+  color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.55);
 }
 
 .sidebar-content {
@@ -188,36 +205,22 @@ function formatLogDetail(log: InteractionLog) {
 
 @media (max-width: 1280px) {
   .sidebar-right {
-    width: 300px;
-  }
-
-  .sidebar-right.collapsed {
-    width: 64px;
+    --sidebar-width: 300px;
+    --sidebar-peek: 60px;
   }
 }
 
 @media (max-width: 1024px) {
   .sidebar-right {
-    position: absolute;
-    right: 0;
     top: 72px;
-    bottom: 0;
-    z-index: 10;
-    box-shadow: var(--shadow);
-  }
-
-  .sidebar-right.collapsed {
-    width: 64px;
+    z-index: 20;
   }
 }
 
 @media (max-width: 768px) {
   .sidebar-right {
-    width: 280px;
-  }
-
-  .sidebar-right.collapsed {
-    width: 64px;
+    --sidebar-width: 280px;
+    --sidebar-peek: 56px;
   }
 }
 
