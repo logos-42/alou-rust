@@ -64,11 +64,11 @@ defineExpose({ textarea, adjustHeight })
 </script>
 
 <style scoped>
+
 .input-area {
   width: 100%;
-  background: var(--background);
-  border-top: 1px solid var(--border-color);
-  padding: 0.875rem 0;
+  background: transparent;
+  padding: 0;
   display: flex;
   justify-content: center;
   flex-shrink: 0;
@@ -77,26 +77,33 @@ defineExpose({ textarea, adjustHeight })
 .input-container {
   width: 100%;
   max-width: 100%;
-  padding: 0 clamp(1rem, 5vw, 4rem);
+  padding: 0 clamp(0.5rem, 3.2vw, 2.4rem);
 }
 
 .input-wrapper {
   display: flex;
-  gap: 0.875rem;
+  gap: 0.55rem;
   align-items: flex-end;
-  background: var(--background);
-  border: 2px solid var(--border-color);
-  border-radius: 1.5rem;
-  padding: 0.75rem 1.25rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  min-height: 52px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 0.85rem;
+  padding: 0.35rem 0.75rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+  min-height: 38px;
+}
+
+.app-shell.dark-mode .input-wrapper {
+  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.35);
 }
 
 .input-wrapper:focus-within {
-  border-color: var(--primary-color);
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.45);
+  box-shadow: 0 12px 24px rgba(99, 102, 241, 0.18);
 }
+
 
 .message-input {
   flex: 1;
@@ -105,12 +112,12 @@ defineExpose({ textarea, adjustHeight })
   outline: none;
   resize: none;
   font-family: inherit;
-  font-size: 0.9375rem;
-  line-height: 1.5;
+  font-size: 0.88rem;
+  line-height: 1.4;
   color: var(--text-primary);
-  min-height: 36px;
-  max-height: 150px;
-  padding: 6px 0;
+  min-height: 28px;
+  max-height: 120px;
+  padding: 1px 0;
 }
 
 .message-input::placeholder {
@@ -122,25 +129,26 @@ defineExpose({ textarea, adjustHeight })
   align-items: center;
 }
 
+
 .send-btn {
   background: var(--primary-color);
   color: white;
   border: none;
-  border-radius: 0.75rem;
-  width: 38px;
-  height: 38px;
+  border-radius: 0.6rem;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
-  margin-bottom: 1px;
+  margin-bottom: 0;
 }
 
 .send-btn:hover:not(:disabled) {
   background: var(--primary-hover);
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .send-btn:disabled {

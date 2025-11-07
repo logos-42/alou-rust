@@ -3,7 +3,7 @@
     <div class="nav-content">
       <div class="logo-section">
         <div class="logo">💖</div>
-        <h1 class="app-title">{{ t('appTitle') }}</h1>
+        <h1 class="app-title">Alou</h1>
       </div>
       
       <div class="nav-controls">
@@ -89,16 +89,16 @@ function handleLogoutClick() {
 .top-nav {
   width: 100%;
   background: var(--background);
-  border-bottom: 1px solid var(--border-color);
-  padding: 1rem 0;
-  box-shadow: var(--shadow);
+  border-bottom: none;
+  padding: 0.4rem 0;
+  box-shadow: none;
   z-index: 10;
   flex-shrink: 0;
 }
 
 .nav-content {
   width: 100%;
-  padding: 0 clamp(1rem, 3vw, 3rem);
+  padding: 0 clamp(0.6rem, 2vw, 2rem);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -111,11 +111,11 @@ function handleLogoutClick() {
 }
 
 .logo {
-  font-size: 2rem;
+  font-size: 1.75rem;
 }
 
 .app-title {
-  font-size: 1.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   margin: 0;
   background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
@@ -164,7 +164,9 @@ function handleLogoutClick() {
   animation: pulse 2s infinite;
 }
 
-.theme-toggle, .login-btn, .user-btn {
+.theme-toggle,
+.login-btn,
+.user-btn {
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -173,12 +175,12 @@ function handleLogoutClick() {
   background: var(--secondary-color);
   border: none;
   border-radius: 50%;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
 }
 
 .login-btn {
