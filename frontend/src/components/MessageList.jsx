@@ -24,7 +24,7 @@ const formatTime = (timestamp) =>
     minute: '2-digit',
   })
 
-const MessageList = forwardRef(({ messages = [], isLoading = false }, ref) => {
+const MessageList = forwardRef(({ messages = [], isLoading = false, onMessageSelect }, ref) => {
   const containerRef = useRef(null)
   const { t } = useI18n()
 
@@ -56,22 +56,37 @@ const MessageList = forwardRef(({ messages = [], isLoading = false }, ref) => {
   return (
     <div className="messages-area" ref={containerRef}>
       <div>
-        {renderedMessages.map((message) => (
-          <div key={message.id} className={`message-wrapper ${message.type}`}>
-            <div className="message-bubble">
-              <div
-                className="message-content"
-                dangerouslySetInnerHTML={{ __html: message.html }}
-              />
-              <div className="message-footer">
-                <span className="timestamp">{message.formattedTime}</span>
-                {message.formattedSource && (
-                  <span className="source-tag">{message.formattedSource}</span>
-                )}
+        {renderedMessages.map((message) => {
+          const isInteractive = typeof onMessageSelect === 'function'
+          return (
+            <div
+              key={message.id}
+              className={`message-wrapper ${message.type}`}
+              role={isInteractive ? 'button' : undefined}
+              tabIndex={isInteractive ? 0 : undefined}
+              onClick={() => onMessageSelect?.(message)}
+              onKeyDown={(event) => {
+                if (!isInteractive) return
+                if (event.key === 'Enter' || event.key === ' ') {
+                  onMessageSelect(message)
+                }
+              }}
+            >
+              <div className="message-bubble">
+                <div
+                  className="message-content"
+                  dangerouslySetInnerHTML={{ __html: message.html }}
+                />
+                <div className="message-footer">
+                  <span className="timestamp">{message.formattedTime}</span>
+                  {message.formattedSource && (
+                    <span className="source-tag">{message.formattedSource}</span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {isLoading && (

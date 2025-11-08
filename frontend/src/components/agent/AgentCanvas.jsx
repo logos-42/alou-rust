@@ -10,6 +10,7 @@ const AgentCanvas = forwardRef(
       onPointerMove,
       onPointerUp,
       onPointerLeave,
+      onAgentActivate,
     },
     ref,
   ) => {
@@ -28,6 +29,11 @@ const AgentCanvas = forwardRef(
       onPointerDown?.(event)
     }
 
+    const handleClick = (event) => {
+      event.stopPropagation()
+      onAgentActivate?.()
+    }
+
     return (
       <main
         ref={rootRef}
@@ -42,7 +48,12 @@ const AgentCanvas = forwardRef(
           ))}
         </div>
 
-        <div className="agent-node" style={agentStyle} onPointerDown={handlePointerDown}>
+        <div
+          className="agent-node"
+          style={agentStyle}
+          onPointerDown={handlePointerDown}
+          onClick={handleClick}
+        >
           <div className="agent-glow" />
           <div className="agent-avatar">
             <img src={agentProfile?.avatar} alt="agent" />

@@ -11,6 +11,7 @@ const AgentConversationOverlay = forwardRef(
       messages,
       isLoading,
       onClose,
+      onInspectMessage,
     },
     ref,
   ) => {
@@ -43,7 +44,12 @@ const AgentConversationOverlay = forwardRef(
             </button>
           </header>
           <div className="conversation-body">
-            <MessageList ref={messageListRef} messages={messages} isLoading={isLoading} />
+            <MessageList
+              ref={messageListRef}
+              messages={messages}
+              isLoading={isLoading}
+              onMessageSelect={onInspectMessage}
+            />
           </div>
         </section>
       </div>

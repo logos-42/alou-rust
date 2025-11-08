@@ -53,6 +53,8 @@ const AgentSidebarRight = ({
   onRefreshWallet,
   onToggleInteraction,
   onToggleCollapse,
+  onInspectWallet,
+  onInspectTransaction,
   connectActionSlot,
 }) => {
   const { t } = useI18n()
@@ -87,12 +89,29 @@ const AgentSidebarRight = ({
                 <span className="emoji">💰</span>
                 <span>{t('agentAssets')}</span>
               </div>
-              <button type="button" className="refresh-btn" onClick={onRefreshWallet}>
+              <button
+                type="button"
+                className="refresh-btn"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRefreshWallet?.()
+                }}
+              >
                 {t('refresh')}
               </button>
             </header>
             {walletSnapshot ? (
-              <div className="wallet-body">
+              <div
+                className="wallet-body"
+                role="button"
+                tabIndex={0}
+                onClick={() => onInspectWallet?.(walletSnapshot)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    onInspectWallet?.(walletSnapshot)
+                  }
+                }}
+              >
                 <div className="balance">
                   <div className="amount">{walletSnapshot.balance} ETH</div>
                   <div className="fiat">≈ {walletSnapshot.balanceFiat} USD</div>
@@ -132,7 +151,18 @@ const AgentSidebarRight = ({
             </header>
             <ul>
               {transactions.map((tx) => (
-                <li key={tx.id} className={tx.status}>
+                <li
+                  key={tx.id}
+                  className={tx.status}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onInspectTransaction?.(tx)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      onInspectTransaction?.(tx)
+                    }
+                  }}
+                >
                   <div className="tx-main">
                     <div className="tx-amount">
                       {tx.direction === 'out' ? '-' : '+'}

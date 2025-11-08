@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
 import { walletService } from '@/services/walletService'
+import { MCP_UI_TARGETS, requestMcpUiResource } from '@/services/mcpUiService'
 import ChatHeader from '@/components/ChatHeader'
 import AgentSidebarLeft from '@/components/agent/AgentSidebarLeft'
 import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
@@ -158,7 +159,7 @@ const AgentChat = () => {
   const canvasRef = useRef(null)
   const conversationOverlayRef = useRef(null)
   const consoleDockRef = useRef(null)
-  const dragStateRef = useRef({ dragging: false, offsetX: 0, offsetY: 0 })
+  const dragStateRef = useRef({ dragging: false, offsetX: 0, offsetY: 0, moved: false })
   const agentPositionRef = useRef({ x: 0, y: 0 })
   const [agentPosition, setAgentPosition] = useState({ x: 0, y: 0 })
   const [uiResource, setUiResource] = useState(null)
@@ -293,6 +294,51 @@ const AgentChat = () => {
       })
     },
     [recordInteraction],
+  )
+
+  const fetchAndOpenUiResource = useCallback(
+    async (target, params = {}, meta = {}) => {
+      if (!target) {
+        return
+      }
+      try {
+        const payload = {
+          session_id: sessionId,
+          ...params,
+        }
+        const resource = await requestMcpUiResource(target, payload)
+        if (!resource) {
+          throw new Error('empty resource response')
+        }
+        openUiResource(resource, {
+          source: 'frontend',
+          target,
+          ...meta,
+        })
+      } catch (error) {
+        console.error('Failed to load MCP UI resource:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        recordInteraction('trigger_mcp', {
+          kind: 'ui_error',
+          target,
+          params,
+          error: errorMessage,
+        })
+        setInteractionLogs((prev) => [
+          {
+            id: `mcp_error_${Date.now()}`,
+            action: 'trigger_mcp',
+            label: 'MCP UI 加载失败',
+            timestamp: Date.now(),
+            detail: { target, error: errorMessage },
+          },
+          ...prev,
+        ])
+      } finally {
+        // no-op
+      }
+    },
+    [openUiResource, recordInteraction, sessionId],
   )
 
   const closeUiResource = useCallback(() => {
@@ -554,6 +600,35 @@ const AgentChat = () => {
     [createSession, recordInteraction, refreshWallet],
   )
 
+  const handleInspectWallet = useCallback(() => {
+    if (!walletSnapshot?.address) {
+      return
+    }
+    void fetchAndOpenUiResource(
+      MCP_UI_TARGETS.walletOverview,
+      {
+        wallet_address: walletSnapshot.address,
+      },
+      { source: 'wallet_card' },
+    )
+  }, [fetchAndOpenUiResource, walletSnapshot])
+
+  const handleInspectTransaction = useCallback(
+    (transaction) => {
+      if (!transaction?.id) return
+      void fetchAndOpenUiResource(
+        MCP_UI_TARGETS.transactionDetail,
+        {
+          transaction_id: transaction.id,
+          direction: transaction.direction,
+          token: transaction.token,
+        },
+        { source: 'transaction_list', transactionId: transaction.id },
+      )
+    },
+    [fetchAndOpenUiResource],
+  )
+
   const checkConnection = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/health`)
@@ -576,6 +651,7 @@ const AgentChat = () => {
       if (!canvasElement) return
 
       dragStateRef.current.dragging = true
+      dragStateRef.current.moved = false
       const rect = canvasElement.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
       const centerY = rect.top + rect.height / 2
@@ -609,6 +685,12 @@ const AgentChat = () => {
     const clamped = {
       x: Math.min(Math.max(nextX, -limitX), limitX),
       y: Math.min(Math.max(nextY, -limitY), limitY),
+    }
+    if (
+      Math.abs(clamped.x - agentPositionRef.current.x) > 1 ||
+      Math.abs(clamped.y - agentPositionRef.current.y) > 1
+    ) {
+      dragStateRef.current.moved = true
     }
     updateAgentPosition(clamped)
   }, [updateAgentPosition])
@@ -669,12 +751,39 @@ const AgentChat = () => {
     if (!isConversationVisible) {
       setConversationVisible(true)
       scrollToBottom()
+      const messageCount = messages.length
+      void fetchAndOpenUiResource(
+        MCP_UI_TARGETS.conversationDetail,
+        {
+          conversation_id: sessionId,
+          message_count: messageCount,
+        },
+        { source: 'conversation_panel' },
+      )
     }
-  }, [isConversationVisible, scrollToBottom])
+  }, [fetchAndOpenUiResource, isConversationVisible, messages, scrollToBottom, sessionId])
 
   const closeConversationPanel = useCallback(() => {
     setConversationVisible(false)
   }, [])
+
+  const handleInspectMessage = useCallback(
+    (message) => {
+      if (!message?.id) {
+        return
+      }
+      void fetchAndOpenUiResource(
+        MCP_UI_TARGETS.conversationDetail,
+        {
+          message_id: message.id,
+          role: message.type,
+          timestamp: message.timestamp,
+        },
+        { source: 'conversation', messageId: message.id },
+      )
+    },
+    [fetchAndOpenUiResource],
+  )
 
   const goToLogin = useCallback(() => {
     recordInteraction('navigate_login')
@@ -700,13 +809,36 @@ const AgentChat = () => {
         status: channel.status,
         statusLabel: channel.statusLabel,
       })
+      void fetchAndOpenUiResource(
+        MCP_UI_TARGETS.channelDetail,
+        {
+          channel_id: channel.id,
+        },
+        { channelId: channel.id },
+      )
     },
-    [recordInteraction],
+    [fetchAndOpenUiResource, recordInteraction],
   )
 
   const createChannel = useCallback(() => {
     recordInteraction('create_channel')
-  }, [recordInteraction])
+    void fetchAndOpenUiResource(MCP_UI_TARGETS.channelCreate, {})
+  }, [fetchAndOpenUiResource, recordInteraction])
+
+  const handleAgentActivate = useCallback(() => {
+    if (dragStateRef.current?.moved) {
+      dragStateRef.current.moved = false
+      return
+    }
+    dragStateRef.current.moved = false
+    void fetchAndOpenUiResource(
+      MCP_UI_TARGETS.agentProfile,
+      {
+        agent_id: agentProfile?.name,
+      },
+      { agent: agentProfile?.name },
+    )
+  }, [agentProfile, fetchAndOpenUiResource])
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -787,6 +919,7 @@ const AgentChat = () => {
           onPointerMove={onDrag}
           onPointerUp={stopDrag}
           onPointerLeave={stopDrag}
+          onAgentActivate={handleAgentActivate}
         />
 
         <AgentSidebarRight
@@ -798,6 +931,8 @@ const AgentChat = () => {
           onRefreshWallet={refreshWallet}
           onToggleInteraction={toggleInteractionPanel}
           onToggleCollapse={toggleSidebar}
+          onInspectWallet={handleInspectWallet}
+          onInspectTransaction={handleInspectTransaction}
           connectActionSlot={() => (
             <button type="button" onClick={goToWallet}>
               立即连接
@@ -814,6 +949,7 @@ const AgentChat = () => {
             messages={messages}
             isLoading={isLoading}
             onClose={closeConversationPanel}
+            onInspectMessage={handleInspectMessage}
           />
         )}
       </div>
