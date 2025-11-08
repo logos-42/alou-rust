@@ -8,8 +8,6 @@ use crate::web3::auth::WalletAuth;
 use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::utils::metrics::MetricsCollector;
-use crate::agent::context::AgentContext;
-use crate::mcp::registry::McpTool;
 
 // Helper function to create JSON response with UTF-8 charset
 fn json_response<T: Serialize>(data: &T) -> Result<Response> {
@@ -649,6 +647,7 @@ impl Router {
     }
     
     async fn handle_agent_wallet(&self, req: &mut Request) -> Result<Response> {
+        #[allow(dead_code)]
         #[derive(Deserialize)]
         struct AgentWalletRequest {
             session_id: String,
@@ -684,13 +683,6 @@ impl Router {
         if let Some(balance) = body.balance {
             args["balance"] = json!(balance);
         }
-        
-        // Create context
-        let context = AgentContext {
-            session_id: body.session_id.clone(),
-            wallet_address: None,
-            chain: None,
-        };
         
         // Execute tool directly - we'll need to get KV from environment
         // For now, let's return an error since we need proper KV setup

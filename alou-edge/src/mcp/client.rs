@@ -6,10 +6,12 @@ use std::sync::Arc;
 
 use crate::utils::error::{AloudError, Result};
 
+#[cfg(target_arch = "wasm32")]
 trait StatusCodeExt {
     fn is_success(&self) -> bool;
 }
 
+#[cfg(target_arch = "wasm32")]
 impl StatusCodeExt for u16 {
     fn is_success(&self) -> bool {
         (200..300).contains(self)
@@ -26,6 +28,7 @@ pub struct JsonRpcRequest {
 }
 
 /// JSON-RPC 2.0 response
+#[cfg_attr(not(any(target_arch = "wasm32", feature = "testing")), allow(dead_code))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcResponse {
     pub jsonrpc: String,
@@ -37,6 +40,7 @@ pub struct JsonRpcResponse {
 }
 
 /// JSON-RPC error object
+#[cfg_attr(not(any(target_arch = "wasm32", feature = "testing")), allow(dead_code))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcError {
     pub code: i32,
@@ -214,7 +218,7 @@ impl McpClient {
         }
         
         // In non-WASM environment, use reqwest
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(all(not(target_arch = "wasm32"), feature = "testing"))]
         {
             let client = reqwest::Client::new();
             let resp = client
@@ -247,6 +251,15 @@ impl McpClient {
             response.result.ok_or_else(|| {
                 AloudError::McpError("No result in response".to_string())
             })
+        }
+
+        #[cfg(all(not(target_arch = "wasm32"), not(feature = "testing")))]
+        {
+            let _ = request;
+            Err(AloudError::McpError(
+                "HTTP client support is disabled; enable the `testing` feature to perform MCP HTTP requests"
+                    .to_string(),
+            ))
         }
     }
     

@@ -33,7 +33,7 @@ uuid = { version = "1.0", features = ["v4", "serde", "js"] }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 # Async primitives (sync only, no net for WASM compatibility)
-tokio = { version = "1.0", default-features = false, features = ["sync"] }
+tokio = { version = "1.0", default-features = false, features = ["sync", "time"] }
 
 # HTTP client for Claude API (only for non-WASM testing)
 reqwest = { version = "0.11", default-features = false, features = ["json"], optional = true }

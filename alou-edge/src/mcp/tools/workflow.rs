@@ -111,6 +111,7 @@ impl WorkflowTool {
             .ok_or_else(|| AloudError::InvalidInput(format!("Workflow not found: {}", id)))
     }
     
+    #[allow(dead_code)]
     fn get_workflow_mut(&mut self, id: &str) -> Result<&mut Workflow> {
         self.workflows
             .get_mut(id)

@@ -9,6 +9,7 @@ pub struct PaymentTool {
     eth_rpc_url: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletInfo {
     pub address: String,
@@ -16,6 +17,7 @@ pub struct WalletInfo {
     pub wallet_type: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionResult {
     pub success: bool,
