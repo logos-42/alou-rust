@@ -96,6 +96,13 @@ export const walletMessages = {
     minutesAgo: '分钟前',
     hoursAgo: '小时前',
     daysAgo: '天前',
+    agentAssets: '智能体资产',
+    refresh: '刷新',
+    noWalletConnected: '尚未连接钱包',
+    currentNetwork: '当前网络',
+    interactionLogs: '互动记录',
+    expand: '展开',
+    collapse: '收起',
   },
   en: {
     ...messages.en,
@@ -141,5 +148,12 @@ export const walletMessages = {
     minutesAgo: ' minutes ago',
     hoursAgo: ' hours ago',
     daysAgo: ' days ago',
+    agentAssets: 'Agent Assets',
+    refresh: 'Refresh',
+    noWalletConnected: 'No wallet connected',
+    currentNetwork: 'Current network',
+    interactionLogs: 'Interaction Logs',
+    expand: 'Expand',
+    collapse: 'Collapse',
   }
 }

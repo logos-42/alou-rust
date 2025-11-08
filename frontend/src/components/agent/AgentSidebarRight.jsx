@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { useI18n } from '@/hooks/useI18n'
 import './AgentSidebarRight.css'
 
 const formatDate = (timestamp) =>
@@ -52,6 +53,8 @@ const AgentSidebarRight = ({
   onToggleCollapse,
   connectActionSlot,
 }) => {
+  const { t } = useI18n()
+
   const handleCopy = useCallback((address) => {
     if (!address || typeof navigator === 'undefined') return
     navigator.clipboard.writeText(address).catch((error) => {
@@ -65,7 +68,7 @@ const AgentSidebarRight = ({
         type="button"
         className="collapse-toggle"
         onClick={onToggleCollapse}
-        aria-label="切换右侧栏"
+        aria-label={t('interactionLogs')}
       >
         {isCollapsed ? '⋯' : '▶'}
       </button>
@@ -76,10 +79,10 @@ const AgentSidebarRight = ({
             <header>
               <div className="title">
                 <span className="emoji">💰</span>
-                <span>智能体资产</span>
+                <span>{t('agentAssets')}</span>
               </div>
               <button type="button" className="refresh-btn" onClick={onRefreshWallet}>
-                刷新
+                {t('refresh')}
               </button>
             </header>
             {walletSnapshot ? (
@@ -102,11 +105,13 @@ const AgentSidebarRight = ({
                   {walletSnapshot.address.slice(0, 6)}...
                   {walletSnapshot.address.slice(-4)}
                 </div>
-                <div className="network">当前网络：{walletSnapshot.networkLabel}</div>
+                <div className="network">
+                  {t('currentNetwork')}：{walletSnapshot.networkLabel}
+                </div>
               </div>
             ) : (
               <div className="wallet-empty">
-                <p>尚未连接钱包</p>
+                <p>{t('noWalletConnected')}</p>
                 {typeof connectActionSlot === 'function' ? connectActionSlot() : connectActionSlot}
               </div>
             )}
@@ -116,7 +121,7 @@ const AgentSidebarRight = ({
             <header>
               <div className="title">
                 <span className="emoji">📜</span>
-                <span>转账历史</span>
+                <span>{t('recentTransactions')}</span>
               </div>
             </header>
             <ul>
@@ -146,10 +151,10 @@ const AgentSidebarRight = ({
             <header>
               <div className="title">
                 <span className="emoji">🧠</span>
-                <span>互动记录</span>
+                <span>{t('interactionLogs')}</span>
               </div>
               <button type="button" className="collapse-btn" onClick={onToggleInteraction}>
-                {isInteractionCollapsed ? '展开' : '收起'}
+                {isInteractionCollapsed ? t('expand') : t('collapse')}
               </button>
             </header>
             {!isInteractionCollapsed && (

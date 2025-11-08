@@ -222,56 +222,6 @@ const AgentChat = () => {
   }, [viewportWidth, isSidebarCollapsed])
 
   const userName = useMemo(() => userNameGetter?.() ?? 'User', [userNameGetter])
-  const sampleUIResource = useMemo(
-    () => ({
-      resource: {
-        uri: 'ui://demo/welcome',
-        mimeType: 'text/html',
-        text: `
-          <style>
-            body {
-              font-family: "Segoe UI", sans-serif;
-              margin: 0;
-              padding: 0;
-              background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-              color: white;
-            }
-            .container {
-              padding: 24px;
-            }
-            .card {
-              background: rgba(255,255,255,0.1);
-              border-radius: 16px;
-              padding: 24px;
-              backdrop-filter: blur(8px);
-              border: 1px solid rgba(255,255,255,0.25);
-            }
-            button {
-              margin-top: 16px;
-              padding: 10px 20px;
-              border-radius: 20px;
-              border: none;
-              background: white;
-              color: #4f46e5;
-              font-size: 14px;
-              cursor: pointer;
-            }
-          </style>
-          <div class="container">
-            <div class="card">
-              <h2>👋 欢迎体验 MCP UI</h2>
-              <p>这是一个使用 &lt;UIResourceRenderer&gt; 渲染的 HTML 资源示例。后端可以随时下发 Remote DOM、HTML 或 externalUrl。</p>
-              <button onclick="window.parent?.postMessage({ type: 'mcp-ui-action', payload: { action: 'demo-click' } }, '*')">
-                发送 UI Action
-              </button>
-            </div>
-          </div>
-        `,
-      },
-    }),
-    [],
-  )
-
   const updateAgentPosition = useCallback((next) => {
     agentPositionRef.current = next
     setAgentPosition(next)
@@ -451,10 +401,6 @@ const AgentChat = () => {
     },
     [appendMessage, openUiResource, recordInteraction, scrollToBottom],
   )
-
-  const triggerMcp = useCallback(() => {
-    openUiResource(sampleUIResource, { source: 'manual_demo' })
-  }, [openUiResource, sampleUIResource])
 
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
@@ -814,9 +760,6 @@ const AgentChat = () => {
           onPointerMove={onDrag}
           onPointerUp={stopDrag}
           onPointerLeave={stopDrag}
-          onTriggerMcp={triggerMcp}
-          onRefreshWallet={refreshWallet}
-          onOpenWallet={goToWallet}
         />
 
         <AgentSidebarRight

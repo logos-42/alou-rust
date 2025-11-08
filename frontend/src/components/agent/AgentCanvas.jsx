@@ -10,9 +10,6 @@ const AgentCanvas = forwardRef(
       onPointerMove,
       onPointerUp,
       onPointerLeave,
-      onTriggerMcp,
-      onRefreshWallet,
-      onOpenWallet,
     },
     ref,
   ) => {
@@ -29,18 +26,6 @@ const AgentCanvas = forwardRef(
 
     const handlePointerDown = (event) => {
       onPointerDown?.(event)
-    }
-
-    const handleTriggerMcp = () => {
-      onTriggerMcp?.()
-    }
-
-    const handleRefresh = () => {
-      onRefreshWallet?.()
-    }
-
-    const handleOpenWallet = () => {
-      onOpenWallet?.()
     }
 
     return (
@@ -64,18 +49,6 @@ const AgentCanvas = forwardRef(
           </div>
           <div className="agent-label">
             <h2>{agentProfile?.name}</h2>
-            <p>{agentProfile?.role}</p>
-          </div>
-          <div className="agent-actions">
-            <button type="button" onClick={handleOpenWallet}>
-              钱包
-            </button>
-            <button type="button" onClick={handleTriggerMcp}>
-              MCP
-            </button>
-            <button type="button" onClick={handleRefresh}>
-              刷新
-            </button>
           </div>
         </div>
       </main>
