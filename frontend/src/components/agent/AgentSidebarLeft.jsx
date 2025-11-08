@@ -1,4 +1,7 @@
 import React from 'react'
+import CollapseIcon from '@/assets/侧边栏收缩.png'
+import SearchIcon from '@/assets/搜索.png'
+import CreateIcon from '@/assets/创建.png'
 import './AgentSidebarLeft.css'
 
 const formatDate = (timestamp) =>
@@ -14,24 +17,40 @@ const AgentSidebarLeft = ({
   onKeywordChange,
   onSelectChannel,
   onCreateChannel,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
+  const sidebarClassName = `sidebar-left${isCollapsed ? ' collapsed' : ''}`
+
   return (
-    <aside className="sidebar-left">
+    <aside className={sidebarClassName}>
       <div className="sidebar-header">
-        <div className="brand">alou</div>
-        <button type="button" className="new-channel-btn" onClick={onCreateChannel}>
-          ＋
+        <button
+          type="button"
+          className="brand-toggle"
+          onClick={() => onToggleCollapse?.()}
+          aria-label={isCollapsed ? '展开智能体列表' : '折叠智能体列表'}
+        >
+          <img src={CollapseIcon} alt="Alou" className="brand-icon" />
         </button>
+        {!isCollapsed && (
+          <button type="button" className="new-channel-btn" onClick={onCreateChannel}>
+            <img src={CreateIcon} alt="创建频道" />
+          </button>
+        )}
       </div>
 
-      <div className="channel-search">
-        <input
-          type="text"
-          value={keyword}
-          placeholder="搜索智能体"
-          onChange={(event) => onKeywordChange?.(event.target.value)}
-        />
-      </div>
+      {!isCollapsed && (
+        <div className="channel-search">
+          <input
+            type="text"
+            value={keyword}
+            placeholder="搜索智能体"
+            onChange={(event) => onKeywordChange?.(event.target.value)}
+          />
+          <img src={SearchIcon} alt="搜索" className="search-icon" />
+        </div>
+      )}
 
       <div className="channel-list">
         {channels.map((channel) => (
@@ -40,6 +59,7 @@ const AgentSidebarLeft = ({
             className={`channel-item${channel.id === activeChannelId ? ' active' : ''}`}
             onClick={() => onSelectChannel?.(channel)}
             role="button"
+            title={channel.name}
             tabIndex={0}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
@@ -49,15 +69,20 @@ const AgentSidebarLeft = ({
           >
             <div className="channel-icon" style={{ background: channel.color }}>
               {channel.icon}
+              <span className={`status-indicator ${channel.status}`} />
             </div>
-            <div className="channel-info">
-              <div className="channel-name">{channel.name}</div>
-              <div className="channel-meta">
-                <span className={`status-dot ${channel.status}`} />
-                <span className="channel-status">{channel.statusLabel}</span>
-              </div>
-            </div>
-            <div className="channel-date">{formatDate(channel.updatedAt)}</div>
+            {!isCollapsed && (
+              <>
+                <div className="channel-info">
+                  <div className="channel-name">{channel.name}</div>
+                  <div className="channel-meta">
+                    <span className={`status-dot ${channel.status}`} />
+                    <span className="channel-status">{channel.statusLabel}</span>
+                  </div>
+                </div>
+                <div className="channel-date">{formatDate(channel.updatedAt)}</div>
+              </>
+            )}
           </div>
         ))}
       </div>

@@ -40,6 +40,11 @@
   z-index: 5;
 }
 
+.sidebar-right .collapse-toggle .toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .app-shell.dark-mode .sidebar-right .collapse-toggle {
   background: rgba(30, 41, 59, 0.96);
   color: #ffffff;
@@ -99,6 +104,11 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.8rem;
+}
+
+.sidebar-right .collapse-btn .collapse-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .sidebar-right .title {

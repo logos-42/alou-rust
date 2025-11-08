@@ -1,9 +1,16 @@
 .sidebar-left {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.72);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
+  width: var(--left-column-width, 300px);
+  transition: width 0.28s ease, padding 0.2s ease;
+}
+
+.app-shell.dark-mode .sidebar-left {
+  background: rgba(15, 23, 42, 0.78);
 }
 
 .sidebar-left .sidebar-header {
@@ -13,40 +20,91 @@
   padding: 1rem 1.25rem 0.6rem;
 }
 
-.sidebar-left .brand {
-  font-size: 1.2rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.sidebar-left .new-channel-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+.sidebar-left .brand-toggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   border: none;
-  background: var(--secondary-color);
+  background: transparent;
   color: var(--primary-color);
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: transform 0.2s ease;
 }
 
+.sidebar-left .brand-toggle:hover {
+  transform: translateY(-1px) scale(1.03);
+}
+
+.sidebar-left .brand-icon {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) saturate(0);
+  opacity: 0.45;
+}
+
+.sidebar-left .new-channel-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sidebar-left .new-channel-btn:hover {
-  transform: rotate(90deg);
+  transform: translateY(-1px);
+  filter: drop-shadow(0 6px 14px rgba(99, 102, 241, 0.35));
+}
+
+.sidebar-left .new-channel-btn img {
+  width: 28px;
+  height: 28px;
+  filter: brightness(0) saturate(0);
+  opacity: 0.55;
+}
+
+.sidebar-left .new-channel-btn:hover img {
+  opacity: 0.75;
+}
+
+.app-shell.dark-mode .sidebar-left .new-channel-btn img {
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
 }
 
 .sidebar-left .channel-search {
   padding: 0 1.25rem 0.75rem;
+  position: relative;
 }
 
 .sidebar-left .channel-search input {
   width: 100%;
   border-radius: 0.75rem;
   border: 1px solid var(--border-color);
-  padding: 0.6rem 0.9rem;
+  padding: 0.7rem 2.4rem 0.7rem 1.05rem;
   background: transparent;
   color: var(--text-primary);
+}
+
+.sidebar-left .channel-search .search-icon {
+  position: absolute;
+  top: 50%;
+  right: 1.6rem;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  filter: brightness(0);
+}
+
+.app-shell.dark-mode .sidebar-left .channel-search .search-icon {
+  filter: brightness(0) invert(1);
 }
 
 .sidebar-left .channel-search input::placeholder {
@@ -91,6 +149,7 @@
   color: white;
   font-size: 1.05rem;
   font-weight: 600;
+  position: relative;
 }
 
 .sidebar-left .channel-info {
@@ -134,6 +193,80 @@
 .sidebar-left .channel-date {
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.sidebar-left .status-indicator {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  display: none;
+}
+
+.sidebar-left .status-indicator.online {
+  background: #10b981;
+}
+
+.sidebar-left .status-indicator.busy {
+  background: #f59e0b;
+}
+
+.sidebar-left .status-indicator.offline {
+  background: #94a3b8;
+}
+
+.sidebar-left.collapsed .status-indicator {
+  display: block;
+}
+
+.sidebar-left.collapsed .sidebar-header {
+  padding: 0.8rem 0.8rem 0.4rem;
+}
+
+.sidebar-left.collapsed .new-channel-btn {
+  display: none;
+}
+
+.sidebar-left.collapsed .channel-search {
+  display: none;
+}
+
+.app-shell.dark-mode .sidebar-left .brand-icon {
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+}
+
+.sidebar-left.collapsed .channel-list {
+  padding: 0.4rem 0.35rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sidebar-left.collapsed .channel-item {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem;
+}
+
+.sidebar-left.collapsed .channel-item.active {
+  background: rgba(99, 102, 241, 0.14);
+}
+
+.sidebar-left.collapsed .channel-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 1.2rem;
+}
+
+.sidebar-left.collapsed .channel-info,
+.sidebar-left.collapsed .channel-date {
+  display: none;
 }
 
 @media (max-width: 768px) {

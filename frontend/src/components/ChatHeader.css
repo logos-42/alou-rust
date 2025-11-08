@@ -1,19 +1,29 @@
 .top-nav {
   width: 100%;
-  background: var(--background);
-  border-bottom: none;
-  padding: 0.4rem 0;
+  padding: 0.1rem 0;
   box-shadow: none;
   z-index: 10;
   flex-shrink: 0;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  background: transparent;
+}
+
+.app-shell.dark-mode .top-nav {
+  background: rgba(11, 16, 36, 0.32);
+}
+
+.app-shell:not(.dark-mode) .top-nav {
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .top-nav .nav-content {
   width: 100%;
-  padding: 0 clamp(0.6rem, 2vw, 2rem);
+  padding: 0 clamp(0.45rem, 1.4vw, 1.5rem);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 46px;
 }
 
 .top-nav .logo-section {

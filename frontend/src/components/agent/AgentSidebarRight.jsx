@@ -1,5 +1,7 @@
 import React, { useCallback } from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import CollapseIcon from '@/assets/收缩.png'
+import DotsIcon from '@/assets/三点.png'
 import './AgentSidebarRight.css'
 
 const formatDate = (timestamp) =>
@@ -70,7 +72,11 @@ const AgentSidebarRight = ({
         onClick={onToggleCollapse}
         aria-label={t('interactionLogs')}
       >
-        {isCollapsed ? '⋯' : '▶'}
+        <img
+          src={isCollapsed ? DotsIcon : CollapseIcon}
+          alt={isCollapsed ? '展开' : '折叠'}
+          className="toggle-icon"
+        />
       </button>
 
       {!isCollapsed && (
@@ -154,7 +160,11 @@ const AgentSidebarRight = ({
                 <span>{t('interactionLogs')}</span>
               </div>
               <button type="button" className="collapse-btn" onClick={onToggleInteraction}>
-                {isInteractionCollapsed ? t('expand') : t('collapse')}
+                <img
+                  src={isInteractionCollapsed ? DotsIcon : CollapseIcon}
+                  alt={isInteractionCollapsed ? '展开' : '折叠'}
+                  className="collapse-icon"
+                />
               </button>
             </header>
             {!isInteractionCollapsed && (

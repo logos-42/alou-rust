@@ -8,6 +8,7 @@
   --background: #f8fafc;
   --surface: rgba(255, 255, 255, 0.85);
   --shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --left-column-width: 300px;
 
   position: fixed;
   inset: 0;
@@ -16,6 +17,7 @@
   background: var(--background);
   color: var(--text-primary);
   transition: background 0.3s ease, color 0.3s ease;
+  -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
 }
 
@@ -35,7 +37,7 @@
   position: relative;
   flex: 1;
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: var(--left-column-width) 1fr;
   overflow: hidden;
 }
 
@@ -71,21 +73,31 @@
   background: rgba(99, 102, 241, 1);
 }
 
+.app-shell.collapsed-left {
+  --left-column-width: 84px;
+}
+
 @media (max-width: 1280px) {
-  .workspace {
-    grid-template-columns: 240px 1fr;
+  .app-shell {
+    --left-column-width: 240px;
+  }
+  .app-shell.collapsed-left {
+    --left-column-width: 84px;
   }
 }
 
 @media (max-width: 1024px) {
-  .workspace {
-    grid-template-columns: 220px 1fr;
+  .app-shell {
+    --left-column-width: 220px;
+  }
+  .app-shell.collapsed-left {
+    --left-column-width: 72px;
   }
 }
 
 @media (max-width: 768px) {
-  .workspace {
-    grid-template-columns: 1fr;
+  .app-shell {
+    --left-column-width: 0px;
   }
 }
 

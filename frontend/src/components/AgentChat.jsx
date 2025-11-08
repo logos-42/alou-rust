@@ -134,6 +134,7 @@ const AgentChat = () => {
   }, [connectionStatus])
 
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(true)
+  const [isLeftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false)
   const [isInteractionCollapsed, setInteractionCollapsed] = useState(true)
   const [isConversationVisible, setConversationVisible] = useState(false)
 
@@ -200,26 +201,34 @@ const AgentChat = () => {
     if (viewportWidth <= 1024) {
       return { margin: '0 1rem 0 1rem' }
     }
-    const leftWidth = viewportWidth <= 1280 ? 240 : 300
+    const leftWidth = isLeftSidebarCollapsed
+      ? 84
+      : viewportWidth <= 1280
+        ? 240
+        : 300
     const rightWidth = isSidebarCollapsed ? 80 : 340
     return {
       marginLeft: `${leftWidth + 24}px`,
       marginRight: `${rightWidth + 24}px`,
     }
-  }, [viewportWidth, isSidebarCollapsed])
+  }, [viewportWidth, isSidebarCollapsed, isLeftSidebarCollapsed])
 
   const conversationOverlayStyle = useMemo(() => {
     if (viewportWidth <= 1024) {
       return { left: '1rem', right: '1rem', bottom: '6rem' }
     }
-    const leftWidth = viewportWidth <= 1280 ? 240 : 300
+    const leftWidth = isLeftSidebarCollapsed
+      ? 84
+      : viewportWidth <= 1280
+        ? 240
+        : 300
     const rightWidth = isSidebarCollapsed ? 80 : 340
     return {
       left: `${leftWidth + 24}px`,
       right: `${rightWidth + 24}px`,
       bottom: '6.5rem',
     }
-  }, [viewportWidth, isSidebarCollapsed])
+  }, [viewportWidth, isSidebarCollapsed, isLeftSidebarCollapsed])
 
   const userName = useMemo(() => userNameGetter?.() ?? 'User', [userNameGetter])
   const updateAgentPosition = useCallback((next) => {
@@ -648,6 +657,14 @@ const AgentChat = () => {
     recordInteraction('toggle_language', { language: next })
   }, [currentLanguage, recordInteraction, setLanguage])
 
+  const toggleLeftSidebar = useCallback(() => {
+    setLeftSidebarCollapsed((prev) => {
+      const next = !prev
+      recordInteraction('toggle_left_sidebar', { collapsed: next })
+      return next
+    })
+  }, [recordInteraction])
+
   const openConversationPanel = useCallback(() => {
     if (!isConversationVisible) {
       setConversationVisible(true)
@@ -729,8 +746,16 @@ const AgentChat = () => {
     refreshWallet,
   ])
 
+  const shellClassName = [
+    'app-shell',
+    isDarkMode ? 'dark-mode' : '',
+    isLeftSidebarCollapsed ? 'collapsed-left' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={`app-shell${isDarkMode ? ' dark-mode' : ''}`}>
+    <div className={shellClassName}>
       <ChatHeader
         connectionStatus={connectionStatus}
         isDarkMode={isDarkMode}
@@ -750,6 +775,8 @@ const AgentChat = () => {
           onKeywordChange={setChannelKeyword}
           onSelectChannel={selectChannel}
           onCreateChannel={createChannel}
+          isCollapsed={isLeftSidebarCollapsed}
+          onToggleCollapse={toggleLeftSidebar}
         />
 
         <AgentCanvas
