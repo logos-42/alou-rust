@@ -1,0 +1,98 @@
+import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { useI18n } from '@/hooks/useI18n'
+import './MessageList.css'
+
+const sourceMap = {
+  'wasm-core': 'WASM',
+  'edge-worker-proxy': 'Edge',
+  'http-backend-fallback': 'Backend',
+  system: 'System',
+  error: 'Error',
+}
+
+const formatMessage = (content) =>
+  content
+    ?.replace(/\n/g, '<br>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`(.*?)`/g, '<code>$1</code>')
+    .replace(/•/g, '<span class="bullet">•</span>')
+
+const formatTime = (timestamp) =>
+  new Date(timestamp).toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+const MessageList = forwardRef(({ messages = [], isLoading = false }, ref) => {
+  const containerRef = useRef(null)
+  const { t } = useI18n()
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      container: containerRef.current,
+      scrollToBottom: () => {
+        const container = containerRef.current
+        if (container) {
+          container.scrollTop = container.scrollHeight
+        }
+      },
+    }),
+    [],
+  )
+
+  const renderedMessages = useMemo(
+    () =>
+      messages.map((message) => ({
+        ...message,
+        html: formatMessage(message.content),
+        formattedTime: formatTime(message.timestamp),
+        formattedSource: message.source ? sourceMap[message.source] || message.source : null,
+      })),
+    [messages],
+  )
+
+  return (
+    <div className="messages-area" ref={containerRef}>
+      <div>
+        {renderedMessages.map((message) => (
+          <div key={message.id} className={`message-wrapper ${message.type}`}>
+            <div className="message-bubble">
+              <div
+                className="message-content"
+                dangerouslySetInnerHTML={{ __html: message.html }}
+              />
+              <div className="message-footer">
+                <span className="timestamp">{message.formattedTime}</span>
+                {message.formattedSource && (
+                  <span className="source-tag">{message.formattedSource}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {isLoading && (
+        <div className="message-wrapper assistant">
+          <div className="message-bubble loading">
+            <div className="typing-animation">
+              <div className="typing-dots">
+                <span />
+                <span />
+                <span />
+              </div>
+              <span className="typing-text">{t('thinking')}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+})
+
+MessageList.displayName = 'MessageList'
+
+export default MessageList
+

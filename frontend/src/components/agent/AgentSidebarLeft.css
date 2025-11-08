@@ -1,0 +1,144 @@
+.sidebar-left {
+  background: var(--surface);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(16px);
+}
+
+.sidebar-left .sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.6rem;
+}
+
+.sidebar-left .brand {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-left .new-channel-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--secondary-color);
+  color: var(--primary-color);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-left .new-channel-btn:hover {
+  transform: rotate(90deg);
+}
+
+.sidebar-left .channel-search {
+  padding: 0 1.25rem 0.75rem;
+}
+
+.sidebar-left .channel-search input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 0.9rem;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.sidebar-left .channel-search input::placeholder {
+  color: var(--text-secondary);
+}
+
+.sidebar-left .channel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.65rem 0.8rem;
+}
+
+.sidebar-left .channel-item {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.85rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  align-items: center;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-left .channel-item:hover {
+  background: rgba(99, 102, 241, 0.08);
+  transform: translateY(-2px);
+}
+
+.sidebar-left .channel-item.active {
+  background: var(--secondary-color);
+  color: var(--text-primary);
+}
+
+.sidebar-left .channel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.sidebar-left .channel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sidebar-left .channel-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-left .channel-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sidebar-left .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
+.sidebar-left .status-dot.online {
+  background: #10b981;
+}
+
+.sidebar-left .status-dot.busy {
+  background: #f59e0b;
+}
+
+.sidebar-left .status-dot.offline {
+  background: #94a3b8;
+}
+
+.sidebar-left .channel-date {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .sidebar-left {
+    display: none;
+  }
+}
+

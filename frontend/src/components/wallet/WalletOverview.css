@@ -1,0 +1,126 @@
+.wallet-overview-card {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow);
+}
+
+.wallet-overview-card .wallet-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wallet-overview-card .wallet-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wallet-overview-card .avatar-icon {
+  font-size: 2rem;
+}
+
+.wallet-overview-card .wallet-details {
+  flex: 1;
+}
+
+.wallet-overview-card .wallet-address-full {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+  font-family: monospace;
+}
+
+.wallet-overview-card .wallet-network {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.wallet-overview-card .network-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success-color);
+  animation: overview-pulse 2s infinite;
+}
+
+.wallet-overview-card .disconnect-btn {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.wallet-overview-card .disconnect-btn:hover {
+  background: var(--error-color);
+  color: #fff;
+  border-color: var(--error-color);
+}
+
+.wallet-overview-card .wallet-balances {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.wallet-overview-card .balance-card {
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.wallet-overview-card .balance-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.wallet-overview-card .balance-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.wallet-overview-card .balance-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.wallet-overview-card .balance-usd {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+@keyframes overview-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+

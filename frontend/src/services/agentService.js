@@ -1,0 +1,111 @@
+/**
+ * Agent Service - 与 Cloudflare Workers (alou-edge) 通信
+ */
+import apiClient from './api'
+
+export class AgentService {
+  constructor() {
+    this.baseUrl = import.meta.env.VITE_AGENT_API_URL || 'https://api.alou.onl'
+  }
+
+  /**
+   * Create a new chat session
+   */
+  async createSession(walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/session`, {
+      wallet_address: walletAddress
+    })
+    return response.data
+  }
+
+  /**
+   * Get session info
+   */
+  async getSession(sessionId) {
+    const response = await apiClient.get(`${this.baseUrl}/api/session/${sessionId}`)
+    return response.data
+  }
+
+  /**
+   * Delete session
+   */
+  async deleteSession(sessionId) {
+    await apiClient.delete(`${this.baseUrl}/api/session/${sessionId}`)
+  }
+
+  /**
+   * Send message to agent
+   */
+  async sendMessage(sessionId, message, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message,
+      wallet_address: walletAddress
+    })
+    return response.data
+  }
+
+  /**
+   * Get balance
+   */
+  async getBalance(address, chain, tokenAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/blockchain/balance`, {
+      address,
+      chain,
+      token_address: tokenAddress
+    })
+    return response.data
+  }
+
+  /**
+   * Build transaction
+   */
+  async buildTransaction(from, to, value, chain) {
+    const response = await apiClient.post(`${this.baseUrl}/api/blockchain/transaction/build`, {
+      from,
+      to,
+      value,
+      chain
+    })
+    return response.data
+  }
+
+  /**
+   * Broadcast transaction
+   */
+  async broadcastTransaction(signedTx, chain) {
+    const response = await apiClient.post(`${this.baseUrl}/api/blockchain/transaction/broadcast`, {
+      signed_tx: signedTx,
+      chain
+    })
+    return response.data
+  }
+
+  /**
+   * Get transaction status
+   */
+  async getTransactionStatus(txHash, chain) {
+    const response = await apiClient.get(
+      `${this.baseUrl}/api/blockchain/transaction/${txHash}?chain=${chain}`
+    )
+    return response.data
+  }
+
+  /**
+   * Health check
+   */
+  async healthCheck() {
+    const response = await apiClient.get(`${this.baseUrl}/api/health`)
+    return response.data
+  }
+
+  /**
+   * Get service status
+   */
+  async getStatus() {
+    const response = await apiClient.get(`${this.baseUrl}/api/status`)
+    return response.data
+  }
+}
+
+export default new AgentService()

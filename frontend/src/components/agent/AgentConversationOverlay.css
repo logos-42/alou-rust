@@ -1,0 +1,90 @@
+.conversation-overlay {
+  position: absolute;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.conversation-panel {
+  width: 100%;
+  max-width: 100%;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 1.25rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  max-height: clamp(240px, 42vh, 360px);
+}
+
+.app-shell.dark-mode .conversation-panel {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.conversation-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.conversation-panel .title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.conversation-panel .status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.conversation-panel .status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.conversation-panel .status.connected .dot {
+  background: #10b981;
+}
+
+.conversation-panel .status.error .dot {
+  background: #f59e0b;
+}
+
+.conversation-panel .status.disconnected .dot {
+  background: #ef4444;
+}
+
+.conversation-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.conversation-panel .close-btn {
+  border: none;
+  background: rgba(148, 163, 184, 0.18);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.conversation-panel .close-btn:hover {
+  background: rgba(148, 163, 184, 0.28);
+}
+

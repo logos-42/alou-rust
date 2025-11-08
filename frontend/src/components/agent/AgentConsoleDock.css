@@ -1,0 +1,41 @@
+.console-dock {
+  border-top: 1px solid rgba(15, 23, 42, 0.05);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.35rem 0 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.app-shell.dark-mode .console-dock {
+  background: rgba(15, 23, 42, 0.88);
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.console-dock .reopen-btn {
+  align-self: flex-start;
+  border: none;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-color);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 0.2s ease;
+}
+
+.console-dock .reopen-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.console-dock .console-input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+

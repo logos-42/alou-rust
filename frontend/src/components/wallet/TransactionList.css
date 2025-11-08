@@ -1,0 +1,164 @@
+.transactions-section {
+  margin-bottom: 2rem;
+}
+
+.transactions-section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.transactions-section .section-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.transactions-section .refresh-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+}
+
+.transactions-section .refresh-btn:hover {
+  background: var(--secondary-color);
+}
+
+.transactions-section .spinning {
+  display: inline-block;
+  animation: transaction-spin 1s linear infinite;
+}
+
+@keyframes transaction-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.transactions-section .empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+}
+
+.transactions-section .empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.transactions-section .empty-state p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+.transactions-section .transaction-list {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.transactions-section .transaction-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transactions-section .transaction-item:last-child {
+  border-bottom: none;
+}
+
+.transactions-section .transaction-item:hover {
+  background: var(--surface);
+}
+
+.transactions-section .tx-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.transactions-section .tx-icon.send {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.transactions-section .tx-icon.receive {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.transactions-section .tx-details {
+  flex: 1;
+}
+
+.transactions-section .tx-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.transactions-section .tx-address {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.transactions-section .tx-amount {
+  text-align: right;
+}
+
+.transactions-section .amount-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.transactions-section .amount-value.send {
+  color: var(--error-color);
+}
+
+.transactions-section .amount-value.receive {
+  color: var(--success-color);
+}
+
+.transactions-section .tx-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.transactions-section .tx-status {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.transactions-section .tx-status.confirmed {
+  color: var(--success-color);
+}
+
+.transactions-section .tx-status.pending {
+  color: var(--warning-color);
+}
+
+.transactions-section .tx-status.failed {
+  color: var(--error-color);
+}
+
