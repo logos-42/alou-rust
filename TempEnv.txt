@@ -1,0 +1,20 @@
+﻿# 数据库配置
+DATABASE_URL=sqlite::memory:
+
+# JWT配置
+JWT_SECRET=dev-secret-key-please-change
+JWT_EXPIRATION_HOURS=24
+REFRESH_TOKEN_EXPIRATION_DAYS=30
+
+# Google OAuth（可选）
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3001/api/auth/google/callback
+
+# DeepSeek API
+DEEPSEEK_API_KEY=sk-69244d21fb1f4481bd4b36ed9bb59b18
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+# 服务器配置
+PORT=3001
+

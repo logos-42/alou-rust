@@ -1,8 +1,8 @@
+use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
+use crate::agent::tools::{BroadcastTool, QueryTool, TransactionTool};
+use crate::utils::error::{AloudError, Result};
 use serde_json::{json, Value};
 use worker::console_log;
-use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
-use crate::agent::tools::{QueryTool, TransactionTool, BroadcastTool};
-use crate::utils::error::{AloudError, Result};
 
 /// Blockchain Agent that combines AI and blockchain tools
 #[allow(dead_code)]
@@ -24,10 +24,10 @@ impl BlockchainAgent {
         sol_rpc_url: String,
     ) -> Result<Self> {
         let ai_client = AiClient::new(provider, api_key, model)?;
-        let query_tool = QueryTool::new(eth_rpc_url.clone(), sol_rpc_url.clone());
-        let transaction_tool = TransactionTool::new(eth_rpc_url.clone(), sol_rpc_url.clone());
-        let broadcast_tool = BroadcastTool::new(eth_rpc_url, sol_rpc_url);
-        
+        let query_tool = QueryTool::new(eth_rpc_url.clone(), None, sol_rpc_url.clone());
+        let transaction_tool = TransactionTool::new(eth_rpc_url.clone(), None, sol_rpc_url.clone());
+        let broadcast_tool = BroadcastTool::new(eth_rpc_url, None, sol_rpc_url);
+
         Ok(Self {
             ai_client,
             query_tool,
@@ -40,28 +40,34 @@ impl BlockchainAgent {
     #[allow(dead_code)]
     pub async fn process_message(&self, user_message: &str) -> Result<String> {
         console_log!("Processing message: {}", user_message);
-        
+
         let messages = vec![
             AiMessage::text("system", "You are a blockchain assistant. You can help users query balances, build transactions, and broadcast transactions on Ethereum and Solana networks.".to_string()),
             AiMessage::text("user", user_message.to_string()),
         ];
-        
+
         let tools = self.get_available_tools();
-        
+
         let response = self.ai_client.send_message(messages, Some(tools)).await?;
-        
+
         // Process tool calls if any
         if !response.tool_calls.is_empty() {
             let mut results = Vec::new();
-            
+
             for tool_call in &response.tool_calls {
                 console_log!("Executing tool: {}", tool_call.name);
-                let result = self.execute_tool(&tool_call.name, &tool_call.arguments).await?;
+                let result = self
+                    .execute_tool(&tool_call.name, &tool_call.arguments)
+                    .await?;
                 results.push(result);
             }
-            
+
             // Return combined results
-            Ok(format!("{}\n\nTool Results:\n{}", response.content, results.join("\n")))
+            Ok(format!(
+                "{}\n\nTool Results:\n{}",
+                response.content,
+                results.join("\n")
+            ))
         } else {
             Ok(response.content)
         }
@@ -169,8 +175,8 @@ impl BlockchainAgent {
                     .get("address")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing address".to_string()))?;
-                
-                let balance = self.query_tool.get_eth_balance(address).await?;
+
+                let balance = self.query_tool.get_eth_balance(address, None).await?;
                 Ok(format!("ETH Balance: {}", balance))
             }
             "get_sol_balance" => {
@@ -178,7 +184,7 @@ impl BlockchainAgent {
                     .get("address")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing address".to_string()))?;
-                
+
                 let balance = self.query_tool.get_sol_balance(address).await?;
                 Ok(format!("SOL Balance: {}", balance))
             }
@@ -187,13 +193,18 @@ impl BlockchainAgent {
                     .get("token_address")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing token_address".to_string()))?;
-                
+
                 let wallet_address = arguments
                     .get("wallet_address")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| AloudError::InvalidInput("Missing wallet_address".to_string()))?;
-                
-                let balance = self.query_tool.get_erc20_balance(token_address, wallet_address).await?;
+                    .ok_or_else(|| {
+                        AloudError::InvalidInput("Missing wallet_address".to_string())
+                    })?;
+
+                let balance = self
+                    .query_tool
+                    .get_erc20_balance(token_address, wallet_address, None)
+                    .await?;
                 Ok(format!("Token Balance: {}", balance))
             }
             "build_eth_transaction" => {
@@ -201,18 +212,21 @@ impl BlockchainAgent {
                     .get("from")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing from".to_string()))?;
-                
+
                 let to = arguments
                     .get("to")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing to".to_string()))?;
-                
+
                 let value_eth = arguments
                     .get("value_eth")
                     .and_then(|v| v.as_f64())
                     .ok_or_else(|| AloudError::InvalidInput("Missing value_eth".to_string()))?;
-                
-                let tx_data = self.transaction_tool.build_eth_transaction(from, to, value_eth).await?;
+
+                let tx_data = self
+                    .transaction_tool
+                    .build_eth_transaction(from, to, value_eth, None)
+                    .await?;
                 Ok(format!("Transaction built: {:?}", tx_data))
             }
             "get_transaction_status" => {
@@ -220,16 +234,22 @@ impl BlockchainAgent {
                     .get("tx_hash")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing tx_hash".to_string()))?;
-                
+
                 let chain = arguments
                     .get("chain")
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| AloudError::InvalidInput("Missing chain".to_string()))?;
-                
-                let confirmed = self.broadcast_tool.is_transaction_confirmed(tx_hash, chain).await?;
+
+                let confirmed = self
+                    .broadcast_tool
+                    .is_transaction_confirmed(tx_hash, chain)
+                    .await?;
                 Ok(format!("Transaction confirmed: {}", confirmed))
             }
-            _ => Err(AloudError::InvalidInput(format!("Unknown tool: {}", tool_name))),
+            _ => Err(AloudError::InvalidInput(format!(
+                "Unknown tool: {}",
+                tool_name
+            ))),
         }
     }
 }

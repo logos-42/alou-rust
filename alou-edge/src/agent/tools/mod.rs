@@ -1,10 +1,10 @@
-pub mod query;
-pub mod transaction;
 pub mod broadcast;
 pub mod payment;
+pub mod query;
+pub mod transaction;
 
+pub use broadcast::BroadcastTool;
 pub use query::QueryTool;
 pub use transaction::TransactionTool;
-pub use broadcast::BroadcastTool;
 // PaymentTool not used yet
 // pub use payment::PaymentTool;

@@ -1,9 +1,9 @@
+use crate::agent::ai_client::{AiMessage, AiProvider, AiResponse, AiTool, AiToolCall};
+use crate::utils::error::{AloudError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use worker::{console_log, Fetch, Headers, Method, RequestInit};
-use crate::agent::ai_client::{AiProvider, AiMessage, AiTool, AiResponse, AiToolCall};
-use crate::utils::error::{AloudError, Result};
 
 const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
 
@@ -67,7 +67,7 @@ impl AiProvider for ClaudeProvider {
         tools: Option<Vec<AiTool>>,
     ) -> Result<AiResponse> {
         console_log!("Claude: Sending request to {}", CLAUDE_API_URL);
-        
+
         let claude_messages: Vec<ClaudeMessage> = messages
             .into_iter()
             .map(|m| ClaudeMessage {
@@ -75,7 +75,7 @@ impl AiProvider for ClaudeProvider {
                 content: m.content,
             })
             .collect();
-        
+
         let claude_tools = tools.map(|tools| {
             tools
                 .into_iter()
@@ -86,17 +86,17 @@ impl AiProvider for ClaudeProvider {
                 })
                 .collect()
         });
-        
+
         let request = ClaudeRequest {
             model: self.model.clone(),
             messages: claude_messages,
             tools: claude_tools,
             max_tokens: 4096,
         };
-        
+
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
-        
+
         let headers = {
             let h = Headers::new();
             h.set("Content-Type", "application/json")
@@ -107,7 +107,7 @@ impl AiProvider for ClaudeProvider {
                 .map_err(|e| AloudError::AgentError(e.to_string()))?;
             h
         };
-        
+
         let init = {
             let mut i = RequestInit::new();
             i.with_method(Method::Post)
@@ -115,15 +115,15 @@ impl AiProvider for ClaudeProvider {
                 .with_body(Some(body.into()));
             i
         };
-        
+
         let mut response = Fetch::Request(
             worker::Request::new_with_init(CLAUDE_API_URL, &init)
-                .map_err(|e| AloudError::AgentError(e.to_string()))?
+                .map_err(|e| AloudError::AgentError(e.to_string()))?,
         )
         .send()
         .await
         .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         if !response.status_code().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(AloudError::AgentError(format!(
@@ -132,18 +132,18 @@ impl AiProvider for ClaudeProvider {
                 error_text
             )));
         }
-        
+
         let response_text = response
             .text()
             .await
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         let claude_response: ClaudeResponse = serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse error: {}", e)))?;
-        
+
         let mut content = String::new();
         let mut tool_calls = Vec::new();
-        
+
         for item in claude_response.content {
             match item {
                 ClaudeContent::Text { text } => {
@@ -161,9 +161,9 @@ impl AiProvider for ClaudeProvider {
                 }
             }
         }
-        
+
         console_log!("Claude: Response received, {} tool calls", tool_calls.len());
-        
+
         Ok(AiResponse {
             content,
             tool_calls,

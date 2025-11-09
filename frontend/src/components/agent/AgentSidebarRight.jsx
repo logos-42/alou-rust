@@ -113,8 +113,13 @@ const AgentSidebarRight = ({
                 }}
               >
                 <div className="balance">
-                  <div className="amount">{walletSnapshot.balance} ETH</div>
-                  <div className="fiat">≈ {walletSnapshot.balanceFiat} USD</div>
+                  <div className="amount">
+                    {walletSnapshot.balance}{' '}
+                    {walletSnapshot.token || 'ETH'}
+                  </div>
+                  <div className="fiat">
+                    ≈ {walletSnapshot.balanceFiat ?? '--'} USD
+                  </div>
                 </div>
                 <div
                   className="address"

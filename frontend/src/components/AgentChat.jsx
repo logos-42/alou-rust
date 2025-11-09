@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
 import { walletService } from '@/services/walletService'
+import agentService from '@/services/agentService'
 import { MCP_UI_TARGETS, requestMcpUiResource } from '@/services/mcpUiService'
 import ChatHeader from '@/components/ChatHeader'
 import AgentSidebarLeft from '@/components/agent/AgentSidebarLeft'
@@ -17,105 +18,23 @@ import AgentCanvas from '@/components/agent/AgentCanvas'
 import AgentConsoleDock from '@/components/agent/AgentConsoleDock'
 import AgentConversationOverlay from '@/components/agent/AgentConversationOverlay'
 import McpModal from '@/components/mcp/McpModal'
+import {
+  ACTION_LABELS,
+  API_BASE_URL,
+  NODE_BOUNDARY,
+  defaultChannels,
+  defaultTransactions,
+  ensureMillis,
+  estimateFiatValue,
+  formatWeiHexToEth,
+  mapChainIdToBackendChain,
+  mapChainLabel,
+  normalizeChannel,
+  normalizeTransaction,
+  resolveBackendChain,
+  useToolCallHandler,
+} from '@/hooks/useAgentChat'
 import './AgentChat.css'
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV
-    ? 'http://localhost:8787'
-    : 'https://alou-edge.yuanjieliu65.workers.dev')
-
-const NODE_BOUNDARY = 140
-
-const defaultChannels = [
-  {
-    id: 'dev-relay',
-    name: 'TRX Smart Contract Staking',
-    status: 'online',
-    statusLabel: '在线',
-    icon: '⚡',
-    color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-    updatedAt: Date.now() - 2 * 60 * 60 * 1000,
-  },
-  {
-    id: 'eth-announce',
-    name: 'ETH Contract Announcement',
-    status: 'busy',
-    statusLabel: '执行任务',
-    icon: '⬡',
-    color: 'linear-gradient(135deg,#0ea5e9,#2563eb)',
-    updatedAt: Date.now() - 6 * 60 * 60 * 1000,
-  },
-  {
-    id: 'firefly',
-    name: 'Firefly Research',
-    status: 'offline',
-    statusLabel: '离线',
-    icon: '🛰️',
-    color: 'linear-gradient(135deg,#ec4899,#f97316)',
-    updatedAt: Date.now() - 24 * 60 * 60 * 1000,
-  },
-  {
-    id: 'wallet-ops',
-    name: 'Wallet Operations',
-    status: 'online',
-    statusLabel: '在线',
-    icon: '💼',
-    color: 'linear-gradient(135deg,#14b8a6,#0ea5e9)',
-    updatedAt: Date.now() - 30 * 60 * 1000,
-  },
-]
-
-const defaultTransactions = [
-  {
-    id: 'tx-1',
-    direction: 'out',
-    amount: '0.42',
-    token: 'ETH',
-    counterparty: '0x1F345...ab91',
-    status: 'confirmed',
-    statusLabel: '已完成',
-    timestamp: Date.now() - 4 * 60 * 60 * 1000,
-  },
-  {
-    id: 'tx-2',
-    direction: 'in',
-    amount: '250',
-    token: 'USDC',
-    counterparty: '0x72ab...cc87',
-    status: 'pending',
-    statusLabel: '确认中',
-    timestamp: Date.now() - 40 * 60 * 1000,
-  },
-  {
-    id: 'tx-3',
-    direction: 'out',
-    amount: '1.2',
-    token: 'ETH',
-    counterparty: '0xbf12...9980',
-    status: 'failed',
-    statusLabel: '失败',
-    timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000,
-  },
-]
-
-const ACTION_LABELS = {
-  channel_selected: '切换频道',
-  create_channel: '创建频道',
-  toggle_theme: '主题切换',
-  toggle_language: '语言切换',
-  toggle_sidebar: '侧边栏',
-  wallet_refresh: '刷新资产',
-  wallet_event: '钱包变更',
-  navigate_wallet: '打开钱包',
-  navigate_login: '跳转登录',
-  logout: '退出登录',
-  agent_drag_start: '移动智能体',
-  agent_drag_end: '智能体位置',
-  trigger_mcp: '调用 MCP',
-  user_message: '用户消息',
-  wallet_instruction: '钱包指令',
-}
 
 const AgentChat = () => {
   const navigate = useNavigate()
@@ -181,7 +100,18 @@ const AgentChat = () => {
   )
 
   const [walletSnapshot, setWalletSnapshot] = useState(null)
-  const [transactions] = useState(defaultTransactions)
+  const [preferredChain, setPreferredChain] = useState(null)
+  const [userWalletInfo, setUserWalletInfo] = useState(null)
+  const [transactions, setTransactions] = useState(defaultTransactions)
+
+  const activeChain = useMemo(
+    () =>
+      resolveBackendChain({
+        chain: preferredChain || walletSnapshot?.chain,
+        chainId: userWalletInfo?.chainId,
+      }),
+    [preferredChain, userWalletInfo?.chainId, walletSnapshot?.chain],
+  )
 
   const filteredChannels = useMemo(() => {
     if (!channelKeyword.trim()) {
@@ -214,22 +144,7 @@ const AgentChat = () => {
     }
   }, [viewportWidth, isSidebarCollapsed, isLeftSidebarCollapsed])
 
-  const conversationOverlayStyle = useMemo(() => {
-    if (viewportWidth <= 1024) {
-      return { left: '1rem', right: '1rem', bottom: '6rem' }
-    }
-    const leftWidth = isLeftSidebarCollapsed
-      ? 84
-      : viewportWidth <= 1280
-        ? 240
-        : 300
-    const rightWidth = isSidebarCollapsed ? 80 : 340
-    return {
-      left: `${leftWidth + 24}px`,
-      right: `${rightWidth + 24}px`,
-      bottom: '6.5rem',
-    }
-  }, [viewportWidth, isSidebarCollapsed, isLeftSidebarCollapsed])
+  const conversationOverlayStyle = useMemo(() => ({}), [])
 
   const userName = useMemo(() => userNameGetter?.() ?? 'User', [userNameGetter])
   const updateAgentPosition = useCallback((next) => {
@@ -282,14 +197,18 @@ const AgentChat = () => {
   }, [])
 
   const openUiResource = useCallback(
-    (resource, meta = {}) => {
-      if (!resource) return
-      const embedded = resource.resource ? resource : { resource }
+    (payload, meta = {}) => {
+      if (!payload || !payload.resource) return
+      const embedded =
+        payload.resource && payload.resource.uri
+          ? { resource: payload.resource, metadata: payload.metadata }
+          : payload
       setUiResource(embedded)
       setUiModalOpen(true)
       recordInteraction('trigger_mcp', {
         kind: 'ui_resource_open',
         uri: embedded.resource?.uri,
+        metadata: payload.metadata,
         ...meta,
       })
     },
@@ -306,11 +225,11 @@ const AgentChat = () => {
           session_id: sessionId,
           ...params,
         }
-        const resource = await requestMcpUiResource(target, payload)
+        const { resource, metadata } = await requestMcpUiResource(target, payload)
         if (!resource) {
           throw new Error('empty resource response')
         }
-        openUiResource(resource, {
+        openUiResource({ resource, metadata }, {
           source: 'frontend',
           target,
           ...meta,
@@ -381,12 +300,26 @@ const AgentChat = () => {
     try {
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+      const chainId =
+        typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+      const detectedChain = resolveBackendChain({
+        chainId,
+        chain: activeChain,
+      })
+
+      if (detectedChain && detectedChain !== preferredChain) {
+        setPreferredChain(detectedChain)
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ wallet_address: walletAddress || undefined }),
+        body: JSON.stringify({
+          wallet_address: walletAddress || undefined,
+          chain: detectedChain || undefined,
+        }),
       })
       if (response.ok) {
         const data = await response.json()
@@ -395,67 +328,326 @@ const AgentChat = () => {
     } catch (error) {
       console.error('Failed to create session:', error)
     }
-  }, [])
+  }, [activeChain, preferredChain])
 
-  const handleToolCalls = useCallback(
-    async (toolCalls = []) => {
-      for (const toolCall of toolCalls) {
-        if (toolCall.name === 'wallet_manager' && toolCall.result) {
-          const result = toolCall.result
+  const refreshWallet = useCallback(async () => {
+    try {
+      const info = await walletService.getCurrentWalletInfo()
+      if (!info) {
+        setUserWalletInfo(null)
+        recordInteraction('wallet_refresh', { connected: false }, '刷新资产')
+        return
+      }
 
-          if (result.instruction) {
-            try {
-              if (result.action === 'switch_network' && result.network) {
-                const success = await walletService.switchNetwork(result.network)
-                if (success) {
-                  recordInteraction('wallet_instruction', {
-                    instruction: 'switch_network',
-                    chainId: result.network.chainId,
-                    name: result.network.name,
-                  })
-                  appendMessage({
-                    id: `system_${Date.now()}`,
-                    type: 'assistant',
-                    content: `✅ 已成功切换到 ${result.network.name} (${result.network.type})`,
-                    timestamp: Date.now(),
-                    source: 'system',
-                  })
-                  scrollToBottom()
-                }
-              } else {
-                await walletService.executeInstruction(result.instruction)
-                recordInteraction('wallet_instruction', {
-                  instruction: result.instruction?.method || 'unknown',
-                })
-              }
-            } catch (error) {
-              console.error('Failed to execute wallet instruction:', error)
-              appendMessage({
-                id: `error_${Date.now()}`,
-                type: 'assistant',
-                content: `❌ 钱包操作失败：${
-                  error instanceof Error ? error.message : '未知错误'
-                }`,
-                timestamp: Date.now(),
-                source: 'error',
-              })
-              scrollToBottom()
-            }
+      const balance = await walletService.getBalance(info.address)
+      const backendChain =
+        resolveBackendChain({ chainId: info.chainId }) || preferredChain || null
+      if (backendChain && backendChain !== preferredChain) {
+        setPreferredChain(backendChain)
+      }
+      const snapshot = {
+        address: info.address,
+        chainId: info.chainId,
+        backendChain,
+        balance,
+        balanceFiat: (parseFloat(balance || '0') * 3400).toFixed(2),
+        networkLabel:
+          mapChainLabel(backendChain) ||
+          {
+            '0x1': 'Ethereum Mainnet',
+            '0x14a34': 'Base Sepolia',
+            '0x2105': 'Base Mainnet',
+            '0xaa36a7': 'Ethereum Sepolia',
+          }[info.chainId] ||
+          `Chain ${info.chainId}`,
+      }
+      setUserWalletInfo(snapshot)
+      recordInteraction(
+        'wallet_refresh',
+        {
+          connected: true,
+          balance,
+          token: 'ETH',
+          chain: backendChain,
+        },
+        '刷新资产',
+      )
+    } catch (error) {
+      console.error('Failed to refresh wallet info:', error)
+    }
+  }, [preferredChain, recordInteraction])
+
+  const handleTransactionBuild = useCallback(
+    async (result) => {
+      if (!result || !result.instruction) {
+        return
+      }
+
+      const instruction = result.instruction
+
+      try {
+        const txResponse = await walletService.executeInstruction(instruction)
+        const txHash =
+          typeof txResponse === 'string'
+            ? txResponse
+            : txResponse?.txHash || txResponse?.transactionHash
+        const chain =
+          resolveBackendChain({
+            chain: result.chain,
+            chainId: userWalletInfo?.chainId,
+          }) || activeChain || 'eth'
+        if (chain && chain !== preferredChain) {
+          setPreferredChain(chain)
+        }
+        const agentWalletChain =
+          chain.startsWith('base')
+            ? 'base'
+            : chain.startsWith('polygon')
+              ? 'polygon'
+              : chain.startsWith('eth')
+                ? 'ethereum'
+                : null
+        const txParams = (instruction.params && instruction.params[0]) || {}
+
+        recordInteraction('wallet_instruction', {
+          instruction: instruction.method || 'eth_sendTransaction',
+          chain,
+          txHash,
+        })
+
+        appendMessage({
+          id: `tx_success_${Date.now()}`,
+          type: 'assistant',
+          content:
+            result.summary
+              ? `✅ ${result.summary}\n交易哈希：${txHash}`
+              : `✅ 交易已提交，哈希：${txHash}`,
+          timestamp: Date.now(),
+          source: 'system',
+        })
+        scrollToBottom()
+
+        const tokenSymbol = chain.startsWith('sol') ? 'SOL' : 'ETH'
+        const txRecord = {
+          hash: txHash,
+          from: txParams.from,
+          to: txParams.to,
+          value: formatWeiHexToEth(txParams.value),
+          token: tokenSymbol,
+          type: 'send',
+          status: 'pending',
+          timestamp: Date.now(),
+          chain,
+          counterparty: txParams.to || txParams.from,
+        }
+
+        const normalizedTx =
+          normalizeTransaction(
+            {
+              ...txRecord,
+              id: txHash,
+              direction: 'out',
+              amount: txRecord.value,
+            },
+            tokenSymbol,
+          ) ||
+          {
+            id: txHash,
+            direction: 'out',
+            amount: txRecord.value,
+            token: tokenSymbol,
+            counterparty: txRecord.counterparty || '未知地址',
+            status: txRecord.status,
+            statusLabel: '已提交',
+            timestamp: txRecord.timestamp,
+            hash: txHash,
+          }
+
+        setTransactions((prev) => [normalizedTx, ...prev])
+
+        if (agentWalletChain) {
+          try {
+            await agentService.recordAgentTransaction(sessionId, agentWalletChain, {
+              ...txRecord,
+              rawValue: txParams.value,
+            })
+          } catch (error) {
+            console.error('Failed to record agent transaction:', error)
           }
         }
 
-        if (toolCall.name === 'ui_resource' || toolCall.name === 'mcp_ui') {
-          const { resource, resources } = toolCall.result || {}
-          if (Array.isArray(resources) && resources.length > 0) {
-            openUiResource(resources[0], { source: toolCall.name })
-          } else if (resource) {
-            openUiResource(resource, { source: toolCall.name })
-          }
-        }
+        await refreshWallet()
+      } catch (error) {
+        console.error('Failed to execute transaction instruction:', error)
+        appendMessage({
+          id: `tx_error_${Date.now()}`,
+          type: 'assistant',
+          content: `❌ 交易发送失败：${error instanceof Error ? error.message : String(error)}`,
+          timestamp: Date.now(),
+          source: 'error',
+        })
+        scrollToBottom()
       }
     },
-    [appendMessage, openUiResource, recordInteraction, scrollToBottom],
+    [
+      activeChain,
+      appendMessage,
+      preferredChain,
+      recordInteraction,
+      refreshWallet,
+      scrollToBottom,
+      sessionId,
+      setTransactions,
+      userWalletInfo?.chainId,
+    ],
   )
+
+  const loadWalletOverview = useCallback(
+    async (options = {}) => {
+      if (!sessionId) {
+        return null
+      }
+
+      try {
+        const targetChain = options.chain || activeChain
+        const payload = {
+          session_id: sessionId,
+          ...(targetChain ? { chain: targetChain } : {}),
+        }
+        const { metadata } = await requestMcpUiResource(
+          MCP_UI_TARGETS.walletOverview,
+          payload,
+        )
+
+        if (!metadata) {
+          return null
+        }
+
+        const metadataChain =
+          resolveBackendChain({ chain: metadata.chain }) ||
+          (targetChain ? resolveBackendChain({ chain: targetChain }) : null)
+        if (metadataChain && metadataChain !== preferredChain) {
+          setPreferredChain(metadataChain)
+        }
+
+        const wallets = Array.isArray(metadata.wallets) ? metadata.wallets : []
+        const requestedChain = payload.chain
+        const primaryWallet =
+          metadata.wallet ||
+          (requestedChain
+            ? wallets.find((item) => item.chain === requestedChain)
+            : null) ||
+          wallets[0] ||
+          null
+
+        if (primaryWallet) {
+          const rawBalance = primaryWallet.balance ?? '0'
+          const balanceString =
+            typeof rawBalance === 'string'
+              ? rawBalance
+              : rawBalance?.toString?.() ?? '0'
+          const balanceNumeric = parseFloat(balanceString)
+          const rawChain = primaryWallet.chain || metadata.chain || targetChain || 'ethereum'
+          const normalizedChain =
+            resolveBackendChain({ chain: rawChain }) || rawChain || 'ethereum'
+          const tokenSymbol = normalizedChain === 'sol' ? 'SOL' : 'ETH'
+
+          setWalletSnapshot({
+            address: primaryWallet.address || '0x0000',
+            balance: balanceString,
+            balanceFiat: estimateFiatValue(balanceNumeric, tokenSymbol),
+            networkLabel: mapChainLabel(normalizedChain),
+            chain: normalizedChain,
+            token: tokenSymbol,
+          })
+
+          if (normalizedChain && normalizedChain !== preferredChain) {
+            setPreferredChain(normalizedChain)
+          }
+
+          const txSource = Array.isArray(primaryWallet.transactions)
+            ? primaryWallet.transactions
+            : Array.isArray(metadata.transactions)
+              ? metadata.transactions
+              : []
+
+          const normalizedTxs = txSource
+            .map((item, index) =>
+              normalizeTransaction(item, tokenSymbol) ||
+              normalizeTransaction(
+                { ...item, id: `${chain}_${index}` },
+                tokenSymbol,
+              ),
+            )
+            .filter(Boolean)
+
+          if (normalizedTxs.length > 0) {
+            setTransactions(normalizedTxs)
+          }
+        }
+
+        return metadata
+      } catch (error) {
+        if (!options.silent) {
+          console.error('Failed to load wallet overview:', error)
+        }
+        return null
+      }
+    },
+    [activeChain, preferredChain, sessionId, setTransactions],
+  )
+
+  const handleTransactionBroadcast = useCallback(
+    async (result) => {
+      if (!result) {
+        return
+      }
+      const txHash = result.tx_hash || result.txHash
+      if (!txHash) {
+        return
+      }
+
+      const chain = result.chain || 'eth'
+
+      setTransactions((prev) =>
+        prev.map((item) =>
+          item.hash === txHash
+            ? {
+                ...item,
+                status: result.status || 'submitted',
+              }
+            : item,
+        ),
+      )
+
+      recordInteraction('wallet_instruction', {
+        instruction: 'broadcast_transaction',
+        chain,
+        txHash,
+      })
+
+      appendMessage({
+        id: `tx_broadcast_${Date.now()}`,
+        type: 'assistant',
+        content: `📡 交易已广播：${txHash}`,
+        timestamp: Date.now(),
+        source: 'system',
+      })
+      scrollToBottom()
+      await loadWalletOverview({ silent: true })
+    },
+    [appendMessage, loadWalletOverview, recordInteraction, scrollToBottom, setTransactions],
+  )
+
+  const handleToolCalls = useToolCallHandler({
+    handleTransactionBuild,
+    handleTransactionBroadcast,
+    refreshWallet,
+    recordInteraction,
+    appendMessage,
+    scrollToBottom,
+    openUiResource,
+  })
 
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
@@ -498,6 +690,7 @@ const AgentChat = () => {
           session_id: sessionId,
           message: text,
           wallet_address: walletAddress || undefined,
+          chain: activeChain || undefined,
           context_events: contextSnapshot,
         }),
       })
@@ -541,6 +734,7 @@ const AgentChat = () => {
       consoleDockRef.current?.adjustInputHeight?.()
     }
   }, [
+    activeChain,
     appendMessage,
     createSession,
     currentMessage,
@@ -552,42 +746,39 @@ const AgentChat = () => {
     sessionId,
   ])
 
-  const refreshWallet = useCallback(async () => {
-    try {
-      const info = await walletService.getCurrentWalletInfo()
-      if (!info) {
-        setWalletSnapshot(null)
-        recordInteraction('wallet_refresh', { connected: false }, '刷新资产')
-        return
-      }
-
-      const balance = await walletService.getBalance(info.address)
-      const snapshot = {
-        address: info.address,
-        chainId: info.chainId,
-        balance,
-        balanceFiat: (parseFloat(balance || '0') * 3400).toFixed(2),
-        networkLabel:
+  const loadChannelList = useCallback(
+    async () => {
+      try {
+        const { metadata } = await requestMcpUiResource(
+          MCP_UI_TARGETS.channelList,
           {
-            '0x1': 'Ethereum Mainnet',
-            '0x14a34': 'Base Sepolia',
-            '0x2105': 'Base Mainnet',
-          }[info.chainId] || `Chain ${info.chainId}`,
+            session_id: sessionId,
+          },
+        )
+        const channelArray = Array.isArray(metadata?.channels) ? metadata.channels : []
+        if (!channelArray.length) {
+          return []
+        }
+
+        const normalized = channelArray
+          .map((item, index) => normalizeChannel(item, index))
+          .filter(Boolean)
+
+        if (normalized.length > 0) {
+          setChannels(normalized)
+          if (!normalized.some((channel) => channel.id === activeChannelId)) {
+            setActiveChannelId(normalized[0].id)
+          }
+        }
+
+        return normalized
+      } catch (error) {
+        console.error('Failed to load channel list:', error)
+        return []
       }
-      setWalletSnapshot(snapshot)
-      recordInteraction(
-        'wallet_refresh',
-        {
-          connected: true,
-          balance,
-          token: 'ETH',
-        },
-        '刷新资产',
-      )
-    } catch (error) {
-      console.error('Failed to refresh wallet info:', error)
-    }
-  }, [recordInteraction])
+    },
+    [activeChannelId, sessionId],
+  )
 
   const handleWalletChanged = useCallback(
     async (event) => {
@@ -601,32 +792,35 @@ const AgentChat = () => {
   )
 
   const handleInspectWallet = useCallback(() => {
-    if (!walletSnapshot?.address) {
+    if (!sessionId) {
       return
     }
     void fetchAndOpenUiResource(
       MCP_UI_TARGETS.walletOverview,
       {
-        wallet_address: walletSnapshot.address,
+        session_id: sessionId,
+        chain: walletSnapshot?.chain,
       },
       { source: 'wallet_card' },
     )
-  }, [fetchAndOpenUiResource, walletSnapshot])
+  }, [fetchAndOpenUiResource, sessionId, walletSnapshot])
 
   const handleInspectTransaction = useCallback(
     (transaction) => {
-      if (!transaction?.id) return
+      if (!transaction) return
+      const transactionId = transaction.hash || transaction.id
+      if (!transactionId) return
       void fetchAndOpenUiResource(
         MCP_UI_TARGETS.transactionDetail,
         {
-          transaction_id: transaction.id,
-          direction: transaction.direction,
-          token: transaction.token,
+          session_id: sessionId,
+          transaction_id: transactionId,
+          chain: walletSnapshot?.chain,
         },
-        { source: 'transaction_list', transactionId: transaction.id },
+        { source: 'transaction_list', transactionId },
       )
     },
-    [fetchAndOpenUiResource],
+    [fetchAndOpenUiResource, sessionId, walletSnapshot],
   )
 
   const checkConnection = useCallback(async () => {
@@ -802,6 +996,7 @@ const AgentChat = () => {
 
   const selectChannel = useCallback(
     (channel) => {
+      void loadChannelList()
       setActiveChannelId(channel.id)
       recordInteraction('channel_selected', {
         channelId: channel.id,
@@ -817,7 +1012,7 @@ const AgentChat = () => {
         { channelId: channel.id },
       )
     },
-    [fetchAndOpenUiResource, recordInteraction],
+    [fetchAndOpenUiResource, loadChannelList, recordInteraction],
   )
 
   const createChannel = useCallback(() => {
@@ -835,10 +1030,12 @@ const AgentChat = () => {
       MCP_UI_TARGETS.agentProfile,
       {
         agent_id: agentProfile?.name,
+        session_id: sessionId,
+        chain: activeChain,
       },
       { agent: agentProfile?.name },
     )
-  }, [agentProfile, fetchAndOpenUiResource])
+  }, [activeChain, agentProfile, fetchAndOpenUiResource, sessionId])
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -923,7 +1120,7 @@ const AgentChat = () => {
         />
 
         <AgentSidebarRight
-          walletSnapshot={walletSnapshot}
+          walletSnapshot={walletSnapshot || userWalletInfo}
           transactions={transactions}
           interactionLogs={interactionLogs}
           isInteractionCollapsed={isInteractionCollapsed}

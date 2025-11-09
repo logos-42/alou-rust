@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use serde_json::{json, Value};
 use crate::agent::context::AgentContext;
 use crate::mcp::registry::McpTool;
 use crate::utils::error::{AloudError, Result};
+use async_trait::async_trait;
+use serde_json::{json, Value};
 
 /// Wallet Manager MCP Tool
 /// Allows the agent to manage wallet operations including network switching
@@ -13,7 +13,7 @@ impl WalletManagerTool {
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Get supported networks configuration
     fn get_supported_networks() -> Value {
         json!([
@@ -98,11 +98,11 @@ impl McpTool for WalletManagerTool {
     fn name(&self) -> &str {
         "wallet_manager"
     }
-    
+
     fn description(&self) -> &str {
         "Manage wallet operations including network switching, balance checking, and wallet information retrieval. The agent can use this tool to switch between different blockchain networks (Ethereum, Base, Polygon) on both mainnet and testnet."
     }
-    
+
     fn input_schema(&self) -> Value {
         json!({
             "type": "object",
@@ -130,12 +130,13 @@ impl McpTool for WalletManagerTool {
             "required": ["action"]
         })
     }
-    
+
     async fn execute(&self, args: Value, context: &AgentContext) -> Result<Value> {
-        let action = args.get("action")
+        let action = args
+            .get("action")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidToolArgs("Missing 'action' field".to_string()))?;
-        
+
         match action {
             "list_networks" => {
                 let networks = Self::get_supported_networks();
@@ -145,17 +146,25 @@ impl McpTool for WalletManagerTool {
                     "message": "Retrieved list of supported networks"
                 }))
             }
-            
+
             "switch_network" => {
-                let chain_id = args.get("chainId")
+                let chain_id = args
+                    .get("chainId")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| AloudError::InvalidToolArgs("Missing 'chainId' field for switch_network action".to_string()))?;
-                
+                    .ok_or_else(|| {
+                        AloudError::InvalidToolArgs(
+                            "Missing 'chainId' field for switch_network action".to_string(),
+                        )
+                    })?;
+
                 let networks = Self::get_supported_networks();
-                let network = networks.as_array()
+                let network = networks
+                    .as_array()
                     .and_then(|arr| arr.iter().find(|n| n["chainId"].as_str() == Some(chain_id)))
-                    .ok_or_else(|| AloudError::InvalidToolArgs(format!("Unsupported chainId: {}", chain_id)))?;
-                
+                    .ok_or_else(|| {
+                        AloudError::InvalidToolArgs(format!("Unsupported chainId: {}", chain_id))
+                    })?;
+
                 // Return instruction for frontend to execute the network switch
                 Ok(json!({
                     "success": true,
@@ -180,11 +189,11 @@ impl McpTool for WalletManagerTool {
                     "message": format!("Switching to {} ({})", network["name"], network["type"])
                 }))
             }
-            
+
             "get_current_network" => {
                 // Get current network from context or session
                 let session_id = &context.session_id;
-                
+
                 Ok(json!({
                     "success": true,
                     "sessionId": session_id,
@@ -195,10 +204,10 @@ impl McpTool for WalletManagerTool {
                     }
                 }))
             }
-            
+
             "get_wallet_info" => {
                 let session_id = &context.session_id;
-                
+
                 Ok(json!({
                     "success": true,
                     "sessionId": session_id,
@@ -209,11 +218,10 @@ impl McpTool for WalletManagerTool {
                     }
                 }))
             }
-            
+
             "check_balance" => {
-                let wallet_address = args.get("walletAddress")
-                    .and_then(|v| v.as_str());
-                
+                let wallet_address = args.get("walletAddress").and_then(|v| v.as_str());
+
                 Ok(json!({
                     "success": true,
                     "message": "To check balance, use eth_getBalance RPC method",
@@ -227,8 +235,11 @@ impl McpTool for WalletManagerTool {
                     }
                 }))
             }
-            
-            _ => Err(AloudError::InvalidToolArgs(format!("Unknown action: {}", action)))
+
+            _ => Err(AloudError::InvalidToolArgs(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 }
@@ -236,27 +247,28 @@ impl McpTool for WalletManagerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_wallet_manager_tool_schema() {
         let tool = WalletManagerTool::new();
-        
+
         assert_eq!(tool.name(), "wallet_manager");
         assert!(!tool.description().is_empty());
-        
+
         let schema = tool.input_schema();
         assert!(schema.get("properties").is_some());
     }
-    
+
     #[test]
     fn test_supported_networks() {
         let networks = WalletManagerTool::get_supported_networks();
         let networks_array = networks.as_array().unwrap();
-        
+
         assert!(networks_array.len() >= 5);
-        
+
         // Check Ethereum Mainnet
-        let eth_mainnet = networks_array.iter()
+        let eth_mainnet = networks_array
+            .iter()
             .find(|n| n["chainId"] == "0x1")
             .unwrap();
         assert_eq!(eth_mainnet["name"], "Ethereum Mainnet");

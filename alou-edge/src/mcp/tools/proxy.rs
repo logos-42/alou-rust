@@ -37,15 +37,15 @@ impl McpTool for ProxyTool {
     fn name(&self) -> &str {
         &self.name
     }
-    
+
     fn description(&self) -> &str {
         &self.description
     }
-    
+
     fn input_schema(&self) -> Value {
         self.input_schema.clone()
     }
-    
+
     async fn execute(&self, args: Value, _context: &AgentContext) -> Result<Value> {
         // Forward the call to the external MCP server
         self.client.call_tool(&self.name, args).await
@@ -56,11 +56,11 @@ impl McpTool for ProxyTool {
 mod tests {
     use super::*;
     use serde_json::json;
-    
+
     #[test]
     fn test_proxy_tool_creation() {
         let client = Arc::new(McpClient::with_url("http://localhost:3000".to_string()));
-        
+
         let tool = ProxyTool::new(
             "test_tool".to_string(),
             "A test tool".to_string(),
@@ -72,7 +72,7 @@ mod tests {
             }),
             client,
         );
-        
+
         assert_eq!(tool.name(), "test_tool");
         assert_eq!(tool.description(), "A test tool");
     }

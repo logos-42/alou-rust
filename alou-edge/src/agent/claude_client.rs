@@ -1,7 +1,7 @@
+use crate::utils::error::{AloudError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use worker::{console_log, console_error};
-use crate::utils::error::{AloudError, Result};
+use worker::{console_error, console_log};
 
 // Claude API Configuration
 const CLAUDE_API_URL: &str = "https://api.anthropic.com/v1/messages";
@@ -35,7 +35,7 @@ impl ClaudeMessage {
             content: vec![ContentBlock::Text { text }],
         }
     }
-    
+
     /// Create a message with tool use
     #[allow(dead_code)]
     pub fn with_tool_use(role: &str, id: String, name: String, input: Value) -> Self {
@@ -44,12 +44,15 @@ impl ClaudeMessage {
             content: vec![ContentBlock::ToolUse { id, name, input }],
         }
     }
-    
+
     /// Create a message with tool result
     pub fn with_tool_result(role: &str, tool_use_id: String, content: String) -> Self {
         Self {
             role: role.to_string(),
-            content: vec![ContentBlock::ToolResult { tool_use_id, content }],
+            content: vec![ContentBlock::ToolResult {
+                tool_use_id,
+                content,
+            }],
         }
     }
 }
@@ -165,13 +168,13 @@ impl ClaudeClient {
             model: CLAUDE_MODEL.to_string(),
         }
     }
-    
+
     /// Create a new Claude client with custom model
     #[allow(dead_code)]
     pub fn with_model(api_key: String, model: String) -> Self {
         Self { api_key, model }
     }
-    
+
     /// Send a message and get a response
     pub async fn send_message(
         &self,
@@ -179,16 +182,19 @@ impl ClaudeClient {
         tools: Option<Vec<ClaudeTool>>,
     ) -> Result<ClaudeResponse> {
         let mut retries = 0;
-        
+
         loop {
-            match self.send_message_internal(messages.clone(), tools.clone()).await {
+            match self
+                .send_message_internal(messages.clone(), tools.clone())
+                .await
+            {
                 Ok(response) => return Ok(response),
                 Err(e) => {
                     retries += 1;
                     if retries >= MAX_RETRIES {
                         return Err(e);
                     }
-                    
+
                     console_log!("Retry {}/{} after error: {}", retries, MAX_RETRIES, e);
                     // Simple delay (in WASM, we'd use a proper async sleep)
                     // For now, just retry immediately
@@ -197,7 +203,7 @@ impl ClaudeClient {
             }
         }
     }
-    
+
     async fn send_message_internal(
         &self,
         messages: Vec<ClaudeMessage>,
@@ -217,14 +223,14 @@ impl ClaudeClient {
                 } else {
                     json!(m.content)
                 };
-                
+
                 ClaudeRequestMessage {
                     role: m.role,
                     content,
                 }
             })
             .collect();
-        
+
         let request = ClaudeRequest {
             model: self.model.clone(),
             messages: api_messages,
@@ -233,22 +239,23 @@ impl ClaudeClient {
             max_tokens: 4096,
             temperature: Some(0.7),
         };
-        
+
         // Make HTTP request using fetch API (worker-compatible)
         let response = self.make_request(&request).await?;
-        
+
         // Parse response
         self.parse_response(response)
     }
-    
+
     async fn make_request(&self, request: &ClaudeRequest) -> Result<ClaudeApiResponse> {
         use worker::{Fetch, Headers, Method, RequestInit};
-        
-        let body = serde_json::to_string(request)
-            .map_err(|e| AloudError::ClaudeApiError(format!("Failed to serialize request: {}", e)))?;
-        
+
+        let body = serde_json::to_string(request).map_err(|e| {
+            AloudError::ClaudeApiError(format!("Failed to serialize request: {}", e))
+        })?;
+
         console_log!("Claude API Request to: {}", CLAUDE_API_URL);
-        
+
         // Create headers following Claude API requirements
         let headers = {
             let h = Headers::new();
@@ -260,7 +267,7 @@ impl ClaudeClient {
                 .map_err(|e| AloudError::ClaudeApiError(format!("Failed to set version: {}", e)))?;
             h
         };
-        
+
         // Create request init
         let init = {
             let mut i = RequestInit::new();
@@ -269,46 +276,58 @@ impl ClaudeClient {
                 .with_body(Some(body.into()));
             i
         };
-        
+
         // Make fetch request
         let mut response = Fetch::Request(
-            worker::Request::new_with_init(CLAUDE_API_URL, &init)
-                .map_err(|e| AloudError::ClaudeApiError(format!("Failed to create request: {}", e)))?
+            worker::Request::new_with_init(CLAUDE_API_URL, &init).map_err(|e| {
+                AloudError::ClaudeApiError(format!("Failed to create request: {}", e))
+            })?,
         )
         .send()
         .await
         .map_err(|e| AloudError::ClaudeApiError(format!("Request failed: {}", e)))?;
-        
+
         // Check status
         if !response.status_code().is_success() {
             let error_text = response
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
-            console_error!("Claude API Error ({}): {}", response.status_code(), error_text);
+            console_error!(
+                "Claude API Error ({}): {}",
+                response.status_code(),
+                error_text
+            );
             return Err(AloudError::ClaudeApiError(format!(
                 "API returned error {}: {}",
                 response.status_code(),
                 error_text
             )));
         }
-        
+
         // Parse response
         let response_text = response
             .text()
             .await
             .map_err(|e| AloudError::ClaudeApiError(format!("Failed to read response: {}", e)))?;
-        
-        console_log!("Claude API Response received ({} bytes)", response_text.len());
-        
-        serde_json::from_str(&response_text)
-            .map_err(|e| AloudError::ClaudeApiError(format!("Failed to parse response: {} - Response: {}", e, response_text)))
+
+        console_log!(
+            "Claude API Response received ({} bytes)",
+            response_text.len()
+        );
+
+        serde_json::from_str(&response_text).map_err(|e| {
+            AloudError::ClaudeApiError(format!(
+                "Failed to parse response: {} - Response: {}",
+                e, response_text
+            ))
+        })
     }
-    
+
     fn parse_response(&self, response: ClaudeApiResponse) -> Result<ClaudeResponse> {
         let mut text_content = String::new();
         let mut tool_calls = Vec::new();
-        
+
         // Extract text and tool uses from content blocks
         for content in response.content {
             match content {
@@ -323,11 +342,13 @@ impl ClaudeClient {
                 }
             }
         }
-        
+
         Ok(ClaudeResponse {
             content: text_content,
             tool_calls,
-            stop_reason: response.stop_reason.unwrap_or_else(|| "end_turn".to_string()),
+            stop_reason: response
+                .stop_reason
+                .unwrap_or_else(|| "end_turn".to_string()),
         })
     }
 }
@@ -335,14 +356,14 @@ impl ClaudeClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_claude_message_creation() {
         let msg = ClaudeMessage::text("user", "Hello".to_string());
         assert_eq!(msg.role, "user");
         assert_eq!(msg.content.len(), 1);
     }
-    
+
     #[test]
     fn test_tool_definition() {
         let tool = ClaudeTool {
@@ -355,7 +376,7 @@ mod tests {
                 }
             }),
         };
-        
+
         assert_eq!(tool.name, "test_tool");
     }
 }

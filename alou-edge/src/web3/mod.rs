@@ -1,4 +1,4 @@
 pub mod auth;
+pub mod chains;
 pub mod rpc;
 pub mod signer;
-pub mod chains;

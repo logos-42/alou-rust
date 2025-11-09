@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use crate::utils::async_lock::{RwLock, Mutex};
-use std::future::Future;
+use crate::utils::async_lock::{Mutex, RwLock};
 use crate::utils::error::Result;
+use std::collections::HashMap;
+use std::future::Future;
+use std::sync::Arc;
 
 /// Request batcher for deduplicating and batching concurrent requests
-/// 
+///
 /// This helps optimize performance by:
 /// 1. Deduplicating identical concurrent requests
 /// 2. Batching multiple requests together
@@ -26,9 +26,9 @@ where
             pending: Arc::new(RwLock::new(HashMap::new())),
         }
     }
-    
+
     /// Execute a request with deduplication
-    /// 
+    ///
     /// If the same key is requested concurrently, only one execution happens
     /// and all callers receive the same result.
     pub async fn execute<F, Fut>(&self, key: K, f: F) -> Result<V>
@@ -39,7 +39,7 @@ where
         // Check if request is already pending
         let result_lock = {
             let mut pending = self.pending.write().await;
-            
+
             if let Some(existing) = pending.get(&key) {
                 existing.clone()
             } else {
@@ -48,31 +48,31 @@ where
                 new_lock
             }
         };
-        
+
         // Try to acquire the lock
         let mut result_guard = result_lock.lock().await;
-        
+
         // If result is already computed, return it
         if let Some(result) = result_guard.as_ref() {
             return result.clone();
         }
-        
+
         // Execute the function
         let result = f().await;
-        
+
         // Store the result (clone for storage)
         let stored_result = match &result {
             Ok(v) => Ok(v.clone()),
             Err(e) => Err(e.clone()),
         };
         *result_guard = Some(stored_result);
-        
+
         // Clean up from pending map
         {
             let mut pending = self.pending.write().await;
             pending.remove(&key);
         }
-        
+
         result
     }
 }
@@ -91,44 +91,48 @@ where
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    
+
     #[tokio::test]
     async fn test_request_deduplication() {
         let batcher = RequestBatcher::<String, String>::new();
         let counter = Arc::new(AtomicUsize::new(0));
-        
+
         let counter1 = counter.clone();
         let counter2 = counter.clone();
-        
+
         // Launch two concurrent requests with the same key
         let handle1 = tokio::spawn({
             let batcher = batcher.clone();
             async move {
-                batcher.execute("test".to_string(), || async {
-                    counter1.fetch_add(1, Ordering::SeqCst);
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    Ok("result".to_string())
-                }).await
+                batcher
+                    .execute("test".to_string(), || async {
+                        counter1.fetch_add(1, Ordering::SeqCst);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        Ok("result".to_string())
+                    })
+                    .await
             }
         });
-        
+
         let handle2 = tokio::spawn({
             let batcher = batcher.clone();
             async move {
-                batcher.execute("test".to_string(), || async {
-                    counter2.fetch_add(1, Ordering::SeqCst);
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    Ok("result".to_string())
-                }).await
+                batcher
+                    .execute("test".to_string(), || async {
+                        counter2.fetch_add(1, Ordering::SeqCst);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                        Ok("result".to_string())
+                    })
+                    .await
             }
         });
-        
+
         let result1 = handle1.await.unwrap().unwrap();
         let result2 = handle2.await.unwrap().unwrap();
-        
+
         // Both should get the same result
         assert_eq!(result1, result2);
-        
+
         // Function should only be called once
         assert_eq!(counter.load(Ordering::SeqCst), 1);
     }

@@ -106,6 +106,38 @@ export class AgentService {
     const response = await apiClient.get(`${this.baseUrl}/api/status`)
     return response.data
   }
+
+  /**
+   * Record agent wallet transaction history
+   */
+  async recordAgentTransaction(sessionId, chain, transaction) {
+    if (!sessionId || !chain || !transaction) {
+      throw new Error('Missing parameters for recordAgentTransaction')
+    }
+
+    await apiClient.post(`${this.baseUrl}/api/agent/wallet`, {
+      session_id: sessionId,
+      action: 'record_transaction',
+      chain,
+      transaction
+    })
+  }
+
+  /**
+   * Update agent wallet balance snapshot
+   */
+  async updateAgentWalletBalance(sessionId, chain, balance) {
+    if (!sessionId || !chain) {
+      throw new Error('Missing parameters for updateAgentWalletBalance')
+    }
+
+    await apiClient.post(`${this.baseUrl}/api/agent/wallet`, {
+      session_id: sessionId,
+      action: 'update_balance',
+      chain,
+      balance
+    })
+  }
 }
 
 export default new AgentService()

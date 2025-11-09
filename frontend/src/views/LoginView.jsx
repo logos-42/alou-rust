@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
+import { walletService } from '@/services/walletService'
 import './LoginView.css'
 
 const walletButtons = [
@@ -78,28 +79,25 @@ const LoginView = () => {
       setCurrentWallet('metamask')
       setError('')
 
-      if (typeof window === 'undefined') {
-        throw new Error('请在浏览器中打开')
-      }
-
-      const { ethereum } = window
-
-      if (!ethereum) {
+      if (!walletService.isWalletAvailable()) {
         throw new Error('请先安装 MetaMask 浏览器插件')
       }
 
-      const provider =
-        Array.isArray(ethereum?.providers) && ethereum.providers.find((p) => p?.isMetaMask)
-          ? ethereum.providers.find((p) => p.isMetaMask)
-          : ethereum
-
-      const accounts = await provider.request({ method: 'eth_requestAccounts' })
+      let accounts = []
+      try {
+        accounts = await walletService.requestAccounts({ forceSelect: true })
+      } catch (requestError) {
+        if (requestError?.code === 4001) {
+          throw requestError
+        }
+        throw new Error(requestError?.message || '请求钱包账户失败')
+      }
 
       if (!accounts || accounts.length === 0) {
         throw new Error('未能获取钱包地址')
       }
 
-      const chainId = await provider.request({ method: 'eth_chainId' })
+      const chainId = await walletService.getCurrentChainId()
 
       await loginWithWeb3Wallet({
         address: accounts[0],
@@ -110,7 +108,7 @@ const LoginView = () => {
       navigate('/')
     } catch (err) {
       if (err?.code === 4001) {
-        setError('您拒绝了连接请求，请重试')
+        setError('您拒绝了连接请求，请在 MetaMask 中选择要连接的钱包')
       } else if (err?.code === -32002) {
         setError('请在 MetaMask 中确认连接请求（可能已有待处理的请求）')
       } else if (err?.code === -32603) {

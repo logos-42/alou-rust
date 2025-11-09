@@ -11,25 +11,25 @@ use crate::utils::error::{AloudError, Result};
 pub struct WorkflowStep {
     /// Step identifier
     pub id: String,
-    
+
     /// Step name/description
     pub name: String,
-    
+
     /// Tool to execute in this step
     pub tool: String,
-    
+
     /// Arguments for the tool
     pub args: Value,
-    
+
     /// Dependencies: IDs of steps that must complete before this step
     pub depends_on: Vec<String>,
-    
+
     /// Step status
     pub status: StepStatus,
-    
+
     /// Step result (if completed)
     pub result: Option<Value>,
-    
+
     /// Error message (if failed)
     pub error: Option<String>,
 }
@@ -47,22 +47,22 @@ pub enum StepStatus {
 pub struct Workflow {
     /// Workflow identifier
     pub id: String,
-    
+
     /// Workflow name
     pub name: String,
-    
+
     /// Description
     pub description: String,
-    
+
     /// Steps in the workflow
     pub steps: Vec<WorkflowStep>,
-    
+
     /// Overall status
     pub status: WorkflowStatus,
-    
+
     /// Created timestamp
     pub created_at: i64,
-    
+
     /// Updated timestamp
     pub updated_at: i64,
 }
@@ -87,10 +87,15 @@ impl WorkflowTool {
             workflows: HashMap::new(),
         }
     }
-    
-    fn create_workflow(&mut self, name: String, description: String, steps: Vec<WorkflowStep>) -> Result<String> {
+
+    fn create_workflow(
+        &mut self,
+        name: String,
+        description: String,
+        steps: Vec<WorkflowStep>,
+    ) -> Result<String> {
         let id = format!("wf_{}", uuid::Uuid::new_v4().to_string());
-        
+
         let workflow = Workflow {
             id: id.clone(),
             name,
@@ -100,28 +105,28 @@ impl WorkflowTool {
             created_at: crate::utils::time::now_timestamp(),
             updated_at: crate::utils::time::now_timestamp(),
         };
-        
+
         self.workflows.insert(id.clone(), workflow);
         Ok(id)
     }
-    
+
     fn get_workflow(&self, id: &str) -> Result<&Workflow> {
         self.workflows
             .get(id)
             .ok_or_else(|| AloudError::InvalidInput(format!("Workflow not found: {}", id)))
     }
-    
+
     #[allow(dead_code)]
     fn get_workflow_mut(&mut self, id: &str) -> Result<&mut Workflow> {
         self.workflows
             .get_mut(id)
             .ok_or_else(|| AloudError::InvalidInput(format!("Workflow not found: {}", id)))
     }
-    
+
     fn list_workflows(&self) -> Vec<&Workflow> {
         self.workflows.values().collect()
     }
-    
+
     fn delete_workflow(&mut self, id: &str) -> Result<()> {
         self.workflows.remove(id);
         Ok(())
@@ -133,11 +138,11 @@ impl McpTool for WorkflowTool {
     fn name(&self) -> &str {
         "workflow"
     }
-    
+
     fn description(&self) -> &str {
         "Manage workflow execution for complex multi-step tasks. Supports creating, executing, and managing workflows with dependencies between steps."
     }
-    
+
     fn input_schema(&self) -> Value {
         json!({
             "type": "object",
@@ -181,17 +186,17 @@ impl McpTool for WorkflowTool {
             "required": ["action"]
         })
     }
-    
+
     async fn execute(&self, args: Value, context: &AgentContext) -> Result<Value> {
         let action = args
             .get("action")
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'action' field".to_string()))?;
-        
+
         // We need mutable access, so we'll create a new instance
         // In production, this would use KV storage for persistence
         let mut workflow_tool = WorkflowTool::new();
-        
+
         match action {
             "create" => self.handle_create(&mut workflow_tool, args, context).await,
             "execute" => self.handle_execute(&mut workflow_tool, args, context).await,
@@ -199,7 +204,10 @@ impl McpTool for WorkflowTool {
             "get" => self.handle_get(&mut workflow_tool, args, context).await,
             "status" => self.handle_status(&mut workflow_tool, args, context).await,
             "delete" => self.handle_delete(&mut workflow_tool, args, context).await,
-            _ => Err(AloudError::InvalidInput(format!("Unknown action: {}", action))),
+            _ => Err(AloudError::InvalidInput(format!(
+                "Unknown action: {}",
+                action
+            ))),
         }
     }
 }
@@ -216,50 +224,48 @@ impl WorkflowTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'name' field".to_string()))?
             .to_string();
-        
+
         let description = args
             .get("description")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
-        
+
         let steps = args
             .get("steps")
             .and_then(|v| v.as_array())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'steps' field".to_string()))?;
-        
+
         let workflow_steps: Vec<WorkflowStep> = steps
             .iter()
-            .map(|step| {
-                WorkflowStep {
-                    id: step["id"].as_str().unwrap().to_string(),
-                    name: step["name"].as_str().unwrap().to_string(),
-                    tool: step["tool"].as_str().unwrap().to_string(),
-                    args: step["args"].clone(),
-                    depends_on: step["depends_on"]
-                        .as_array()
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                .collect()
-                        })
-                        .unwrap_or_else(|| vec![]),
-                    status: StepStatus::Pending,
-                    result: None,
-                    error: None,
-                }
+            .map(|step| WorkflowStep {
+                id: step["id"].as_str().unwrap().to_string(),
+                name: step["name"].as_str().unwrap().to_string(),
+                tool: step["tool"].as_str().unwrap().to_string(),
+                args: step["args"].clone(),
+                depends_on: step["depends_on"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_else(|| vec![]),
+                status: StepStatus::Pending,
+                result: None,
+                error: None,
             })
             .collect();
-        
+
         let workflow_id = workflow_tool.create_workflow(name, description, workflow_steps)?;
-        
+
         Ok(json!({
             "workflow_id": workflow_id,
             "message": "Workflow created successfully",
             "session_id": context.session_id
         }))
     }
-    
+
     async fn handle_execute(
         &self,
         workflow_tool: &mut WorkflowTool,
@@ -271,10 +277,10 @@ impl WorkflowTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'workflow_id' field".to_string()))?
             .to_string();
-        
+
         // Get workflow and execute it
         let workflow = workflow_tool.get_workflow(&workflow_id)?;
-        
+
         // Simple execution: mark all steps as completed
         // In production, this would actually execute the tools in the right order
         Ok(json!({
@@ -284,7 +290,7 @@ impl WorkflowTool {
             "steps_completed": workflow.steps.len()
         }))
     }
-    
+
     async fn handle_list(
         &self,
         workflow_tool: &mut WorkflowTool,
@@ -292,7 +298,7 @@ impl WorkflowTool {
         context: &AgentContext,
     ) -> Result<Value> {
         let workflows = workflow_tool.list_workflows();
-        
+
         let workflow_list: Vec<Value> = workflows
             .iter()
             .map(|wf| {
@@ -306,14 +312,14 @@ impl WorkflowTool {
                 })
             })
             .collect();
-        
+
         Ok(json!({
             "workflows": workflow_list,
             "count": workflow_list.len(),
             "session_id": context.session_id
         }))
     }
-    
+
     async fn handle_get(
         &self,
         workflow_tool: &mut WorkflowTool,
@@ -325,9 +331,9 @@ impl WorkflowTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'workflow_id' field".to_string()))?
             .to_string();
-        
+
         let workflow = workflow_tool.get_workflow(&workflow_id)?;
-        
+
         Ok(json!({
             "workflow": json!({
                 "id": workflow.id,
@@ -348,7 +354,7 @@ impl WorkflowTool {
             "session_id": context.session_id
         }))
     }
-    
+
     async fn handle_status(
         &self,
         workflow_tool: &mut WorkflowTool,
@@ -360,9 +366,9 @@ impl WorkflowTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'workflow_id' field".to_string()))?
             .to_string();
-        
+
         let workflow = workflow_tool.get_workflow(&workflow_id)?;
-        
+
         let status_summary: Vec<Value> = workflow
             .steps
             .iter()
@@ -374,7 +380,7 @@ impl WorkflowTool {
                 })
             })
             .collect();
-        
+
         Ok(json!({
             "workflow_id": workflow_id,
             "overall_status": format!("{:?}", workflow.status),
@@ -382,7 +388,7 @@ impl WorkflowTool {
             "session_id": context.session_id
         }))
     }
-    
+
     async fn handle_delete(
         &self,
         workflow_tool: &mut WorkflowTool,
@@ -394,9 +400,9 @@ impl WorkflowTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing 'workflow_id' field".to_string()))?
             .to_string();
-        
+
         workflow_tool.delete_workflow(&workflow_id)?;
-        
+
         Ok(json!({
             "workflow_id": workflow_id,
             "message": "Workflow deleted successfully",
@@ -415,12 +421,12 @@ impl Default for WorkflowTool {
 mod tests {
     use super::*;
     use crate::agent::context::AgentContext;
-    
+
     #[tokio::test]
     async fn test_workflow_tool_create() {
         let tool = WorkflowTool::new();
         let context = AgentContext::new("test_session".to_string());
-        
+
         let args = json!({
             "action": "create",
             "name": "Test Workflow",
@@ -435,22 +441,21 @@ mod tests {
                 }
             ]
         });
-        
+
         let result = tool.execute(args, &context).await;
         assert!(result.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_workflow_tool_list() {
         let tool = WorkflowTool::new();
         let context = AgentContext::new("test_session".to_string());
-        
+
         let args = json!({
             "action": "list"
         });
-        
+
         let result = tool.execute(args, &context).await;
         assert!(result.is_ok());
     }
 }
-

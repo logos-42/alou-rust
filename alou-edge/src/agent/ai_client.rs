@@ -1,8 +1,8 @@
+use super::providers;
+use crate::utils::error::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::utils::error::Result;
-use super::providers;
 
 /// AI Provider trait for different model providers
 #[async_trait(?Send)]
@@ -37,7 +37,7 @@ impl AiMessage {
             tool_calls: None,
         }
     }
-    
+
     /// Create a tool result message
     pub fn tool_result(tool_call_id: String, content: String) -> Self {
         Self {
@@ -47,7 +47,7 @@ impl AiMessage {
             tool_calls: None,
         }
     }
-    
+
     /// Create an assistant message with tool calls
     pub fn assistant_with_tools(content: String, tool_calls: Vec<AiToolCall>) -> Self {
         Self {
@@ -108,14 +108,17 @@ impl AiClient {
                 api_key,
                 model.unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string()),
             )),
-            _ => return Err(crate::utils::error::AloudError::InvalidInput(
-                format!("Unknown provider: {}", provider_type)
-            )),
+            _ => {
+                return Err(crate::utils::error::AloudError::InvalidInput(format!(
+                    "Unknown provider: {}",
+                    provider_type
+                )))
+            }
         };
-        
+
         Ok(Self { provider })
     }
-    
+
     /// Send message to AI
     pub async fn send_message(
         &self,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/hooks/useI18n'
 import { blockchainService } from '@/services/blockchainService'
+import { walletService } from '@/services/walletService'
 import WalletConnect from '@/components/wallet/WalletConnect'
 import WalletOverview from '@/components/wallet/WalletOverview'
 import NetworkSelector from '@/components/wallet/NetworkSelector'
@@ -104,6 +105,7 @@ const WalletManager = () => {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('wallet_address', address)
       localStorage.setItem('wallet_chain_id', chainId)
+      localStorage.setItem('wallet_type', 'metamask')
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('wallet-changed', { detail: { address } }))
@@ -153,26 +155,57 @@ const WalletManager = () => {
     }
   }, [])
 
-  const connectMetaMask = useCallback(async () => {
-    try {
-      if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
-        alert(t('installMetaMask'))
-        return
+  const connectMetaMask = useCallback(
+    async ({ forceSelect = false, silent = false } = {}) => {
+      try {
+        if (!walletService.isWalletAvailable()) {
+          if (!silent) {
+            alert(t('installMetaMask'))
+          }
+          return false
+        }
+
+        let accounts = []
+        if (forceSelect) {
+          accounts = await walletService.requestAccounts({ forceSelect: true })
+        } else {
+          accounts = await walletService.getAccounts()
+          if (!accounts.length && !silent) {
+            accounts = await walletService.requestAccounts()
+          }
+        }
+
+        if (!accounts || accounts.length === 0) {
+          if (!silent) {
+            alert(t('connectionFailed'))
+          }
+          return false
+        }
+
+        const address = accounts[0]
+        const chainId = await walletService.getCurrentChainId()
+        const balanceInfo = await blockchainService.getBalance(address)
+
+        updateConnectedWallet(address, chainId, balanceInfo)
+        await loadTransactions(address)
+        await loadAgentWallets()
+        return true
+      } catch (error) {
+        if (!silent) {
+          if (error?.code === 4001) {
+            alert(t('connectionFailed'))
+          } else {
+            console.error('Failed to connect MetaMask:', error)
+            alert(t('connectionFailed'))
+          }
+        } else if (error?.code !== 4001) {
+          console.error('Failed to connect MetaMask silently:', error)
+        }
+        return false
       }
-
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
-      const address = accounts[0]
-      const balanceInfo = await blockchainService.getBalance(address)
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' })
-
-      updateConnectedWallet(address, chainId, balanceInfo)
-      await loadTransactions(address)
-      await loadAgentWallets()
-    } catch (error) {
-      console.error('Failed to connect MetaMask:', error)
-      alert(t('connectionFailed'))
-    }
-  }, [loadAgentWallets, loadTransactions, t, updateConnectedWallet])
+    },
+    [loadAgentWallets, loadTransactions, t, updateConnectedWallet],
+  )
 
   const connectWalletConnect = useCallback(() => {
     alert(t('walletConnectComingSoon'))
@@ -181,8 +214,8 @@ const WalletManager = () => {
   const checkWalletConnection = useCallback(() => {
     const savedAddress =
       typeof localStorage !== 'undefined' ? localStorage.getItem('wallet_address') : null
-    if (savedAddress && typeof window !== 'undefined' && window.ethereum) {
-      connectMetaMask()
+    if (savedAddress) {
+      void connectMetaMask({ silent: true })
     }
   }, [connectMetaMask])
 
@@ -190,6 +223,8 @@ const WalletManager = () => {
     setConnectedWallet(null)
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('wallet_address')
+      localStorage.removeItem('wallet_type')
+      localStorage.removeItem('wallet_chain_id')
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('wallet-changed', { detail: { address: null } }))
@@ -412,7 +447,7 @@ const WalletManager = () => {
         <div className="wallet-content">
           {!connectedWallet ? (
             <WalletConnect
-              onConnectMetaMask={connectMetaMask}
+              onConnectMetaMask={() => connectMetaMask({ forceSelect: true })}
               onConnectWalletConnect={connectWalletConnect}
             />
           ) : (
@@ -422,6 +457,7 @@ const WalletManager = () => {
                 currentNetwork={currentNetwork}
                 networkName={networkName}
                 ethPrice={ethPrice}
+                onSwitchWallet={() => connectMetaMask({ forceSelect: true })}
                 onDisconnect={disconnectWallet}
               />
 

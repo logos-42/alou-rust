@@ -1,7 +1,7 @@
+use crate::utils::error::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use worker::console_log;
-use crate::utils::error::Result;
 
 /// Payment tool for blockchain payments (simplified from MCP server)
 #[allow(dead_code)]
@@ -37,8 +37,12 @@ impl PaymentTool {
     /// Get balance (ETH or token)
     #[allow(dead_code)]
     pub async fn get_balance(&self, address: &str, token_symbol: Option<&str>) -> Result<Value> {
-        console_log!("Getting balance for {} (token: {:?})", address, token_symbol);
-        
+        console_log!(
+            "Getting balance for {} (token: {:?})",
+            address,
+            token_symbol
+        );
+
         // 使用 RPC 调用查询余额
         let _request_body = if token_symbol.is_some() {
             // ERC20 token balance
@@ -60,7 +64,7 @@ impl PaymentTool {
                 "id": 1
             })
         };
-        
+
         // 模拟返回
         Ok(json!({
             "address": address,
@@ -78,8 +82,13 @@ impl PaymentTool {
         amount: &str,
         token_symbol: Option<&str>,
     ) -> Result<Value> {
-        console_log!("Preparing transaction to {} amount {} token {:?}", to, amount, token_symbol);
-        
+        console_log!(
+            "Preparing transaction to {} amount {} token {:?}",
+            to,
+            amount,
+            token_symbol
+        );
+
         Ok(json!({
             "to": to,
             "amount": amount,
@@ -95,14 +104,14 @@ impl PaymentTool {
     #[allow(dead_code)]
     pub async fn get_transaction_status(&self, tx_hash: &str) -> Result<Value> {
         console_log!("Getting transaction status for {}", tx_hash);
-        
+
         let _request_body = json!({
             "jsonrpc": "2.0",
             "method": "eth_getTransactionReceipt",
             "params": [tx_hash],
             "id": 1
         });
-        
+
         // 模拟返回
         Ok(json!({
             "tx_hash": tx_hash,
@@ -117,7 +126,7 @@ impl PaymentTool {
     #[allow(dead_code)]
     pub async fn estimate_gas_fees(&self) -> Result<Value> {
         console_log!("Estimating gas fees");
-        
+
         Ok(json!({
             "gas_price": "20",
             "gas_price_gwei": "20",

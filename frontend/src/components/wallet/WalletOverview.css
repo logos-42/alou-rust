@@ -51,6 +51,29 @@
   color: var(--text-secondary);
 }
 
+.wallet-overview-card .wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+}
+
+.wallet-overview-card .switch-btn {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--primary-color);
+  border-radius: 0.75rem;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.wallet-overview-card .switch-btn:hover {
+  filter: brightness(0.95);
+}
+
 .wallet-overview-card .network-dot {
   width: 8px;
   height: 8px;

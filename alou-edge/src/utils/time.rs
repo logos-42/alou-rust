@@ -1,7 +1,6 @@
 /// Time utilities for WASM environment
-/// 
+///
 /// Standard library time functions don't work in WASM, so we use js-sys::Date
-
 use js_sys::Date;
 
 /// Get current timestamp in seconds (Unix timestamp)
@@ -22,14 +21,18 @@ pub fn now_timestamp_nanos() -> i64 {
 /// Get current time as RFC3339 string
 pub fn now_rfc3339() -> String {
     let date = Date::new_0();
-    date.to_iso_string().as_string().unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
+    date.to_iso_string()
+        .as_string()
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }
 
 /// Format timestamp as RFC3339 string
 #[allow(dead_code)]
 pub fn timestamp_to_rfc3339(timestamp: i64) -> String {
     let date = Date::new(&(timestamp * 1000).into());
-    date.to_iso_string().as_string().unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
+    date.to_iso_string()
+        .as_string()
+        .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string())
 }
 
 /// Format current time as YYYY-MM-DD HH:MM:SS
@@ -47,13 +50,13 @@ pub fn now_formatted() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_now_timestamp() {
         let ts = now_timestamp();
         assert!(ts > 1700000000); // After 2023
     }
-    
+
     #[test]
     fn test_now_rfc3339() {
         let rfc = now_rfc3339();

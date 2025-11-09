@@ -15,6 +15,67 @@ class WalletService {
   }
 
   /**
+   * Request wallet accounts, optionally forcing the provider to show the
+   * account selection dialog (MetaMask, etc.).
+   */
+  async requestAccounts({ forceSelect = false } = {}) {
+    if (!this.isWalletAvailable()) {
+      throw new Error('Wallet not available')
+    }
+
+    const provider = this.getProvider()
+    let accounts = []
+
+    if (forceSelect) {
+      try {
+        await provider.request({
+          method: 'wallet_requestPermissions',
+          params: [{ eth_accounts: {} }],
+        })
+        accounts = await provider.request({ method: 'eth_accounts' })
+      } catch (error) {
+        if (error?.code === 4001) {
+          // User rejected the permission request – rethrow so caller can handle
+          throw error
+        }
+
+        if (error?.code !== -32601) {
+          console.warn('wallet_requestPermissions failed, falling back to eth_requestAccounts', error)
+        }
+        // If method not supported or other non-blocking error, fall back below
+      }
+    }
+
+    if (!accounts || accounts.length === 0) {
+      accounts = await provider.request({ method: 'eth_requestAccounts' })
+    }
+
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No wallet accounts available')
+    }
+
+    return accounts
+  }
+
+  /**
+   * Get currently authorized accounts without prompting the user.
+   */
+  async getAccounts() {
+    if (!this.isWalletAvailable()) {
+      return []
+    }
+
+    try {
+      const provider = this.getProvider()
+      const accounts = await provider.request({ method: 'eth_accounts' })
+      return Array.isArray(accounts) ? accounts : []
+    } catch (error) {
+      console.warn('Failed to get wallet accounts silently:', error)
+      return []
+    }
+  }
+
+  /**
    * Check if wallet is available
    */
   isWalletAvailable() {
@@ -189,6 +250,14 @@ class WalletService {
 
     try {
       if (instruction.type === 'wallet_operation') {
+        if (instruction.method === 'eth_sendTransaction') {
+          const txParams = Array.isArray(instruction.params) ? instruction.params[0] : instruction.params
+          if (!txParams) {
+            throw new Error('Missing transaction params')
+          }
+          return await this.sendTransaction(txParams)
+        }
+
         if (instruction.method === 'wallet_switchEthereumChain') {
           const chainId = instruction.params?.chainId
           if (!chainId) {
@@ -237,6 +306,48 @@ class WalletService {
       console.error('Failed to execute instruction:', error)
       throw error
     }
+  }
+
+  /**
+   * Send transaction with current wallet (eth_sendTransaction)
+   */
+  async sendTransaction(rawParams) {
+    if (!this.isWalletAvailable()) {
+      throw new Error('Wallet not available')
+    }
+
+    const provider = this.getProvider()
+    const params = { ...(rawParams || {}) }
+
+    if (!params.from) {
+      const address = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+      if (!address) {
+        throw new Error('Missing sender address. 请先连接钱包')
+      }
+      params.from = address
+    }
+
+    // Remove undefined / null values to avoid RPC errors
+    Object.keys(params).forEach((key) => {
+      if (params[key] === undefined || params[key] === null || params[key] === '') {
+        delete params[key]
+      }
+    })
+
+    const txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [params],
+    })
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('wallet-transaction-sent', {
+          detail: { txHash, params },
+        }),
+      )
+    }
+
+    return txHash
   }
 
   /**

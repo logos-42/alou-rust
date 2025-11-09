@@ -21,47 +21,78 @@ impl PromptMode {
             PromptMode::Developer => DEVELOPER_PROMPT,
         }
     }
-    
-    pub fn system_prompt_with_wallet(&self, wallet_address: Option<&str>) -> String {
+
+    pub fn system_prompt_with_context(
+        &self,
+        wallet_address: Option<&str>,
+        chain: Option<&str>,
+    ) -> String {
         let base_prompt = self.system_prompt();
-        
-        if let Some(address) = wallet_address {
+
+        let wallet_section = if let Some(address) = wallet_address {
             format!(
-                "{}\n\n=== 当前钱包信息 ===\n已连接钱包地址：{}\n\n你可以直接使用该地址查询余额、发送交易等操作，无需再询问用户钱包地址。",
-                base_prompt,
+                "=== 当前钱包信息 ===\n已连接钱包地址：{}\n你可以直接使用该地址查询余额、发送交易等操作，无需再询问用户钱包地址。",
                 address
             )
         } else {
-            format!(
-                "{}\n\n=== 钱包状态 ===\n当前未连接钱包。如需执行链上操作（如查询余额、发送交易），请先提示用户连接钱包。",
-                base_prompt
-            )
-        }
+            "=== 钱包状态 ===\n当前未连接钱包。如需执行链上操作（如查询余额、发送交易），请先提示用户连接钱包。".to_string()
+        };
+
+        let chain_label = chain.unwrap_or("未指定");
+        let chain_section = format!(
+            "=== 网络选择准则 ===\n\
+- 当前默认链：{}\n\
+- 在执行任何链上操作之前，先判断用户是否明确指定链或网络（主网 / 测试网 / 特定链名或 chainId）。\n\
+- 若用户指令与当前默认链不一致，应先向用户确认后再决定是否切换，并可使用 wallet_manager 工具执行网络切换。\n\
+- 若用户未指定且默认链为 \"未指定\"，请先询问用户需要使用的链，再进行后续操作。\n\
+- 任何余额查询、交易构建与广播都必须使用最终确认的链对应的 RPC。",
+            chain_label
+        );
+
+        format!("{base_prompt}\n\n{wallet_section}\n\n{chain_section}")
     }
-    
+
     pub fn detect_from_message(message: &str) -> Self {
         let message_lower = message.to_lowercase();
-        
-        if message_lower.contains("nft") || message_lower.contains("铸造") || message_lower.contains("mint") {
+
+        if message_lower.contains("nft")
+            || message_lower.contains("铸造")
+            || message_lower.contains("mint")
+        {
             return PromptMode::NFT;
         }
-        
-        if message_lower.contains("defi") || message_lower.contains("swap") || message_lower.contains("兑换") || message_lower.contains("质押") {
+
+        if message_lower.contains("defi")
+            || message_lower.contains("swap")
+            || message_lower.contains("兑换")
+            || message_lower.contains("质押")
+        {
             return PromptMode::DeFi;
         }
-        
-        if message_lower.contains("支付") || message_lower.contains("付款") || message_lower.contains("payment") {
+
+        if message_lower.contains("支付")
+            || message_lower.contains("付款")
+            || message_lower.contains("payment")
+        {
             return PromptMode::Payment;
         }
-        
-        if message_lower.contains("合约") || message_lower.contains("contract") || message_lower.contains("开发") {
+
+        if message_lower.contains("合约")
+            || message_lower.contains("contract")
+            || message_lower.contains("开发")
+        {
             return PromptMode::Developer;
         }
-        
-        if message_lower.contains("余额") || message_lower.contains("balance") || message_lower.contains("查询") || message_lower.contains("交易") || message_lower.contains("钱包") {
+
+        if message_lower.contains("余额")
+            || message_lower.contains("balance")
+            || message_lower.contains("查询")
+            || message_lower.contains("交易")
+            || message_lower.contains("钱包")
+        {
             return PromptMode::Wallet;
         }
-        
+
         PromptMode::General
     }
 }

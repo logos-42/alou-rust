@@ -10,10 +10,10 @@ use crate::utils::error::{AloudError, Result};
 pub struct ToolCall {
     /// Unique identifier for this tool call
     pub id: String,
-    
+
     /// Name of the tool to call
     pub name: String,
-    
+
     /// Arguments to pass to the tool
     pub args: Value,
 }
@@ -23,13 +23,13 @@ pub struct ToolCall {
 pub struct ToolResult {
     /// Tool call identifier
     pub id: String,
-    
+
     /// Tool name
     pub name: String,
-    
+
     /// Result data
     pub result: Value,
-    
+
     /// Optional error message
     pub error: Option<String>,
 }
@@ -44,7 +44,7 @@ impl McpExecutor {
     pub fn new(registry: McpRegistry) -> Self {
         Self { registry }
     }
-    
+
     /// Execute a single tool call
     pub async fn execute(
         &self,
@@ -57,16 +57,16 @@ impl McpExecutor {
             .registry
             .get_tool(tool_name)
             .ok_or_else(|| AloudError::ToolNotFound(tool_name.to_string()))?;
-        
+
         // Validate arguments against schema (basic validation)
         self.validate_args(&args, &tool.input_schema())?;
-        
+
         // Execute the tool
         tool.execute(args, context)
             .await
             .map_err(|e| AloudError::ToolExecutionError(e.to_string()))
     }
-    
+
     /// Execute multiple tool calls in sequence
     pub async fn execute_batch(
         &self,
@@ -74,7 +74,7 @@ impl McpExecutor {
         context: &AgentContext,
     ) -> Vec<ToolResult> {
         let mut results = Vec::new();
-        
+
         for call in calls {
             let result = match self.execute(&call.name, call.args.clone(), context).await {
                 Ok(value) => ToolResult {
@@ -90,24 +90,24 @@ impl McpExecutor {
                     error: Some(e.to_string()),
                 },
             };
-            
+
             results.push(result);
         }
-        
+
         results
     }
-    
+
     /// Get list of available tools from registry
     pub fn list_tools(&self) -> Vec<crate::mcp::registry::ToolInfo> {
         self.registry.list_tools()
     }
-    
+
     /// Check if a tool exists
     #[allow(dead_code)]
     pub fn has_tool(&self, name: &str) -> bool {
         self.registry.has_tool(name)
     }
-    
+
     /// Basic validation of arguments against schema
     fn validate_args(&self, args: &Value, schema: &Value) -> Result<()> {
         // Basic validation: check if args is an object when schema expects object
@@ -118,7 +118,7 @@ impl McpExecutor {
                         "Expected object arguments".to_string(),
                     ));
                 }
-                
+
                 // Check required fields
                 if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
                     let args_obj = args.as_object().unwrap();
@@ -135,7 +135,7 @@ impl McpExecutor {
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -147,19 +147,19 @@ mod tests {
     use async_trait::async_trait;
     use serde_json::json;
     use std::sync::Arc;
-    
+
     struct TestTool;
-    
+
     #[async_trait(?Send)]
     impl McpTool for TestTool {
         fn name(&self) -> &str {
             "test_tool"
         }
-        
+
         fn description(&self) -> &str {
             "A test tool"
         }
-        
+
         fn input_schema(&self) -> Value {
             json!({
                 "type": "object",
@@ -169,7 +169,7 @@ mod tests {
                 "required": ["message"]
             })
         }
-        
+
         async fn execute(&self, args: Value, _context: &AgentContext) -> Result<Value> {
             let message = args
                 .get("message")
@@ -178,66 +178,61 @@ mod tests {
             Ok(json!({ "echo": message }))
         }
     }
-    
+
     #[tokio::test]
     async fn test_executor_execute() {
         let mut registry = McpRegistry::new();
         registry.register(Arc::new(TestTool));
-        
+
         let executor = McpExecutor::new(registry);
         let context = AgentContext::new("test_session".to_string());
-        
+
         let result = executor
-            .execute(
-                "test_tool",
-                json!({ "message": "hello" }),
-                &context,
-            )
+            .execute("test_tool", json!({ "message": "hello" }), &context)
             .await
             .unwrap();
-        
+
         assert_eq!(result.get("echo").and_then(|v| v.as_str()), Some("hello"));
     }
-    
+
     #[tokio::test]
     async fn test_executor_tool_not_found() {
         let registry = McpRegistry::new();
         let executor = McpExecutor::new(registry);
         let context = AgentContext::new("test_session".to_string());
-        
-        let result = executor
-            .execute("nonexistent", json!({}), &context)
-            .await;
-        
+
+        let result = executor.execute("nonexistent", json!({}), &context).await;
+
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AloudError::ToolNotFound(_)));
     }
-    
+
     #[tokio::test]
     async fn test_executor_validate_args() {
         let mut registry = McpRegistry::new();
         registry.register(Arc::new(TestTool));
-        
+
         let executor = McpExecutor::new(registry);
         let context = AgentContext::new("test_session".to_string());
-        
+
         // Missing required field
-        let result = executor
-            .execute("test_tool", json!({}), &context)
-            .await;
-        
+        let result = executor.execute("test_tool", json!({}), &context).await;
+
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), AloudError::InvalidToolArgs(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            AloudError::InvalidToolArgs(_)
+        ));
     }
-    
+
     #[tokio::test]
     async fn test_executor_batch() {
         let mut registry = McpRegistry::new();
         registry.register(Arc::new(TestTool));
-        
+
         let executor = McpExecutor::new(registry);
         let context = AgentContext::new("test_session".to_string());
-        
+
         let calls = vec![
             ToolCall {
                 id: "call1".to_string(),
@@ -250,9 +245,9 @@ mod tests {
                 args: json!({ "message": "second" }),
             },
         ];
-        
+
         let results = executor.execute_batch(calls, &context).await;
-        
+
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].error, None);
         assert_eq!(results[1].error, None);

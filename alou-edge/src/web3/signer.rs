@@ -1,4 +1,4 @@
-use crate::utils::crypto::{ChainType, verify_ethereum_signature, verify_solana_signature};
+use crate::utils::crypto::{verify_ethereum_signature, verify_solana_signature, ChainType};
 use crate::utils::error::Result;
 
 /// Verify a wallet signature
@@ -17,7 +17,7 @@ pub fn verify_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_verify_signature_ethereum() {
         // This would require a real signature for testing
@@ -28,7 +28,7 @@ mod tests {
             "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
             ChainType::Ethereum
         );
-        
+
         // Should return false or error for invalid signature
         assert!(result.is_ok() || result.is_err());
     }

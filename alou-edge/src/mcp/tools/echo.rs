@@ -13,11 +13,11 @@ impl McpTool for EchoTool {
     fn name(&self) -> &str {
         "echo"
     }
-    
+
     fn description(&self) -> &str {
         "Echo tool that returns the input message. Useful for testing the MCP system."
     }
-    
+
     fn input_schema(&self) -> Value {
         json!({
             "type": "object",
@@ -30,13 +30,10 @@ impl McpTool for EchoTool {
             "required": ["message"]
         })
     }
-    
+
     async fn execute(&self, args: Value, context: &AgentContext) -> Result<Value> {
-        let message = args
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        
+        let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
+
         Ok(json!({
             "echo": message,
             "session_id": context.session_id,
@@ -49,17 +46,17 @@ impl McpTool for EchoTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_echo_tool() {
         let tool = EchoTool;
         let context = AgentContext::new("test_session".to_string());
-        
+
         let result = tool
             .execute(json!({ "message": "hello world" }), &context)
             .await
             .unwrap();
-        
+
         assert_eq!(
             result.get("echo").and_then(|v| v.as_str()),
             Some("hello world")

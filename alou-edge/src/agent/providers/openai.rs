@@ -1,9 +1,9 @@
+use crate::agent::ai_client::{AiMessage, AiProvider, AiResponse, AiTool, AiToolCall};
+use crate::utils::error::{AloudError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use worker::{console_log, Fetch, Headers, Method, RequestInit};
-use crate::agent::ai_client::{AiProvider, AiMessage, AiTool, AiResponse, AiToolCall};
-use crate::utils::error::{AloudError, Result};
 
 const OPENAI_API_URL: &str = "https://api.openai.com/v1/chat/completions";
 
@@ -86,7 +86,7 @@ impl AiProvider for OpenAiProvider {
         tools: Option<Vec<AiTool>>,
     ) -> Result<AiResponse> {
         console_log!("OpenAI: Sending request to {}", OPENAI_API_URL);
-        
+
         let openai_messages: Vec<OpenAiMessage> = messages
             .into_iter()
             .map(|m| OpenAiMessage {
@@ -94,7 +94,7 @@ impl AiProvider for OpenAiProvider {
                 content: m.content,
             })
             .collect();
-        
+
         let openai_tools = tools.map(|tools| {
             tools
                 .into_iter()
@@ -108,7 +108,7 @@ impl AiProvider for OpenAiProvider {
                 })
                 .collect()
         });
-        
+
         let request = OpenAiRequest {
             model: self.model.clone(),
             messages: openai_messages,
@@ -116,29 +116,31 @@ impl AiProvider for OpenAiProvider {
             temperature: 0.7,
             max_tokens: 4096,
         };
-        
+
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
-        
+
         let headers = Headers::new();
-        headers.set("Content-Type", "application/json")
+        headers
+            .set("Content-Type", "application/json")
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        headers.set("Authorization", &format!("Bearer {}", self.api_key))
+        headers
+            .set("Authorization", &format!("Bearer {}", self.api_key))
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         let mut init = RequestInit::new();
         init.with_method(Method::Post)
             .with_headers(headers)
             .with_body(Some(body.into()));
-        
+
         let mut response = Fetch::Request(
             worker::Request::new_with_init(OPENAI_API_URL, &init)
-                .map_err(|e| AloudError::AgentError(e.to_string()))?
+                .map_err(|e| AloudError::AgentError(e.to_string()))?,
         )
         .send()
         .await
         .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         if !response.status_code().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(AloudError::AgentError(format!(
@@ -147,22 +149,22 @@ impl AiProvider for OpenAiProvider {
                 error_text
             )));
         }
-        
+
         let response_text = response
             .text()
             .await
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         let openai_response: OpenAiResponse = serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Parse error: {}", e)))?;
-        
+
         let choice = openai_response
             .choices
             .first()
             .ok_or_else(|| AloudError::AgentError("No choices in response".to_string()))?;
-        
+
         let content = choice.message.content.clone().unwrap_or_default();
-        
+
         let tool_calls: Vec<AiToolCall> = choice
             .message
             .tool_calls
@@ -176,9 +178,9 @@ impl AiProvider for OpenAiProvider {
                 })
             })
             .collect();
-        
+
         console_log!("OpenAI: Response received, {} tool calls", tool_calls.len());
-        
+
         Ok(AiResponse {
             content,
             tool_calls,

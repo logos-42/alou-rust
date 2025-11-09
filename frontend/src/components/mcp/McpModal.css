@@ -6,17 +6,16 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 2rem;
+  padding: 1.5rem;
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
 
 .mcp-modal-content {
   background: rgba(255, 255, 255, 0.98);
-  border-radius: 1.5rem;
-  max-width: 960px;
-  width: 100%;
-  max-height: 90vh;
+  border-radius: 1.25rem;
+  width: min(96vw, 1400px);
+  height: min(92vh, 880px);
   box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
   overflow: hidden;
   display: flex;

@@ -12,7 +12,14 @@ const calculateUSD = (ethAmount, price) => {
   return (amount * price).toFixed(2)
 }
 
-const WalletOverview = ({ wallet, currentNetwork, networkName, ethPrice, onDisconnect }) => {
+const WalletOverview = ({
+  wallet,
+  currentNetwork,
+  networkName,
+  ethPrice,
+  onSwitchWallet,
+  onDisconnect,
+}) => {
   const { t } = useI18n()
 
   const formattedEthUSD = useMemo(
@@ -33,9 +40,16 @@ const WalletOverview = ({ wallet, currentNetwork, networkName, ethPrice, onDisco
             {networkName}
           </div>
         </div>
-        <button type="button" onClick={onDisconnect} className="disconnect-btn">
-          {t('disconnect')}
-        </button>
+        <div className="wallet-actions">
+          {typeof onSwitchWallet === 'function' && (
+            <button type="button" onClick={onSwitchWallet} className="switch-btn">
+              {t('switchWallet')}
+            </button>
+          )}
+          <button type="button" onClick={onDisconnect} className="disconnect-btn">
+            {t('disconnect')}
+          </button>
+        </div>
       </div>
 
       <div className="wallet-balances">

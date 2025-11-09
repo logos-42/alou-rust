@@ -1,9 +1,9 @@
+use crate::agent::ai_client::{AiMessage, AiProvider, AiResponse, AiTool, AiToolCall};
+use crate::utils::error::{AloudError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use worker::{console_log, Fetch, Headers, Method, RequestInit};
-use crate::agent::ai_client::{AiProvider, AiMessage, AiTool, AiResponse, AiToolCall};
-use crate::utils::error::{AloudError, Result};
 
 const DEEPSEEK_API_URL: &str = "https://api.deepseek.com/v1/chat/completions";
 
@@ -104,8 +104,12 @@ impl AiProvider for DeepSeekProvider {
         tools: Option<Vec<AiTool>>,
     ) -> Result<AiResponse> {
         console_log!("DeepSeek: Sending request to {}", DEEPSEEK_API_URL);
-        console_log!("DeepSeek: Model: {}, Messages: {}", self.model, messages.len());
-        
+        console_log!(
+            "DeepSeek: Model: {}, Messages: {}",
+            self.model,
+            messages.len()
+        );
+
         let deepseek_messages: Vec<DeepSeekMessage> = messages
             .into_iter()
             .map(|m| {
@@ -121,7 +125,7 @@ impl AiProvider for DeepSeekProvider {
                         })
                         .collect()
                 });
-                
+
                 DeepSeekMessage {
                     role: m.role,
                     content: m.content,
@@ -130,7 +134,7 @@ impl AiProvider for DeepSeekProvider {
                 }
             })
             .collect();
-        
+
         let deepseek_tools = tools.map(|tools| {
             tools
                 .into_iter()
@@ -144,7 +148,7 @@ impl AiProvider for DeepSeekProvider {
                 })
                 .collect()
         });
-        
+
         let request = DeepSeekRequest {
             model: self.model.clone(),
             messages: deepseek_messages,
@@ -152,10 +156,10 @@ impl AiProvider for DeepSeekProvider {
             temperature: 0.7,
             max_tokens: 4096,
         };
-        
+
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
-        
+
         let headers = {
             let h = Headers::new();
             h.set("Content-Type", "application/json")
@@ -164,7 +168,7 @@ impl AiProvider for DeepSeekProvider {
                 .map_err(|e| AloudError::AgentError(e.to_string()))?;
             h
         };
-        
+
         let init = {
             let mut i = RequestInit::new();
             i.with_method(Method::Post)
@@ -172,15 +176,15 @@ impl AiProvider for DeepSeekProvider {
                 .with_body(Some(body.into()));
             i
         };
-        
+
         let mut response = Fetch::Request(
             worker::Request::new_with_init(DEEPSEEK_API_URL, &init)
-                .map_err(|e| AloudError::AgentError(e.to_string()))?
+                .map_err(|e| AloudError::AgentError(e.to_string()))?,
         )
         .send()
         .await
         .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         if !response.status_code().is_success() {
             let error_text = response.text().await.unwrap_or_default();
             return Err(AloudError::AgentError(format!(
@@ -189,32 +193,44 @@ impl AiProvider for DeepSeekProvider {
                 error_text
             )));
         }
-        
+
         let response_text = response
             .text()
             .await
             .map_err(|e| AloudError::AgentError(e.to_string()))?;
-        
+
         let preview = response_text.chars().take(500).collect::<String>();
         console_log!("DeepSeek: Raw response: {}", preview);
-        
-        let deepseek_response: DeepSeekResponse = serde_json::from_str(&response_text)
-            .map_err(|e| AloudError::AgentError(format!("Parse error: {} | Response: {}", e, response_text)))?;
-        
-        console_log!("DeepSeek: Parsed response, {} choices", deepseek_response.choices.len());
-        
+
+        let deepseek_response: DeepSeekResponse =
+            serde_json::from_str(&response_text).map_err(|e| {
+                AloudError::AgentError(format!("Parse error: {} | Response: {}", e, response_text))
+            })?;
+
+        console_log!(
+            "DeepSeek: Parsed response, {} choices",
+            deepseek_response.choices.len()
+        );
+
         let choice = deepseek_response
             .choices
             .first()
             .ok_or_else(|| AloudError::AgentError("No choices in response".to_string()))?;
-        
+
         console_log!("DeepSeek: Choice finish_reason: {}", choice.finish_reason);
-        console_log!("DeepSeek: Message content is_some: {}", choice.message.content.is_some());
-        
+        console_log!(
+            "DeepSeek: Message content is_some: {}",
+            choice.message.content.is_some()
+        );
+
         let content = choice.message.content.clone().unwrap_or_default();
         let content_preview = content.chars().take(100).collect::<String>();
-        console_log!("DeepSeek: Content length: {}, content: '{}'", content.len(), content_preview);
-        
+        console_log!(
+            "DeepSeek: Content length: {}, content: '{}'",
+            content.len(),
+            content_preview
+        );
+
         let tool_calls: Vec<AiToolCall> = choice
             .message
             .tool_calls
@@ -228,9 +244,12 @@ impl AiProvider for DeepSeekProvider {
                 })
             })
             .collect();
-        
-        console_log!("DeepSeek: Response received, {} tool calls", tool_calls.len());
-        
+
+        console_log!(
+            "DeepSeek: Response received, {} tool calls",
+            tool_calls.len()
+        );
+
         Ok(AiResponse {
             content,
             tool_calls,

@@ -1,7 +1,10 @@
 // 这是一个示例测试文件，展示如何使用 BlockchainAgent
 // 注意：这不是实际的测试文件，仅用于演示
 
-use alou_edge::agent::{BlockchainAgent, tools::{QueryTool, TransactionTool, BroadcastTool}};
+use alou_edge::agent::{
+    tools::{BroadcastTool, QueryTool, TransactionTool},
+    BlockchainAgent,
+};
 
 // 示例 1: 创建和使用 BlockchainAgent
 async fn example_blockchain_agent() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,12 +17,12 @@ async fn example_blockchain_agent() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // 处理用户查询
-    let response = agent.process_message(
-        "查询地址 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb 的 ETH 余额"
-    ).await?;
-    
+    let response = agent
+        .process_message("查询地址 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb 的 ETH 余额")
+        .await?;
+
     println!("AI Response: {}", response);
-    
+
     Ok(())
 }
 
@@ -31,22 +34,24 @@ async fn example_query_tool() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 查询 ETH 余额
-    let eth_balance = query_tool.get_eth_balance(
-        "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-    ).await?;
+    let eth_balance = query_tool
+        .get_eth_balance("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+        .await?;
     println!("ETH Balance: {}", eth_balance);
 
     // 查询 SOL 余额
-    let sol_balance = query_tool.get_sol_balance(
-        "DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK"
-    ).await?;
+    let sol_balance = query_tool
+        .get_sol_balance("DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK")
+        .await?;
     println!("SOL Balance: {}", sol_balance);
 
     // 查询 ERC20 余额 (USDT)
-    let usdt_balance = query_tool.get_erc20_balance(
-        "0xdAC17F958D2ee523a2206206994597C13D831ec7", // USDT contract
-        "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-    ).await?;
+    let usdt_balance = query_tool
+        .get_erc20_balance(
+            "0xdAC17F958D2ee523a2206206994597C13D831ec7", // USDT contract
+            "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+        )
+        .await?;
     println!("USDT Balance: {}", usdt_balance);
 
     Ok(())
@@ -60,12 +65,14 @@ async fn example_transaction_tool() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // 构建 ETH 转账交易
-    let tx_data = tx_tool.build_eth_transaction(
-        "0xSenderAddress",
-        "0xRecipientAddress",
-        0.1  // 0.1 ETH
-    ).await?;
-    
+    let tx_data = tx_tool
+        .build_eth_transaction(
+            "0xSenderAddress",
+            "0xRecipientAddress",
+            0.1, // 0.1 ETH
+        )
+        .await?;
+
     println!("Transaction Data: {:?}", tx_data);
     println!("From: {}", tx_data.from);
     println!("To: {}", tx_data.to);
@@ -99,7 +106,9 @@ async fn example_broadcast_tool() -> Result<(), Box<dyn std::error::Error>> {
     println!("Block Number: {:?}", receipt.block_number);
 
     // 检查是否确认
-    let confirmed = broadcast_tool.is_transaction_confirmed(&tx_hash, "eth").await?;
+    let confirmed = broadcast_tool
+        .is_transaction_confirmed(&tx_hash, "eth")
+        .await?;
     println!("Confirmed: {}", confirmed);
 
     Ok(())
@@ -157,21 +166,19 @@ async fn example_complete_workflow() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // 1. 查询余额
-    let balance_response = agent.process_message(
-        "查询我的 ETH 余额，地址是 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
-    ).await?;
+    let balance_response = agent
+        .process_message("查询我的 ETH 余额，地址是 0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb")
+        .await?;
     println!("Step 1 - Balance: {}", balance_response);
 
     // 2. 构建交易
-    let tx_response = agent.process_message(
-        "帮我构建一笔转账交易，从 0xAAA 转 0.1 ETH 到 0xBBB"
-    ).await?;
+    let tx_response = agent
+        .process_message("帮我构建一笔转账交易，从 0xAAA 转 0.1 ETH 到 0xBBB")
+        .await?;
     println!("Step 2 - Transaction: {}", tx_response);
 
     // 3. 查询交易状态（假设已广播）
-    let status_response = agent.process_message(
-        "查询交易 0x123abc 的状态"
-    ).await?;
+    let status_response = agent.process_message("查询交易 0x123abc 的状态").await?;
     println!("Step 3 - Status: {}", status_response);
 
     Ok(())
