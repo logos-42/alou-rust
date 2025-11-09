@@ -163,7 +163,11 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     console_log!("  ✓ API key loaded");
 
     // Load RPC URLs (optional, with fallbacks)
-    let eth_rpc_url = env.secret("ETH_RPC_URL").map(|s| s.to_string()).ok();
+    let eth_rpc_url = env
+        .secret("ETH_RPC_URL")
+        .map(|s| s.to_string())
+        .or_else(|_| env.var("ETH_RPC_URL").map(|v| v.to_string()))
+        .ok();
     if eth_rpc_url.is_some() {
         console_log!("  ✓ ETH_RPC_URL loaded");
     } else {
@@ -173,6 +177,7 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     let eth_testnet_rpc_url = env
         .secret("ETH_TESTNET_RPC_URL")
         .map(|s| s.to_string())
+        .or_else(|_| env.var("ETH_TESTNET_RPC_URL").map(|v| v.to_string()))
         .ok();
     if eth_testnet_rpc_url.is_some() {
         console_log!("  ✓ ETH_TESTNET_RPC_URL loaded");

@@ -97,9 +97,7 @@ const useAuthStore = create((set, get) => ({
       dispatchWalletChanged(address)
       return { user: mockUser, token: mockToken }
     } catch (error) {
-      const message =
-        error?.message ||
-        (typeof error === 'string' ? error : 'Web3钱包登录失败')
+      const message = error?.message || (typeof error === 'string' ? error : 'Web3钱包登录失败')
       set({ error: message })
       throw error
     } finally {
@@ -134,9 +132,7 @@ const useAuthStore = create((set, get) => ({
       dispatchWalletChanged(address)
       return { user: mockUser, token: mockToken }
     } catch (error) {
-      const message =
-        error?.message ||
-        (typeof error === 'string' ? error : '钱包登录失败')
+      const message = error?.message || (typeof error === 'string' ? error : '钱包登录失败')
       set({ error: message })
       throw error
     } finally {
@@ -269,4 +265,3 @@ const useAuthStore = create((set, get) => ({
 }))
 
 export default useAuthStore
-

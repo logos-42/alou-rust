@@ -73,13 +73,10 @@ const WalletManager = () => {
   const [ethPrice] = useState(2000)
   const [agentWallets, setAgentWallets] = useState([])
 
-  const getNetworkName = useCallback(
-    (chainId) => {
-      const network = networks.find((network) => network.chainId === chainId)
-      return network ? network.name : 'Unknown Network'
-    },
-    [],
-  )
+  const getNetworkName = useCallback((chainId) => {
+    const network = networks.find((network) => network.chainId === chainId)
+    return network ? network.name : 'Unknown Network'
+  }, [])
 
   const goBack = useCallback(() => {
     navigate('/')
@@ -500,4 +497,3 @@ const WalletManager = () => {
 }
 
 export default WalletManager
-

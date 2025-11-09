@@ -34,4 +34,3 @@ const McpModal = ({ resource, onClose, onUIAction }) => {
 }
 
 export default McpModal
-

@@ -295,9 +295,27 @@ class WalletService {
       } else if (instruction.type === 'query') {
         if (instruction.method === 'eth_chainId') {
           return await this.getCurrentChainId()
-        } else if (instruction.method === 'eth_getBalance') {
-          const address = instruction.params?.[0]
-          return await this.getBalance(address === 'current_wallet' ? undefined : address)
+        }
+
+        if (instruction.method === 'eth_getBalance') {
+          const addressParam =
+            Array.isArray(instruction.params) ? instruction.params[0] : instruction.params?.address
+          const targetAddress =
+            addressParam === 'current_wallet' || !addressParam ? undefined : addressParam
+          return await this.getBalance(targetAddress)
+        }
+
+        if (Array.isArray(instruction.keys) && typeof window !== 'undefined') {
+          const result = {}
+          instruction.keys.forEach((key) => {
+            try {
+              result[key] = window.localStorage?.getItem?.(key) ?? null
+            } catch (error) {
+              console.warn('Failed to read wallet info key from localStorage:', key, error)
+              result[key] = null
+            }
+          })
+          return result
         }
       }
 

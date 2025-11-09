@@ -4,16 +4,7 @@ import './AgentConsoleDock.css'
 
 const AgentConsoleDock = forwardRef(
   (
-    {
-      value,
-      onChange,
-      isLoading,
-      style,
-      showOpenButton,
-      onSend,
-      onNewLine,
-      onOpenConversation,
-    },
+    { value, onChange, isLoading, style, showOpenButton, onSend, onNewLine, onOpenConversation },
     ref,
   ) => {
     const chatInputRef = useRef(null)
@@ -51,4 +42,3 @@ const AgentConsoleDock = forwardRef(
 AgentConsoleDock.displayName = 'AgentConsoleDock'
 
 export default AgentConsoleDock
-

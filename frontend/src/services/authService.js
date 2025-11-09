@@ -57,4 +57,3 @@ export const authService = {
     await apiClient.post('/auth/logout-all')
   },
 }
-

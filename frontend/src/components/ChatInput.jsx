@@ -98,4 +98,3 @@ const ChatInput = forwardRef(
 ChatInput.displayName = 'ChatInput'
 
 export default ChatInput
-

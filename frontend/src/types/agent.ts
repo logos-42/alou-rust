@@ -54,4 +54,3 @@ export interface ContextEvent {
   detail?: Record<string, unknown>
   timestamp: number
 }
-

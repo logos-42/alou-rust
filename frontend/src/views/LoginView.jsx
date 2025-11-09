@@ -173,11 +173,11 @@ const LoginView = () => {
               type="button"
               onClick={() => handleWalletClick(wallet.id)}
               disabled={isLoading}
-              className={`wallet-btn${
-                isLoading && currentWallet === wallet.id ? ' loading' : ''
-              }`}
+              className={`wallet-btn${isLoading && currentWallet === wallet.id ? ' loading' : ''}`}
             >
-              <div className={`wallet-icon${wallet.id === 'walletconnect' ? ' wallet-icon-walletconnect' : ''}`}>
+              <div
+                className={`wallet-icon${wallet.id === 'walletconnect' ? ' wallet-icon-walletconnect' : ''}`}
+              >
                 {wallet.icon}
               </div>
               <div className="wallet-info">
@@ -211,7 +211,12 @@ const LoginView = () => {
 
         <div className="help-section">
           <p className="help-text">没有钱包？</p>
-          <a href="https://metamask.io/download/" target="_blank" rel="noreferrer" className="help-link">
+          <a
+            href="https://metamask.io/download/"
+            target="_blank"
+            rel="noreferrer"
+            className="help-link"
+          >
             下载 MetaMask
           </a>
         </div>
@@ -234,4 +239,3 @@ const LoginView = () => {
 }
 
 export default LoginView
-

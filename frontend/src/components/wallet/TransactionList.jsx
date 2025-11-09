@@ -40,21 +40,19 @@ const TransactionList = ({ transactions = [], isRefreshing, onRefresh, onViewTra
       ) : (
         <div className="transaction-list">
           {transactions.map((tx) => (
-            <div
-              key={tx.hash}
-              className="transaction-item"
-              onClick={() => onViewTransaction?.(tx)}
-            >
+            <div key={tx.hash} className="transaction-item" onClick={() => onViewTransaction?.(tx)}>
               <div className={`tx-icon ${tx.type}`}>
                 {tx.type === 'send' ? '📤' : tx.type === 'receive' ? '📥' : '🔄'}
               </div>
               <div className="tx-details">
                 <div className="tx-title">
-                  {tx.type === 'send' ? t('sent') : tx.type === 'receive' ? t('received') : 'Contract'}
+                  {tx.type === 'send'
+                    ? t('sent')
+                    : tx.type === 'receive'
+                      ? t('received')
+                      : 'Contract'}
                 </div>
-                <div className="tx-address">
-                  {formatAddress(tx.to || tx.from)}
-                </div>
+                <div className="tx-address">{formatAddress(tx.to || tx.from)}</div>
               </div>
               <div className="tx-amount">
                 <div className={`amount-value ${tx.type}`}>
@@ -75,4 +73,3 @@ const TransactionList = ({ transactions = [], isRefreshing, onRefresh, onViewTra
 }
 
 export default TransactionList
-

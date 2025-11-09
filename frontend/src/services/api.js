@@ -6,7 +6,8 @@ import axios from 'axios'
 import Cookies from 'js-cookie'
 
 // API base URL - use local dev server in development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 // Create axios instance
@@ -29,7 +30,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error)
-  }
+  },
 )
 
 // Response interceptor - handle errors
@@ -71,8 +72,7 @@ apiClient.interceptors.response.use(
     }
 
     return Promise.reject(error)
-  }
+  },
 )
 
 export default apiClient
-

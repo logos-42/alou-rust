@@ -7,13 +7,7 @@ const formatAddress = (address) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
-const ContractWallet = ({
-  contractWallet,
-  onCreate,
-  onDeposit,
-  onWithdraw,
-  onManage,
-}) => {
+const ContractWallet = ({ contractWallet, onCreate, onDeposit, onWithdraw, onManage }) => {
   const { t } = useI18n()
 
   return (
@@ -39,9 +33,7 @@ const ContractWallet = ({
             <div className="contract-icon">🤖</div>
             <div className="contract-info">
               <div className="contract-label">{t('agentWallet')}</div>
-              <div className="contract-address">
-                {formatAddress(contractWallet.address)}
-              </div>
+              <div className="contract-address">{formatAddress(contractWallet.address)}</div>
             </div>
           </div>
 
@@ -68,4 +60,3 @@ const ContractWallet = ({
 }
 
 export default ContractWallet
-

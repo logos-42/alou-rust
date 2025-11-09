@@ -69,4 +69,3 @@ const WalletOverview = ({
 }
 
 export default WalletOverview
-

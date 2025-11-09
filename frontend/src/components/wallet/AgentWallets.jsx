@@ -44,9 +44,7 @@ const AgentWallets = ({ wallets = [] }) => {
               </span>
             </div>
             <div className="wallet-info">
-              <span className="info-item">
-                交易: {wallet.transactions?.length || 0}
-              </span>
+              <span className="info-item">交易: {wallet.transactions?.length || 0}</span>
               <span className="info-item">创建: {formatDate(wallet.created_at)}</span>
             </div>
           </div>
@@ -57,4 +55,3 @@ const AgentWallets = ({ wallets = [] }) => {
 }
 
 export default AgentWallets
-

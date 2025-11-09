@@ -60,4 +60,3 @@ const AgentConversationOverlay = forwardRef(
 AgentConversationOverlay.displayName = 'AgentConversationOverlay'
 
 export default AgentConversationOverlay
-

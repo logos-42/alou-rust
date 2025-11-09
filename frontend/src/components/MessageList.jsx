@@ -110,4 +110,3 @@ const MessageList = forwardRef(({ messages = [], isLoading = false, onMessageSel
 MessageList.displayName = 'MessageList'
 
 export default MessageList
-

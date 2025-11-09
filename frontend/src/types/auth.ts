@@ -27,4 +27,3 @@ export interface UpdateProfileRequest {
   name?: string
   avatar_url?: string
 }
-

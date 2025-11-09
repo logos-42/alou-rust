@@ -76,4 +76,3 @@ export const i18n = {
   initLanguage: initLanguageInternal,
   t: (key) => translate(currentLanguage, key),
 }
-

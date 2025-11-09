@@ -5,9 +5,11 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
+    "clean": "node ./scripts/worker-build.js --clean-only",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "build": "cargo build --target wasm32-unknown-unknown --release",
+    "build": "node ./scripts/worker-build.js",
+    "build:cargo": "cargo build --target wasm32-unknown-unknown --release",
     "test": "cargo test"
   },
   "keywords": [
@@ -17,10 +19,14 @@
     "blockchain"
   ],
   "author": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alou-pay/aloupay"
+  },
   "license": "MIT OR Apache-2.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "typescript": "^5.7.2",
-    "wrangler": "^4.45.0"
+    "wrangler": "^4.46.0"
   }
 }

@@ -158,7 +158,7 @@ impl AgentCore {
         let mut iterations = 0;
         let mut tool_call_info = Vec::new();
 
-        loop {
+        let final_content = loop {
             iterations += 1;
             if iterations > MAX_TOOL_ITERATIONS {
                 return Err(AloudError::AgentError(
@@ -169,55 +169,58 @@ impl AgentCore {
             // Call AI API (Claude or other provider)
             let response = if let Some(ai_client) = &self.ai_client {
                 // Use new unified AI client
-                let ai_messages: Vec<AiMessage> = messages
-                    .iter()
-                    .map(|m| {
-                        // Extract text content and tool calls from ContentBlocks
-                        let mut text_parts = Vec::new();
-                        let mut tool_uses = Vec::new();
-                        let mut tool_result_id = None;
+                let mut pending_tool_ids: Vec<String> = Vec::new();
+                let mut ai_messages: Vec<AiMessage> = Vec::new();
 
-                        for block in &m.content {
-                            match block {
-                                crate::agent::claude_client::ContentBlock::Text { text } => {
-                                    text_parts.push(text.clone());
-                                }
-                                crate::agent::claude_client::ContentBlock::ToolUse {
-                                    id,
-                                    name,
-                                    input,
-                                } => {
-                                    tool_uses.push(crate::agent::ai_client::AiToolCall {
-                                        id: id.clone(),
-                                        name: name.clone(),
-                                        arguments: input.clone(),
-                                    });
-                                }
-                                crate::agent::claude_client::ContentBlock::ToolResult {
-                                    tool_use_id,
-                                    content,
-                                } => {
-                                    tool_result_id = Some(tool_use_id.clone());
-                                    text_parts.push(content.clone());
-                                }
+                for m in messages.iter() {
+                    let mut text_parts = Vec::new();
+                    let mut tool_uses = Vec::new();
+                    let mut tool_result_id = None;
+
+                    for block in &m.content {
+                        match block {
+                            crate::agent::claude_client::ContentBlock::Text { text } => {
+                                text_parts.push(text.clone());
+                            }
+                            crate::agent::claude_client::ContentBlock::ToolUse {
+                                id,
+                                name,
+                                input,
+                            } => {
+                                tool_uses.push(crate::agent::ai_client::AiToolCall {
+                                    id: id.clone(),
+                                    name: name.clone(),
+                                    arguments: input.clone(),
+                                });
+                            }
+                            crate::agent::claude_client::ContentBlock::ToolResult {
+                                tool_use_id,
+                                content,
+                            } => {
+                                tool_result_id = Some(tool_use_id.clone());
+                                text_parts.push(content.clone());
                             }
                         }
+                    }
 
-                        let content = text_parts.join("\n");
+                    let content = text_parts.join("\n");
 
-                        // Build appropriate message type
-                        if let Some(tool_id) = tool_result_id {
-                            // This is a tool result message
-                            AiMessage::tool_result(tool_id, content)
-                        } else if !tool_uses.is_empty() {
-                            // This is an assistant message with tool calls
-                            AiMessage::assistant_with_tools(content, tool_uses)
+                    if let Some(tool_id) = tool_result_id {
+                        if pending_tool_ids.contains(&tool_id) {
+                            pending_tool_ids.retain(|id| id != &tool_id);
+                            ai_messages.push(AiMessage::tool_result(tool_id, content));
                         } else {
-                            // Regular text message
-                            AiMessage::text(&m.role, content)
+                            // Skip orphaned tool result that lacks preceding tool call
+                            continue;
                         }
-                    })
-                    .collect();
+                    } else if !tool_uses.is_empty() {
+                        pending_tool_ids = tool_uses.iter().map(|tc| tc.id.clone()).collect();
+                        ai_messages.push(AiMessage::assistant_with_tools(content, tool_uses));
+                    } else {
+                        pending_tool_ids.clear();
+                        ai_messages.push(AiMessage::text(&m.role, content));
+                    }
+                }
 
                 let ai_tools: Vec<AiTool> = tools
                     .iter()
@@ -263,17 +266,7 @@ impl AgentCore {
                 );
                 let preview = response.content.chars().take(100).collect::<String>();
                 console_log!("AgentCore: Content preview: {}", preview);
-
-                // Add assistant response to session
-                self.session_manager
-                    .add_message(session_id, "assistant", &response.content)
-                    .await?;
-
-                return Ok(AgentResponse {
-                    content: response.content,
-                    session_id: session_id.to_string(),
-                    tool_calls: tool_call_info,
-                });
+                break response.content.clone();
             }
 
             // Execute tool calls
@@ -309,7 +302,7 @@ impl AgentCore {
 
                 // Add to Claude messages (using tool result format)
                 messages.push(ClaudeMessage::with_tool_result(
-                    "user",
+                    "tool",
                     tool_use.id.clone(),
                     result_str.clone(),
                 ));
@@ -328,7 +321,17 @@ impl AgentCore {
             }
 
             // Continue loop to get next response from Claude
-        }
+        };
+
+        self.session_manager
+            .add_message(session_id, "assistant", &final_content)
+            .await?;
+
+        Ok(AgentResponse {
+            content: final_content,
+            session_id: session_id.to_string(),
+            tool_calls: tool_call_info,
+        })
     }
 
     /// Execute tool calls using MCP executor
@@ -339,10 +342,34 @@ impl AgentCore {
     ) -> Vec<crate::mcp::executor::ToolResult> {
         let tool_calls: Vec<ToolCall> = tool_uses
             .iter()
-            .map(|tu| ToolCall {
-                id: tu.id.clone(),
-                name: tu.name.clone(),
-                args: tu.input.clone(),
+            .map(|tu| {
+                let mut args = match tu.input.clone() {
+                    Value::String(s) => serde_json::from_str(&s).unwrap_or(Value::Null),
+                    other => other,
+                };
+
+                if let Some(chain) = context.chain.as_ref() {
+                    if let Value::Object(ref mut map) = args {
+                        let overwrite = match map.get("chain") {
+                            None => true,
+                            Some(Value::Null) => true,
+                            Some(Value::String(existing)) => existing.trim().is_empty(),
+                            _ => false,
+                        };
+
+                        if overwrite {
+                            map.insert("chain".to_string(), Value::String(chain.clone()));
+                        }
+                        map.entry("chain_hint".to_string())
+                            .or_insert_with(|| Value::String(chain.clone()));
+                    }
+                }
+
+                ToolCall {
+                    id: tu.id.clone(),
+                    name: tu.name.clone(),
+                    args,
+                }
             })
             .collect();
 

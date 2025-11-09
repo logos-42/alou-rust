@@ -70,4 +70,3 @@ const AgentCanvas = forwardRef(
 AgentCanvas.displayName = 'AgentCanvas'
 
 export default AgentCanvas
-

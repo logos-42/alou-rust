@@ -34,4 +34,3 @@ const WalletConnect = ({ onConnectMetaMask, onConnectWalletConnect }) => {
 }
 
 export default WalletConnect
-

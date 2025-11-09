@@ -47,7 +47,7 @@ export const messages = {
     transactionHistory: 'Transaction History',
     error: 'Sorry, an error occurred',
     networkError: 'Please check your network connection or try again later',
-  }
+  },
 }
 
 // 钱包相关翻译
@@ -157,5 +157,5 @@ export const walletMessages = {
     interactionLogs: 'Interaction Logs',
     expand: 'Expand',
     collapse: 'Collapse',
-  }
+  },
 }

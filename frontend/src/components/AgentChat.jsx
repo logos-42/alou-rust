@@ -113,6 +113,39 @@ const AgentChat = () => {
     [preferredChain, userWalletInfo?.chainId, walletSnapshot?.chain],
   )
 
+  const sidebarWallet = useMemo(() => {
+    const normalizedActive = resolveBackendChain({ chain: activeChain }) || activeChain
+
+    const normalizedAgentChain = walletSnapshot
+      ? resolveBackendChain({ chain: walletSnapshot.chain })
+      : null
+
+    const normalizedUserChain = userWalletInfo
+      ? resolveBackendChain({
+          chain: userWalletInfo.backendChain,
+          chainId: userWalletInfo.chainId,
+        })
+      : null
+
+    if (normalizedActive) {
+      if (userWalletInfo && normalizedUserChain === normalizedActive) {
+        if (!walletSnapshot || normalizedAgentChain !== normalizedActive) {
+          return userWalletInfo
+        }
+      }
+
+      if (walletSnapshot && normalizedAgentChain === normalizedActive) {
+        return walletSnapshot
+      }
+
+      if (userWalletInfo && normalizedUserChain === normalizedActive) {
+        return userWalletInfo
+      }
+    }
+
+    return walletSnapshot || userWalletInfo
+  }, [activeChain, userWalletInfo, walletSnapshot])
+
   const filteredChannels = useMemo(() => {
     if (!channelKeyword.trim()) {
       return channels
@@ -526,7 +559,11 @@ const AgentChat = () => {
         const metadataChain =
           resolveBackendChain({ chain: metadata.chain }) ||
           (targetChain ? resolveBackendChain({ chain: targetChain }) : null)
-        if (metadataChain && metadataChain !== preferredChain) {
+        if (
+          metadataChain &&
+          metadataChain !== preferredChain &&
+          (!activeChain || metadataChain === activeChain)
+        ) {
           setPreferredChain(metadataChain)
         }
 
@@ -561,7 +598,11 @@ const AgentChat = () => {
             token: tokenSymbol,
           })
 
-          if (normalizedChain && normalizedChain !== preferredChain) {
+          if (
+            normalizedChain &&
+            normalizedChain !== preferredChain &&
+            (!activeChain || normalizedChain === activeChain)
+          ) {
             setPreferredChain(normalizedChain)
           }
 
@@ -779,6 +820,31 @@ const AgentChat = () => {
     },
     [activeChannelId, sessionId],
   )
+
+  useEffect(() => {
+    if (!walletService.isWalletAvailable()) {
+      return undefined
+    }
+
+    const handleChainChanged = (chainId) => {
+      const backendChain = mapChainIdToBackendChain(chainId) || null
+      recordInteraction('wallet_event', {
+        event: 'chain_changed',
+        chainId,
+        backendChain,
+      })
+      if (backendChain && backendChain !== preferredChain) {
+        setPreferredChain(backendChain)
+      }
+      void refreshWallet()
+      void loadWalletOverview({ chain: backendChain, silent: true })
+    }
+
+    walletService.onChainChanged(handleChainChanged)
+    return () => {
+      walletService.removeListener('chainChanged', handleChainChanged)
+    }
+  }, [loadWalletOverview, preferredChain, recordInteraction, refreshWallet])
 
   const handleWalletChanged = useCallback(
     async (event) => {
@@ -1120,7 +1186,7 @@ const AgentChat = () => {
         />
 
         <AgentSidebarRight
-          walletSnapshot={walletSnapshot || userWalletInfo}
+          walletSnapshot={sidebarWallet}
           transactions={transactions}
           interactionLogs={interactionLogs}
           isInteractionCollapsed={isInteractionCollapsed}

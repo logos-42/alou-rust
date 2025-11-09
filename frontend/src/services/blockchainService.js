@@ -17,15 +17,15 @@ class BlockchainService {
 
     try {
       const currentChainId = chainId || (await this.ethereum.request({ method: 'eth_chainId' }))
-      
+
       const balance = await this.ethereum.request({
         method: 'eth_getBalance',
-        params: [address, 'latest']
+        params: [address, 'latest'],
       })
 
       // Convert from wei to ether
       const ethBalance = (parseInt(balance, 16) / 1e18).toFixed(6)
-      
+
       const networkName = this.getNetworkName(currentChainId)
       const symbol = this.getNetworkSymbol(currentChainId)
 
@@ -34,7 +34,7 @@ class BlockchainService {
         balance: ethBalance,
         symbol,
         chainId: currentChainId,
-        network: networkName
+        network: networkName,
       }
     } catch (error) {
       console.error('Failed to get balance:', error)
@@ -61,7 +61,7 @@ class BlockchainService {
       '0x14a34': 'Base Sepolia',
       '0x13882': 'Polygon Amoy',
       '0x2105': 'Base Mainnet',
-      '0x89': 'Polygon Mainnet'
+      '0x89': 'Polygon Mainnet',
     }
     return networks[chainId] || 'Unknown Network'
   }
@@ -76,7 +76,7 @@ class BlockchainService {
       '0x14a34': 'ETH',
       '0x13882': 'MATIC',
       '0x2105': 'ETH',
-      '0x89': 'MATIC'
+      '0x89': 'MATIC',
     }
     return symbols[chainId] || 'ETH'
   }
@@ -85,7 +85,8 @@ class BlockchainService {
    * Query agent's wallet from backend
    */
   async getAgentWallet(sessionId, chain) {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL ||
       (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
     try {
@@ -97,8 +98,8 @@ class BlockchainService {
         body: JSON.stringify({
           session_id: sessionId,
           action: 'get_wallet',
-          chain
-        })
+          chain,
+        }),
       })
 
       if (response.ok) {
@@ -116,7 +117,8 @@ class BlockchainService {
    * List all agent wallets
    */
   async listAgentWallets(sessionId) {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+    const API_BASE_URL =
+      import.meta.env.VITE_API_BASE_URL ||
       (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
     try {
@@ -127,8 +129,8 @@ class BlockchainService {
         },
         body: JSON.stringify({
           session_id: sessionId,
-          action: 'list_wallets'
-        })
+          action: 'list_wallets',
+        }),
       })
 
       if (response.ok) {

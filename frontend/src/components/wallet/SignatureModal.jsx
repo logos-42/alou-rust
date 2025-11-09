@@ -53,12 +53,7 @@ const SignatureModal = ({ show, request, isSigning, onConfirm, onCancel }) => {
           <button type="button" onClick={onCancel} className="btn-secondary">
             {t('cancel')}
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="btn-primary"
-            disabled={isSigning}
-          >
+          <button type="button" onClick={onConfirm} className="btn-primary" disabled={isSigning}>
             {isSigning ? `${t('signing')}...` : t('confirm')}
           </button>
         </div>
@@ -68,4 +63,3 @@ const SignatureModal = ({ show, request, isSigning, onConfirm, onCancel }) => {
 }
 
 export default SignatureModal
-

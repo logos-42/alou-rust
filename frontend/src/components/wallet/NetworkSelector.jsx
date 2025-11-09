@@ -30,4 +30,3 @@ const NetworkSelector = ({ networks = [], currentNetwork, onSwitchNetwork }) => 
 }
 
 export default NetworkSelector
-

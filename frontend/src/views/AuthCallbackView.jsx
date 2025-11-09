@@ -75,4 +75,3 @@ const AuthCallbackView = () => {
 }
 
 export default AuthCallbackView
-
