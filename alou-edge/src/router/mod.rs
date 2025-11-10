@@ -15,6 +15,7 @@ use worker::*;
 mod agent;
 mod blockchain;
 mod session;
+mod diap;
 mod wallet;
 
 pub struct Router {
@@ -85,7 +86,7 @@ impl Router {
         self
     }
 
-    pub async fn handle(&self, mut req: Request, _env: Env) -> Result<Response> {
+    pub async fn handle(&self, mut req: Request, env: Env) -> Result<Response> {
         let start_time = crate::utils::time::now_timestamp_millis();
         let path = req.path();
         let method = req.method();
@@ -105,7 +106,9 @@ impl Router {
             return Response::empty().map(|r| r.with_headers(headers));
         }
 
-        let result = self.route_request(&mut req, &method, &path).await;
+        let result = self
+            .route_request(&mut req, &method, &path, &env)
+            .await;
 
         let end_time = crate::utils::time::now_timestamp_millis();
         let duration_us = ((end_time - start_time) * 1000) as u64;
@@ -152,6 +155,7 @@ impl Router {
         req: &mut Request,
         method: &Method,
         path: &str,
+        env: &Env,
     ) -> Result<Response> {
         match (method, path) {
             (Method::Get, "/") => self.handle_root().await,
@@ -226,6 +230,27 @@ impl Router {
                     req,
                 )
                 .await
+            }
+
+            (Method::Post, "/api/diap/token") => diap::handle_token_request(env, req).await,
+            (Method::Post, "/api/diap/agent") => diap::handle_agent_request(env, req).await,
+            (Method::Post, "/api/diap/payment/core") => {
+                diap::handle_payment_core_request(env, req).await
+            }
+            (Method::Post, "/api/diap/payment/channel") => {
+                diap::handle_payment_channel_request(env, req).await
+            }
+            (Method::Post, "/api/diap/payment/privacy") => {
+                diap::handle_payment_privacy_request(env, req).await
+            }
+            (Method::Post, "/api/diap/governance") => {
+                diap::handle_governance_request(env, req).await
+            }
+            (Method::Post, "/api/diap/timelock") => {
+                diap::handle_timelock_request(env, req).await
+            }
+            (Method::Post, "/api/diap/account") => {
+                diap::handle_account_request(env, req).await
             }
 
             _ => {

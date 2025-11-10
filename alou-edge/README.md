@@ -157,6 +157,10 @@ id = "your-kv-id"
 
 ```
 alou-edge/
+├── abi/                  # Compiled contract ABIs (embedded via include_str!)
+│   ├── diap/
+│   ├── aa/
+│   └── openzeppelin/
 ├── src/
 │   ├── lib.rs              # Worker entry point
 │   ├── router.rs           # API routing
@@ -185,6 +189,11 @@ alou-edge/
 ├── deploy.ps1              # Deployment script
 └── test-local.ps1          # Local testing script
 ```
+
+### ABI Assets
+
+- 所有链上交互使用的 ABI 文件已迁移到 `alou-edge/abi/`，构建时通过 `include_str!` 打包到 WASM。
+- `Smart ETH` 目录仅作为原始 Hardhat 产物备份，可在确认无其他依赖后删除或裁剪，只需保留必要的 ABI 文件即可。
 
 ## Performance
 

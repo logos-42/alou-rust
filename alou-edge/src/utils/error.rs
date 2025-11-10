@@ -79,4 +79,16 @@ impl From<serde_json::Error> for AloudError {
     }
 }
 
+impl From<ethabi::Error> for AloudError {
+    fn from(err: ethabi::Error) -> Self {
+        AloudError::InvalidInput(err.to_string())
+    }
+}
+
+impl From<hex::FromHexError> for AloudError {
+    fn from(err: hex::FromHexError) -> Self {
+        AloudError::InvalidInput(err.to_string())
+    }
+}
+
 pub type Result<T> = std::result::Result<T, AloudError>;
