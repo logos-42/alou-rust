@@ -40,7 +40,10 @@ class WalletService {
         }
 
         if (error?.code !== -32601) {
-          console.warn('wallet_requestPermissions failed, falling back to eth_requestAccounts', error)
+          console.warn(
+            'wallet_requestPermissions failed, falling back to eth_requestAccounts',
+            error,
+          )
         }
         // If method not supported or other non-blocking error, fall back below
       }
@@ -102,7 +105,7 @@ class WalletService {
       return {
         address,
         chainId: chainId || '0x1',
-        walletType: walletType || 'metamask'
+        walletType: walletType || 'metamask',
       }
     } catch (error) {
       console.error('Failed to get wallet info:', error)
@@ -150,12 +153,14 @@ class WalletService {
       if (typeof window !== 'undefined') {
         localStorage.setItem('wallet_chain_id', network.chainId)
       }
-      
+
       // Dispatch event for other components
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('network-changed', {
-          detail: { chainId: network.chainId, network }
-        }))
+        window.dispatchEvent(
+          new CustomEvent('network-changed', {
+            detail: { chainId: network.chainId, network },
+          }),
+        )
       }
 
       return true
@@ -182,26 +187,30 @@ class WalletService {
 
       await provider.request({
         method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: network.chainId,
-          chainName: network.name,
-          rpcUrls: [network.rpcUrl],
-          nativeCurrency: network.nativeCurrency || {
-            name: 'Ether',
-            symbol: 'ETH',
-            decimals: 18
-          }
-        }],
+        params: [
+          {
+            chainId: network.chainId,
+            chainName: network.name,
+            rpcUrls: [network.rpcUrl],
+            nativeCurrency: network.nativeCurrency || {
+              name: 'Ether',
+              symbol: 'ETH',
+              decimals: 18,
+            },
+          },
+        ],
       })
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('wallet_chain_id', network.chainId)
       }
-      
+
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('network-changed', {
-          detail: { chainId: network.chainId, network }
-        }))
+        window.dispatchEvent(
+          new CustomEvent('network-changed', {
+            detail: { chainId: network.chainId, network },
+          }),
+        )
       }
 
       return true
@@ -220,7 +229,8 @@ class WalletService {
     }
 
     try {
-      const targetAddress = address || (typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null)
+      const targetAddress =
+        address || (typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null)
       if (!targetAddress) {
         throw new Error('No wallet address available')
       }
@@ -228,7 +238,7 @@ class WalletService {
       const provider = this.getProvider()
       const balance = await provider.request({
         method: 'eth_getBalance',
-        params: [targetAddress, 'latest']
+        params: [targetAddress, 'latest'],
       })
 
       // Convert from wei to ether
@@ -251,7 +261,9 @@ class WalletService {
     try {
       if (instruction.type === 'wallet_operation') {
         if (instruction.method === 'eth_sendTransaction') {
-          const txParams = Array.isArray(instruction.params) ? instruction.params[0] : instruction.params
+          const txParams = Array.isArray(instruction.params)
+            ? instruction.params[0]
+            : instruction.params
           if (!txParams) {
             throw new Error('Missing transaction params')
           }
@@ -268,9 +280,9 @@ class WalletService {
             const provider = this.getProvider()
             await provider.request({
               method: instruction.method,
-              params: [{ chainId }]
+              params: [{ chainId }],
             })
-            
+
             if (typeof window !== 'undefined') {
               localStorage.setItem('wallet_chain_id', chainId)
             }
@@ -281,9 +293,9 @@ class WalletService {
               const provider = this.getProvider()
               await provider.request({
                 method: instruction.fallback.method,
-                params: [instruction.fallback.params]
+                params: [instruction.fallback.params],
               })
-              
+
               if (typeof window !== 'undefined') {
                 localStorage.setItem('wallet_chain_id', chainId)
               }
@@ -298,8 +310,9 @@ class WalletService {
         }
 
         if (instruction.method === 'eth_getBalance') {
-          const addressParam =
-            Array.isArray(instruction.params) ? instruction.params[0] : instruction.params?.address
+          const addressParam = Array.isArray(instruction.params)
+            ? instruction.params[0]
+            : instruction.params?.address
           const targetAddress =
             addressParam === 'current_wallet' || !addressParam ? undefined : addressParam
           return await this.getBalance(targetAddress)

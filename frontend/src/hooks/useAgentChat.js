@@ -3,9 +3,7 @@ import { walletService } from '@/services/walletService'
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV
-    ? 'http://localhost:8787'
-    : 'https://alou-edge.yuanjieliu65.workers.dev')
+  (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 export const NODE_BOUNDARY = 140
 
@@ -110,8 +108,7 @@ const chainIdToBackendMap = {
   '0x2105': 'base',
 }
 
-export const mapChainLabel = (chain) =>
-  chainLabelMap[chain] || chain?.toUpperCase?.() || '未知网络'
+export const mapChainLabel = (chain) => chainLabelMap[chain] || chain?.toUpperCase?.() || '未知网络'
 
 export const mapChainIdToBackendChain = (chainId) => {
   if (!chainId) return null
@@ -177,17 +174,12 @@ export const estimateFiatValue = (balance, token = 'ETH') => {
 export const normalizeTransaction = (tx, fallbackToken = 'ETH') => {
   if (!tx) return null
 
-  const hash =
-    tx.hash ||
-    tx.id ||
-    `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  const hash = tx.hash || tx.id || `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
   const rawDirection = tx.direction || tx.type
-  const direction =
-    rawDirection === 'in' || rawDirection === 'receive' ? 'in' : 'out'
+  const direction = rawDirection === 'in' || rawDirection === 'receive' ? 'in' : 'out'
 
-  const amountValue =
-    tx.amount ?? tx.value ?? tx.quantity ?? tx.displayValue ?? '0'
+  const amountValue = tx.amount ?? tx.value ?? tx.quantity ?? tx.displayValue ?? '0'
 
   const token = tx.token || fallbackToken
   const counterparty = tx.counterparty || tx.to || tx.from || ''
@@ -206,10 +198,7 @@ export const normalizeTransaction = (tx, fallbackToken = 'ETH') => {
     id: hash,
     hash,
     direction,
-    amount:
-      typeof amountValue === 'number'
-        ? amountValue.toString()
-        : amountValue || '0',
+    amount: typeof amountValue === 'number' ? amountValue.toString() : amountValue || '0',
     token,
     counterparty: counterparty || '未知地址',
     status,
@@ -241,9 +230,7 @@ export const formatWeiHexToEth = (hexValue) => {
 
   try {
     const normalized =
-      typeof hexValue === 'string' && !hexValue.startsWith('0x')
-        ? `0x${hexValue}`
-        : hexValue
+      typeof hexValue === 'string' && !hexValue.startsWith('0x') ? `0x${hexValue}` : hexValue
     const value = BigInt(normalized)
     const base = 10n ** 18n
     const whole = value / base
@@ -339,9 +326,7 @@ export const useToolCallHandler = ({
               appendMessage({
                 id: `error_${Date.now()}`,
                 type: 'assistant',
-                content: `❌ 钱包操作失败：${
-                  error instanceof Error ? error.message : '未知错误'
-                }`,
+                content: `❌ 钱包操作失败：${error instanceof Error ? error.message : '未知错误'}`,
                 timestamp: Date.now(),
                 source: 'error',
               })
@@ -371,4 +356,3 @@ export const useToolCallHandler = ({
     ],
   )
 }
-

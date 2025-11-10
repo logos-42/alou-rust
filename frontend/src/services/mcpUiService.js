@@ -24,10 +24,7 @@ const normalizeResourcePayload = (payload) => {
     resource = payload
   }
 
-  const metadata =
-    (resource && (resource._meta || resource.metadata)) ||
-    payload.metadata ||
-    null
+  const metadata = (resource && (resource._meta || resource.metadata)) || payload.metadata || null
 
   return {
     resource,
@@ -44,5 +41,3 @@ export const requestMcpUiResource = async (target, params = {}) => {
 
   return normalizeResourcePayload(response.data)
 }
-
-

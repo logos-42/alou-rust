@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
@@ -22,14 +16,12 @@ import {
   ACTION_LABELS,
   API_BASE_URL,
   NODE_BOUNDARY,
-  defaultChannels,
   defaultTransactions,
   ensureMillis,
   estimateFiatValue,
   formatWeiHexToEth,
   mapChainIdToBackendChain,
   mapChainLabel,
-  normalizeChannel,
   normalizeTransaction,
   resolveBackendChain,
   useToolCallHandler,
@@ -65,6 +57,25 @@ const AgentChat = () => {
     `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
   )
   const [isSessionReady, setSessionReady] = useState(false)
+
+  useEffect(() => {
+    if (!isSessionReady) {
+      return
+    }
+    void loadChannelList(channelKeyword)
+  }, [channelKeyword, isSessionReady, loadChannelList])
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [])
+
+  const refreshChannels = useCallback(() => {
+    void loadChannelList(channelKeyword)
+  }, [channelKeyword, loadChannelList])
   const [interactionLogs, setInteractionLogs] = useState([])
   const [viewportWidth, setViewportWidth] = useState(
     typeof window !== 'undefined' ? window.innerWidth : 1440,
@@ -87,17 +98,94 @@ const AgentChat = () => {
   const contextEventsRef = useRef([])
 
   const [channelKeyword, setChannelKeyword] = useState('')
-  const [activeChannelId, setActiveChannelId] = useState('dev-relay')
-  const [channels, setChannels] = useState(defaultChannels)
+  const [activeChannelId, setActiveChannelId] = useState(null)
+  const [channels, setChannels] = useState([])
+  const [selectedAgent, setSelectedAgent] = useState(null)
+  const [isChannelLoading, setChannelLoading] = useState(false)
+  const [channelError, setChannelError] = useState(null)
+  const channelRequestIdRef = useRef(0)
+  const searchDebounceRef = useRef(null)
 
-  const agentProfile = useMemo(
-    () => ({
-      name: 'alou',
-      role: 'Web3 Multi-Agent Coordinator',
-      avatar: 'https://avatars.githubusercontent.com/u/16309930?v=4',
-    }),
-    [],
+  const buildChannelFromAgent = useCallback((agent) => {
+    if (!agent) {
+      return null
+    }
+    const id = agent.did || agent.cid || agent.ipns || `agent_${Date.now()}`
+    const nameFromIpns = agent.ipns ? agent.ipns.replace(/^\/?ipns\//, '') : null
+    const nameFromDid = agent.did ? agent.did.split(':').filter(Boolean).slice(-1)[0] : null
+    const fallbackName = agent.cid || id
+    const statusLabel = agent.ipns ? 'IPNS 解析' : agent.did ? 'DID 解析' : 'CID 解析'
+
+    return {
+      id,
+      name: nameFromIpns || nameFromDid || fallbackName,
+      status: 'online',
+      statusLabel,
+      icon: '🛰️',
+      color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+      updatedAt: Math.floor(Date.now() / 1000),
+      meta: agent,
+    }
+  }, [])
+
+  const extractAgentTarget = useCallback((agent) => {
+    if (!agent) return null
+    if (agent.ipns) return agent.ipns
+    if (agent.did) return agent.did
+    if (agent.cid) return agent.cid
+    if (agent.meta) {
+      return agent.meta.ipns || agent.meta.did || agent.meta.cid || null
+    }
+    return null
+  }, [])
+
+  const extractErrorMessage = useCallback((error) => {
+    if (!error) return '未知错误'
+    if (error.response?.data?.error) {
+      return error.response.data.error
+    }
+    if (typeof error.message === 'string' && error.message.trim().length > 0) {
+      return error.message
+    }
+    return '请求失败'
+  }, [])
+
+  const handleChannelKeywordChange = useCallback(
+    (value) => {
+      setChannelKeyword(value)
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+      searchDebounceRef.current = setTimeout(() => {
+        void loadChannelList(value)
+      }, 400)
+    },
+    [loadChannelList],
   )
+
+  const agentProfile = useMemo(() => {
+    if (!selectedAgent) {
+      return {
+        name: 'alou',
+        role: 'Web3 Multi-Agent Coordinator',
+        avatar: 'https://avatars.githubusercontent.com/u/16309930?v=4',
+      }
+    }
+
+    const displayName =
+      (selectedAgent.ipns && selectedAgent.ipns.replace(/^\/?ipns\//, '').slice(0, 42)) ||
+      (selectedAgent.did && selectedAgent.did.split(':').filter(Boolean).slice(-1)[0]) ||
+      selectedAgent.cid ||
+      '解析智能体'
+
+    const role = selectedAgent.did ? 'DID 智能体' : '去中心化智能体'
+
+    return {
+      name: displayName,
+      role,
+      avatar: 'https://avatars.githubusercontent.com/u/16309930?v=4',
+    }
+  }, [selectedAgent])
 
   const [walletSnapshot, setWalletSnapshot] = useState(null)
   const [preferredChain, setPreferredChain] = useState(null)
@@ -165,11 +253,7 @@ const AgentChat = () => {
     if (viewportWidth <= 1024) {
       return { margin: '0 1rem 0 1rem' }
     }
-    const leftWidth = isLeftSidebarCollapsed
-      ? 84
-      : viewportWidth <= 1280
-        ? 240
-        : 300
+    const leftWidth = isLeftSidebarCollapsed ? 84 : viewportWidth <= 1280 ? 240 : 300
     const rightWidth = isSidebarCollapsed ? 80 : 340
     return {
       marginLeft: `${leftWidth + 24}px`,
@@ -216,10 +300,7 @@ const AgentChat = () => {
 
     contextEventsRef.current.push({ action, detail, timestamp })
     if (contextEventsRef.current.length > 50) {
-      contextEventsRef.current.splice(
-        0,
-        contextEventsRef.current.length - 50,
-      )
+      contextEventsRef.current.splice(0, contextEventsRef.current.length - 50)
     }
 
     if (typeof window !== 'undefined') {
@@ -262,11 +343,14 @@ const AgentChat = () => {
         if (!resource) {
           throw new Error('empty resource response')
         }
-        openUiResource({ resource, metadata }, {
-          source: 'frontend',
-          target,
-          ...meta,
-        })
+        openUiResource(
+          { resource, metadata },
+          {
+            source: 'frontend',
+            target,
+            ...meta,
+          },
+        )
       } catch (error) {
         console.error('Failed to load MCP UI resource:', error)
         const errorMessage = error instanceof Error ? error.message : String(error)
@@ -333,8 +417,7 @@ const AgentChat = () => {
     try {
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-      const chainId =
-        typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+      const chainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
       const detectedChain = resolveBackendChain({
         chainId,
         chain: activeChain,
@@ -373,8 +456,7 @@ const AgentChat = () => {
       }
 
       const balance = await walletService.getBalance(info.address)
-      const backendChain =
-        resolveBackendChain({ chainId: info.chainId }) || preferredChain || null
+      const backendChain = resolveBackendChain({ chainId: info.chainId }) || preferredChain || null
       if (backendChain && backendChain !== preferredChain) {
         setPreferredChain(backendChain)
       }
@@ -428,18 +510,19 @@ const AgentChat = () => {
           resolveBackendChain({
             chain: result.chain,
             chainId: userWalletInfo?.chainId,
-          }) || activeChain || 'eth'
+          }) ||
+          activeChain ||
+          'eth'
         if (chain && chain !== preferredChain) {
           setPreferredChain(chain)
         }
-        const agentWalletChain =
-          chain.startsWith('base')
-            ? 'base'
-            : chain.startsWith('polygon')
-              ? 'polygon'
-              : chain.startsWith('eth')
-                ? 'ethereum'
-                : null
+        const agentWalletChain = chain.startsWith('base')
+          ? 'base'
+          : chain.startsWith('polygon')
+            ? 'polygon'
+            : chain.startsWith('eth')
+              ? 'ethereum'
+              : null
         const txParams = (instruction.params && instruction.params[0]) || {}
 
         recordInteraction('wallet_instruction', {
@@ -451,10 +534,9 @@ const AgentChat = () => {
         appendMessage({
           id: `tx_success_${Date.now()}`,
           type: 'assistant',
-          content:
-            result.summary
-              ? `✅ ${result.summary}\n交易哈希：${txHash}`
-              : `✅ 交易已提交，哈希：${txHash}`,
+          content: result.summary
+            ? `✅ ${result.summary}\n交易哈希：${txHash}`
+            : `✅ 交易已提交，哈希：${txHash}`,
           timestamp: Date.now(),
           source: 'system',
         })
@@ -474,27 +556,25 @@ const AgentChat = () => {
           counterparty: txParams.to || txParams.from,
         }
 
-        const normalizedTx =
-          normalizeTransaction(
-            {
-              ...txRecord,
-              id: txHash,
-              direction: 'out',
-              amount: txRecord.value,
-            },
-            tokenSymbol,
-          ) ||
+        const normalizedTx = normalizeTransaction(
           {
+            ...txRecord,
             id: txHash,
             direction: 'out',
             amount: txRecord.value,
-            token: tokenSymbol,
-            counterparty: txRecord.counterparty || '未知地址',
-            status: txRecord.status,
-            statusLabel: '已提交',
-            timestamp: txRecord.timestamp,
-            hash: txHash,
-          }
+          },
+          tokenSymbol,
+        ) || {
+          id: txHash,
+          direction: 'out',
+          amount: txRecord.value,
+          token: tokenSymbol,
+          counterparty: txRecord.counterparty || '未知地址',
+          status: txRecord.status,
+          statusLabel: '已提交',
+          timestamp: txRecord.timestamp,
+          hash: txHash,
+        }
 
         setTransactions((prev) => [normalizedTx, ...prev])
 
@@ -547,10 +627,7 @@ const AgentChat = () => {
           session_id: sessionId,
           ...(targetChain ? { chain: targetChain } : {}),
         }
-        const { metadata } = await requestMcpUiResource(
-          MCP_UI_TARGETS.walletOverview,
-          payload,
-        )
+        const { metadata } = await requestMcpUiResource(MCP_UI_TARGETS.walletOverview, payload)
 
         if (!metadata) {
           return null
@@ -571,22 +648,17 @@ const AgentChat = () => {
         const requestedChain = payload.chain
         const primaryWallet =
           metadata.wallet ||
-          (requestedChain
-            ? wallets.find((item) => item.chain === requestedChain)
-            : null) ||
+          (requestedChain ? wallets.find((item) => item.chain === requestedChain) : null) ||
           wallets[0] ||
           null
 
         if (primaryWallet) {
           const rawBalance = primaryWallet.balance ?? '0'
           const balanceString =
-            typeof rawBalance === 'string'
-              ? rawBalance
-              : rawBalance?.toString?.() ?? '0'
+            typeof rawBalance === 'string' ? rawBalance : (rawBalance?.toString?.() ?? '0')
           const balanceNumeric = parseFloat(balanceString)
           const rawChain = primaryWallet.chain || metadata.chain || targetChain || 'ethereum'
-          const normalizedChain =
-            resolveBackendChain({ chain: rawChain }) || rawChain || 'ethereum'
+          const normalizedChain = resolveBackendChain({ chain: rawChain }) || rawChain || 'ethereum'
           const tokenSymbol = normalizedChain === 'sol' ? 'SOL' : 'ETH'
 
           setWalletSnapshot({
@@ -613,12 +685,10 @@ const AgentChat = () => {
               : []
 
           const normalizedTxs = txSource
-            .map((item, index) =>
-              normalizeTransaction(item, tokenSymbol) ||
-              normalizeTransaction(
-                { ...item, id: `${chain}_${index}` },
-                tokenSymbol,
-              ),
+            .map(
+              (item, index) =>
+                normalizeTransaction(item, tokenSymbol) ||
+                normalizeTransaction({ ...item, id: `${chain}_${index}` }, tokenSymbol),
             )
             .filter(Boolean)
 
@@ -714,10 +784,7 @@ const AgentChat = () => {
     recordInteraction('user_message', { content: text })
     scrollToBottom()
 
-    const contextSnapshot = contextEventsRef.current.splice(
-      0,
-      contextEventsRef.current.length,
-    )
+    const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
 
     try {
       const walletAddress =
@@ -763,9 +830,7 @@ const AgentChat = () => {
       appendMessage({
         id: `error_${Date.now()}`,
         type: 'assistant',
-        content: `❌ 抱歉，发生了错误：${
-          error instanceof Error ? error.message : '未知错误'
-        }`,
+        content: `❌ 抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
         timestamp: Date.now(),
         source: 'error',
       })
@@ -788,37 +853,80 @@ const AgentChat = () => {
   ])
 
   const loadChannelList = useCallback(
-    async () => {
-      try {
-        const { metadata } = await requestMcpUiResource(
-          MCP_UI_TARGETS.channelList,
-          {
-            session_id: sessionId,
-          },
-        )
-        const channelArray = Array.isArray(metadata?.channels) ? metadata.channels : []
-        if (!channelArray.length) {
-          return []
-        }
-
-        const normalized = channelArray
-          .map((item, index) => normalizeChannel(item, index))
-          .filter(Boolean)
-
-        if (normalized.length > 0) {
-          setChannels(normalized)
-          if (!normalized.some((channel) => channel.id === activeChannelId)) {
-            setActiveChannelId(normalized[0].id)
-          }
-        }
-
-        return normalized
-      } catch (error) {
-        console.error('Failed to load channel list:', error)
+    async (keyword = channelKeyword) => {
+      if (!sessionId) {
         return []
       }
+
+      const query = keyword?.trim() || ''
+      const requestId = channelRequestIdRef.current + 1
+      channelRequestIdRef.current = requestId
+
+      const applyLatest = (updater) => {
+        if (channelRequestIdRef.current === requestId) {
+          updater()
+        }
+      }
+
+      setChannelLoading(true)
+      setChannelError(null)
+
+      try {
+        if (!query) {
+          const session = await agentService.getSession(sessionId)
+          const metadata = session?.agent_metadata
+          const channel = buildChannelFromAgent(metadata)
+
+          applyLatest(() => {
+            if (channel) {
+              setChannels([channel])
+              setActiveChannelId(channel.id)
+              setSelectedAgent(metadata)
+            } else {
+              setChannels([])
+              setActiveChannelId(null)
+              setSelectedAgent(null)
+            }
+          })
+
+          return channel ? [channel] : []
+        }
+
+        const response = await agentService.searchAgents(query)
+        const agents = Array.isArray(response?.agents) ? response.agents : []
+        const mapped = agents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
+
+        applyLatest(() => {
+          setChannels(mapped)
+          if (mapped.length > 0) {
+            if (!mapped.some((channel) => channel.id === activeChannelId)) {
+              setActiveChannelId(mapped[0].id)
+              setSelectedAgent(mapped[0].meta)
+            }
+          } else {
+            setActiveChannelId(null)
+            setSelectedAgent(null)
+          }
+        })
+
+        return mapped
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        applyLatest(() => {
+          console.error('Failed to load agent channels:', error)
+          setChannelError(message)
+          setChannels([])
+          setActiveChannelId(null)
+          setSelectedAgent(null)
+        })
+        return []
+      } finally {
+        applyLatest(() => {
+          setChannelLoading(false)
+        })
+      }
     },
-    [activeChannelId, sessionId],
+    [activeChannelId, buildChannelFromAgent, channelKeyword, extractErrorMessage, sessionId],
   )
 
   useEffect(() => {
@@ -915,45 +1023,44 @@ const AgentChat = () => {
       const rect = canvasElement.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
       const centerY = rect.top + rect.height / 2
-      dragStateRef.current.offsetX =
-        event.clientX - (centerX + agentPositionRef.current.x)
-      dragStateRef.current.offsetY =
-        event.clientY - (centerY + agentPositionRef.current.y)
+      dragStateRef.current.offsetX = event.clientX - (centerX + agentPositionRef.current.x)
+      dragStateRef.current.offsetY = event.clientY - (centerY + agentPositionRef.current.y)
       event.target?.setPointerCapture?.(event.pointerId)
       recordInteraction('agent_drag_start', { ...agentPositionRef.current })
     },
     [recordInteraction],
   )
 
-  const onDrag = useCallback((event) => {
-    if (!dragStateRef.current.dragging) return
-    const canvasElement = canvasRef.current?.getElement?.()
-    if (!canvasElement) return
+  const onDrag = useCallback(
+    (event) => {
+      if (!dragStateRef.current.dragging) return
+      const canvasElement = canvasRef.current?.getElement?.()
+      if (!canvasElement) return
 
-    const rect = canvasElement.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
+      const rect = canvasElement.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
 
-    const nextX =
-      event.clientX - centerX - dragStateRef.current.offsetX
-    const nextY =
-      event.clientY - centerY - dragStateRef.current.offsetY
+      const nextX = event.clientX - centerX - dragStateRef.current.offsetX
+      const nextY = event.clientY - centerY - dragStateRef.current.offsetY
 
-    const limitX = Math.max(rect.width / 2 - NODE_BOUNDARY, 0)
-    const limitY = Math.max(rect.height / 2 - NODE_BOUNDARY, 0)
+      const limitX = Math.max(rect.width / 2 - NODE_BOUNDARY, 0)
+      const limitY = Math.max(rect.height / 2 - NODE_BOUNDARY, 0)
 
-    const clamped = {
-      x: Math.min(Math.max(nextX, -limitX), limitX),
-      y: Math.min(Math.max(nextY, -limitY), limitY),
-    }
-    if (
-      Math.abs(clamped.x - agentPositionRef.current.x) > 1 ||
-      Math.abs(clamped.y - agentPositionRef.current.y) > 1
-    ) {
-      dragStateRef.current.moved = true
-    }
-    updateAgentPosition(clamped)
-  }, [updateAgentPosition])
+      const clamped = {
+        x: Math.min(Math.max(nextX, -limitX), limitX),
+        y: Math.min(Math.max(nextY, -limitY), limitY),
+      }
+      if (
+        Math.abs(clamped.x - agentPositionRef.current.x) > 1 ||
+        Math.abs(clamped.y - agentPositionRef.current.y) > 1
+      ) {
+        dragStateRef.current.moved = true
+      }
+      updateAgentPosition(clamped)
+    },
+    [updateAgentPosition],
+  )
 
   const stopDrag = useCallback(
     (event) => {
@@ -1062,29 +1169,106 @@ const AgentChat = () => {
 
   const selectChannel = useCallback(
     (channel) => {
-      void loadChannelList()
+      if (!channel) {
+        return
+      }
+
       setActiveChannelId(channel.id)
+      setSelectedAgent(channel.meta ?? null)
       recordInteraction('channel_selected', {
         channelId: channel.id,
         name: channel.name,
         status: channel.status,
         statusLabel: channel.statusLabel,
       })
+
+      const target = extractAgentTarget(channel.meta ?? channel)
+      if (target) {
+        setChannelLoading(true)
+        setChannelError(null)
+        void (async () => {
+          try {
+            const agent = await agentService.resolveAgent(target, sessionId)
+            const refreshed = buildChannelFromAgent(agent)
+            setSelectedAgent(agent)
+            if (refreshed) {
+              setChannels((prev) => {
+                const others = prev.filter((item) => item.id !== channel.id)
+                return [refreshed, ...others]
+              })
+              setActiveChannelId(refreshed.id)
+            }
+          } catch (error) {
+            const message = extractErrorMessage(error)
+            console.error('Failed to resolve agent', error)
+            setChannelError(message)
+          } finally {
+            setChannelLoading(false)
+          }
+        })()
+      }
+
       void fetchAndOpenUiResource(
         MCP_UI_TARGETS.channelDetail,
         {
           channel_id: channel.id,
+          did: channel.meta?.did,
+          cid: channel.meta?.cid,
+          ipns: channel.meta?.ipns,
         },
         { channelId: channel.id },
       )
     },
-    [fetchAndOpenUiResource, loadChannelList, recordInteraction],
+    [
+      buildChannelFromAgent,
+      extractAgentTarget,
+      extractErrorMessage,
+      fetchAndOpenUiResource,
+      recordInteraction,
+      sessionId,
+    ],
   )
 
   const createChannel = useCallback(() => {
-    recordInteraction('create_channel')
-    void fetchAndOpenUiResource(MCP_UI_TARGETS.channelCreate, {})
-  }, [fetchAndOpenUiResource, recordInteraction])
+    const input =
+      typeof window !== 'undefined'
+        ? window.prompt('请输入 IPNS / CID / DID 标识以解析智能体')
+        : null
+
+    const target = input?.trim()
+    if (!target) {
+      recordInteraction('create_channel_cancelled')
+      return
+    }
+
+    setChannelLoading(true)
+    setChannelError(null)
+    recordInteraction('create_channel', { target })
+
+    void (async () => {
+      try {
+        const agent = await agentService.resolveAgent(target, sessionId)
+        const channel = buildChannelFromAgent(agent)
+        if (!channel) {
+          throw new Error('解析结果为空')
+        }
+
+        setChannels((prev) => {
+          const others = prev.filter((item) => item.id !== channel.id)
+          return [channel, ...others]
+        })
+        setActiveChannelId(channel.id)
+        setSelectedAgent(agent)
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        console.error('Failed to resolve agent via createChannel:', error)
+        setChannelError(message)
+        recordInteraction('create_channel_failed', { target, error: message })
+      } finally {
+        setChannelLoading(false)
+      }
+    })()
+  }, [buildChannelFromAgent, extractErrorMessage, recordInteraction, sessionId])
 
   const handleAgentActivate = useCallback(() => {
     if (dragStateRef.current?.moved) {
@@ -1167,7 +1351,10 @@ const AgentChat = () => {
           channels={filteredChannels}
           activeChannelId={activeChannelId}
           keyword={channelKeyword}
-          onKeywordChange={setChannelKeyword}
+          isLoading={isChannelLoading}
+          errorMessage={channelError}
+          onKeywordChange={handleChannelKeywordChange}
+          onRefresh={refreshChannels}
           onSelectChannel={selectChannel}
           onCreateChannel={createChannel}
           isCollapsed={isLeftSidebarCollapsed}
@@ -1243,4 +1430,3 @@ const AgentChat = () => {
 }
 
 export default AgentChat
-

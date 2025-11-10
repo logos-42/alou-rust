@@ -1,4 +1,5 @@
 use crate::agent::core::AgentCore;
+use crate::agent::discovery::AgentDiscovery;
 use crate::agent::session::SessionManager;
 use crate::agent::tools::{BroadcastTool, QueryTool, TransactionTool};
 use crate::mcp::tools::AgentWalletTool;
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use worker::*;
 
+mod agent;
 mod blockchain;
 mod session;
 mod wallet;
@@ -20,6 +22,7 @@ pub struct Router {
     agent_wallet_tool: AgentWalletTool,
     wallet_auth: Option<WalletAuth>,
     agent_core: Option<AgentCore>,
+    agent_discovery: Option<AgentDiscovery>,
     query_tool: Option<QueryTool>,
     transaction_tool: Option<TransactionTool>,
     broadcast_tool: Option<BroadcastTool>,
@@ -35,6 +38,7 @@ impl Router {
             agent_wallet_tool: AgentWalletTool::new(wallet_store),
             wallet_auth: None,
             agent_core: None,
+            agent_discovery: None,
             query_tool: None,
             transaction_tool: None,
             broadcast_tool: None,
@@ -49,6 +53,11 @@ impl Router {
 
     pub fn with_agent_core(mut self, agent_core: AgentCore) -> Self {
         self.agent_core = Some(agent_core);
+        self
+    }
+
+    pub fn with_agent_discovery(mut self, agent_discovery: AgentDiscovery) -> Self {
+        self.agent_discovery = Some(agent_discovery);
         self
     }
 
@@ -184,6 +193,17 @@ impl Router {
                     req,
                 )
                 .await
+            }
+            (Method::Post, "/api/agent/resolve") => {
+                agent::handle_resolve_agent(
+                    self.agent_discovery.as_ref(),
+                    &self.session_manager,
+                    req,
+                )
+                .await
+            }
+            (Method::Post, "/api/agent/search") => {
+                agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
             }
             (Method::Post, "/api/agent/stream") => self.handle_agent_stream().await,
 

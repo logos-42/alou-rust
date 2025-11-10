@@ -114,12 +114,9 @@ const AgentSidebarRight = ({
               >
                 <div className="balance">
                   <div className="amount">
-                    {walletSnapshot.balance}{' '}
-                    {walletSnapshot.token || 'ETH'}
+                    {walletSnapshot.balance} {walletSnapshot.token || 'ETH'}
                   </div>
-                  <div className="fiat">
-                    ≈ {walletSnapshot.balanceFiat ?? '--'} USD
-                  </div>
+                  <div className="fiat">≈ {walletSnapshot.balanceFiat ?? '--'} USD</div>
                 </div>
                 <div
                   className="address"
@@ -186,9 +183,7 @@ const AgentSidebarRight = ({
             </ul>
           </section>
 
-          <section
-            className={`context-card${isInteractionCollapsed ? ' collapsed' : ''}`}
-          >
+          <section className={`context-card${isInteractionCollapsed ? ' collapsed' : ''}`}>
             <header>
               <div className="title">
                 <span className="emoji">🧠</span>
@@ -211,9 +206,7 @@ const AgentSidebarRight = ({
                         <span className="log-label">{log.label}</span>
                         <span className="log-time">{formatTime(log.timestamp)}</span>
                       </div>
-                      {log.detail && (
-                        <div className="log-detail">{formatLogDetail(log)}</div>
-                      )}
+                      {log.detail && <div className="log-detail">{formatLogDetail(log)}</div>}
                     </li>
                   ))}
                 </ul>
@@ -227,4 +220,3 @@ const AgentSidebarRight = ({
 }
 
 export default AgentSidebarRight
-

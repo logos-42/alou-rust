@@ -73,3 +73,7 @@ panic = "abort"
 [profile.release.package."*"]
 opt-level = "z"
 strip = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+diap-rs-sdk = { version = "0.2.8", default-features = false, features = ["embedded-noir"] }
+reqwest = { version = "0.11", default-features = true, features = ["json"] }

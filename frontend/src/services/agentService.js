@@ -13,7 +13,7 @@ export class AgentService {
    */
   async createSession(walletAddress) {
     const response = await apiClient.post(`${this.baseUrl}/api/session`, {
-      wallet_address: walletAddress
+      wallet_address: walletAddress,
     })
     return response.data
   }
@@ -40,7 +40,28 @@ export class AgentService {
     const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
       session_id: sessionId,
       message,
-      wallet_address: walletAddress
+      wallet_address: walletAddress,
+    })
+    return response.data
+  }
+
+  /**
+   * Resolve agent metadata via DIAP/IPFS
+   */
+  async resolveAgent(target, sessionId) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/resolve`, {
+      target,
+      session_id: sessionId,
+    })
+    return response.data
+  }
+
+  /**
+   * Search agents by keyword (IPNS / CID / DID)
+   */
+  async searchAgents(query) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/search`, {
+      query,
     })
     return response.data
   }
@@ -52,7 +73,7 @@ export class AgentService {
     const response = await apiClient.post(`${this.baseUrl}/api/blockchain/balance`, {
       address,
       chain,
-      token_address: tokenAddress
+      token_address: tokenAddress,
     })
     return response.data
   }
@@ -65,7 +86,7 @@ export class AgentService {
       from,
       to,
       value,
-      chain
+      chain,
     })
     return response.data
   }
@@ -76,7 +97,7 @@ export class AgentService {
   async broadcastTransaction(signedTx, chain) {
     const response = await apiClient.post(`${this.baseUrl}/api/blockchain/transaction/broadcast`, {
       signed_tx: signedTx,
-      chain
+      chain,
     })
     return response.data
   }
@@ -86,7 +107,7 @@ export class AgentService {
    */
   async getTransactionStatus(txHash, chain) {
     const response = await apiClient.get(
-      `${this.baseUrl}/api/blockchain/transaction/${txHash}?chain=${chain}`
+      `${this.baseUrl}/api/blockchain/transaction/${txHash}?chain=${chain}`,
     )
     return response.data
   }
@@ -119,7 +140,7 @@ export class AgentService {
       session_id: sessionId,
       action: 'record_transaction',
       chain,
-      transaction
+      transaction,
     })
   }
 
@@ -135,7 +156,7 @@ export class AgentService {
       session_id: sessionId,
       action: 'update_balance',
       chain,
-      balance
+      balance,
     })
   }
 }

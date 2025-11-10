@@ -14,9 +14,12 @@ const AgentSidebarLeft = ({
   channels = [],
   activeChannelId,
   keyword,
+  isLoading = false,
+  errorMessage,
   onKeywordChange,
   onSelectChannel,
   onCreateChannel,
+  onRefresh,
   isCollapsed = false,
   onToggleCollapse,
 }) => {
@@ -47,12 +50,33 @@ const AgentSidebarLeft = ({
             value={keyword}
             placeholder="搜索智能体"
             onChange={(event) => onKeywordChange?.(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                onRefresh?.()
+              }
+            }}
           />
           <img src={SearchIcon} alt="搜索" className="search-icon" />
         </div>
       )}
 
       <div className="channel-list">
+        {isLoading && <div className="channel-placeholder">正在加载智能体...</div>}
+        {!isLoading && errorMessage && (
+          <div className="channel-placeholder channel-error">
+            <div>{errorMessage}</div>
+            {onRefresh && (
+              <button type="button" onClick={onRefresh}>
+                重试
+              </button>
+            )}
+          </div>
+        )}
+        {!isLoading && !errorMessage && channels.length === 0 && (
+          <div className="channel-placeholder">
+            暂无智能体。请在上方输入 IPNS / CID / DID 搜索。
+          </div>
+        )}
         {channels.map((channel) => (
           <div
             key={channel.id}
@@ -78,6 +102,9 @@ const AgentSidebarLeft = ({
                   <div className="channel-meta">
                     <span className={`status-dot ${channel.status}`} />
                     <span className="channel-status">{channel.statusLabel}</span>
+                    {channel.meta?.did && (
+                      <span className="channel-hint">· …{channel.meta.did.slice(-12)}</span>
+                    )}
                   </div>
                 </div>
                 <div className="channel-date">{formatDate(channel.updatedAt)}</div>

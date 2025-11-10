@@ -54,6 +54,8 @@ pub struct Session {
     pub messages: Vec<Message>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recent_events: Vec<ContextEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_metadata: Option<serde_json::Value>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -67,6 +69,7 @@ impl Session {
             chain,
             messages: Vec::new(),
             recent_events: Vec::new(),
+            agent_metadata: None,
             created_at: now,
             updated_at: now,
         }
@@ -199,6 +202,31 @@ impl SessionManager {
     pub async fn get_history(&self, session_id: &str) -> Result<Vec<Message>> {
         let session = self.get_session(session_id).await?;
         Ok(session.messages)
+    }
+
+    /// Persist agent discovery metadata for this session
+    pub async fn set_agent_metadata(
+        &self,
+        session_id: &str,
+        metadata: serde_json::Value,
+    ) -> Result<()> {
+        let mut session = self.get_session(session_id).await?;
+        session.agent_metadata = Some(metadata);
+        session.updated_at = crate::utils::time::now_timestamp();
+
+        let key = Self::session_key(session_id);
+        self.kv
+            .put(&key, &session, Some(SESSION_TTL_SECONDS))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Retrieve agent discovery metadata for a session
+    #[allow(dead_code)]
+    pub async fn get_agent_metadata(&self, session_id: &str) -> Result<Option<serde_json::Value>> {
+        let session = self.get_session(session_id).await?;
+        Ok(session.agent_metadata.clone())
     }
 
     /// Clear a session

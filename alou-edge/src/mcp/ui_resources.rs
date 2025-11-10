@@ -561,25 +561,48 @@ impl<'a> UiResourceBuilder<'a> {
             .get("channel_id")
             .and_then(|v| v.as_str())
             .unwrap_or("wallet-ops");
+        let did = params
+            .get("did")
+            .and_then(|v| v.as_str())
+            .unwrap_or("未提供");
+        let cid = params
+            .get("cid")
+            .and_then(|v| v.as_str())
+            .unwrap_or("未提供");
+        let ipns = params.get("ipns").and_then(|v| v.as_str());
+
+        let ipns_row = if let Some(ipns_value) = ipns {
+            format!(
+                r#"<div><span class="label">IPNS</span><span class="value mono">{}</span></div>"#,
+                escape_html(ipns_value)
+            )
+        } else {
+            r#"<div><span class="label">IPNS</span><span class="value">未绑定</span></div>"#
+                .to_string()
+        };
 
         let html = format!(
             r#"<div class="section">
-                    <h2>频道详情</h2>
+                    <h2>智能体通道</h2>
                     <div class="meta">
                         <div><span class="label">频道 ID</span><span class="value">{}</span></div>
-                        <div><span class="label">角色定位</span><span class="value">链上资产调度 · 支付执行</span></div>
-                        <div><span class="label">关联合约</span><span class="value">USDC 代币 · 智能钱包</span></div>
+                        <div><span class="label">DID</span><span class="value mono">{}</span></div>
+                        <div><span class="label">CID</span><span class="value mono">{}</span></div>
+                        {}
                     </div>
                     <div class="section">
-                        <h3>推荐操作</h3>
+                        <h3>联调建议</h3>
                         <ul>
-                            <li>同步最新钱包余额，确认资产状态</li>
-                            <li>发起批量支付前，准备收款地址列表</li>
-                            <li>使用 <code>workflow</code> 定义自动化付款流程</li>
+                            <li>在左侧输入 IPNS / CID / DID，可自动解析智能体 DID 文档并完成 ZKP 校验。</li>
+                            <li>解析成功后，会话上下文会写入最新 DID / CID 信息，可直接开始对话。</li>
+                            <li>若需要重新解析，请重新输入标识或点击“刷新”触发新的解析请求。</li>
                         </ul>
                     </div>
                 </div>"#,
-            escape_html(channel_id)
+            escape_html(channel_id),
+            escape_html(did),
+            escape_html(cid),
+            ipns_row
         );
 
         Ok(embed_html(
@@ -587,6 +610,9 @@ impl<'a> UiResourceBuilder<'a> {
             render_html("频道详情", &html),
             Some(json!({
                 "channelId": channel_id,
+                "did": did,
+                "cid": cid,
+                "ipns": ipns,
             })),
         ))
     }

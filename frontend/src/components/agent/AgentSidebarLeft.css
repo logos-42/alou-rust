@@ -122,6 +122,37 @@
   padding: 0 0.65rem 0.8rem;
 }
 
+.sidebar-left .channel-placeholder {
+  padding: 1rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.45;
+}
+
+.sidebar-left .channel-placeholder.channel-error {
+  color: #dc2626;
+}
+
+.sidebar-left .channel-placeholder button {
+  margin-top: 0.6rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: inherit;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sidebar-left .channel-placeholder button:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
 .sidebar-left .channel-item {
   display: grid;
   grid-template-columns: 40px 1fr auto;
@@ -176,6 +207,12 @@
   gap: 0.45rem;
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.sidebar-left .channel-hint {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.75;
 }
 
 .sidebar-left .status-dot {

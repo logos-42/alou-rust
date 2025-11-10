@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 use worker::*;
 
 mod agent;
@@ -8,7 +9,10 @@ mod storage;
 mod utils;
 mod web3;
 
-use agent::{AgentCore, SessionManager};
+use agent::{
+    discovery::{AgentDiscovery, AgentDiscoveryConfig},
+    AgentCore, SessionManager,
+};
 use mcp::tools::{
     AgentWalletTool, BroadcastTool, EchoTool, QueryTool, TransactionTool, WalletAuthTool,
     WalletManagerTool, WorkflowTool,
@@ -194,6 +198,53 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
         console_log!("  ℹ SOL_RPC_URL not configured (optional)");
     }
 
+    // Load DIAP/IPFS configuration
+    let diap_ipfs_api_url = env.var("DIAP_IPFS_API_URL").map(|v| v.to_string()).ok();
+    let diap_ipfs_gateway_url = env.var("DIAP_IPFS_GATEWAY_URL").map(|v| v.to_string()).ok();
+    let diap_ipns_key = env.var("DIAP_IPNS_KEY").map(|v| v.to_string()).ok();
+    let diap_ipfs_timeout = env
+        .var("DIAP_IPFS_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.to_string().parse::<u64>().ok());
+    let diap_agent_cache_ttl = env
+        .var("DIAP_AGENT_CACHE_TTL_SECS")
+        .ok()
+        .and_then(|v| v.to_string().parse::<u64>().ok());
+
+    #[allow(unused_mut)]
+    let mut agent_discovery = None;
+
+    if let (Some(api_url), Some(gateway_url)) =
+        (diap_ipfs_api_url.clone(), diap_ipfs_gateway_url.clone())
+    {
+        console_log!("  ℹ Configuring agent discovery service (IPFS)");
+        let mut config =
+            AgentDiscoveryConfig::new(api_url, gateway_url).with_ipns_key(diap_ipns_key.clone());
+
+        if let Some(timeout_secs) = diap_ipfs_timeout {
+            config = config.with_request_timeout(Duration::from_secs(timeout_secs.max(1)));
+        }
+
+        if let Some(cache_ttl_secs) = diap_agent_cache_ttl {
+            config = config.with_cache_ttl(Duration::from_secs(cache_ttl_secs.max(1)));
+        }
+
+        match AgentDiscovery::new(config) {
+            Ok(discovery) => {
+                console_log!("  ✓ Agent discovery configured");
+                agent_discovery = Some(discovery);
+            }
+            Err(e) => {
+                console_warn!(
+                    "  ⚠ Failed to initialize agent discovery: {} (agent resolution disabled)",
+                    e
+                );
+            }
+        }
+    } else {
+        console_log!("  ℹ Agent discovery not configured (DIAP_IPFS_API_URL or DIAP_IPFS_GATEWAY_URL missing)");
+    }
+
     // ========================================
     // 3. Initialize MCP Registry and Tools
     // ========================================
@@ -321,6 +372,10 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     let mut router = Router::new(sessions_store)
         .with_wallet_auth(nonces_store, jwt_secret)
         .with_agent_core(agent_core);
+
+    if let Some(discovery) = agent_discovery {
+        router = router.with_agent_discovery(discovery);
+    }
 
     // Add blockchain tools if RPC URLs are configured
     if let (Some(eth_rpc), Some(sol_rpc)) = (eth_rpc_url.clone(), solana_rpc_url.clone()) {
