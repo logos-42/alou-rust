@@ -1,0 +1,135 @@
+=== 紧急联系人 ===
+
+--- 你自己 ---
+
+姓名: [刘元杰]
+电话: [13115718038]
+Email: [yuanjieliu65@gmail.com]
+Telegram: @[你的用户名]
+Discord: [你的Discord]
+
+--- 技术顾问（如果有）---
+
+姓名: [顾问姓名]
+电话: [顾问电话]
+Email: [顾问邮箱]
+专长: 智能合约安全
+可用时间: [时间]
+
+--- 审计公司（如果有）---
+
+公司: [公司名称]
+联系人: [联系人]
+电话: [电话]
+Email: [邮箱]
+紧急热线: [如果有]
+
+--- 律师（如果有）---
+
+姓名: [律师姓名]
+电话: [律师电话]
+Email: [律师邮箱]
+专长: 加密货币法律
+
+--- 信任的开发者朋友 ---
+
+姓名: [朋友姓名]
+电话: [朋友电话]
+Telegram: @[用户名]
+专长: [专长领域]
+
+=== 技术支持资源 ===
+
+--- OpenZeppelin ---
+
+Discord: https://discord.gg/openzeppelin
+Forum: https://forum.openzeppelin.com
+Docs: https://docs.openzeppelin.com
+
+--- Hardhat ---
+
+Discord: https://discord.gg/hardhat
+GitHub: https://github.com/NomicFoundation/hardhat
+Docs: https://hardhat.org/docs
+
+--- Etherscan ---
+
+Support: https://etherscan.io/contactus
+API Docs: https://docs.etherscan.io
+
+--- Tenderly ---
+
+Support: https://tenderly.co/contact
+Discord: https://discord.gg/tenderly
+Docs: https://docs.tenderly.co
+
+--- Gnosis Safe ---
+
+Support: https://help.safe.global
+Discord: https://discord.gg/safe
+Docs: https://docs.safe.global
+
+=== 社区资源 ===
+
+--- Ethereum 社区 ---
+
+Reddit: https://reddit.com/r/ethereum
+Discord: https://discord.gg/ethereum
+Stack Exchange: https://ethereum.stackexchange.com
+
+--- 安全社区 ---
+
+Immunefi: https://immunefi.com
+Code4rena: https://code4rena.com
+Sherlock: https://www.sherlock.xyz
+
+=== 你的社区 ===
+
+Discord: [你的Discord服务器]
+Telegram: [你的Telegram群组]
+Twitter: [你的Twitter]
+GitHub: [你的GitHub]
+
+=== 紧急服务 ===
+
+--- 如果涉及犯罪 ---
+
+当地警方: 110（中国）
+网络犯罪举报: https://www.12377.cn
+
+--- 如果涉及交易所 ---
+
+Binance Support: https://www.binance.com/en/support
+Coinbase Support: https://help.coinbase.com
+OKX Support: https://www.okx.com/support
+
+=== 使用说明 ===
+
+1. 定期更新联系方式
+2. 测试所有联系方式可用性
+3. 按严重程度联系相应人员
+4. 记录所有沟通内容
+
+=== 联系优先级 ===
+
+严重安全问题:
+1. 立即暂停合约
+2. 联系技术顾问
+3. 通知用户
+4. 联系审计公司
+
+一般技术问题:
+1. 查看文档
+2. 搜索社区
+3. 联系技术支持
+4. 寻求朋友帮助
+
+法律问题:
+1. 联系律师
+2. 准备材料
+3. 遵循法律程序
+
+=== 最后更新 ===
+
+日期: [2025.11.10]
+更新人: [liuyuanjie]

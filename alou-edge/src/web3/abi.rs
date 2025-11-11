@@ -58,6 +58,7 @@ lazy_contract!(
 );
 
 /// DIAPVerification 合约 ABI（ZKP 入口，当前仅作占位）
+#[allow(dead_code)]
 pub const DIAP_VERIFICATION: &str =
     include_str!("../../abi/diap/DIAPVerification.json");
 lazy_contract!(
@@ -120,6 +121,7 @@ pub fn diap_payment_privacy_contract() -> Arc<Contract> {
     DIAP_PAYMENT_PRIVACY_CONTRACT.clone()
 }
 
+#[allow(dead_code)]
 pub fn diap_verification_contract() -> Arc<Contract> {
     DIAP_VERIFICATION_CONTRACT.clone()
 }

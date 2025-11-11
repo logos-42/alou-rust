@@ -4,7 +4,7 @@ use crate::web3::abi::{
     entry_point_contract,
 };
 use crate::web3::clients::common::{
-    parse_u256, token_address, token_bytes_from_hex, token_string, token_uint, token_uint_u64,
+    parse_u256, token_address, token_bytes_from_hex, token_uint,
     ContractClient, EncodedCall,
 };
 use crate::web3::config::ContractEnvironment;
@@ -28,13 +28,13 @@ impl DiapAccountFactoryClient {
         let abi = diap_account_factory_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Ok(Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         })
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 
@@ -162,13 +162,13 @@ impl DiapPaymasterClient {
         let abi = diap_paymaster_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Ok(Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         })
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 
@@ -310,13 +310,13 @@ impl EntryPointClient {
         let abi = entry_point_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 
@@ -356,13 +356,13 @@ impl DiapAccountClient {
         let abi = diap_account_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(account_address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 

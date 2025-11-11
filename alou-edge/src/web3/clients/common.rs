@@ -26,6 +26,7 @@ pub struct ContractClient {
     address: String,
     abi: Arc<Contract>,
     rpc: JsonRpcClient,
+    #[allow(dead_code)]
     pub network: Network,
 }
 
@@ -39,6 +40,7 @@ impl ContractClient {
         }
     }
 
+    #[allow(dead_code)]
     pub fn address(&self) -> &str {
         &self.address
     }
@@ -114,6 +116,7 @@ pub fn parse_u256(value: &str) -> Result<U256> {
     })
 }
 
+#[allow(dead_code)]
 pub fn parse_u256_hex(value: &str) -> Result<U256> {
     let trimmed = value.trim_start_matches("0x");
     U256::from_str_radix(trimmed, 16).map_err(|e| {
@@ -133,6 +136,7 @@ pub fn token_uint_u64(value: u64) -> Token {
     Token::Uint(U256::from(value))
 }
 
+#[allow(dead_code)]
 pub fn token_bool(value: bool) -> Token {
     Token::Bool(value)
 }
@@ -174,7 +178,7 @@ fn token_to_json(token: &Token) -> Value {
         Token::Int(value) => Value::String(value.to_string()),
         Token::Bool(value) => Value::Bool(*value),
         Token::String(value) => Value::String(value.clone()),
-        Token::FixedBytes(bytes) | Token::Bytes(bytes) | Token::Function(bytes) => {
+        Token::FixedBytes(bytes) | Token::Bytes(bytes) => {
             Value::String(format!("0x{}", hex::encode(bytes)))
         }
         Token::Array(items) | Token::FixedArray(items) | Token::Tuple(items) => {

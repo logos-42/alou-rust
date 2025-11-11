@@ -17,13 +17,13 @@ impl DiapTokenClient {
         let abi = diap_token_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 

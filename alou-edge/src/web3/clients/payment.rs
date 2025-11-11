@@ -20,13 +20,13 @@ impl DiapPaymentCoreClient {
         let abi = diap_payment_core_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 
@@ -110,13 +110,13 @@ impl DiapPaymentChannelClient {
         let abi = diap_payment_channel_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 
@@ -221,13 +221,13 @@ impl DiapPaymentPrivacyClient {
         let abi = diap_payment_privacy_contract();
         let rpc_url = env.rpc.url.clone();
         let network = env.rpc.network;
-
         Self {
             inner: ContractClient::new(address, abi, rpc_url, network),
         }
     }
 
-    pub fn address(&self) -> &'static str {
+    #[allow(dead_code)]
+    pub fn address(&self) -> &str {
         self.inner.address()
     }
 

@@ -1,0 +1,132 @@
+=== DIAP 合约地址 ===
+
+网络: Sepolia 测试网 (Ethereum)
+Chain ID: 11155111
+部署者: 0x308339a0C2fA14475EC42fbF0b8Fae239b293b52
+部署时间: 2025-11-01T15:34:35.151Z
+
+--- 核心合约 (Sepolia) ---
+
+DIAPToken:
+代理地址: 0x2a5b6A672e9028962Ab4DaF20d256C0978604Cb3
+实现地址: 0xbD9d07d42978798dAC0452A5eB24A8446A3Aa4b6
+区块浏览器: https://sepolia.etherscan.io/address/0x2a5b6A672e9028962Ab4DaF20d256C0978604Cb3
+
+DIAPAgentNetwork:
+代理地址: 0x9eF71FD5be68ebab2ABE20c5Fab826b14BfBc089
+实现地址: 0xc83663765d62db77802b0Fd0EAC80144f23E3E9B
+区块浏览器: https://sepolia.etherscan.io/address/0x9eF71FD5be68ebab2ABE20c5Fab826b14BfBc089
+
+DIAPVerification:
+代理地址: 0x8F513135a6865173b6fC08e7A1138211ba174109
+实现地址: 0xC36b92Cf8722eDbD5E5CD365Ccd08725ebcc5493
+区块浏览器: https://sepolia.etherscan.io/address/0x8F513135a6865173b6fC08e7A1138211ba174109
+
+DIAPPaymentCore:
+代理地址: 0x498CbdD8d509058FfDe7335391B8a053Bb4Ab0e7
+实现地址: 0xED2203795bF2Be6872530A1A62b1741fD00503c9
+区块浏览器: https://sepolia.etherscan.io/address/0x498CbdD8d509058FfDe7335391B8a053Bb4Ab0e7
+
+DIAPPaymentChannel:
+代理地址: 0x471cB216e5bF64d9E33b92E12d6AE3327c7a7a80
+实现地址: 0x37cA7821a995F67eaE49CB38473Bd5f99f08b121
+区块浏览器: https://sepolia.etherscan.io/address/0x471cB216e5bF64d9E33b92E12d6AE3327c7a7a80
+
+DIAPPaymentPrivacy:
+代理地址: 0x69bd0c763F86B80C043eA7CF1af58186E23E21cc
+实现地址: 0xba9aaC051FbC0ad8CA78E7aE283F29E0D6e7F8Ef
+区块浏览器: https://sepolia.etherscan.io/address/0x69bd0c763F86B80C043eA7CF1af58186E23E21cc
+
+DIAPGovernance:
+地址: 0xFBD843F3ECDd5398639d849763088BF9Cd36f2Be
+区块浏览器: https://sepolia.etherscan.io/address/0xFBD843F3ECDd5398639d849763088BF9Cd36f2Be
+
+TimelockController:
+地址: 0x4CFDC3D8aAabDB6E9f78a0CEe5d32Fb062eCD17A
+区块浏览器: https://sepolia.etherscan.io/address/0x4CFDC3D8aAabDB6E9f78a0CEe5d32Fb062eCD17A
+
+--- ERC-4337 合约 ---
+
+DIAPAccountFactory:
+地址: 0xeaf2cb64685695497bf20f70c6F74bA86851edfD
+DIAPAccount实现: 0x9Fb4fCDF304f27bBf9E7869279a2347bCFc6d20C
+EntryPoint: 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+区块浏览器: https://sepolia.etherscan.io/address/0xeaf2cb64685695497bf20f70c6F74bA86851edfD
+
+DIAPPaymaster:
+地址: 0xA960cf9053FA76278e16f9D4BA35225f7634DC54
+EntryPoint: 0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789
+区块浏览器: https://sepolia.etherscan.io/address/0xA960cf9053FA76278e16f9D4BA35225f7634DC54
+
+--- 核心合约 (Base Sepolia) ---
+
+DIAPToken (Base Sepolia):
+代理地址: 0xFBD843F3ECDd5398639d849763088BF9Cd36f2Be
+实现地址: 0xCd9B0781A933B3650d1c72b92eaD0E4bf6eB698c
+部署时间: 2025-11-01T04:22:18.084Z
+区块浏览器: https://sepolia.basescan.org/address/0xFBD843F3ECDd5398639d849763088BF9Cd36f2Be
+
+DIAPAgentNetwork (Base Sepolia):
+代理地址: 0xA960cf9053FA76278e16f9D4BA35225f7634DC54
+实现地址: 0x8F513135a6865173b6fC08e7A1138211ba174109
+部署时间: 2025-11-01T04:22:18.084Z
+区块浏览器: https://sepolia.basescan.org/address/0xA960cf9053FA76278e16f9D4BA35225f7634DC54
+
+DIAPVerification (Base Sepolia):
+代理地址: 0x3d21CbF5C3bc48b19A4627181ABA42baC76AE93b
+实现地址: 0x498CbdD8d509058FfDe7335391B8a053Bb4Ab0e7
+区块浏览器: https://sepolia.basescan.org/address/0x3d21CbF5C3bc48b19A4627181ABA42baC76AE93b
+
+DIAPPaymentCore (Base Sepolia):
+代理地址: 0xfb433bac16C391956367409257262C402b49ba5e
+实现地址: 0x471cB216e5bF64d9E33b92E12d6AE3327c7a7a80
+区块浏览器: https://sepolia.basescan.org/address/0xfb433bac16C391956367409257262C402b49ba5e
+
+DIAPPaymentChannel (Base Sepolia):
+代理地址: 0x793FCa0108F87D106f8E5Aa60443f52f6D1EE345
+实现地址: 0x69bd0c763F86B80C043eA7CF1af58186E23E21cc
+区块浏览器: https://sepolia.basescan.org/address/0x793FCa0108F87D106f8E5Aa60443f52f6D1EE345
+
+DIAPPaymentPrivacy (Base Sepolia):
+代理地址: 0xef2252273BbBfa20d6a510C304C0224A5f9b88ac
+实现地址: 0xF684594C83D5d940e3bec7D25FaAF27A562133dB
+区块浏览器: https://sepolia.basescan.org/address/0xef2252273BbBfa20d6a510C304C0224A5f9b88ac
+
+DIAPGovernance (Base Sepolia):
+地址: 0x4e058BbE725C26375f8782B922fA26DBcc180B96
+区块浏览器: https://sepolia.basescan.org/address/0x4e058BbE725C26375f8782B922fA26DBcc180B96
+
+TimelockController (Base Sepolia):
+地址: 0x82d4a4171a255D0f5b759Dfa5EFf77c00C94b3ca
+区块浏览器: https://sepolia.basescan.org/address/0x82d4a4171a255D0f5b759Dfa5EFf77c00C94b3ca
+
+--- 部署信息 ---
+
+部署者地址: 0x308339a0C2fA14475EC42fbF0b8Fae239b293b52
+
+Sepolia 部署时间: 2025-11-01T15:34:35.151Z
+Base Sepolia 部署时间: 2025-11-01T04:22:18.084Z
+
+--- RPC URLs ---
+
+Sepolia: https://ethereum-sepolia-rpc.publicnode.com (推荐)
+Base Sepolia: https://sepolia.base.org (推荐)
+
+--- 区块浏览器 ---
+
+Sepolia Etherscan: https://sepolia.etherscan.io
+Base Sepolia Basescan: https://sepolia.basescan.org
+
+--- 最后更新 ---
+
+日期: 2025-11-01
+版本: v0.4.0 (包含ERC-4337)
+状态: 测试网部署完成
+
+=== 使用说明 ===
+
+1. 所有代理地址用于前端集成和用户交互
+2. 实现地址仅用于升级，不要直接交互
+3. 定期验证地址正确性
+4. 部署后已保存到 deployments/ 目录
+5. ERC-4337合约已配置到AgentNetwork

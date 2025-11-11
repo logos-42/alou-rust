@@ -33,7 +33,7 @@ impl JsonRpcClient {
         let mut init = RequestInit::new();
         init.with_method(Method::Post);
 
-        let mut headers = Headers::new();
+        let headers = Headers::new();
         headers
             .set("Content-Type", "application/json")
             .map_err(|e| AloudError::WorkerError(e.to_string()))?;

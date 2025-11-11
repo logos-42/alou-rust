@@ -40,8 +40,8 @@ pub async fn handle_account_request(env: &Env, req: &mut Request) -> WorkerResul
             handle_entrypoint(client, body.action, body).await
         }
         AccountModule::Account => {
-            let account = match body.account_address {
-                Some(addr) => addr,
+            let account = match &body.account_address {
+                Some(addr) => addr.clone(),
                 None => return missing_field("account_address"),
             };
             let client = DiapAccountClient::new(account, &contract_env);
@@ -335,7 +335,7 @@ struct AccountRequest {
     data: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 enum AccountModule {
     Factory,
@@ -344,7 +344,7 @@ enum AccountModule {
     Account,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 enum AccountAction {
     // Factory

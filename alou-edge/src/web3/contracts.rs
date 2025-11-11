@@ -12,6 +12,7 @@ pub enum Network {
 
 impl Network {
     /// 获取链 ID
+    #[allow(dead_code)]
     pub const fn chain_id(self) -> u64 {
         match self {
             Network::Sepolia => 11155111,
@@ -174,6 +175,7 @@ pub const fn contracts_for(network: Network) -> &'static NetworkContracts {
 }
 
 /// 根据链 ID 推断网络（若不匹配则返回 None）
+#[allow(dead_code)]
 pub fn network_from_chain_id(chain_id: u64) -> Option<Network> {
     match chain_id {
         11155111 => Some(Network::Sepolia),
