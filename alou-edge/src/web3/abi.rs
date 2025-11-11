@@ -11,8 +11,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 fn parse_contract(json: &str) -> Contract {
-    let value: Value = serde_json::from_str(json)
-        .expect("Failed to parse Hardhat artifact JSON");
+    let value: Value = serde_json::from_str(json).expect("Failed to parse Hardhat artifact JSON");
     let abi_value = value
         .get("abi")
         .expect("ABI field missing in Hardhat artifact");
@@ -24,8 +23,7 @@ fn parse_contract(json: &str) -> Contract {
 
 macro_rules! lazy_contract {
     ($name:ident, $artifact:ident) => {
-        pub static $name: Lazy<Arc<Contract>> =
-            Lazy::new(|| Arc::new(parse_contract($artifact)));
+        pub static $name: Lazy<Arc<Contract>> = Lazy::new(|| Arc::new(parse_contract($artifact)));
     };
 }
 
@@ -42,58 +40,37 @@ pub const DIAP_PAYMENT_CORE: &str = include_str!("../../abi/diap/DIAPPaymentCore
 lazy_contract!(DIAP_PAYMENT_CORE_CONTRACT, DIAP_PAYMENT_CORE);
 
 /// DIAPPaymentChannel 合约 ABI
-pub const DIAP_PAYMENT_CHANNEL: &str =
-    include_str!("../../abi/diap/DIAPPaymentChannel.json");
-lazy_contract!(
-    DIAP_PAYMENT_CHANNEL_CONTRACT,
-    DIAP_PAYMENT_CHANNEL
-);
+pub const DIAP_PAYMENT_CHANNEL: &str = include_str!("../../abi/diap/DIAPPaymentChannel.json");
+lazy_contract!(DIAP_PAYMENT_CHANNEL_CONTRACT, DIAP_PAYMENT_CHANNEL);
 
 /// DIAPPaymentPrivacy 合约 ABI
-pub const DIAP_PAYMENT_PRIVACY: &str =
-    include_str!("../../abi/diap/DIAPPaymentPrivacy.json");
-lazy_contract!(
-    DIAP_PAYMENT_PRIVACY_CONTRACT,
-    DIAP_PAYMENT_PRIVACY
-);
+pub const DIAP_PAYMENT_PRIVACY: &str = include_str!("../../abi/diap/DIAPPaymentPrivacy.json");
+lazy_contract!(DIAP_PAYMENT_PRIVACY_CONTRACT, DIAP_PAYMENT_PRIVACY);
 
 /// DIAPVerification 合约 ABI（ZKP 入口，当前仅作占位）
 #[allow(dead_code)]
-pub const DIAP_VERIFICATION: &str =
-    include_str!("../../abi/diap/DIAPVerification.json");
-lazy_contract!(
-    DIAP_VERIFICATION_CONTRACT,
-    DIAP_VERIFICATION
-);
+pub const DIAP_VERIFICATION: &str = include_str!("../../abi/diap/DIAPVerification.json");
+lazy_contract!(DIAP_VERIFICATION_CONTRACT, DIAP_VERIFICATION);
 
 /// DIAPGovernance 合约 ABI
-pub const DIAP_GOVERNANCE: &str =
-    include_str!("../../abi/diap/DIAPGovernance.json");
+pub const DIAP_GOVERNANCE: &str = include_str!("../../abi/diap/DIAPGovernance.json");
 lazy_contract!(DIAP_GOVERNANCE_CONTRACT, DIAP_GOVERNANCE);
 
 /// TimelockController 合约 ABI（来自 Hardhat 构建产物）
 pub const TIMELOCK_CONTROLLER: &str =
     include_str!("../../abi/openzeppelin/TimelockController.json");
-lazy_contract!(
-    TIMELOCK_CONTROLLER_CONTRACT,
-    TIMELOCK_CONTROLLER
-);
+lazy_contract!(TIMELOCK_CONTROLLER_CONTRACT, TIMELOCK_CONTROLLER);
 
 /// ERC-4337 账户工厂 ABI
-pub const DIAP_ACCOUNT_FACTORY: &str =
-    include_str!("../../abi/aa/DIAPAccountFactory.json");
-lazy_contract!(
-    DIAP_ACCOUNT_FACTORY_CONTRACT,
-    DIAP_ACCOUNT_FACTORY
-);
+pub const DIAP_ACCOUNT_FACTORY: &str = include_str!("../../abi/aa/DIAPAccountFactory.json");
+lazy_contract!(DIAP_ACCOUNT_FACTORY_CONTRACT, DIAP_ACCOUNT_FACTORY);
 
 /// DIAPAccount 实现 ABI
 pub const DIAP_ACCOUNT: &str = include_str!("../../abi/aa/DIAPAccount.json");
 lazy_contract!(DIAP_ACCOUNT_CONTRACT, DIAP_ACCOUNT);
 
 /// DIAPPaymaster ABI
-pub const DIAP_PAYMASTER: &str =
-    include_str!("../../abi/aa/DIAPPaymaster.json");
+pub const DIAP_PAYMASTER: &str = include_str!("../../abi/aa/DIAPPaymaster.json");
 lazy_contract!(DIAP_PAYMASTER_CONTRACT, DIAP_PAYMASTER);
 
 /// EntryPoint 接口 ABI
@@ -149,4 +126,3 @@ pub fn diap_paymaster_contract() -> Arc<Contract> {
 pub fn entry_point_contract() -> Arc<Contract> {
     ENTRY_POINT_CONTRACT.clone()
 }
-

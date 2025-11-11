@@ -163,6 +163,7 @@ contract DIAPPaymentPrivacy is
 
     // ============ 管理函数 ============
 
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // ============ 查询函数 ============

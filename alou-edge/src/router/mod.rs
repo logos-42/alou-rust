@@ -1,6 +1,7 @@
 use crate::agent::core::AgentCore;
 use crate::agent::discovery::AgentDiscovery;
 use crate::agent::session::SessionManager;
+use crate::agent::stream::get_events;
 use crate::agent::tools::{BroadcastTool, QueryTool, TransactionTool};
 use crate::mcp::tools::AgentWalletTool;
 use crate::mcp::UiResourceBuilder;
@@ -14,8 +15,8 @@ use worker::*;
 
 mod agent;
 mod blockchain;
-mod session;
 mod diap;
+mod session;
 mod wallet;
 
 pub struct Router {
@@ -106,9 +107,7 @@ impl Router {
             return Response::empty().map(|r| r.with_headers(headers));
         }
 
-        let result = self
-            .route_request(&mut req, &method, &path, &env)
-            .await;
+        let result = self.route_request(&mut req, &method, &path, &env).await;
 
         let end_time = crate::utils::time::now_timestamp_millis();
         let duration_us = ((end_time - start_time) * 1000) as u64;
@@ -209,7 +208,7 @@ impl Router {
             (Method::Post, "/api/agent/search") => {
                 agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
             }
-            (Method::Post, "/api/agent/stream") => self.handle_agent_stream().await,
+            (Method::Get, "/api/agent/progress") => self.handle_agent_progress(req).await,
 
             (Method::Post, "/api/mcp/ui-resource") => self.handle_mcp_ui_resource(req).await,
 
@@ -246,12 +245,8 @@ impl Router {
             (Method::Post, "/api/diap/governance") => {
                 diap::handle_governance_request(env, req).await
             }
-            (Method::Post, "/api/diap/timelock") => {
-                diap::handle_timelock_request(env, req).await
-            }
-            (Method::Post, "/api/diap/account") => {
-                diap::handle_account_request(env, req).await
-            }
+            (Method::Post, "/api/diap/timelock") => diap::handle_timelock_request(env, req).await,
+            (Method::Post, "/api/diap/account") => diap::handle_account_request(env, req).await,
 
             _ => {
                 console_log!("Route not found: {} {}", method.to_string(), path);
@@ -310,11 +305,39 @@ impl Router {
         json_response(&response)
     }
 
-    async fn handle_agent_stream(&self) -> Result<Response> {
-        let error_response = ErrorResponse {
-            error: "Streaming not yet implemented. Use /api/agent/chat instead.".to_string(),
+    async fn handle_agent_progress(&self, req: &Request) -> Result<Response> {
+        let url = req.url()?;
+        let mut session_id: Option<String> = None;
+        let mut since: Option<i64> = None;
+
+        for (key, value) in url.query_pairs() {
+            match key.as_ref() {
+                "session_id" | "sessionId" => session_id = Some(value.into_owned()),
+                "since" | "cursor" => {
+                    if let Ok(parsed) = value.parse::<i64>() {
+                        since = Some(parsed);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let session_id = match session_id {
+            Some(id) if !id.trim().is_empty() => id,
+            _ => {
+                let error_response = ErrorResponse {
+                    error: "Missing session_id query parameter".to_string(),
+                };
+                return json_response_with_status(&error_response, 400);
+            }
         };
-        json_response_with_status(&error_response, 501)
+
+        let events = get_events(&session_id, since).await;
+        let response = json!({
+            "session_id": session_id,
+            "events": events,
+        });
+        json_response(&response)
     }
 
     async fn handle_mcp_ui_resource(&self, req: &mut Request) -> Result<Response> {

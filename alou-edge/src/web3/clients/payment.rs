@@ -242,10 +242,7 @@ impl DiapPaymentPrivacyClient {
     pub fn lock_funds_call(&self, commitment: &str, amount: &str) -> Result<EncodedCall> {
         self.inner.encode_call(
             "lockFundsForPrivacy",
-            vec![
-                token_fixed_bytes32(commitment)?,
-                token_uint(amount)?,
-            ],
+            vec![token_fixed_bytes32(commitment)?, token_uint(amount)?],
             None,
         )
     }
@@ -298,4 +295,3 @@ impl DiapPaymentPrivacyClient {
         )
     }
 }
-

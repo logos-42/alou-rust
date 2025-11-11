@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+// solhint-disable max-states-count
+
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -79,8 +81,8 @@ contract DIAPAgentNetwork is
     // ============ 结构体定义 ============
     
     struct Agent {
-        string didDocument;        // DID文档标识符 (优先IPNS名称，兼容IPFS CID)
-                                  // IPNS名称不变，可通过重新发布更新指向的内容
+        string identifier;        // CID 标识符（CID 或 IPNS 名称）
+                                  // 建议使用 IPNS 名称指向可更新的文档
                                   // 示例: k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8
         string publicKey;          // 公钥
         uint128 stakedAmount;     // 质押代币数量 (打包优化)
@@ -122,7 +124,7 @@ contract DIAPAgentNetwork is
     address public accountFactory; // DIAPAccountFactory合约地址
     
     mapping(address => Agent) public agents;
-    mapping(string => address) public didToAgent;  // DID标识符到地址映射 (支持IPNS名称和IPFS CID)
+    mapping(string => address) public identifierToAgent;  // CID/IPNS 标识符到地址映射
     mapping(bytes32 => Message) public messages;
     mapping(uint256 => Service) public services;
     
@@ -166,7 +168,7 @@ contract DIAPAgentNetwork is
     
     event AgentRegistered(
         address indexed agent, 
-        string didDocument,  // 支持IPNS名称和IPFS CID
+        string identifier,  // 支持IPNS名称和IPFS CID
         uint256 stakedAmount
     );
     
@@ -271,10 +273,10 @@ contract DIAPAgentNetwork is
         token = IERC20(_token);
         
         // 设置默认参数
-        registrationFee = 100 * 10**18;      // 100 代币
+        registrationFee = 10 * 10**18;      // 10 代币
         messageFee = 1 * 10**18;             // 1 代币
         serviceFeeRate = 300;                // 3%
-        minStakeAmount = 1000 * 10**18;      // 1000 代币
+        minStakeAmount = 100 * 10**18;      // 100 代币
         reputationThreshold = 1000;          // 1000 声誉点
         lockPeriod = 30 days;                // 30天锁定期
         rewardRate = 5;                      // 5% 年化
@@ -286,29 +288,29 @@ contract DIAPAgentNetwork is
     
     /**
      * @dev 注册智能体（传统 EOA 方式）
-     * @param didDocument DID文档标识符 (推荐使用IPNS名称，兼容IPFS CID)
-     *                    IPNS名称是不变的根域名，内容更新时无需修改链上标识符
-     *                    示例: k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8
+     * @param identifier CID 标识符（CID 或 IPNS 名称）
+     *                   推荐使用 IPNS 名称映射到可更新的 DID 文档
+     *                   示例: k51qzi5uqu5dlvj2baxnqndepeb86cbk3ng7n3i46uzyxzyqj2xjonzllnv0v8
      * @param publicKey 公钥
      * @param stakedAmount 质押代币数量
      */
     function registerAgent(
-        string calldata didDocument,
+        string calldata identifier,
         string calldata publicKey,
         uint256 stakedAmount
     ) external nonReentrant whenNotPaused {
-        _registerAgent(msg.sender, didDocument, publicKey, stakedAmount, address(0), false);
+        _registerAgent(msg.sender, identifier, publicKey, stakedAmount, address(0), false);
     }
     
     /**
      * @dev 注册智能体（ERC-4337 AA 账户方式）
-     * @param didDocument DID文档标识符
+     * @param identifier DID 标识符（CID 或 IPNS 名称）
      * @param publicKey 公钥
      * @param stakedAmount 质押代币数量
      * @param salt 用于创建 AA 账户的盐值
      */
     function registerAgentWithAA(
-        string calldata didDocument,
+        string calldata identifier,
         string calldata publicKey,
         uint256 stakedAmount,
         uint256 salt
@@ -325,7 +327,7 @@ contract DIAPAgentNetwork is
         aaAccount = address(abi.decode(data, (address)));
         
         // 注册智能体
-        _registerAgent(msg.sender, didDocument, publicKey, stakedAmount, aaAccount, true);
+        _registerAgent(msg.sender, identifier, publicKey, stakedAmount, aaAccount, true);
         
         emit AAAccountCreated(msg.sender, aaAccount, block.timestamp);
         
@@ -337,7 +339,7 @@ contract DIAPAgentNetwork is
      */
     function _registerAgent(
         address agentAddress,
-        string calldata didDocument,
+        string calldata identifier,
         string calldata publicKey,
         uint256 stakedAmount,
         address aaAccount,
@@ -346,14 +348,14 @@ contract DIAPAgentNetwork is
         if (agents[agentAddress].isActive) revert AgentAlreadyRegistered();
         if (stakedAmount < minStakeAmount) revert InsufficientStakeAmount();
         if (stakedAmount > type(uint128).max) revert StakeAmountTooLarge();
-        if (bytes(didDocument).length == 0) revert InvalidDIDDocument();
-        if (!_isValidIdentifier(didDocument)) revert InvalidIdentifierFormat();
+        if (bytes(identifier).length == 0) revert InvalidDIDDocument();
+        if (!_isValidIdentifier(identifier)) revert InvalidIdentifierFormat();
         
         // 优先使用IPNS，检查标识符类型
-        IdentifierType idType = _getIdentifierType(didDocument);
+        IdentifierType idType = _getIdentifierType(identifier);
         if (idType != IdentifierType.IPNS_NAME && idType != IdentifierType.IPFS_CID) revert MustUseIPNSOrIPFS();
         
-        if (didToAgent[didDocument] != address(0)) revert DIDAlreadyExists();
+        if (identifierToAgent[identifier] != address(0)) revert DIDAlreadyExists();
         
         // 计算总费用（质押金额 + 注册费用）
         uint256 totalCost = stakedAmount + registrationFee;
@@ -374,7 +376,7 @@ contract DIAPAgentNetwork is
         
         // 创建智能体
         agents[agentAddress] = Agent({
-            didDocument: didDocument,
+            identifier: identifier,
             publicKey: publicKey,
             stakedAmount: uint128(stakedAmount),
             totalEarnings: 0,
@@ -388,7 +390,7 @@ contract DIAPAgentNetwork is
             isAAAccount: isAA
         });
         
-        didToAgent[didDocument] = agentAddress;
+        identifierToAgent[identifier] = agentAddress;
         
         // Gas优化：维护可枚举列表
         agentIndex[agentAddress] = agentList.length;
@@ -397,7 +399,7 @@ contract DIAPAgentNetwork is
         totalAgents++;
         totalStaked += stakedAmount;
         
-        emit AgentRegistered(agentAddress, didDocument, stakedAmount);
+        emit AgentRegistered(agentAddress, identifier, stakedAmount);
     }
     
     /**
@@ -880,6 +882,7 @@ contract DIAPAgentNetwork is
         _unpause();
     }
     
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
     // ============ 查询函数 ============
@@ -913,7 +916,7 @@ contract DIAPAgentNetwork is
      */
     function getAgentIdentifierType(address agent) external view returns (IdentifierType) {
         if (!agents[agent].isActive) revert AgentNotRegistered();
-        return _getIdentifierType(agents[agent].didDocument);
+        return _getIdentifierType(agents[agent].identifier);
     }
     
     /**

@@ -63,4 +63,3 @@ pub fn load_contract_environment(env: &Env, network: Network) -> ContractEnviron
 
     ContractEnvironment { contracts, rpc }
 }
-

@@ -686,6 +686,7 @@ contract DIAPToken is
         _unpause();
     }
     
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
     // ============ 紧急控制函数 ============

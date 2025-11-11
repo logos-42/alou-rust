@@ -1,9 +1,10 @@
 use crate::agent::core::AgentCore;
 use crate::agent::session::{ContextEvent, SessionManager};
+use crate::agent::stream::{cleanup_session, StreamEvent, StreamPublisher};
 use crate::utils::error::AloudError;
 use crate::web3::auth::WalletAuth;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use worker::*;
 
 use super::{json_response, json_response_with_status, ErrorResponse};
@@ -135,7 +136,10 @@ pub(crate) async fn handle_delete_session(
     session_id: &str,
 ) -> Result<Response> {
     match session_manager.clear_session(session_id).await {
-        Ok(_) => Response::ok("Session deleted"),
+        Ok(_) => {
+            cleanup_session(session_id).await;
+            Response::ok("Session deleted")
+        }
         Err(e) => {
             let error_response = ErrorResponse {
                 error: e.to_string(),
@@ -170,6 +174,17 @@ pub(crate) async fn handle_agent_chat(
             return json_response_with_status(&error_response, 400);
         }
     };
+
+    let stream_publisher = StreamPublisher::new(&body.session_id);
+    stream_publisher
+        .publish(
+            StreamEvent::new(&body.session_id, "conversation.received")
+                .with_label("收到会话请求")
+                .with_payload(json!({
+                    "message_preview": body.message.chars().take(140).collect::<String>(),
+                })),
+        )
+        .await;
 
     console_log!(
         "Chat request - session_id: {}, wallet_address from body: {:?}",
@@ -296,18 +311,40 @@ pub(crate) async fn handle_agent_chat(
             chain.clone(),
             events_for_prompt,
             event_summary.clone(),
+            Some(stream_publisher.clone()),
         )
         .await
     {
         Ok(response) => {
             let chat_response = ChatResponse {
-                content: response.content,
+                content: response.content.clone(),
                 session_id: response.session_id,
-                tool_calls: response.tool_calls,
+                tool_calls: response.tool_calls.clone(),
             };
+            stream_publisher
+                .publish(
+                    StreamEvent::new(&body.session_id, "conversation.completed")
+                        .with_label("代理响应完成")
+                        .with_payload(json!({
+                            "content": response.content,
+                            "tool_calls": response.tool_calls,
+                        }))
+                        .mark_final(),
+                )
+                .await;
             json_response(&chat_response)
         }
         Err(e) => {
+            stream_publisher
+                .publish(
+                    StreamEvent::new(&body.session_id, "conversation.error")
+                        .with_label("代理执行失败")
+                        .with_payload(json!({
+                            "message": e.to_string(),
+                        }))
+                        .mark_final(),
+                )
+                .await;
             let error_response = ErrorResponse {
                 error: e.to_string(),
             };

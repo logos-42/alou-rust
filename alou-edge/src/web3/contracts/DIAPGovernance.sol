@@ -291,6 +291,7 @@ contract DIAPGovernance is
             }
         } catch {
             // 如果智能体网络不可用，只使用代币投票
+            reputationVotes = 0;
         }
         
         // 检查总和不会溢出
@@ -419,7 +420,11 @@ contract DIAPGovernance is
      * @dev 检查升级权限（多签控制）
      */
     function _authorizeUpgrade(address /* newImplementation */) internal view {
-        if (!upgradeAuthorizers[msg.sender] && msg.sender != multisigWallet && msg.sender != owner()) revert NotAuthorizedForUpgrade();
+        if (
+            !upgradeAuthorizers[msg.sender]
+            && msg.sender != multisigWallet
+            && msg.sender != owner()
+        ) revert NotAuthorizedForUpgrade();
         // 注意：DIAPGovernance不是UUPS合约，这里只是权限检查
     }
     
@@ -523,7 +528,12 @@ contract DIAPGovernance is
      * @param blockNumber 区块号
      * @return 法定人数
      */
-    function quorum(uint256 blockNumber) public view override(IGovernor, GovernorVotesQuorumFraction) returns (uint256) {
+    function quorum(uint256 blockNumber)
+        public
+        view
+        override(IGovernor, GovernorVotesQuorumFraction)
+        returns (uint256)
+    {
         return super.quorum(blockNumber);
     }
     
@@ -569,7 +579,12 @@ contract DIAPGovernance is
     /**
      * @dev 重写supportsInterface函数以解决多重继承冲突
      */
-    function supportsInterface(bytes4 interfaceId) public view override(Governor, GovernorTimelockControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(Governor, GovernorTimelockControl)
+        returns (bool)
+    {
         return super.supportsInterface(interfaceId);
     }
 }

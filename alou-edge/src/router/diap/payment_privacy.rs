@@ -1,4 +1,6 @@
-use super::common::{app_error, invalid_request, missing_field, respond_encoded, resolve_environment};
+use super::common::{
+    app_error, invalid_request, missing_field, resolve_environment, respond_encoded,
+};
 use crate::web3::clients::DiapPaymentPrivacyClient;
 use serde::Deserialize;
 use serde_json::json;
@@ -111,4 +113,3 @@ enum PaymentPrivacyAction {
     WithdrawFundsEncode,
     RefundCommitmentEncode,
 }
-

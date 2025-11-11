@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
+// solhint-disable max-states-count
+
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -224,8 +226,14 @@ contract DIAPVerification is
         uint256[8] calldata proof
     ) external nonReentrant returns (bytes32) {
         if (blacklistedAgents[msg.sender]) revert AgentIsBlacklisted();
-        if (bytes(didDocument).length == 0 || bytes(didDocument).length > MAX_STRING_LENGTH) revert InvalidDIDDocumentLength();
-        if (bytes(publicKey).length == 0 || bytes(publicKey).length > MAX_STRING_LENGTH) revert InvalidPublicKeyLength();
+        if (
+            bytes(didDocument).length == 0
+            || bytes(didDocument).length > MAX_STRING_LENGTH
+        ) revert InvalidDIDDocumentLength();
+        if (
+            bytes(publicKey).length == 0
+            || bytes(publicKey).length > MAX_STRING_LENGTH
+        ) revert InvalidPublicKeyLength();
         if (commitment == bytes32(0)) revert InvalidCommitment();
         if (nullifier == bytes32(0)) revert InvalidNullifier();
         if (usedNullifiers[nullifier]) revert NullifierAlreadyUsed(); // 防止重放攻击
@@ -393,7 +401,7 @@ contract DIAPVerification is
             try agentNetwork.getAgent(agents[i]) returns (DIAPAgentNetwork.Agent memory agent) {
                 if (agent.isActive) {
                     uint256[8] memory proofCopy = proofs[i];
-                    results[i] = _verifyZKProof(proofCopy, agent.didDocument, agent.publicKey);
+                    results[i] = _verifyZKProof(proofCopy, agent.identifier, agent.publicKey);
                 } else {
                     results[i] = false;
                 }
@@ -464,22 +472,22 @@ contract DIAPVerification is
     /**
      * @dev 验证ZKP证明
      * @param proof ZKP证明
-     * @param didDocument DID文档
+     * @param identifier DID 标识符（CID/IPNS）
      * @param publicKey 公钥
      * @return 是否有效
      */
     function _verifyZKProof(
         uint256[8] memory proof,
-        string memory didDocument,
+        string memory identifier,
         string memory publicKey
     ) internal view returns (bool) {
         if (zkpVerifier == address(0)) {
             // 默认验证逻辑 (简化实现)
-            return proof.length == 8 && proof[0] != 0 && bytes(didDocument).length > 0;
+            return proof.length == 8 && proof[0] != 0 && bytes(identifier).length > 0;
         }
         
         // 使用ABI-safe调用外部ZKP验证器
-        try IZKPVerifier(zkpVerifier).verifyProof(proof, didDocument, publicKey) returns (bool result) {
+        try IZKPVerifier(zkpVerifier).verifyProof(proof, identifier, publicKey) returns (bool result) {
             return result;
         } catch {
             // 验证器调用失败时返回false
@@ -578,6 +586,7 @@ contract DIAPVerification is
         emit ReputationThresholdUpdated(oldThreshold, _threshold);
     }
     
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
     // ============ 查询函数 ============

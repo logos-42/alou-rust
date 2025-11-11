@@ -1,6 +1,8 @@
 use crate::utils::error::{AloudError, Result};
 use crate::web3::abi::diap_agent_network_contract;
-use crate::web3::clients::common::{token_address, token_string, token_uint, token_uint_u64, ContractClient, EncodedCall};
+use crate::web3::clients::common::{
+    token_address, token_string, token_uint, token_uint_u64, ContractClient, EncodedCall,
+};
 use crate::web3::config::ContractEnvironment;
 use ethabi::Token;
 use serde_json::Value;
@@ -117,7 +119,6 @@ impl DiapAgentNetworkClient {
             None,
         )
     }
-
 }
 
 fn extract_uint(tokens: &[Token], name: &str) -> Result<String> {
@@ -133,4 +134,3 @@ fn extract_uint(tokens: &[Token], name: &str) -> Result<String> {
         ))),
     }
 }
-

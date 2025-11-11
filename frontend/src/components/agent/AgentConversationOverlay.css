@@ -91,3 +91,16 @@
 .conversation-panel .close-btn:hover {
   background: rgba(148, 163, 184, 0.28);
 }
+
+.stream-panel-wrapper {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.stream-panel-wrapper .agent-stream-panel {
+  margin: 0;
+  pointer-events: auto;
+}

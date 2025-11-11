@@ -59,12 +59,11 @@ impl DiapTokenClient {
     }
 
     pub fn stake_call(&self, amount_wei: &str, tier: u64) -> Result<EncodedCall> {
-        self.inner
-            .encode_call(
-                "stake",
-                vec![token_uint(amount_wei)?, token_uint_u64(tier)],
-                None,
-            )
+        self.inner.encode_call(
+            "stake",
+            vec![token_uint(amount_wei)?, token_uint_u64(tier)],
+            None,
+        )
     }
 
     pub fn claim_rewards_call(&self) -> Result<EncodedCall> {
@@ -89,4 +88,3 @@ fn extract_uint(tokens: &[Token], fn_name: &str) -> Result<String> {
         ))),
     }
 }
-

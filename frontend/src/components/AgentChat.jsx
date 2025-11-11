@@ -5,6 +5,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { walletService } from '@/services/walletService'
 import agentService from '@/services/agentService'
 import { MCP_UI_TARGETS, requestMcpUiResource } from '@/services/mcpUiService'
+import { useAgentStream } from '@/hooks/useAgentStream'
 import ChatHeader from '@/components/ChatHeader'
 import AgentSidebarLeft from '@/components/agent/AgentSidebarLeft'
 import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
@@ -41,6 +42,7 @@ const AgentChat = () => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
   const connectionStatusLabel = useMemo(() => {
     if (connectionStatus === 'connected') return '已连接'
+    if (connectionStatus === 'connecting') return '连接中'
     if (connectionStatus === 'error') return '服务异常'
     return '未连接'
   }, [connectionStatus])
@@ -57,45 +59,6 @@ const AgentChat = () => {
     `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
   )
   const [isSessionReady, setSessionReady] = useState(false)
-
-  useEffect(() => {
-    if (!isSessionReady) {
-      return
-    }
-    void loadChannelList(channelKeyword)
-  }, [channelKeyword, isSessionReady, loadChannelList])
-
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current)
-      }
-    }
-  }, [])
-
-  const refreshChannels = useCallback(() => {
-    void loadChannelList(channelKeyword)
-  }, [channelKeyword, loadChannelList])
-  const [interactionLogs, setInteractionLogs] = useState([])
-  const [viewportWidth, setViewportWidth] = useState(
-    typeof window !== 'undefined' ? window.innerWidth : 1440,
-  )
-  const languageLabel = useMemo(
-    () => (currentLanguage === 'zh' ? '中 / EN' : 'EN / 中'),
-    [currentLanguage],
-  )
-  const showConversationPanel = messages.length > 0 && isConversationVisible
-
-  const canvasRef = useRef(null)
-  const conversationOverlayRef = useRef(null)
-  const consoleDockRef = useRef(null)
-  const dragStateRef = useRef({ dragging: false, offsetX: 0, offsetY: 0, moved: false })
-  const agentPositionRef = useRef({ x: 0, y: 0 })
-  const [agentPosition, setAgentPosition] = useState({ x: 0, y: 0 })
-  const [uiResource, setUiResource] = useState(null)
-  const [isUiModalOpen, setUiModalOpen] = useState(false)
-
-  const contextEventsRef = useRef([])
 
   const [channelKeyword, setChannelKeyword] = useState('')
   const [activeChannelId, setActiveChannelId] = useState(null)
@@ -149,6 +112,129 @@ const AgentChat = () => {
     }
     return '请求失败'
   }, [])
+
+  const loadChannelList = useCallback(
+    async (keyword = channelKeyword) => {
+      if (!sessionId) {
+        return []
+      }
+
+      const query = keyword?.trim() || ''
+      const requestId = channelRequestIdRef.current + 1
+      channelRequestIdRef.current = requestId
+
+      const applyLatest = (updater) => {
+        if (channelRequestIdRef.current === requestId) {
+          updater()
+        }
+      }
+
+      setChannelLoading(true)
+      setChannelError(null)
+
+      try {
+        if (!query) {
+          const session = await agentService.getSession(sessionId)
+          const metadata = session?.agent_metadata
+          const channel = buildChannelFromAgent(metadata)
+
+          applyLatest(() => {
+            if (channel) {
+              setChannels([channel])
+              setActiveChannelId(channel.id)
+              setSelectedAgent(metadata)
+            } else {
+              setChannels([])
+              setActiveChannelId(null)
+              setSelectedAgent(null)
+            }
+          })
+
+          return channel ? [channel] : []
+        }
+
+        const response = await agentService.searchAgents(query)
+        const agents = Array.isArray(response?.agents) ? response.agents : []
+        const mapped = agents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
+
+        applyLatest(() => {
+          setChannels(mapped)
+          if (mapped.length > 0) {
+            if (!mapped.some((channel) => channel.id === activeChannelId)) {
+              setActiveChannelId(mapped[0].id)
+              setSelectedAgent(mapped[0].meta)
+            }
+          } else {
+            setActiveChannelId(null)
+            setSelectedAgent(null)
+          }
+        })
+
+        return mapped
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        applyLatest(() => {
+          console.error('Failed to load agent channels:', error)
+          setChannelError(message)
+          setChannels([])
+          setActiveChannelId(null)
+          setSelectedAgent(null)
+        })
+        return []
+      } finally {
+        applyLatest(() => {
+          setChannelLoading(false)
+        })
+      }
+    },
+    [
+      activeChannelId,
+      buildChannelFromAgent,
+      channelKeyword,
+      extractErrorMessage,
+      sessionId,
+    ],
+  )
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSessionReady) {
+      return
+    }
+    void loadChannelList(channelKeyword)
+  }, [channelKeyword, isSessionReady, loadChannelList])
+
+  const refreshChannels = useCallback(() => {
+    void loadChannelList(channelKeyword)
+  }, [channelKeyword, loadChannelList])
+  const [interactionLogs, setInteractionLogs] = useState([])
+  const [viewportWidth, setViewportWidth] = useState(
+    typeof window !== 'undefined' ? window.innerWidth : 1440,
+  )
+  const languageLabel = useMemo(
+    () => (currentLanguage === 'zh' ? '中 / EN' : 'EN / 中'),
+    [currentLanguage],
+  )
+  const showConversationPanel = messages.length > 0 && isConversationVisible
+
+  const canvasRef = useRef(null)
+  const conversationOverlayRef = useRef(null)
+  const consoleDockRef = useRef(null)
+  const dragStateRef = useRef({ dragging: false, offsetX: 0, offsetY: 0, moved: false })
+  const agentPositionRef = useRef({ x: 0, y: 0 })
+  const [agentPosition, setAgentPosition] = useState({ x: 0, y: 0 })
+  const [uiResource, setUiResource] = useState(null)
+  const [isUiModalOpen, setUiModalOpen] = useState(false)
+  const finalEventHandledRef = useRef(null)
+
+  const contextEventsRef = useRef([])
 
   const handleChannelKeywordChange = useCallback(
     (value) => {
@@ -396,6 +482,75 @@ const AgentChat = () => {
     },
     [closeUiResource, recordInteraction],
   )
+
+  const handleStreamEvent = useCallback(
+    (event) => {
+      if (!event) {
+        return
+      }
+
+      recordInteraction(
+        'stream_event',
+        {
+          event: event.event,
+          payload: event.payload,
+        },
+        event.label,
+      )
+
+      if (event.isFinal && event.timestamp && finalEventHandledRef.current !== event.timestamp) {
+        finalEventHandledRef.current = event.timestamp
+        if (Array.isArray(event.payload?.tool_calls)) {
+          const uiCall = event.payload.tool_calls.find((call) => {
+            const result = call?.result
+            if (!result) return false
+            if (Array.isArray(result.resources) && result.resources.length > 0) {
+              return true
+            }
+            return Boolean(result.resource || result.uri)
+          })
+
+          if (uiCall?.result) {
+            const result = uiCall.result
+            if (Array.isArray(result.resources) && result.resources.length > 0) {
+              openUiResource(result.resources[0], {
+                source: 'stream_final',
+                toolCall: uiCall.name,
+              })
+            } else if (result.resource) {
+              openUiResource(result.resource, {
+                source: 'stream_final',
+                toolCall: uiCall.name,
+              })
+            } else if (result.uri) {
+              openUiResource(result, {
+                source: 'stream_final',
+                toolCall: uiCall.name,
+              })
+            }
+          }
+        }
+      }
+    },
+    [openUiResource, recordInteraction],
+  )
+
+  const { status: streamStatus, events: streamEvents } = useAgentStream(sessionId, {
+    enabled: isSessionReady,
+    onEvent: handleStreamEvent,
+  })
+
+  useEffect(() => {
+    if (streamStatus === 'error') {
+      setConnectionStatus('error')
+    } else if (streamStatus === 'active' || streamStatus === 'completed') {
+      setConnectionStatus('connected')
+    } else if (streamStatus === 'polling') {
+      setConnectionStatus('connecting')
+    } else {
+      setConnectionStatus('disconnected')
+    }
+  }, [streamStatus])
 
   const appendMessage = useCallback(
     (message) => {
@@ -851,83 +1006,6 @@ const AgentChat = () => {
     scrollToBottom,
     sessionId,
   ])
-
-  const loadChannelList = useCallback(
-    async (keyword = channelKeyword) => {
-      if (!sessionId) {
-        return []
-      }
-
-      const query = keyword?.trim() || ''
-      const requestId = channelRequestIdRef.current + 1
-      channelRequestIdRef.current = requestId
-
-      const applyLatest = (updater) => {
-        if (channelRequestIdRef.current === requestId) {
-          updater()
-        }
-      }
-
-      setChannelLoading(true)
-      setChannelError(null)
-
-      try {
-        if (!query) {
-          const session = await agentService.getSession(sessionId)
-          const metadata = session?.agent_metadata
-          const channel = buildChannelFromAgent(metadata)
-
-          applyLatest(() => {
-            if (channel) {
-              setChannels([channel])
-              setActiveChannelId(channel.id)
-              setSelectedAgent(metadata)
-            } else {
-              setChannels([])
-              setActiveChannelId(null)
-              setSelectedAgent(null)
-            }
-          })
-
-          return channel ? [channel] : []
-        }
-
-        const response = await agentService.searchAgents(query)
-        const agents = Array.isArray(response?.agents) ? response.agents : []
-        const mapped = agents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
-
-        applyLatest(() => {
-          setChannels(mapped)
-          if (mapped.length > 0) {
-            if (!mapped.some((channel) => channel.id === activeChannelId)) {
-              setActiveChannelId(mapped[0].id)
-              setSelectedAgent(mapped[0].meta)
-            }
-          } else {
-            setActiveChannelId(null)
-            setSelectedAgent(null)
-          }
-        })
-
-        return mapped
-      } catch (error) {
-        const message = extractErrorMessage(error)
-        applyLatest(() => {
-          console.error('Failed to load agent channels:', error)
-          setChannelError(message)
-          setChannels([])
-          setActiveChannelId(null)
-          setSelectedAgent(null)
-        })
-        return []
-      } finally {
-        applyLatest(() => {
-          setChannelLoading(false)
-        })
-      }
-    },
-    [activeChannelId, buildChannelFromAgent, channelKeyword, extractErrorMessage, sessionId],
-  )
 
   useEffect(() => {
     if (!walletService.isWalletAvailable()) {
@@ -1400,6 +1478,8 @@ const AgentChat = () => {
             isLoading={isLoading}
             onClose={closeConversationPanel}
             onInspectMessage={handleInspectMessage}
+            streamEvents={streamEvents}
+            streamStatus={streamStatus}
           />
         )}
       </div>

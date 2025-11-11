@@ -1,13 +1,12 @@
-use super::common::{app_error, invalid_request, missing_field, respond_encoded, resolve_environment};
+use super::common::{
+    app_error, invalid_request, missing_field, resolve_environment, respond_encoded,
+};
 use crate::web3::clients::DiapGovernanceClient;
 use serde::Deserialize;
 use serde_json::json;
 use worker::{Env, Request, Response, Result as WorkerResult};
 
-pub async fn handle_governance_request(
-    env: &Env,
-    req: &mut Request,
-) -> WorkerResult<Response> {
+pub async fn handle_governance_request(env: &Env, req: &mut Request) -> WorkerResult<Response> {
     let body: GovernanceRequest = match req.json().await {
         Ok(body) => body,
         Err(e) => return invalid_request(e.to_string()),
@@ -81,11 +80,7 @@ pub async fn handle_governance_request(
             };
             let support = body.support.unwrap_or(0) as u8;
             let reason = body.reason.unwrap_or_default();
-            respond_encoded(client.cast_vote_with_reason_call(
-                &proposal_id,
-                support,
-                &reason,
-            ))
+            respond_encoded(client.cast_vote_with_reason_call(&proposal_id, support, &reason))
         }
     }
 }
@@ -116,4 +111,3 @@ enum GovernanceAction {
     CastVoteEncode,
     CastVoteWithReasonEncode,
 }
-

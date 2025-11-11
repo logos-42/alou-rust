@@ -1,4 +1,6 @@
-use super::common::{app_error, invalid_request, missing_field, respond_encoded, resolve_environment};
+use super::common::{
+    app_error, invalid_request, missing_field, resolve_environment, respond_encoded,
+};
 use crate::web3::clients::DiapAgentNetworkClient;
 use serde::Deserialize;
 use serde_json::json;
@@ -37,7 +39,9 @@ pub async fn handle_agent_request(env: &Env, req: &mut Request) -> WorkerResult<
             Err(e) => app_error(e),
         },
         AgentAction::ReputationThreshold => match client.reputation_threshold().await {
-            Ok(threshold) => super::super::json_response(&json!({ "reputation_threshold": threshold })),
+            Ok(threshold) => {
+                super::super::json_response(&json!({ "reputation_threshold": threshold }))
+            }
             Err(e) => app_error(e),
         },
         AgentAction::IdentifierType => {
@@ -95,7 +99,12 @@ pub async fn handle_agent_request(env: &Env, req: &mut Request) -> WorkerResult<
                 None => return missing_field("stake_amount"),
             };
             let salt = body.salt.unwrap_or(0);
-            respond_encoded(client.register_agent_with_aa_call(&did, &public_key, &stake_amount, salt))
+            respond_encoded(client.register_agent_with_aa_call(
+                &did,
+                &public_key,
+                &stake_amount,
+                salt,
+            ))
         }
     }
 }
@@ -128,4 +137,3 @@ enum AgentAction {
     RegisterEncode,
     RegisterAaEncode,
 }
-

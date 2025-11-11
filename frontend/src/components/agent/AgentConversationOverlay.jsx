@@ -1,5 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react'
 import MessageList from '@/components/MessageList'
+import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
 import './AgentConversationOverlay.css'
 
 const AgentConversationOverlay = forwardRef(
@@ -12,6 +13,8 @@ const AgentConversationOverlay = forwardRef(
       isLoading,
       onClose,
       onInspectMessage,
+      streamEvents = [],
+      streamStatus = 'idle',
     },
     ref,
   ) => {
@@ -48,6 +51,11 @@ const AgentConversationOverlay = forwardRef(
               ref={messageListRef}
               messages={messages}
               isLoading={isLoading}
+              loadingContent={
+                <div className="stream-panel-wrapper">
+                  <AgentStreamPanel events={streamEvents} status={streamStatus} />
+                </div>
+              }
               onMessageSelect={onInspectMessage}
             />
           </div>

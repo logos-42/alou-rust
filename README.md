@@ -66,6 +66,7 @@ export CLOUDFLARE_ACCOUNT_ID=your_account_id
 - 多轮对话上下文管理
 - 流式响应支持
 - 会话持久化存储
+- 统一的进度轮询：客户端通过 `/api/agent/progress` 获取执行阶段，兼容本地与生产环境
 
 ### Web3 钱包认证
 - MetaMask / Phantom 连接

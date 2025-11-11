@@ -24,7 +24,8 @@ const formatTime = (timestamp) =>
     minute: '2-digit',
   })
 
-const MessageList = forwardRef(({ messages = [], isLoading = false, onMessageSelect }, ref) => {
+const MessageList = forwardRef(
+  ({ messages = [], isLoading = false, loadingContent = null, onMessageSelect }, ref) => {
   const containerRef = useRef(null)
   const { t } = useI18n()
 
@@ -89,20 +90,21 @@ const MessageList = forwardRef(({ messages = [], isLoading = false, onMessageSel
         })}
       </div>
 
-      {isLoading && (
-        <div className="message-wrapper assistant">
-          <div className="message-bubble loading">
-            <div className="typing-animation">
-              <div className="typing-dots">
-                <span />
-                <span />
-                <span />
+      {isLoading &&
+        (loadingContent || (
+          <div className="message-wrapper assistant">
+            <div className="message-bubble loading">
+              <div className="typing-animation">
+                <div className="typing-dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="typing-text">{t('thinking')}</span>
               </div>
-              <span className="typing-text">{t('thinking')}</span>
             </div>
           </div>
-        </div>
-      )}
+        ))}
     </div>
   )
 })

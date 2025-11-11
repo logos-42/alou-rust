@@ -4,8 +4,7 @@ use crate::web3::abi::{
     entry_point_contract,
 };
 use crate::web3::clients::common::{
-    parse_u256, token_address, token_bytes_from_hex, token_uint,
-    ContractClient, EncodedCall,
+    parse_u256, token_address, token_bytes_from_hex, token_uint, ContractClient, EncodedCall,
 };
 use crate::web3::config::ContractEnvironment;
 use ethabi::Token;
@@ -23,7 +22,9 @@ impl DiapAccountFactoryClient {
             .as_ref()
             .map(|c| c.factory)
             .ok_or_else(|| {
-                AloudError::InvalidInput("Account factory not configured for selected network".into())
+                AloudError::InvalidInput(
+                    "Account factory not configured for selected network".into(),
+                )
             })?;
         let abi = diap_account_factory_contract();
         let rpc_url = env.rpc.url.clone();
@@ -92,10 +93,7 @@ impl DiapAccountFactoryClient {
     pub async fn get_address(&self, owner: &str, salt: &str) -> Result<String> {
         let result = self
             .inner
-            .call(
-                "getAddress",
-                vec![token_address(owner)?, token_uint(salt)?],
-            )
+            .call("getAddress", vec![token_address(owner)?, token_uint(salt)?])
             .await?;
         match result.tokens.first() {
             Some(Token::Address(addr)) => Ok(format!("0x{:040x}", addr)),
@@ -334,11 +332,7 @@ impl EntryPointClient {
             .encode_call("depositTo", vec![token_address(account)?], Some(value))
     }
 
-    pub fn withdraw_to_call(
-        &self,
-        withdraw_address: &str,
-        amount: &str,
-    ) -> Result<EncodedCall> {
+    pub fn withdraw_to_call(&self, withdraw_address: &str, amount: &str) -> Result<EncodedCall> {
         self.inner.encode_call(
             "withdrawTo",
             vec![token_address(withdraw_address)?, token_uint(amount)?],
@@ -374,16 +368,13 @@ impl DiapAccountClient {
                 "owner returned unexpected token: {:?}",
                 other
             ))),
-            None => Err(AloudError::InvalidInput("owner returned empty result".into())),
+            None => Err(AloudError::InvalidInput(
+                "owner returned empty result".into(),
+            )),
         }
     }
 
-    pub fn execute_call(
-        &self,
-        target: &str,
-        value: &str,
-        data_hex: &str,
-    ) -> Result<EncodedCall> {
+    pub fn execute_call(&self, target: &str, value: &str, data_hex: &str) -> Result<EncodedCall> {
         self.inner.encode_call(
             "execute",
             vec![
@@ -409,4 +400,3 @@ fn extract_uint(tokens: &[Token], name: &str) -> Result<String> {
         ))),
     }
 }
-

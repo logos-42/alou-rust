@@ -31,7 +31,12 @@ pub struct ContractClient {
 }
 
 impl ContractClient {
-    pub fn new(address: impl Into<String>, abi: Arc<Contract>, rpc_url: String, network: Network) -> Self {
+    pub fn new(
+        address: impl Into<String>,
+        abi: Arc<Contract>,
+        rpc_url: String,
+        network: Network,
+    ) -> Self {
         Self {
             address: address.into(),
             abi,
@@ -198,4 +203,3 @@ fn decode_tokens(function: &Function, raw: &str) -> Result<Vec<Token>> {
         .decode_output(&bytes)
         .map_err(|e| AloudError::InvalidInput(format!("Failed to decode output: {}", e)))
 }
-

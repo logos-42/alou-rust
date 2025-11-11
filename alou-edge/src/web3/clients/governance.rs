@@ -137,10 +137,7 @@ impl TimelockControllerClient {
     pub async fn operation_timestamp(&self, operation_id: &str) -> Result<String> {
         let result = self
             .inner
-            .call(
-                "getTimestamp",
-                vec![token_fixed_bytes32(operation_id)?],
-            )
+            .call("getTimestamp", vec![token_fixed_bytes32(operation_id)?])
             .await?;
         extract_uint(&result.tokens, "getTimestamp")
     }
@@ -148,10 +145,7 @@ impl TimelockControllerClient {
     pub async fn is_operation_ready(&self, operation_id: &str) -> Result<bool> {
         let result = self
             .inner
-            .call(
-                "isOperationReady",
-                vec![token_fixed_bytes32(operation_id)?],
-            )
+            .call("isOperationReady", vec![token_fixed_bytes32(operation_id)?])
             .await?;
         match result.tokens.first() {
             Some(Token::Bool(value)) => Ok(*value),
@@ -179,4 +173,3 @@ fn extract_uint(tokens: &[Token], name: &str) -> Result<String> {
         ))),
     }
 }
-

@@ -16,4 +16,3 @@ pub use payment_core::handle_payment_core_request;
 pub use payment_privacy::handle_payment_privacy_request;
 pub use timelock::handle_timelock_request;
 pub use token::handle_token_request;
-

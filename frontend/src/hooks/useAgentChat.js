@@ -264,6 +264,7 @@ export const ACTION_LABELS = {
   trigger_mcp: '调用 MCP',
   user_message: '用户消息',
   wallet_instruction: '钱包指令',
+  stream_event: '流式事件',
 }
 
 export const useToolCallHandler = ({

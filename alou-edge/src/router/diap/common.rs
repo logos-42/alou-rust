@@ -15,7 +15,9 @@ pub(crate) fn resolve_environment(
     Ok((net, config))
 }
 
-pub(crate) fn respond_encoded(result: crate::utils::error::Result<EncodedCall>) -> WorkerResult<Response> {
+pub(crate) fn respond_encoded(
+    result: crate::utils::error::Result<EncodedCall>,
+) -> WorkerResult<Response> {
     match result {
         Ok(call) => super::super::json_response(&call),
         Err(e) => app_error(e),
@@ -61,4 +63,3 @@ pub(crate) fn method_not_allowed() -> WorkerResult<Response> {
         405,
     )
 }
-

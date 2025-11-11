@@ -1,6 +1,6 @@
 use super::common::{
-    app_error, invalid_request, missing_field, method_not_allowed, respond_encoded,
-    resolve_environment,
+    app_error, invalid_request, method_not_allowed, missing_field, resolve_environment,
+    respond_encoded,
 };
 use crate::web3::clients::{
     DiapAccountClient, DiapAccountFactoryClient, DiapPaymasterClient, EntryPointClient,
@@ -62,7 +62,9 @@ async fn handle_account_factory(
                 None => return missing_field("address"),
             };
             match client.get_account_by_owner(&owner).await {
-                Ok(account) => super::super::json_response(&json!({ "owner": owner, "account": account })),
+                Ok(account) => {
+                    super::super::json_response(&json!({ "owner": owner, "account": account }))
+                }
                 Err(e) => app_error(e),
             }
         }
@@ -72,7 +74,9 @@ async fn handle_account_factory(
                 None => return missing_field("address"),
             };
             match client.get_owner_by_account(&account).await {
-                Ok(owner) => super::super::json_response(&json!({ "account": account, "owner": owner })),
+                Ok(owner) => {
+                    super::super::json_response(&json!({ "account": account, "owner": owner }))
+                }
                 Err(e) => app_error(e),
             }
         }
@@ -82,7 +86,9 @@ async fn handle_account_factory(
                 None => return missing_field("address"),
             };
             match client.is_account(&account).await {
-                Ok(is_account) => super::super::json_response(&json!({ "account": account, "exists": is_account })),
+                Ok(is_account) => super::super::json_response(
+                    &json!({ "account": account, "exists": is_account }),
+                ),
                 Err(e) => app_error(e),
             }
         }
@@ -146,7 +152,9 @@ async fn handle_paymaster(
                 None => return missing_field("address"),
             };
             match client.account_whitelisted(&address).await {
-                Ok(whitelisted) => super::super::json_response(&json!({ "address": address, "whitelisted": whitelisted })),
+                Ok(whitelisted) => super::super::json_response(
+                    &json!({ "address": address, "whitelisted": whitelisted }),
+                ),
                 Err(e) => app_error(e),
             }
         }
@@ -156,7 +164,9 @@ async fn handle_paymaster(
                 None => return missing_field("address"),
             };
             match client.target_whitelisted(&target).await {
-                Ok(whitelisted) => super::super::json_response(&json!({ "address": target, "whitelisted": whitelisted })),
+                Ok(whitelisted) => super::super::json_response(
+                    &json!({ "address": target, "whitelisted": whitelisted }),
+                ),
                 Err(e) => app_error(e),
             }
         }
@@ -256,7 +266,9 @@ async fn handle_entrypoint(
                 None => return missing_field("address"),
             };
             match client.balance_of(&address).await {
-                Ok(balance) => super::super::json_response(&json!({ "address": address, "balance": balance })),
+                Ok(balance) => {
+                    super::super::json_response(&json!({ "address": address, "balance": balance }))
+                }
                 Err(e) => app_error(e),
             }
         }
@@ -381,4 +393,3 @@ enum AccountAction {
     AccountOwner,
     AccountExecuteEncode,
 }
-

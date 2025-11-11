@@ -332,6 +332,7 @@ contract DIAPPaymentChannel is
         _unpause();
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // ============ 查询函数 ============

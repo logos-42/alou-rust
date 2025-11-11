@@ -7,9 +7,9 @@ pub mod token;
 
 #[allow(unused_imports)]
 pub use common::{
-    tokens_to_json, CallOutput, ContractClient, EncodedCall, parse_address, parse_u256,
-    parse_u256_hex, token_address, token_bool, token_bytes_from_hex, token_fixed_bytes32,
-    token_string, token_uint, token_uint_u64,
+    parse_address, parse_u256, parse_u256_hex, token_address, token_bool, token_bytes_from_hex,
+    token_fixed_bytes32, token_string, token_uint, token_uint_u64, tokens_to_json, CallOutput,
+    ContractClient, EncodedCall,
 };
 
 pub use account_abstraction::{
@@ -17,8 +17,5 @@ pub use account_abstraction::{
 };
 pub use agent::DiapAgentNetworkClient;
 pub use governance::{DiapGovernanceClient, TimelockControllerClient};
-pub use payment::{
-    DiapPaymentChannelClient, DiapPaymentCoreClient, DiapPaymentPrivacyClient,
-};
+pub use payment::{DiapPaymentChannelClient, DiapPaymentCoreClient, DiapPaymentPrivacyClient};
 pub use token::DiapTokenClient;
-

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use worker::console_log;
 
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
@@ -7,6 +7,7 @@ use crate::agent::claude_client::{ClaudeClient, ClaudeMessage, ClaudeTool, ToolU
 use crate::agent::context::AgentContext;
 use crate::agent::prompts::PromptMode;
 use crate::agent::session::{ContextEvent, Message, SessionManager};
+use crate::agent::stream::{StreamEvent, StreamPublisher};
 use crate::mcp::executor::{McpExecutor, ToolCall};
 use crate::utils::error::{AloudError, Result};
 
@@ -106,14 +107,26 @@ impl AgentCore {
         chain: Option<String>,
         recent_events: Vec<ContextEvent>,
         event_summary: Option<String>,
+        stream: Option<StreamPublisher>,
     ) -> Result<AgentResponse> {
         // Detect prompt mode from user message
         let prompt_mode = PromptMode::detect_from_message(message);
 
         // Add user message to session
-        self.session_manager
+        self
+            .session_manager
             .add_message(session_id, "user", message)
             .await?;
+        Self::emit_stream(
+            &stream,
+            StreamEvent::new(session_id, "message.recorded")
+                .with_label("收到用户消息")
+                .with_payload(json!({
+                    "role": "user",
+                    "content": message,
+                })),
+        )
+        .await;
 
         // Load conversation history
         let history = self.session_manager.get_history(session_id).await?;
@@ -167,6 +180,18 @@ impl AgentCore {
             }
 
             // Call AI API (Claude or other provider)
+            Self::emit_stream(
+                &stream,
+                StreamEvent::new(session_id, "llm.request")
+                    .with_label("请求模型响应")
+                    .with_payload(json!({
+                        "provider": format!("{:?}", self.provider_type),
+                        "iteration": iterations,
+                        "tool_count": tools.len(),
+                    })),
+            )
+            .await;
+
             let response = if let Some(ai_client) = &self.ai_client {
                 // Use new unified AI client
                 let mut pending_tool_ids: Vec<String> = Vec::new();
@@ -266,10 +291,38 @@ impl AgentCore {
                 );
                 let preview = response.content.chars().take(100).collect::<String>();
                 console_log!("AgentCore: Content preview: {}", preview);
+                Self::emit_stream(
+                    &stream,
+                    StreamEvent::new(session_id, "llm.response")
+                        .with_label("模型生成最终回复")
+                        .with_payload(json!({
+                            "preview": preview,
+                            "length": response.content.len(),
+                        })),
+                )
+                .await;
                 break response.content.clone();
             }
 
             // Execute tool calls
+            Self::emit_stream(
+                &stream,
+                StreamEvent::new(session_id, "tool.calls")
+                    .with_label("执行工具调用")
+                    .with_payload(json!({
+                        "count": response.tool_calls.len(),
+                        "tools": response
+                            .tool_calls
+                            .iter()
+                            .map(|t| json!({
+                                "id": t.id,
+                                "name": t.name,
+                            }))
+                            .collect::<Vec<_>>(),
+                    })),
+            )
+            .await;
+
             let tool_results = self
                 .execute_tool_calls(&response.tool_calls, &context)
                 .await;
@@ -318,20 +371,45 @@ impl AgentCore {
                     name: tool_use.name.clone(),
                     result: result.result.clone(),
                 });
+                Self::emit_stream(
+                    &stream,
+                    StreamEvent::new(session_id, "tool.result")
+                        .with_payload(json!({
+                            "tool_call_id": tool_use.id,
+                            "name": tool_use.name,
+                        })),
+                )
+                .await;
             }
 
             // Continue loop to get next response from Claude
         };
 
-        self.session_manager
+        self
+            .session_manager
             .add_message(session_id, "assistant", &final_content)
             .await?;
+        Self::emit_stream(
+            &stream,
+            StreamEvent::new(session_id, "assistant.persisted")
+                .with_label("助手回复已记录")
+                .with_payload(json!({
+                    "length": final_content.len(),
+                })),
+        )
+        .await;
 
         Ok(AgentResponse {
             content: final_content,
             session_id: session_id.to_string(),
             tool_calls: tool_call_info,
         })
+    }
+
+    async fn emit_stream(stream: &Option<StreamPublisher>, event: StreamEvent) {
+        if let Some(publisher) = stream {
+            publisher.publish(event).await;
+        }
     }
 
     /// Execute tool calls using MCP executor

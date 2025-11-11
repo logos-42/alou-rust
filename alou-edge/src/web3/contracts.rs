@@ -192,4 +192,3 @@ pub fn network_from_str(value: &str) -> Option<Network> {
         _ => None,
     }
 }
-

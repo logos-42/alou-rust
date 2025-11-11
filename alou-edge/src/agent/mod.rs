@@ -7,6 +7,7 @@ pub mod discovery;
 pub mod prompts;
 pub mod providers;
 pub mod session;
+pub mod stream;
 pub mod tools;
 
 pub use core::AgentCore;

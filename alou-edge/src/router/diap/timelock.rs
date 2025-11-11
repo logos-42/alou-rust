@@ -80,4 +80,3 @@ enum TimelockAction {
     OperationTimestamp,
     IsOperationReady,
 }
-
