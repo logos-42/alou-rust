@@ -12,20 +12,52 @@ const calculateUSD = (ethAmount, price) => {
   return (amount * price).toFixed(2)
 }
 
-const WalletOverview = ({
-  wallet,
-  currentNetwork,
-  networkName,
-  ethPrice,
-  onSwitchWallet,
-  onDisconnect,
-}) => {
+const formatStableUsd = (value) => {
+  if (value === undefined || value === null) {
+    return '≈ $0.00'
+  }
+  const numeric = Number(value)
+  if (Number.isFinite(numeric)) {
+    return `≈ $${numeric.toFixed(2)}`
+  }
+  const coerced = typeof value === 'string' ? value : String(value)
+  return `≈ $${coerced}`
+}
+
+const WalletOverview = ({ wallet, currentNetwork, networkName, ethPrice, supportedTokens = [], onSwitchWallet, onDisconnect }) => {
   const { t } = useI18n()
 
   const formattedEthUSD = useMemo(
     () => calculateUSD(wallet?.ethBalance, ethPrice),
     [ethPrice, wallet?.ethBalance],
   )
+
+  const tokenCards = useMemo(() => {
+    if (!Array.isArray(supportedTokens) || supportedTokens.length === 0) {
+      return []
+    }
+
+    const balances = wallet?.tokenBalances || {}
+
+    return supportedTokens.map((token) => {
+      const balanceInfo = balances[token.symbol] || {}
+      const displayBalance =
+        balanceInfo.normalizedBalance ??
+        balanceInfo.balance ??
+        '0'
+
+      return {
+        symbol: token.symbol,
+        name: token.name,
+        balance: displayBalance,
+        rawBalance: balanceInfo.rawBalance ?? '0',
+        decimals: balanceInfo.decimals ?? token.decimals,
+        usdDisplay: formatStableUsd(
+          balanceInfo.normalizedBalance ?? displayBalance,
+        ),
+      }
+    })
+  }, [supportedTokens, wallet?.tokenBalances])
 
   return (
     <div className="wallet-overview-card">
@@ -58,11 +90,15 @@ const WalletOverview = ({
           <div className="balance-amount">{wallet?.ethBalance || '0.0'}</div>
           <div className="balance-usd">≈ ${formattedEthUSD}</div>
         </div>
-        <div className="balance-card">
-          <div className="balance-label">USDC {t('balance')}</div>
-          <div className="balance-amount">{wallet?.usdcBalance || '0.0'}</div>
-          <div className="balance-usd">≈ ${wallet?.usdcBalance || '0.0'}</div>
-        </div>
+        {tokenCards.map((token) => (
+          <div className="balance-card" key={token.symbol}>
+            <div className="balance-label">
+              {token.symbol} {t('balance')}
+            </div>
+            <div className="balance-amount">{token.balance}</div>
+            <div className="balance-usd">{token.usdDisplay}</div>
+          </div>
+        ))}
       </div>
     </div>
   )

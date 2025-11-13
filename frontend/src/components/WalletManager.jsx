@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/hooks/useI18n'
+import { mapChainIdToBackendChain } from '@/hooks/useAgentChat'
 import { blockchainService } from '@/services/blockchainService'
 import { walletService } from '@/services/walletService'
 import WalletConnect from '@/components/wallet/WalletConnect'
@@ -72,6 +73,7 @@ const WalletManager = () => {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [ethPrice] = useState(2000)
   const [agentWallets, setAgentWallets] = useState([])
+  const [supportedTokens, setSupportedTokens] = useState([])
 
   const getNetworkName = useCallback((chainId) => {
     const network = networks.find((network) => network.chainId === chainId)
@@ -96,7 +98,7 @@ const WalletManager = () => {
     setConnectedWallet({
       address,
       ethBalance: balanceInfo?.balance || '0.0',
-      usdcBalance: '0.0',
+      tokenBalances: {},
     })
     setCurrentNetwork(chainId)
     if (typeof localStorage !== 'undefined') {
@@ -152,6 +154,88 @@ const WalletManager = () => {
     }
   }, [])
 
+  const resolveBackendChain = useCallback((chainId, chainHint) => {
+    if (chainHint && chainHint.trim()) {
+      return chainHint
+    }
+    const mapped = mapChainIdToBackendChain(chainId)
+    return mapped || 'ethereum'
+  }, [])
+
+  const loadSupportedTokens = useCallback(
+    async (chainId, chainHint) => {
+      const backendChain = resolveBackendChain(chainId, chainHint)
+      try {
+        const response = await blockchainService.listSupportedTokens(backendChain)
+        const tokens = response?.tokens || []
+        setSupportedTokens(tokens)
+        return { tokens, backendChain }
+      } catch (error) {
+        console.error('Failed to load supported tokens:', error)
+        setSupportedTokens([])
+        return { tokens: [], backendChain }
+      }
+    },
+    [resolveBackendChain],
+  )
+
+  const loadTokenBalances = useCallback(
+    async (address, chainId, chainHint, tokensOverride) => {
+      if (!address) return
+      const backendChain = resolveBackendChain(chainId, chainHint)
+      const tokens = tokensOverride && tokensOverride.length > 0 ? tokensOverride : supportedTokens
+
+      if (!tokens.length) {
+        setConnectedWallet((prev) =>
+          prev
+            ? {
+                ...prev,
+                tokenBalances: {},
+              }
+            : prev,
+        )
+        return
+      }
+
+      const balances = {}
+
+      await Promise.all(
+        tokens.map(async (token) => {
+          try {
+            const result = await blockchainService.getTokenBalance(address, backendChain, token.address)
+            balances[token.symbol] = {
+              balance: result?.balance ?? '0',
+              normalizedBalance: result?.normalized_balance ?? null,
+              rawBalance: result?.raw_balance ?? null,
+              decimals: result?.decimals ?? token.decimals,
+              tokenAddress: result?.token_address ?? token.address,
+              timestamp: result?.timestamp,
+            }
+          } catch (error) {
+            console.error(`Failed to load ${token.symbol} balance:`, error)
+            balances[token.symbol] = {
+              balance: '0',
+              normalizedBalance: null,
+              rawBalance: null,
+              decimals: token.decimals,
+              tokenAddress: token.address,
+            }
+          }
+        }),
+      )
+
+      setConnectedWallet((prev) =>
+        prev
+          ? {
+              ...prev,
+              tokenBalances: balances,
+            }
+          : prev,
+      )
+    },
+    [resolveBackendChain, supportedTokens],
+  )
+
   const connectMetaMask = useCallback(
     async ({ forceSelect = false, silent = false } = {}) => {
       try {
@@ -185,6 +269,8 @@ const WalletManager = () => {
 
         updateConnectedWallet(address, chainId, balanceInfo)
         await loadTransactions(address)
+        const { tokens, backendChain } = await loadSupportedTokens(chainId)
+        await loadTokenBalances(address, chainId, backendChain, tokens)
         await loadAgentWallets()
         return true
       } catch (error) {
@@ -201,7 +287,14 @@ const WalletManager = () => {
         return false
       }
     },
-    [loadAgentWallets, loadTransactions, t, updateConnectedWallet],
+    [
+      loadAgentWallets,
+      loadSupportedTokens,
+      loadTokenBalances,
+      loadTransactions,
+      t,
+      updateConnectedWallet,
+    ],
   )
 
   const connectWalletConnect = useCallback(() => {
@@ -218,6 +311,7 @@ const WalletManager = () => {
 
   const disconnectWallet = useCallback(() => {
     setConnectedWallet(null)
+    setSupportedTokens([])
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('wallet_address')
       localStorage.removeItem('wallet_type')
@@ -356,10 +450,11 @@ const WalletManager = () => {
             : prev,
         )
       }
+      await loadTokenBalances(connectedWallet.address, currentNetwork)
     } catch (error) {
       console.error('Failed to refresh balance:', error)
     }
-  }, [connectedWallet?.address])
+  }, [connectedWallet?.address, currentNetwork, loadTokenBalances])
 
   const handleNetworkChanged = useCallback(
     (event) => {
@@ -454,6 +549,7 @@ const WalletManager = () => {
                 currentNetwork={currentNetwork}
                 networkName={networkName}
                 ethPrice={ethPrice}
+                supportedTokens={supportedTokens}
                 onSwitchWallet={() => connectMetaMask({ forceSelect: true })}
                 onDisconnect={disconnectWallet}
               />

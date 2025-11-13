@@ -1,4 +1,5 @@
 use crate::utils::error::Result;
+use crate::web3::tokens::supported_symbols;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use worker::console_log;
@@ -146,12 +147,15 @@ impl PaymentTool {
     /// Get supported tokens
     #[allow(dead_code)]
     pub fn get_supported_tokens(&self) -> Vec<String> {
-        vec![
-            "ETH".to_string(),
-            "USDC".to_string(),
-            "USDT".to_string(),
-            "DAI".to_string(),
-        ]
+        let mut tokens = vec!["ETH".to_string()];
+        tokens.extend(
+            supported_symbols(None)
+                .into_iter()
+                .map(|symbol| symbol.to_string()),
+        );
+        tokens.sort();
+        tokens.dedup();
+        tokens
     }
 }
 

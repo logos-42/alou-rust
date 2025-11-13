@@ -1,6 +1,7 @@
 use crate::agent::context::AgentContext;
 use crate::mcp::registry::McpTool;
 use crate::utils::error::{AloudError, Result};
+use crate::web3::tokens::{find_token, find_token_by_symbol, normalize_chain_identifier, TokenMetadata};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -300,6 +301,113 @@ impl TransactionTool {
 
         &self.eth_rpc_url
     }
+
+    async fn build_erc20_transfer(
+        &self,
+        from: &str,
+        to: &str,
+        args: &Value,
+        context_chain_hint: Option<&str>,
+    ) -> Result<Value> {
+        let chain_arg = args.get("chain").and_then(|v| v.as_str());
+
+        let normalized_chain = chain_arg.map(normalize_chain_identifier);
+        let (token_address, metadata): (String, Option<&TokenMetadata>) =
+            if let Some(address) = args
+                .get("token_address")
+                .and_then(|v| v.as_str())
+            {
+                (
+                    address.to_string(),
+                    find_token(normalized_chain.as_deref(), address),
+                )
+            } else if let Some(symbol) = args
+                .get("token_symbol")
+                .and_then(|v| v.as_str())
+            {
+                let token = find_token_by_symbol(chain_arg, symbol).ok_or_else(|| {
+                    AloudError::InvalidInput(format!(
+                        "Unsupported token symbol '{}' on chain {:?}",
+                        symbol, chain_arg
+                    ))
+                })?;
+                (token.address.to_string(), Some(token))
+            } else {
+                return Err(AloudError::InvalidInput(
+                    "Missing token_address or token_symbol".to_string(),
+                ));
+            };
+
+        let decimals = args
+            .get("decimals")
+            .and_then(|v| v.as_u64())
+            .map(|v| v as u8)
+            .or_else(|| metadata.map(|token| token.decimals))
+            .ok_or_else(|| {
+                AloudError::InvalidInput("Missing ERC20 token decimals".to_string())
+            })?;
+
+        let amount_value = args
+            .get("amount")
+            .or_else(|| args.get("value"))
+            .ok_or_else(|| {
+                AloudError::InvalidInput("Missing transfer amount (amount/value)".to_string())
+            })?;
+
+        let amount = parse_decimal_amount(amount_value, decimals)?;
+
+        let metadata_chain = metadata.map(|token| token.chain);
+        let effective_chain_hint = metadata_chain
+            .or(chain_arg)
+            .or(context_chain_hint);
+
+        let tx_data = self
+            .build_erc20_transaction(
+                from,
+                token_address.as_str(),
+                to,
+                amount,
+                effective_chain_hint,
+            )
+            .await?;
+
+        let wallet_request = json!({
+            "from": tx_data.from.clone(),
+            "to": tx_data.to.clone(),
+            "value": tx_data.value.clone(),
+            "gas": tx_data.gas.clone().unwrap_or_else(|| "0xfde8".to_string()),
+            "gasPrice": tx_data.gas_price.clone().unwrap_or_else(|| "0x0".to_string()),
+            "nonce": tx_data.nonce.clone().unwrap_or_default(),
+            "data": tx_data.data.clone().unwrap_or_else(|| "0x".to_string())
+        });
+
+        let symbol = metadata
+            .map(|token| token.symbol.to_string())
+            .or_else(|| {
+                args.get("token_symbol")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+            .unwrap_or_else(|| "TOKEN".to_string());
+
+        Ok(json!({
+            "success": true,
+            "chain": "eth",
+            "token_address": token_address,
+            "token_symbol": symbol,
+            "decimals": decimals,
+            "raw_amount": amount.to_string(),
+            "amount": format_token_amount(amount, decimals),
+            "transaction": tx_data,
+            "transaction_request": wallet_request.clone(),
+            "summary": format!("向 {} 转账 {} {}", to, format_token_amount(amount, decimals), symbol),
+            "instruction": {
+                "type": "wallet_operation",
+                "method": "eth_sendTransaction",
+                "params": [wallet_request]
+            }
+        }))
+    }
 }
 
 #[async_trait(?Send)]
@@ -319,7 +427,7 @@ impl McpTool for TransactionTool {
                 "chain": {
                     "type": "string",
                     "enum": ["eth", "sol"],
-                    "description": "Blockchain network"
+                    "description": "Blockchain network (default eth)"
                 },
                 "from": {
                     "type": "string",
@@ -330,19 +438,50 @@ impl McpTool for TransactionTool {
                     "description": "Recipient address"
                 },
                 "value": {
-                    "type": "number",
-                    "description": "Amount to send (in ETH for Ethereum, SOL for Solana)"
+                    "type": ["number", "string"],
+                    "description": "Amount to send for native transfers (ETH or SOL)"
+                },
+                "amount": {
+                    "type": ["number", "string"],
+                    "description": "Amount for ERC20 transfers (human readable)"
+                },
+                "token_address": {
+                    "type": "string",
+                    "description": "ERC20 token contract address"
+                },
+                "token_symbol": {
+                    "type": "string",
+                    "description": "ERC20 token symbol (optional alternative to token_address)"
+                },
+                "decimals": {
+                    "type": "integer",
+                    "description": "ERC20 token decimals (optional, inferred if known)"
                 }
             },
-            "required": ["chain", "from", "to", "value"]
+            "required": ["from", "to"],
+            "anyOf": [
+                { "required": ["value"] },
+                { "required": ["amount"] }
+            ],
+            "allOf": [
+                {
+                    "if": { "properties": { "chain": { "const": "sol" } } },
+                    "then": { "required": ["value"] }
+                },
+                {
+                    "if": { "properties": { "token_address": { "type": "string" } } },
+                    "then": { "required": ["amount"] }
+                },
+                {
+                    "if": { "properties": { "token_symbol": { "type": "string" } } },
+                    "then": { "required": ["amount"] }
+                }
+            ]
         })
     }
 
     async fn execute(&self, args: Value, context: &AgentContext) -> Result<Value> {
-        let chain = args
-            .get("chain")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| AloudError::InvalidInput("Missing chain".to_string()))?;
+        let chain = args.get("chain").and_then(|v| v.as_str()).unwrap_or("eth");
 
         let from = args
             .get("from")
@@ -354,43 +493,64 @@ impl McpTool for TransactionTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| AloudError::InvalidInput("Missing to".to_string()))?;
 
-        let value = args
-            .get("value")
-            .and_then(|v| v.as_f64())
-            .ok_or_else(|| AloudError::InvalidInput("Missing value".to_string()))?;
-
         let chain_hint = context.chain.as_deref();
 
         match chain {
             "eth" => {
-                let tx_data = self
-                    .build_eth_transaction(from, to, value, chain_hint)
-                    .await?;
+                let wants_erc20 = args.get("token_address").is_some()
+                    || args.get("token_symbol").is_some();
 
-                let wallet_request = json!({
-                    "from": tx_data.from.clone(),
-                    "to": tx_data.to.clone(),
-                    "value": tx_data.value.clone(),
-                    "gas": tx_data.gas.clone().unwrap_or_else(|| "0x5208".to_string()),
-                    "gasPrice": tx_data.gas_price.clone().unwrap_or_else(|| "0x0".to_string()),
-                    "nonce": tx_data.nonce.clone().unwrap_or_default(),
-                    "data": tx_data.data.clone().unwrap_or_else(|| "0x".to_string())
-                });
+                if wants_erc20 {
+                    self.build_erc20_transfer(from, to, &args, chain_hint)
+                        .await
+                } else {
+                    let value = args
+                        .get("value")
+                        .and_then(|v| v.as_f64())
+                        .ok_or_else(|| {
+                            AloudError::InvalidInput(
+                                "Missing value for ETH transfer".to_string(),
+                            )
+                        })?;
 
-                Ok(json!({
-                    "success": true,
-                    "chain": "eth",
-                    "summary": format!("向 {} 转账 {:.6} ETH", to, value),
-                    "transaction": tx_data,
-                    "transaction_request": wallet_request.clone(),
-                    "instruction": {
-                        "type": "wallet_operation",
-                        "method": "eth_sendTransaction",
-                        "params": [wallet_request]
-                    }
-                }))
+                        let tx_data = self
+                            .build_eth_transaction(from, to, value, chain_hint)
+                            .await?;
+
+                        let wallet_request = json!({
+                            "from": tx_data.from.clone(),
+                            "to": tx_data.to.clone(),
+                            "value": tx_data.value.clone(),
+                            "gas": tx_data.gas.clone().unwrap_or_else(|| "0x5208".to_string()),
+                            "gasPrice": tx_data.gas_price.clone().unwrap_or_else(|| "0x0".to_string()),
+                            "nonce": tx_data.nonce.clone().unwrap_or_default(),
+                            "data": tx_data.data.clone().unwrap_or_else(|| "0x".to_string())
+                        });
+
+                        Ok(json!({
+                            "success": true,
+                            "chain": "eth",
+                            "summary": format!("向 {} 转账 {:.6} ETH", to, value),
+                            "transaction": tx_data,
+                            "transaction_request": wallet_request.clone(),
+                            "instruction": {
+                                "type": "wallet_operation",
+                                "method": "eth_sendTransaction",
+                                "params": [wallet_request]
+                            }
+                        }))
+                }
             }
             "sol" => {
+                let value = args
+                    .get("value")
+                    .and_then(|v| v.as_f64())
+                    .ok_or_else(|| {
+                        AloudError::InvalidInput(
+                            "Missing value for SOL transfer".to_string(),
+                        )
+                    })?;
+
                 let tx_data = self.build_sol_transaction(from, to, value).await?;
                 let lamports: u64 = tx_data.amount;
                 let sol_amount = lamports as f64 / 1e9;
@@ -419,4 +579,116 @@ impl McpTool for TransactionTool {
             ))),
         }
     }
+}
+
+fn parse_decimal_amount(value: &Value, decimals: u8) -> Result<u128> {
+    let amount_str = if let Some(str_value) = value.as_str() {
+        str_value.trim()
+    } else if let Some(num) = value.as_f64() {
+        return decimal_to_u128(&format!("{:.prec$}", num, prec = decimals as usize), decimals);
+    } else if let Some(num) = value.as_u64() {
+        return decimal_to_u128(&num.to_string(), decimals);
+    } else if let Some(num) = value.as_i64() {
+        if num < 0 {
+            return Err(AloudError::InvalidInput(
+                "Amount cannot be negative".to_string(),
+            ));
+        }
+        return decimal_to_u128(&num.to_string(), decimals);
+    } else {
+        return Err(AloudError::InvalidInput(
+            "Unsupported amount format".to_string(),
+        ));
+    };
+
+    decimal_to_u128(amount_str, decimals)
+}
+
+fn decimal_to_u128(amount: &str, decimals: u8) -> Result<u128> {
+    let trimmed = amount.trim();
+    if trimmed.is_empty() {
+        return Err(AloudError::InvalidInput(
+            "Amount cannot be empty".to_string(),
+        ));
+    }
+
+    if trimmed.starts_with('-') {
+        return Err(AloudError::InvalidInput(
+            "Amount cannot be negative".to_string(),
+        ));
+    }
+
+    let parts: Vec<&str> = trimmed.split('.').collect();
+    if parts.len() > 2 {
+        return Err(AloudError::InvalidInput(
+            "Invalid decimal format for amount".to_string(),
+        ));
+    }
+
+    let whole_part = parts[0];
+    let fractional_part = if parts.len() == 2 { parts[1] } else { "" };
+
+    if fractional_part.len() > decimals as usize {
+        return Err(AloudError::InvalidInput(format!(
+            "Amount has more than {} decimal places",
+            decimals
+        )));
+    }
+
+    let scaling_factor = 10u128.pow(decimals as u32);
+    let whole = if whole_part.is_empty() {
+        0u128
+    } else {
+        whole_part
+            .parse::<u128>()
+            .map_err(|_| AloudError::InvalidInput("Invalid whole number".to_string()))?
+    };
+
+    let mut fractional = if fractional_part.is_empty() {
+        0u128
+    } else {
+        fractional_part
+            .parse::<u128>()
+            .map_err(|_| AloudError::InvalidInput("Invalid fractional number".to_string()))?
+    };
+
+    let fractional_digits = fractional_part.len();
+    if fractional_digits > 0 {
+        let padding = decimals as usize - fractional_digits;
+        fractional *= 10u128.pow(padding as u32);
+    }
+
+    whole
+        .checked_mul(scaling_factor)
+        .and_then(|whole_scaled| whole_scaled.checked_add(fractional))
+        .ok_or_else(|| AloudError::InvalidInput("Amount overflow".to_string()))
+}
+
+fn format_token_amount(value: u128, decimals: u8) -> String {
+    if decimals == 0 {
+        return value.to_string();
+    }
+
+    let scaling_factor = 10u128
+        .checked_pow(decimals as u32)
+        .unwrap_or_else(|| 10u128.pow(18));
+
+    let whole = value / scaling_factor;
+    let remainder = value % scaling_factor;
+
+    if remainder == 0 {
+        return whole.to_string();
+    }
+
+    let mut remainder_str = format!(
+        "{:0>width$}",
+        remainder,
+        width = decimals as usize
+    );
+
+    while remainder_str.ends_with('0') {
+        remainder_str.pop();
+    }
+
+    format!("{}.{}", whole, remainder_str)
 }

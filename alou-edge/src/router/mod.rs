@@ -215,6 +215,7 @@ impl Router {
             (Method::Post, "/api/blockchain/balance") => {
                 blockchain::handle_blockchain_balance(self.query_tool.as_ref(), req).await
             }
+            (Method::Get, "/api/blockchain/tokens") => blockchain::handle_blockchain_tokens(req).await,
             (Method::Post, "/api/blockchain/transaction/build") => {
                 blockchain::handle_build_transaction(self.transaction_tool.as_ref(), req).await
             }

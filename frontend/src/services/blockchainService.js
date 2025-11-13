@@ -2,9 +2,14 @@
 // Blockchain Service - Query real blockchain data
 // ============================================
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+
 class BlockchainService {
   constructor() {
     this.ethereum = typeof window !== 'undefined' ? window.ethereum : null
+    this.apiBaseUrl = API_BASE_URL
   }
 
   /**
@@ -49,6 +54,54 @@ class BlockchainService {
     // In production, use Etherscan API or similar service
     // For now, return mock data
     return []
+  }
+
+  async getTokenBalance(address, chain, tokenAddress) {
+    if (!address || !tokenAddress) {
+      throw new Error('address 和 tokenAddress 不能为空')
+    }
+
+    const payload = {
+      address,
+      chain: chain || 'ethereum',
+      token_address: tokenAddress,
+    }
+
+    const response = await fetch(`${this.apiBaseUrl}/api/blockchain/balance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error?.error || 'Failed to load token balance')
+    }
+
+    return response.json()
+  }
+
+  async listSupportedTokens(chain) {
+    const url = new URL(`${this.apiBaseUrl}/api/blockchain/tokens`)
+    if (chain) {
+      url.searchParams.set('chain', chain)
+    }
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}))
+      throw new Error(error?.error || 'Failed to load supported tokens')
+    }
+
+    return response.json()
   }
 
   /**
