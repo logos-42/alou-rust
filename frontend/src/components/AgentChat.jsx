@@ -12,6 +12,7 @@ import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
 import AgentCanvas from '@/components/agent/AgentCanvas'
 import AgentConsoleDock from '@/components/agent/AgentConsoleDock'
 import AgentConversationOverlay from '@/components/agent/AgentConversationOverlay'
+import DiapIdentityPanel from '@/components/agent/DiapIdentityPanel'
 import McpModal from '@/components/mcp/McpModal'
 import {
   ACTION_LABELS,
@@ -1308,45 +1309,124 @@ const AgentChat = () => {
   )
 
   const createChannel = useCallback(() => {
-    const input =
+    // Ask user if they want to create a new Claude Agent SDK or resolve an existing agent
+    const choice =
       typeof window !== 'undefined'
-        ? window.prompt('请输入 IPNS / CID / DID 标识以解析智能体')
-        : null
+        ? window.confirm('创建新的 Claude Agent SDK？\n\n点击"确定"创建新智能体（自动生成 DIAP 身份）\n点击"取消"解析已有智能体（输入 IPNS/CID/DID）')
+        : false
 
-    const target = input?.trim()
-    if (!target) {
-      recordInteraction('create_channel_cancelled')
-      return
-    }
+    if (choice) {
+      // Create new Claude Agent SDK
+      const name =
+        typeof window !== 'undefined'
+          ? window.prompt('请输入智能体名称（可选）', 'Claude Agent SDK')
+          : null
 
-    setChannelLoading(true)
-    setChannelError(null)
-    recordInteraction('create_channel', { target })
+      setChannelLoading(true)
+      setChannelError(null)
+      recordInteraction('create_claude_agent', { name: name || 'Claude Agent SDK' })
 
-    void (async () => {
-      try {
-        const agent = await agentService.resolveAgent(target, sessionId)
-        const channel = buildChannelFromAgent(agent)
-        if (!channel) {
-          throw new Error('解析结果为空')
+      void (async () => {
+        try {
+          const walletAddress =
+            typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+          const chainId =
+            typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+          const detectedChain = resolveBackendChain({
+            chainId,
+            chain: activeChain,
+          })
+
+          const result = await agentService.createClaudeAgent(
+            sessionId,
+            walletAddress,
+            detectedChain || activeChain,
+            name || 'Claude Agent SDK',
+          )
+
+          // Create a channel from the created agent
+          const channel = {
+            id: result.session_id,
+            name: result.name || 'Claude Agent SDK',
+            color: '#6366f1',
+            type: 'claude_agent_sdk',
+            diap_identity: result.diap_identity,
+          }
+
+          setChannels((prev) => {
+            const others = prev.filter((item) => item.id !== channel.id)
+            return [channel, ...others]
+          })
+          setActiveChannelId(channel.id)
+
+          // Store agent metadata
+          if (result.diap_identity) {
+            const agentMetadata = {
+              did: result.diap_identity.did,
+              ipns: result.diap_identity.ipns,
+              cid: result.diap_identity.cid,
+              agent_type: 'claude_agent_sdk',
+            }
+            setSelectedAgent(agentMetadata)
+          }
+        } catch (error) {
+          const message = extractErrorMessage(error)
+          console.error('Failed to create Claude Agent SDK:', error)
+          setChannelError(message)
+          recordInteraction('create_claude_agent_failed', { error: message })
+        } finally {
+          setChannelLoading(false)
         }
+      })()
+    } else {
+      // Resolve existing agent
+      const input =
+        typeof window !== 'undefined'
+          ? window.prompt('请输入 IPNS / CID / DID 标识以解析智能体')
+          : null
 
-        setChannels((prev) => {
-          const others = prev.filter((item) => item.id !== channel.id)
-          return [channel, ...others]
-        })
-        setActiveChannelId(channel.id)
-        setSelectedAgent(agent)
-      } catch (error) {
-        const message = extractErrorMessage(error)
-        console.error('Failed to resolve agent via createChannel:', error)
-        setChannelError(message)
-        recordInteraction('create_channel_failed', { target, error: message })
-      } finally {
-        setChannelLoading(false)
+      const target = input?.trim()
+      if (!target) {
+        recordInteraction('create_channel_cancelled')
+        return
       }
-    })()
-  }, [buildChannelFromAgent, extractErrorMessage, recordInteraction, sessionId])
+
+      setChannelLoading(true)
+      setChannelError(null)
+      recordInteraction('create_channel', { target })
+
+      void (async () => {
+        try {
+          const agent = await agentService.resolveAgent(target, sessionId)
+          const channel = buildChannelFromAgent(agent)
+          if (!channel) {
+            throw new Error('解析结果为空')
+          }
+
+          setChannels((prev) => {
+            const others = prev.filter((item) => item.id !== channel.id)
+            return [channel, ...others]
+          })
+          setActiveChannelId(channel.id)
+          setSelectedAgent(agent)
+        } catch (error) {
+          const message = extractErrorMessage(error)
+          console.error('Failed to resolve agent via createChannel:', error)
+          setChannelError(message)
+          recordInteraction('create_channel_failed', { target, error: message })
+        } finally {
+          setChannelLoading(false)
+        }
+      })()
+    }
+  }, [
+    buildChannelFromAgent,
+    extractErrorMessage,
+    recordInteraction,
+    sessionId,
+    activeChain,
+    resolveBackendChain,
+  ])
 
   const handleAgentActivate = useCallback(() => {
     if (dragStateRef.current?.moved) {
@@ -1501,6 +1581,27 @@ const AgentChat = () => {
         onClose={closeUiResource}
         onUIAction={handleUiAction}
       />
+
+      {/* DIAP Identity Panel - Show when a Claude Agent SDK is selected */}
+      {activeChannelId && (
+        <div
+          className="diap-identity-overlay"
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: isSidebarCollapsed ? '20px' : '320px',
+            zIndex: 1000,
+            maxWidth: '400px',
+          }}
+        >
+          <DiapIdentityPanel
+            sessionId={activeChannelId}
+            onClose={() => {
+              // Optionally hide the panel
+            }}
+          />
+        </div>
+      )}
 
       <button type="button" className="language-switch" onClick={toggleLanguage}>
         {languageLabel}

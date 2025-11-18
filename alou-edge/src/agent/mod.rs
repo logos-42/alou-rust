@@ -3,6 +3,7 @@ pub mod blockchain_agent;
 pub mod claude_client;
 pub mod context;
 pub mod core;
+pub mod diap_identity;
 pub mod discovery;
 pub mod prompts;
 pub mod providers;

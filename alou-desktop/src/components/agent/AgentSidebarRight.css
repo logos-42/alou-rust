@@ -1,0 +1,262 @@
+.sidebar-right {
+  --sidebar-width: 340px;
+  --sidebar-peek: 64px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--surface);
+  border-left: 1px solid var(--border-color);
+  overflow: visible;
+  transform: translateX(0);
+  transition:
+    transform 0.32s ease,
+    box-shadow 0.32s ease;
+  box-shadow: var(--shadow);
+}
+
+.sidebar-right.collapsed {
+  transform: translateX(calc(var(--sidebar-width) - var(--sidebar-peek)));
+  box-shadow: none;
+}
+
+.sidebar-right .collapse-toggle {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text-primary);
+  z-index: 5;
+}
+
+.sidebar-right .collapse-toggle .toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.app-shell.dark-mode .sidebar-right .collapse-toggle {
+  background: rgba(30, 41, 59, 0.96);
+  color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.55);
+}
+
+.sidebar-right .sidebar-content {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.05rem;
+}
+
+@media (max-width: 1280px) {
+  .sidebar-right {
+    --sidebar-width: 300px;
+    --sidebar-peek: 60px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar-right {
+    top: 72px;
+    z-index: 20;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar-right {
+    --sidebar-width: 280px;
+    --sidebar-peek: 56px;
+  }
+}
+
+.sidebar-right section.wallet-card,
+.sidebar-right section.history-card,
+.sidebar-right section.context-card {
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 1.1rem;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.app-shell.dark-mode .sidebar-right section.wallet-card,
+.app-shell.dark-mode .sidebar-right section.history-card,
+.app-shell.dark-mode .sidebar-right section.context-card {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.sidebar-right section header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.sidebar-right .collapse-btn .collapse-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-right .title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-right .refresh-btn {
+  border: none;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-color);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.sidebar-right .wallet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.sidebar-right .balance {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.sidebar-right .amount {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.sidebar-right .fiat {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.sidebar-right .address {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sidebar-right .wallet-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.sidebar-right .history-card ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sidebar-right .history-card li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem;
+  border-radius: 0.9rem;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.sidebar-right .history-card li.confirmed {
+  border-left: 3px solid #10b981;
+}
+
+.sidebar-right .history-card li.pending {
+  border-left: 3px solid #f59e0b;
+}
+
+.sidebar-right .history-card li.failed {
+  border-left: 3px solid #ef4444;
+}
+
+.sidebar-right .tx-main {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.sidebar-right .tx-sub {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.sidebar-right .context-card.collapsed .context-body {
+  display: none;
+}
+
+.sidebar-right .collapse-btn {
+  border: none;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--primary-color);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.sidebar-right .context-body ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.sidebar-right .context-body li {
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 0.9rem;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sidebar-right .log-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-right .log-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  opacity: 0.8;
+  word-break: break-word;
+}

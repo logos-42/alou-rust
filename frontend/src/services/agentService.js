@@ -162,6 +162,54 @@ export class AgentService {
       balance,
     })
   }
+
+  /**
+   * Create a new Claude Agent SDK with automatic DIAP identity
+   */
+  async createClaudeAgent(sessionId, walletAddress, chain, name) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/create-claude`, {
+      session_id: sessionId,
+      wallet_address: walletAddress,
+      chain,
+      name,
+    })
+    return response.data
+  }
+
+  /**
+   * Create DIAP identity for a session
+   */
+  async createDiapIdentity(sessionId) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/diap/create-identity`, {
+      session_id: sessionId,
+    })
+    return response.data
+  }
+
+  /**
+   * Get DIAP identity for a session
+   */
+  async getDiapIdentity(sessionId) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/diap/get-identity`, {
+      session_id: sessionId,
+    })
+    return response.data
+  }
+
+  /**
+   * Register agent to DIAP network on-chain
+   * Returns encoded transaction that needs to be signed and broadcast
+   */
+  async registerAgentOnChain(sessionId, network, stakeAmount, useAa = false, salt = 0) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/diap/register-onchain`, {
+      session_id: sessionId,
+      network,
+      stake_amount: stakeAmount,
+      use_aa: useAa,
+      salt,
+    })
+    return response.data
+  }
 }
 
 export default new AgentService()

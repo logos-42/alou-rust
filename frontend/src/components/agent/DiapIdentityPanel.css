@@ -1,0 +1,224 @@
+.diap-identity-panel {
+  background: var(--bg-color, #fff);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+  max-width: 600px;
+}
+
+.diap-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color, #e0e0e0);
+}
+
+.diap-panel-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-color, #666);
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  color: var(--text-color, #000);
+}
+
+.diap-panel-content {
+  min-height: 100px;
+}
+
+.diap-panel-content.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color-secondary, #999);
+}
+
+.diap-error {
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+  color: #c33;
+}
+
+.diap-no-identity {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.diap-no-identity p {
+  margin-bottom: 16px;
+  color: var(--text-color-secondary, #666);
+}
+
+.create-identity-btn {
+  background: var(--primary-color, #007bff);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.create-identity-btn:hover:not(:disabled) {
+  background: var(--primary-color-hover, #0056b3);
+}
+
+.create-identity-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.diap-identity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diap-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-color-secondary, #666);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diap-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diap-value code {
+  flex: 1;
+  background: var(--code-bg, #f5f5f5);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  word-break: break-all;
+  color: var(--text-color, #333);
+}
+
+.copy-btn {
+  background: none;
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.copy-btn:hover {
+  background: var(--hover-bg, #f0f0f0);
+}
+
+.status-registered {
+  color: #28a745;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-unregistered {
+  color: var(--text-color-secondary, #999);
+}
+
+.registered-address {
+  font-size: 11px;
+  font-weight: normal;
+  color: var(--text-color, #333);
+  margin-left: 8px;
+}
+
+.register-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.register-btn {
+  background: var(--primary-color, #007bff);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.register-btn:hover:not(:disabled) {
+  background: var(--primary-color-hover, #0056b3);
+}
+
+.register-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register-info {
+  background: var(--info-bg, #e7f3ff);
+  border: 1px solid var(--info-border, #b3d9ff);
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.info-text {
+  font-size: 12px;
+  color: var(--text-color-secondary, #666);
+  margin: 4px 0;
+}
+
+.encoded-call {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.encoded-call code {
+  flex: 1;
+  background: var(--code-bg, #f5f5f5);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  word-break: break-all;
+  color: var(--text-color, #333);
+  max-height: 100px;
+  overflow-y: auto;
+}
+

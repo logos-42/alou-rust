@@ -1,0 +1,115 @@
+.agent-wallets-section {
+  margin-top: 2rem;
+  animation: agent-wallet-fade 0.5s ease 0.4s both;
+}
+
+.agent-wallets-section .section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-wallets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.agent-wallet-card {
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  transition: all 0.3s ease;
+}
+
+.agent-wallet-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.agent-wallet-card .wallet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.agent-wallet-card .wallet-chain {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  text-transform: capitalize;
+}
+
+.agent-wallet-card .wallet-badge {
+  background: linear-gradient(135deg, var(--primary-color), #8b5cf6);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.agent-wallet-card .wallet-address {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.agent-wallet-card .wallet-balance {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: var(--surface);
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.agent-wallet-card .balance-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.agent-wallet-card .balance-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--success-color);
+}
+
+.agent-wallet-card .wallet-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.agent-wallet-card .info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+@keyframes agent-wallet-fade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .agent-wallets-grid {
+    grid-template-columns: 1fr;
+  }
+}

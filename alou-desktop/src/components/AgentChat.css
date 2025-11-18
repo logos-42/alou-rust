@@ -1,0 +1,106 @@
+.app-shell {
+  --primary-color: #6366f1;
+  --primary-hover: #5855eb;
+  --secondary-color: rgba(99, 102, 241, 0.12);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.08);
+  --background: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.85);
+  --shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --left-column-width: 300px;
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--text-primary);
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
+.app-shell.dark-mode {
+  --primary-color: #818cf8;
+  --primary-hover: #6366f1;
+  --secondary-color: rgba(129, 140, 248, 0.16);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border-color: rgba(148, 163, 184, 0.2);
+  --background: #0f172a;
+  --surface: rgba(15, 23, 42, 0.78);
+  --shadow: 0 12px 32px rgba(2, 6, 23, 0.55);
+}
+
+.workspace {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns: var(--left-column-width) 1fr;
+  overflow: hidden;
+}
+
+.language-switch {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: 40;
+  border: none;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  background: rgba(15, 23, 42, 0.88);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.35);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.language-switch:hover {
+  background: rgba(15, 23, 42, 1);
+  transform: translateY(-2px);
+}
+
+.app-shell.dark-mode .language-switch {
+  background: rgba(99, 102, 241, 0.88);
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.35);
+}
+
+.app-shell.dark-mode .language-switch:hover {
+  background: rgba(99, 102, 241, 1);
+}
+
+.app-shell.collapsed-left {
+  --left-column-width: 84px;
+}
+
+@media (max-width: 1280px) {
+  .app-shell {
+    --left-column-width: 240px;
+  }
+  .app-shell.collapsed-left {
+    --left-column-width: 84px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    --left-column-width: 220px;
+  }
+  .app-shell.collapsed-left {
+    --left-column-width: 72px;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    --left-column-width: 0px;
+  }
+}

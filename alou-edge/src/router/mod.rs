@@ -208,6 +208,18 @@ impl Router {
             (Method::Post, "/api/agent/search") => {
                 agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
             }
+            (Method::Post, "/api/agent/diap/create-identity") => {
+                agent::handle_create_diap_identity(&self.session_manager, &env, req).await
+            }
+            (Method::Post, "/api/agent/diap/get-identity") => {
+                agent::handle_get_diap_identity(&self.session_manager, req).await
+            }
+            (Method::Post, "/api/agent/create-claude") => {
+                agent::handle_create_claude_agent(&self.session_manager, &env, req).await
+            }
+            (Method::Post, "/api/agent/diap/register-onchain") => {
+                agent::handle_register_agent_onchain(&self.session_manager, &env, req).await
+            }
             (Method::Get, "/api/agent/progress") => self.handle_agent_progress(req).await,
 
             (Method::Post, "/api/mcp/ui-resource") => self.handle_mcp_ui_resource(req).await,

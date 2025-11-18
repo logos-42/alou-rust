@@ -1429,9 +1429,9 @@ dependencies = [
 
 [[package]]
 name = "diap-rs-sdk"
-version = "0.2.8"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8664ca1523959b75eb2d9ca1ea447cb771e24bd9e1034c887ea09662d3d52f0a"
+checksum = "469c30bbc7940f9abff3949bc048e14945f6ec968ddf11a43fc6cee410b41f75"
 dependencies = [
  "aes-gcm",
  "anyhow",

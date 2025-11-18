@@ -1,3 +1,4 @@
+use crate::agent::diap_identity::DiapIdentity;
 use crate::storage::kv::KvStore;
 use crate::utils::error::{AloudError, Result};
 use serde::{Deserialize, Serialize};
@@ -56,6 +57,8 @@ pub struct Session {
     pub recent_events: Vec<ContextEvent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_metadata: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diap_identity: Option<DiapIdentity>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -70,6 +73,7 @@ impl Session {
             messages: Vec::new(),
             recent_events: Vec::new(),
             agent_metadata: None,
+            diap_identity: None,
             created_at: now,
             updated_at: now,
         }
@@ -251,6 +255,30 @@ impl SessionManager {
             .await?;
 
         Ok(())
+    }
+
+    /// Set DIAP identity for a session
+    pub async fn set_diap_identity(
+        &self,
+        session_id: &str,
+        identity: DiapIdentity,
+    ) -> Result<()> {
+        let mut session = self.get_session(session_id).await?;
+        session.diap_identity = Some(identity);
+        session.updated_at = crate::utils::time::now_timestamp();
+
+        let key = Self::session_key(session_id);
+        self.kv
+            .put(&key, &session, Some(SESSION_TTL_SECONDS))
+            .await?;
+
+        Ok(())
+    }
+
+    /// Get DIAP identity for a session
+    pub async fn get_diap_identity(&self, session_id: &str) -> Result<Option<DiapIdentity>> {
+        let session = self.get_session(session_id).await?;
+        Ok(session.diap_identity.clone())
     }
 
     /// Generate KV key for a session
