@@ -47,6 +47,13 @@
   overflow: hidden;
 }
 
+.agent-center {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
 .language-switch {
   position: fixed;
   right: 1.5rem;

@@ -106,16 +106,16 @@ impl DiapIdentityManager {
         // 2. Create a DID document
         // 3. Publish to IPFS to get CID
         // 4. Optionally publish to IPNS
-        
+
         // For now, we'll create a simplified identity structure
         // The actual implementation should use diap-rs-sdk's identity creation methods
         use uuid::Uuid;
         let session_id = Uuid::new_v4().to_string();
         let did = format!("did:alou:{}", session_id);
-        
+
         // Generate a placeholder CID (in production, this would be the actual IPFS CID)
         let cid = format!("bafy{}", simple_hash_fragment(&session_id));
-        
+
         // Generate IPNS name
         let ipns = if let Some(ref ipns_key) = self.config.ipns_key {
             if ipns_key.starts_with("/ipns/") {
@@ -132,14 +132,11 @@ impl DiapIdentityManager {
         let public_key = format!("pubkey_{}", simple_hash_fragment(&session_id));
 
         Ok(DiapIdentity::new(
-            did,
-            ipns,
-            cid,
-            public_key,
+            did, ipns, cid, public_key,
             None, // Encrypted peer ID would be generated during actual identity creation
         ))
     }
-    
+
     fn simple_hash_fragment(input: &str) -> String {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -149,9 +146,9 @@ impl DiapIdentityManager {
 
     /// Get identity information from CID
     pub async fn get_identity(&self, cid: &str) -> Result<DiapIdentity> {
+        use diap_rs_sdk::get_did_document_from_cid;
         use diap_rs_sdk::identity_manager::IdentityManager;
         use diap_rs_sdk::IpfsClient;
-        use diap_rs_sdk::get_did_document_from_cid;
 
         // Create IPFS client
         let ipfs_client = IpfsClient::new_with_remote_node(
@@ -234,4 +231,3 @@ impl DiapIdentityManager {
 }
 
 // EncryptedPeerPayload::from_encrypted is already implemented in discovery.rs
-

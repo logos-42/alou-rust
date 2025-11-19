@@ -258,11 +258,7 @@ impl SessionManager {
     }
 
     /// Set DIAP identity for a session
-    pub async fn set_diap_identity(
-        &self,
-        session_id: &str,
-        identity: DiapIdentity,
-    ) -> Result<()> {
+    pub async fn set_diap_identity(&self, session_id: &str, identity: DiapIdentity) -> Result<()> {
         let mut session = self.get_session(session_id).await?;
         session.diap_identity = Some(identity);
         session.updated_at = crate::utils::time::now_timestamp();

@@ -15,6 +15,8 @@ import AgentConsoleDock from '@/components/agent/AgentConsoleDock'
 import AgentConversationOverlay from '@/components/agent/AgentConversationOverlay'
 import DiapIdentityPanel from '@/components/agent/DiapIdentityPanel'
 import McpModal from '@/components/mcp/McpModal'
+import CreateAgentModal from '@/components/CreateAgentModal'
+import AgentProfilePanel from '@/components/AgentProfilePanel'
 import {
   ACTION_LABELS,
   API_BASE_URL,
@@ -70,6 +72,7 @@ const AgentChat = () => {
   const [channelError, setChannelError] = useState(null)
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
+  const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
 
   const buildChannelFromAgent = useCallback((agent) => {
     if (!agent) {
@@ -79,11 +82,18 @@ const AgentChat = () => {
     const nameFromIpns = agent.ipns ? agent.ipns.replace(/^\/?ipns\//, '') : null
     const nameFromDid = agent.did ? agent.did.split(':').filter(Boolean).slice(-1)[0] : null
     const fallbackName = agent.cid || id
-    const statusLabel = agent.ipns ? 'IPNS 解析' : agent.did ? 'DID 解析' : 'CID 解析'
+    const displayName = agent.display_name || agent.name || nameFromIpns || nameFromDid || fallbackName
+    const statusLabel = agent.ipns
+      ? 'IPNS 解析'
+      : agent.did
+        ? 'DID 解析'
+        : agent.agent_type === 'claude_agent_sdk'
+          ? '自定义智能体'
+          : 'CID 解析'
 
     return {
       id,
-      name: nameFromIpns || nameFromDid || fallbackName,
+      name: displayName,
       status: 'online',
       statusLabel,
       icon: '🛰️',
@@ -1367,125 +1377,132 @@ const AgentChat = () => {
     ],
   )
 
-  const createChannel = useCallback(() => {
-    // Ask user if they want to create a new Claude Agent SDK or resolve an existing agent
-    const choice =
-      typeof window !== 'undefined'
-        ? window.confirm('创建新的 Claude Agent SDK？\n\n点击"确定"创建新智能体（自动生成 DIAP 身份）\n点击"取消"解析已有智能体（输入 IPNS/CID/DID）')
-        : false
-
-    if (choice) {
-      // Create new Claude Agent SDK
-      const name =
-        typeof window !== 'undefined'
-          ? window.prompt('请输入智能体名称（可选）', 'Claude Agent SDK')
-          : null
-
-      setChannelLoading(true)
-      setChannelError(null)
-      recordInteraction('create_claude_agent', { name: name || 'Claude Agent SDK' })
-
-      void (async () => {
-        try {
-          const walletAddress =
-            typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-          const chainId =
-            typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
-          const detectedChain = resolveBackendChain({
-            chainId,
-            chain: activeChain,
-          })
-
-          const result = await agentService.createClaudeAgent(
-            sessionId,
-            walletAddress,
-            detectedChain || activeChain,
-            name || 'Claude Agent SDK',
-          )
-
-          // Create a channel from the created agent
-          const channel = {
-            id: result.session_id,
-            name: result.name || 'Claude Agent SDK',
-            color: '#6366f1',
-            type: 'claude_agent_sdk',
-            diap_identity: result.diap_identity,
-          }
-
-          setChannels((prev) => {
-            const others = prev.filter((item) => item.id !== channel.id)
-            return [channel, ...others]
-          })
-          setActiveChannelId(channel.id)
-
-          // Store agent metadata
-          if (result.diap_identity) {
-            const agentMetadata = {
-              did: result.diap_identity.did,
-              ipns: result.diap_identity.ipns,
-              cid: result.diap_identity.cid,
-              agent_type: 'claude_agent_sdk',
-            }
-            setSelectedAgent(agentMetadata)
-          }
-        } catch (error) {
-          const message = extractErrorMessage(error)
-          console.error('Failed to create Claude Agent SDK:', error)
-          setChannelError(message)
-          recordInteraction('create_claude_agent_failed', { error: message })
-        } finally {
-          setChannelLoading(false)
-        }
-      })()
-    } else {
-      // Resolve existing agent
-      const input =
-        typeof window !== 'undefined'
-          ? window.prompt('请输入 IPNS / CID / DID 标识以解析智能体')
-          : null
-
-      const target = input?.trim()
-      if (!target) {
-        recordInteraction('create_channel_cancelled')
-        return
+  const resolveExistingAgentTarget = useCallback(
+    async (target) => {
+      const parsedTarget = target?.trim()
+      if (!parsedTarget) {
+        throw new Error('请输入 IPNS / CID / DID 标识')
       }
-
       setChannelLoading(true)
       setChannelError(null)
-      recordInteraction('create_channel', { target })
+      recordInteraction('create_channel', { target: parsedTarget })
+      try {
+        const agent = await agentService.resolveAgent(parsedTarget, sessionId)
+        const channel = buildChannelFromAgent(agent)
+        if (!channel) {
+          throw new Error('解析结果为空')
+        }
+        setChannels((prev) => {
+          const others = prev.filter((item) => item.id !== channel.id)
+          return [channel, ...others]
+        })
+        setActiveChannelId(channel.id)
+        setSelectedAgent(agent)
+        setCreateAgentModalOpen(false)
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        setChannelError(message)
+        recordInteraction('create_channel_failed', { target: parsedTarget, error: message })
+        throw new Error(message)
+      } finally {
+        setChannelLoading(false)
+      }
+    },
+    [
+      buildChannelFromAgent,
+      extractErrorMessage,
+      recordInteraction,
+      sessionId,
+      setChannels,
+      setSelectedAgent,
+    ],
+  )
 
-      void (async () => {
-        try {
-          const agent = await agentService.resolveAgent(target, sessionId)
-          const channel = buildChannelFromAgent(agent)
-          if (!channel) {
-            throw new Error('解析结果为空')
-          }
+  const handleCreateAgentSubmit = useCallback(
+    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity }) => {
+      setChannelLoading(true)
+      setChannelError(null)
+      recordInteraction('create_claude_agent', { name })
+      try {
+        const walletAddress =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+        const chainId =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+        const detectedChain = resolveBackendChain({
+          chainId,
+          chain: activeChain,
+        })
 
+        const result = await agentService.createClaudeAgent({
+          sessionId,
+          walletAddress,
+          chain: detectedChain || activeChain,
+          name,
+          roleDescription,
+          avatarCid,
+          mcpConfigCid,
+          mcpPorts,
+          diapIdentity,
+        })
+
+        const metadata = result.agent_metadata || {
+          did: result.diap_identity?.did,
+          cid: result.diap_identity?.cid,
+          ipns: result.diap_identity?.ipns,
+          agent_type: 'claude_agent_sdk',
+          display_name: name,
+          role_description: roleDescription,
+          avatar_cid: avatarCid,
+          mcp_config_cid: mcpConfigCid,
+          mcp_ports: mcpPorts,
+          diap_identity: diapIdentity,
+        }
+        if (diapIdentity) {
+          metadata.diap_identity = diapIdentity
+          metadata.did = metadata.did || diapIdentity.did
+          metadata.cid = metadata.cid || diapIdentity.cid
+          metadata.ipns = metadata.ipns || diapIdentity.ipns
+        }
+
+        const channel = buildChannelFromAgent(metadata)
+        if (channel) {
           setChannels((prev) => {
             const others = prev.filter((item) => item.id !== channel.id)
             return [channel, ...others]
           })
           setActiveChannelId(channel.id)
-          setSelectedAgent(agent)
-        } catch (error) {
-          const message = extractErrorMessage(error)
-          console.error('Failed to resolve agent via createChannel:', error)
-          setChannelError(message)
-          recordInteraction('create_channel_failed', { target, error: message })
-        } finally {
-          setChannelLoading(false)
         }
-      })()
-    }
-  }, [
-    buildChannelFromAgent,
-    extractErrorMessage,
-    recordInteraction,
-    sessionId,
-    activeChain,
-    resolveBackendChain,
-  ])
+
+        setSelectedAgent(metadata)
+        setCreateAgentModalOpen(false)
+        return result
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        setChannelError(message)
+        recordInteraction('create_claude_agent_failed', { error: message })
+        throw new Error(message)
+      } finally {
+        setChannelLoading(false)
+      }
+    },
+    [
+      activeChain,
+      buildChannelFromAgent,
+      extractErrorMessage,
+      recordInteraction,
+      resolveBackendChain,
+      sessionId,
+    ],
+  )
+
+  const createChannel = useCallback(() => {
+    setCreateAgentModalOpen(true)
+    recordInteraction('open_create_agent_modal')
+  }, [recordInteraction])
+
+  const closeCreateAgentModal = useCallback(() => {
+    setCreateAgentModalOpen(false)
+  }, [])
 
   const handleAgentActivate = useCallback(() => {
     if (dragStateRef.current?.moved) {
@@ -1503,6 +1520,21 @@ const AgentChat = () => {
       { agent: agentProfile?.name },
     )
   }, [activeChain, agentProfile, fetchAndOpenUiResource, sessionId])
+
+  const handleInspectSelectedAgent = useCallback(() => {
+    if (!selectedAgent) {
+      return
+    }
+    void fetchAndOpenUiResource(
+      MCP_UI_TARGETS.agentProfile,
+      {
+        agent_id: selectedAgent.did || selectedAgent.cid || selectedAgent.ipns,
+        session_id: sessionId,
+        metadata: selectedAgent,
+      },
+      { source: 'agent_profile_panel' },
+    )
+  }, [fetchAndOpenUiResource, selectedAgent, sessionId])
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -1585,16 +1617,21 @@ const AgentChat = () => {
           onToggleCollapse={toggleLeftSidebar}
         />
 
-        <AgentCanvas
-          ref={canvasRef}
-          agentProfile={agentProfile}
-          agentStyle={agentStyle}
-          onPointerDown={startDrag}
-          onPointerMove={onDrag}
-          onPointerUp={stopDrag}
-          onPointerLeave={stopDrag}
-          onAgentActivate={handleAgentActivate}
-        />
+        <div className="agent-center">
+          <AgentCanvas
+            ref={canvasRef}
+            agentProfile={agentProfile}
+            agentStyle={agentStyle}
+            onPointerDown={startDrag}
+            onPointerMove={onDrag}
+            onPointerUp={stopDrag}
+            onPointerLeave={stopDrag}
+            onAgentActivate={handleAgentActivate}
+          />
+          {selectedAgent && (
+            <AgentProfilePanel agent={selectedAgent} onInspect={handleInspectSelectedAgent} />
+          )}
+        </div>
 
         <AgentSidebarRight
           walletSnapshot={sidebarWallet}
@@ -1640,6 +1677,14 @@ const AgentChat = () => {
         onSend={sendMessage}
         onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}
         onOpenConversation={openConversationPanel}
+      />
+
+      <CreateAgentModal
+        isOpen={isCreateAgentModalOpen}
+        onClose={closeCreateAgentModal}
+        onSubmit={handleCreateAgentSubmit}
+        onResolve={resolveExistingAgentTarget}
+        sessionId={sessionId}
       />
 
       <McpModal

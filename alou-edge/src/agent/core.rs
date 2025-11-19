@@ -113,8 +113,7 @@ impl AgentCore {
         let prompt_mode = PromptMode::detect_from_message(message);
 
         // Add user message to session
-        self
-            .session_manager
+        self.session_manager
             .add_message(session_id, "user", message)
             .await?;
         Self::emit_stream(
@@ -373,11 +372,10 @@ impl AgentCore {
                 });
                 Self::emit_stream(
                     &stream,
-                    StreamEvent::new(session_id, "tool.result")
-                        .with_payload(json!({
-                            "tool_call_id": tool_use.id,
-                            "name": tool_use.name,
-                        })),
+                    StreamEvent::new(session_id, "tool.result").with_payload(json!({
+                        "tool_call_id": tool_use.id,
+                        "name": tool_use.name,
+                    })),
                 )
                 .await;
             }
@@ -385,8 +383,7 @@ impl AgentCore {
             // Continue loop to get next response from Claude
         };
 
-        self
-            .session_manager
+        self.session_manager
             .add_message(session_id, "assistant", &final_content)
             .await?;
         Self::emit_stream(

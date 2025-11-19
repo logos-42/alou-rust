@@ -118,13 +118,16 @@ impl QueryTool {
             .or_else(|| find_token(normalized_chain.as_deref(), token_address));
 
             let decimals = token_metadata.map(|token| token.decimals);
-            let normalized_balance = decimals.map(|decimals| format_token_amount(raw_balance, decimals));
+            let normalized_balance =
+                decimals.map(|decimals| format_token_amount(raw_balance, decimals));
 
             Ok(Erc20Balance {
                 token_address: token_address.to_string(),
                 symbol: token_metadata.map(|token| token.symbol.to_string()),
                 name: token_metadata.map(|token| token.name.to_string()),
-                chain: token_metadata.map(|token| token.chain.to_string()).or(normalized_chain),
+                chain: token_metadata
+                    .map(|token| token.chain.to_string())
+                    .or(normalized_chain),
                 decimals,
                 balance: raw_balance.to_string(),
                 normalized_balance,
@@ -288,11 +291,7 @@ fn format_token_amount(value: u128, decimals: u8) -> String {
         return whole.to_string();
     }
 
-    let mut remainder_str = format!(
-        "{:0>width$}",
-        remainder,
-        width = decimals as usize
-    );
+    let mut remainder_str = format!("{:0>width$}", remainder, width = decimals as usize);
     // 去掉多余的末尾 0，避免显示过长的小数
     while remainder_str.ends_with('0') {
         remainder_str.pop();

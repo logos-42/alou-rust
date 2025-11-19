@@ -1,11 +1,11 @@
-use crate::agent::diap_identity::{DiapIdentityConfig, DiapIdentityManager};
+use crate::agent::diap_identity::DiapIdentity;
 use crate::agent::discovery::{AgentDiscovery, ResolvedAgent};
 use crate::agent::session::SessionManager;
 use crate::utils::error::AloudError;
 use crate::utils::time;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use worker::*;
 
 use super::{json_response, json_response_with_status, ErrorResponse};
@@ -26,6 +26,31 @@ pub(crate) struct SearchAgentRequest {
 struct SearchAgentResponse {
     pub agents: Vec<ResolvedAgent>,
     pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpPortConfig {
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub endpoint: Option<String>,
+    #[serde(default)]
+    pub port: Option<u16>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub protocol: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProvidedDiapIdentity {
+    pub did: String,
+    pub cid: String,
+    pub ipns: String,
+    #[serde(default)]
+    pub public_key: Option<String>,
 }
 
 pub(crate) async fn handle_resolve_agent(
@@ -382,7 +407,6 @@ pub(crate) async fn handle_create_diap_identity(
 /// Create a new Claude Agent SDK with automatic DIAP identity
 pub(crate) async fn handle_create_claude_agent(
     session_manager: &SessionManager,
-    env: &Env,
     req: &mut Request,
 ) -> Result<Response> {
     #[derive(Deserialize)]
@@ -395,6 +419,16 @@ pub(crate) async fn handle_create_claude_agent(
         chain: Option<String>,
         #[serde(default)]
         name: Option<String>,
+        #[serde(default)]
+        avatar_cid: Option<String>,
+        #[serde(default)]
+        mcp_config_cid: Option<String>,
+        #[serde(default)]
+        role_description: Option<String>,
+        #[serde(default)]
+        mcp_ports: Option<Vec<McpPortConfig>>,
+        #[serde(default)]
+        diap_identity: Option<ProvidedDiapIdentity>,
     }
 
     let body: CreateClaudeAgentRequest = match req.json().await {
@@ -413,10 +447,8 @@ pub(crate) async fn handle_create_claude_agent(
         session_manager
             .get_session(&sid)
             .await
-            .map_err(|e| {
-                ErrorResponse {
-                    error: format!("Session not found: {}", e),
-                }
+            .map_err(|e| ErrorResponse {
+                error: format!("Session not found: {}", e),
             })?;
         sid
     } else {
@@ -429,88 +461,90 @@ pub(crate) async fn handle_create_claude_agent(
             })?
     };
 
-    // Check if DIAP identity already exists
-    let identity_exists = session_manager
-        .get_diap_identity(&session_id)
-        .await
-        .map(|opt| opt.is_some())
-        .unwrap_or(false);
+    let provided_identity = body.diap_identity.clone();
+    let mut stored_identity: Option<DiapIdentity> = None;
+    if let Some(provided_identity) = provided_identity.clone() {
+        let public_key = provided_identity
+            .public_key
+            .clone()
+            .unwrap_or_else(|| format!("pubkey_{}", provided_identity.ipns));
+        let identity = DiapIdentity::new(
+            provided_identity.did.clone(),
+            provided_identity.ipns.clone(),
+            provided_identity.cid.clone(),
+            public_key,
+            None,
+        );
+        if let Err(e) = session_manager
+            .set_diap_identity(&session_id, identity.clone())
+            .await
+        {
+            let error_response = ErrorResponse {
+                error: format!("Failed to store DIAP identity: {}", e),
+            };
+            return json_response_with_status(&error_response, 500);
+        }
+        stored_identity = Some(identity);
+    }
 
-    if !identity_exists {
-        // Create DIAP identity automatically
-        let ipfs_api_url = match env.var("DIAP_IPFS_API_URL") {
-            Ok(v) => v.to_string(),
-            Err(_) => {
-                let error_response = ErrorResponse {
-                    error: "DIAP_IPFS_API_URL not configured".to_string(),
-                };
-                return json_response_with_status(&error_response, 500);
-            }
-        };
-
-        let ipfs_gateway_url = match env.var("DIAP_IPFS_GATEWAY_URL") {
-            Ok(v) => v.to_string(),
-            Err(_) => {
-                let error_response = ErrorResponse {
-                    error: "DIAP_IPFS_GATEWAY_URL not configured".to_string(),
-                };
-                return json_response_with_status(&error_response, 500);
-            }
-        };
-
-        let ipns_key = env.var("DIAP_IPNS_KEY").map(|v| v.to_string()).ok();
-        let timeout_secs = env
-            .var("DIAP_IPFS_TIMEOUT_SECS")
+    let identity = if let Some(identity) = stored_identity.clone() {
+        Some(identity)
+    } else {
+        session_manager
+            .get_diap_identity(&session_id)
+            .await
             .ok()
-            .and_then(|v| v.to_string().parse::<u64>().ok())
-            .unwrap_or(10);
+            .flatten()
+    };
 
-        let config = DiapIdentityConfig::new(ipfs_api_url, ipfs_gateway_url)
-            .with_ipns_key(ipns_key)
-            .with_timeout(timeout_secs);
+    let mut agent_metadata = json!({
+        "agent_type": "claude_agent_sdk",
+        "display_name": body.name.clone().unwrap_or_else(|| "Claude Agent SDK".to_string()),
+        "session_id": session_id,
+    });
 
-        let identity_manager = match DiapIdentityManager::new(config) {
-            Ok(manager) => manager,
-            Err(e) => {
-                let error_response = ErrorResponse {
-                    error: format!("Failed to create identity manager: {}", e),
-                };
-                return json_response_with_status(&error_response, 500);
-            }
-        };
-
-        match identity_manager.create_identity().await {
-            Ok(identity) => {
-                if let Err(e) = session_manager
-                    .set_diap_identity(&session_id, identity)
-                    .await
-                {
-                    console_warn!(
-                        "Failed to store DIAP identity for session {}: {}",
-                        session_id,
-                        e
-                    );
-                }
-            }
-            Err(e) => {
-                console_warn!(
-                    "Failed to create DIAP identity for session {}: {}",
-                    session_id,
-                    e
-                );
-                // Continue without DIAP identity - it can be created later
-            }
+    if let Some(desc) = body.role_description.clone() {
+        agent_metadata["role_description"] = json!(desc);
+    }
+    if let Some(avatar_cid) = body.avatar_cid.clone() {
+        agent_metadata["avatar_cid"] = json!(avatar_cid);
+    }
+    if let Some(config_cid) = body.mcp_config_cid.clone() {
+        agent_metadata["mcp_config_cid"] = json!(config_cid);
+    }
+    if let Some(ports) = body.mcp_ports.clone() {
+        if let Ok(value) = serde_json::to_value(ports) {
+            agent_metadata["mcp_ports"] = value;
+        }
+    }
+    if let Some(ref identity) = identity {
+        agent_metadata["did"] = json!(identity.did);
+        agent_metadata["cid"] = json!(identity.cid);
+        agent_metadata["ipns"] = json!(identity.ipns);
+    }
+    if let Some(provided) = provided_identity {
+        if let Ok(value) = serde_json::to_value(provided) {
+            agent_metadata["diap_identity"] = value;
         }
     }
 
-    // Get the created identity
-    let identity = session_manager.get_diap_identity(&session_id).await.ok().flatten();
+    if let Err(e) = session_manager
+        .set_agent_metadata(&session_id, agent_metadata.clone())
+        .await
+    {
+        console_warn!(
+            "Failed to store agent metadata for session {}: {}",
+            session_id,
+            e
+        );
+    }
 
     json_response(&json!({
         "session_id": session_id,
         "agent_type": "claude_agent_sdk",
         "name": body.name.unwrap_or_else(|| "Claude Agent SDK".to_string()),
         "diap_identity": identity,
+        "agent_metadata": agent_metadata,
     }))
 }
 
@@ -589,7 +623,8 @@ pub(crate) async fn handle_register_agent_onchain(
         Ok(Some(identity)) => identity,
         Ok(None) => {
             let error_response = ErrorResponse {
-                error: "DIAP identity not found for this session. Please create identity first.".to_string(),
+                error: "DIAP identity not found for this session. Please create identity first."
+                    .to_string(),
             };
             return json_response_with_status(&error_response, 404);
         }

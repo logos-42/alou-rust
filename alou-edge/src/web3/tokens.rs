@@ -129,4 +129,3 @@ pub fn normalize_chain_identifier(chain: &str) -> String {
         other => other.to_string(),
     }
 }
-

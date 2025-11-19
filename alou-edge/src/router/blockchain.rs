@@ -107,32 +107,47 @@ pub(crate) async fn handle_blockchain_balance(
     let chain_lower = chain.to_lowercase();
     let chain_hint = Some(chain.as_str());
 
-    let response: StdResult<BalanceResponse, AloudError> = if chain_lower == "eth"
-        || chain_lower == "ethereum"
-    {
-        if let Some(token_addr) = token_address.clone() {
-            match query_tool
-                .get_erc20_balance(&token_addr, &address, chain_hint)
-                .await
-            {
-                Ok(balance) => Ok(BalanceResponse {
-                    address,
-                    chain,
-                    balance: balance
-                        .normalized_balance
-                        .clone()
-                        .unwrap_or_else(|| balance.balance.clone()),
-                    raw_balance: Some(balance.balance),
-                    token_address: Some(balance.token_address),
-                    token_symbol: balance.symbol,
-                    token_name: balance.name,
-                    decimals: balance.decimals,
-                    timestamp: Some(balance.timestamp),
-                }),
-                Err(e) => Err(e),
+    let response: StdResult<BalanceResponse, AloudError> =
+        if chain_lower == "eth" || chain_lower == "ethereum" {
+            if let Some(token_addr) = token_address.clone() {
+                match query_tool
+                    .get_erc20_balance(&token_addr, &address, chain_hint)
+                    .await
+                {
+                    Ok(balance) => Ok(BalanceResponse {
+                        address,
+                        chain,
+                        balance: balance
+                            .normalized_balance
+                            .clone()
+                            .unwrap_or_else(|| balance.balance.clone()),
+                        raw_balance: Some(balance.balance),
+                        token_address: Some(balance.token_address),
+                        token_symbol: balance.symbol,
+                        token_name: balance.name,
+                        decimals: balance.decimals,
+                        timestamp: Some(balance.timestamp),
+                    }),
+                    Err(e) => Err(e),
+                }
+            } else {
+                match query_tool.get_eth_balance(&address, chain_hint).await {
+                    Ok(balance) => Ok(BalanceResponse {
+                        address,
+                        chain,
+                        balance,
+                        raw_balance: None,
+                        token_address: None,
+                        token_symbol: None,
+                        token_name: None,
+                        decimals: None,
+                        timestamp: None,
+                    }),
+                    Err(e) => Err(e),
+                }
             }
-        } else {
-            match query_tool.get_eth_balance(&address, chain_hint).await {
+        } else if chain_lower == "sol" || chain_lower == "solana" {
+            match query_tool.get_sol_balance(&address).await {
                 Ok(balance) => Ok(BalanceResponse {
                     address,
                     chain,
@@ -146,28 +161,12 @@ pub(crate) async fn handle_blockchain_balance(
                 }),
                 Err(e) => Err(e),
             }
-        }
-    } else if chain_lower == "sol" || chain_lower == "solana" {
-        match query_tool.get_sol_balance(&address).await {
-            Ok(balance) => Ok(BalanceResponse {
-                address,
-                chain,
-                balance,
-                raw_balance: None,
-                token_address: None,
-                token_symbol: None,
-                token_name: None,
-                decimals: None,
-                timestamp: None,
-            }),
-            Err(e) => Err(e),
-        }
-    } else {
-        Err(AloudError::InvalidInput(format!(
-            "Unsupported chain: {}",
-            chain
-        )))
-    };
+        } else {
+            Err(AloudError::InvalidInput(format!(
+                "Unsupported chain: {}",
+                chain
+            )))
+        };
 
     match response {
         Ok(balance_response) => json_response(&balance_response),
@@ -395,4 +394,3 @@ pub(crate) async fn handle_get_transaction_status(
         }
     }
 }
-

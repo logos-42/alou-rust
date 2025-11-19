@@ -215,7 +215,7 @@ impl Router {
                 agent::handle_get_diap_identity(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/create-claude") => {
-                agent::handle_create_claude_agent(&self.session_manager, &env, req).await
+                agent::handle_create_claude_agent(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/diap/register-onchain") => {
                 agent::handle_register_agent_onchain(&self.session_manager, &env, req).await
@@ -227,7 +227,9 @@ impl Router {
             (Method::Post, "/api/blockchain/balance") => {
                 blockchain::handle_blockchain_balance(self.query_tool.as_ref(), req).await
             }
-            (Method::Get, "/api/blockchain/tokens") => blockchain::handle_blockchain_tokens(req).await,
+            (Method::Get, "/api/blockchain/tokens") => {
+                blockchain::handle_blockchain_tokens(req).await
+            }
             (Method::Post, "/api/blockchain/transaction/build") => {
                 blockchain::handle_build_transaction(self.transaction_tool.as_ref(), req).await
             }

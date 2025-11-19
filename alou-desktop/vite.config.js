@@ -18,7 +18,9 @@ export default defineConfig({
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    target: ['es2021', 'chrome100', 'safari13'],
+    // BigInt literals are required by blockchain libs (viem/ox). Safari 13 lacks support,
+    // so we target modern runtimes (Tauri desktop Chromium/WebKit >= 14).
+    target: 'esnext',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
     outDir: './dist',

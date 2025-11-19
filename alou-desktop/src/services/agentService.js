@@ -157,12 +157,34 @@ export class AgentService {
   /**
    * Create a new Claude Agent SDK with automatic DIAP identity
    */
-  async createClaudeAgent(sessionId, walletAddress, chain, name) {
+  async createClaudeAgent({
+    sessionId,
+    walletAddress,
+    chain,
+    name,
+    avatarCid,
+    mcpConfigCid,
+    roleDescription,
+    mcpPorts,
+    diapIdentity,
+  }) {
     const response = await apiClient.post('/agent/create-claude', {
       session_id: sessionId,
       wallet_address: walletAddress,
       chain,
       name,
+      avatar_cid: avatarCid,
+      mcp_config_cid: mcpConfigCid,
+      role_description: roleDescription,
+      mcp_ports: mcpPorts,
+      diap_identity: diapIdentity
+        ? {
+            did: diapIdentity.did,
+            cid: diapIdentity.cid,
+            ipns: diapIdentity.ipns,
+            public_key: diapIdentity.public_key,
+          }
+        : undefined,
     })
     return response.data
   }

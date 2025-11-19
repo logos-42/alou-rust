@@ -142,7 +142,8 @@ impl BlockchainAgent {
             },
             AiTool {
                 name: "list_supported_tokens".to_string(),
-                description: "List supported stablecoins / ERC20 tokens for a given chain".to_string(),
+                description: "List supported stablecoins / ERC20 tokens for a given chain"
+                    .to_string(),
                 parameters: json!({
                     "type": "object",
                     "properties": {
@@ -264,17 +265,13 @@ impl BlockchainAgent {
 
                 let normalized_chain = chain_hint.map(normalize_chain_identifier);
                 let (token_address_cow, metadata): (Cow<'_, str>, Option<&TokenMetadata>) =
-                    if let Some(address) = arguments
-                        .get("token_address")
-                        .and_then(|v| v.as_str())
-                    {
+                    if let Some(address) = arguments.get("token_address").and_then(|v| v.as_str()) {
                         (
                             Cow::Owned(address.to_string()),
                             find_token(normalized_chain.as_deref(), address),
                         )
-                    } else if let Some(symbol) = arguments
-                        .get("token_symbol")
-                        .and_then(|v| v.as_str())
+                    } else if let Some(symbol) =
+                        arguments.get("token_symbol").and_then(|v| v.as_str())
                     {
                         let token = find_token_by_symbol(chain_hint, symbol).ok_or_else(|| {
                             AloudError::InvalidInput(format!(
@@ -303,7 +300,11 @@ impl BlockchainAgent {
 
                 let balance = self
                     .query_tool
-                    .get_erc20_balance(token_address_cow.as_ref(), wallet_address, chain_hint_effective)
+                    .get_erc20_balance(
+                        token_address_cow.as_ref(),
+                        wallet_address,
+                        chain_hint_effective,
+                    )
                     .await?;
 
                 let symbol = balance
@@ -316,11 +317,7 @@ impl BlockchainAgent {
                     .clone()
                     .unwrap_or_else(|| balance.balance.clone());
 
-                Ok(format!(
-                    "{} Balance: {}",
-                    symbol,
-                    display_balance
-                ))
+                Ok(format!("{} Balance: {}", symbol, display_balance))
             }
             "list_supported_tokens" => {
                 let chain = arguments.get("chain").and_then(|v| v.as_str());
@@ -391,16 +388,13 @@ impl BlockchainAgent {
 
                 let chain_hint = arguments.get("chain").and_then(|v| v.as_str());
 
-                let (token_address, metadata) = if let Some(address) = arguments
-                    .get("token_address")
-                    .and_then(|v| v.as_str())
+                let (token_address, metadata) = if let Some(address) =
+                    arguments.get("token_address").and_then(|v| v.as_str())
                 {
                     let normalized = chain_hint.map(normalize_chain_identifier);
                     let metadata = find_token(normalized.as_deref(), address);
                     (address.to_string(), metadata)
-                } else if let Some(symbol) = arguments
-                    .get("token_symbol")
-                    .and_then(|v| v.as_str())
+                } else if let Some(symbol) = arguments.get("token_symbol").and_then(|v| v.as_str())
                 {
                     let token = find_token_by_symbol(chain_hint, symbol).ok_or_else(|| {
                         AloudError::InvalidInput(format!(
@@ -428,14 +422,14 @@ impl BlockchainAgent {
                     .get("amount")
                     .or_else(|| arguments.get("value"))
                     .ok_or_else(|| {
-                        AloudError::InvalidInput("Missing transfer amount (amount/value)".to_string())
+                        AloudError::InvalidInput(
+                            "Missing transfer amount (amount/value)".to_string(),
+                        )
                     })?;
 
                 let amount = parse_amount_to_u128(amount_value, decimals)?;
 
-                let chain_for_hint = metadata
-                    .map(|token| token.chain)
-                    .or(chain_hint);
+                let chain_for_hint = metadata.map(|token| token.chain).or(chain_hint);
 
                 let tx_data = self
                     .transaction_tool
@@ -462,10 +456,7 @@ impl BlockchainAgent {
 
                 Ok(format!(
                     "ERC20 Transaction built: 向 {} 转账 {} {} (nonce {:?})",
-                    to,
-                    human_amount,
-                    symbol,
-                    tx_data.nonce
+                    to, human_amount, symbol, tx_data.nonce
                 ))
             }
             "get_transaction_status" => {
@@ -497,7 +488,10 @@ fn parse_amount_to_u128(value: &Value, decimals: u8) -> Result<u128> {
     let amount_str = if let Some(str_value) = value.as_str() {
         str_value.trim()
     } else if let Some(num) = value.as_f64() {
-        return decimal_to_u128(&format!("{:.prec$}", num, prec = decimals as usize), decimals);
+        return decimal_to_u128(
+            &format!("{:.prec$}", num, prec = decimals as usize),
+            decimals,
+        );
     } else if let Some(num) = value.as_u64() {
         return decimal_to_u128(&num.to_string(), decimals);
     } else if let Some(num) = value.as_i64() {
@@ -592,11 +586,7 @@ fn format_token_amount(value: u128, decimals: u8) -> String {
         return whole.to_string();
     }
 
-    let mut remainder_str = format!(
-        "{:0>width$}",
-        remainder,
-        width = decimals as usize
-    );
+    let mut remainder_str = format!("{:0>width$}", remainder, width = decimals as usize);
 
     while remainder_str.ends_with('0') {
         remainder_str.pop();
