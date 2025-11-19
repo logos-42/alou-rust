@@ -9,8 +9,9 @@
   background: transparent;
 }
 
+/* 暗夜模式 - 纯黑色顶部导航栏 */
 .app-shell.dark-mode .top-nav {
-  background: rgba(11, 16, 36, 0.32);
+  background: #000000; /* 纯黑色背景 */
 }
 
 .app-shell:not(.dark-mode) .top-nav {
@@ -106,8 +107,8 @@
 }
 
 .top-nav .login-btn {
-  background: var(--primary-color);
-  color: white;
+  background: white; /* 白天模式保持白色 */
+  color: #000000; /* 白天模式黑色文字 */
   border: none;
   border-radius: 0.75rem;
   padding: 0.75rem 1.25rem;
@@ -116,6 +117,18 @@
   gap: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+/* 暗夜模式下登录按钮变暗色 */
+.app-shell.dark-mode .top-nav .login-btn {
+  background: rgba(255, 255, 255, 0.1); /* 暗夜模式暗色背景 */
+  color: #ffffff; /* 暗夜模式白色文字 */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-shell.dark-mode .top-nav .login-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .top-nav .user-menu {

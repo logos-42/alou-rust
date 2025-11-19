@@ -41,6 +41,36 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
+    // Check if it's a connection refused error
+    const isConnectionError = 
+      error.code === 'ECONNREFUSED' || 
+      error.code === 'ERR_NETWORK' ||
+      error.message?.includes('ERR_CONNECTION_REFUSED') ||
+      error.message?.includes('Failed to fetch') ||
+      !error.response
+
+    // Only log connection errors once per endpoint to avoid spam
+    if (isConnectionError) {
+      const errorKey = `${error.config?.method || 'unknown'}_${error.config?.url || 'unknown'}`
+      const lastErrorTime = window.__lastApiError?.[errorKey] || 0
+      const now = Date.now()
+      
+      // Only log if it's been more than 5 seconds since last error for this endpoint
+      if (now - lastErrorTime > 5000) {
+        if (!window.__lastApiError) {
+          window.__lastApiError = {}
+        }
+        window.__lastApiError[errorKey] = now
+        
+        console.warn(`[API] Connection to backend server failed (${API_BASE_URL}). Make sure the backend server is running or set VITE_API_BASE_URL environment variable.`)
+      }
+      
+      // For connection errors, don't throw detailed errors for health checks
+      if (error.config?.url?.includes('/health')) {
+        return Promise.reject(new Error('Backend server unavailable'))
+      }
+    }
+
     // If 401 and not already retried, try to refresh token
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true

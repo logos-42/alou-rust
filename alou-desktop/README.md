@@ -186,7 +186,7 @@ TAURI_COMPRESSION=1 npm run build:tauri:release
 3. **发布更新**：构建新版本并上传到更新服务器
 4. **用户更新**：应用会自动检测并提示更新
 
-详细说明请查看 [DEPLOYMENT.md](./DEPLOYMENT.md)
+详细说明请查看 [DEPLOYMENT.md](../docs/DEPLOYMENT.md)
 
 ## 注意事项
 
@@ -218,5 +218,5 @@ TAURI_COMPRESSION=1 npm run build:tauri:release
 
 ## 相关文档
 
-- [架构说明](./ARCHITECTURE.md) - 前后端分离架构
-- [部署指南](./DEPLOYMENT.md) - 自动更新和部署说明
+- [架构说明](../docs/ARCHITECTURE.md) - 前后端分离架构
+- [部署指南](../docs/DEPLOYMENT.md) - 自动更新和部署说明

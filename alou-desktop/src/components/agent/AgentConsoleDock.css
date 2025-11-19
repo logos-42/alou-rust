@@ -9,9 +9,10 @@
   backdrop-filter: blur(8px);
 }
 
+/* 暗夜模式 - 纯黑色底部输入框 */
 .app-shell.dark-mode .console-dock {
-  background: rgba(15, 23, 42, 0.88);
-  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  background: #000000; /* 纯黑色背景 */
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .console-dock .reopen-btn {

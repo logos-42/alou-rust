@@ -26,15 +26,22 @@
   min-height: 38px;
 }
 
+/* 暗夜模式 - 纯黑色输入框 */
 .app-shell.dark-mode .input-area .input-wrapper {
-  background: rgba(15, 23, 42, 0.85);
-  border-color: rgba(148, 163, 184, 0.18);
-  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.35);
+  background: #000000; /* 纯黑色背景 */
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 22px rgba(255, 255, 255, 0.05);
 }
 
 .input-area .input-wrapper:focus-within {
   border-color: rgba(99, 102, 241, 0.45);
   box-shadow: 0 12px 24px rgba(99, 102, 241, 0.18);
+}
+
+/* 暗夜模式下焦点边框 */
+.app-shell.dark-mode .input-area .input-wrapper:focus-within {
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 12px 24px rgba(255, 255, 255, 0.1);
 }
 
 .input-area .message-input {

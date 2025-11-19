@@ -176,7 +176,31 @@ const AgentChat = () => {
       } catch (error) {
         const message = extractErrorMessage(error)
         applyLatest(() => {
-          console.error('Failed to load agent channels:', error)
+          // Only log connection errors occasionally to avoid spam
+          const isConnectionError = 
+            error.code === 'ECONNREFUSED' || 
+            error.code === 'ERR_NETWORK' ||
+            error.message?.includes('ERR_CONNECTION_REFUSED') ||
+            error.message?.includes('Failed to fetch') ||
+            !error.response
+          
+          const now = Date.now()
+          const lastErrorTime = window.__lastLoadChannelsError || 0
+          
+          if (isConnectionError) {
+            // For connection errors, only log every 10 seconds
+            if (now - lastErrorTime > 10000) {
+              window.__lastLoadChannelsError = now
+              console.warn('[AgentChat] Cannot load agent channels: backend server unavailable.')
+            }
+          } else {
+            // For other errors, log normally
+            if (now - lastErrorTime > 5000) {
+              window.__lastLoadChannelsError = now
+              console.error('Failed to load agent channels:', error)
+            }
+          }
+          
           setChannelError(message)
           setChannels([])
           setActiveChannelId(null)
@@ -588,7 +612,30 @@ const AgentChat = () => {
       const data = await agentService.createSession(walletAddress || undefined)
       setSessionId(data.session_id)
     } catch (error) {
-      console.error('Failed to create session:', error)
+      // Only log connection errors occasionally to avoid spam
+      const isConnectionError = 
+        error.code === 'ECONNREFUSED' || 
+        error.code === 'ERR_NETWORK' ||
+        error.message?.includes('ERR_CONNECTION_REFUSED') ||
+        error.message?.includes('Failed to fetch') ||
+        !error.response
+      
+      const now = Date.now()
+      const lastErrorTime = window.__lastCreateSessionError || 0
+      
+      if (isConnectionError) {
+        // For connection errors, only log every 10 seconds
+        if (now - lastErrorTime > 10000) {
+          window.__lastCreateSessionError = now
+          console.warn('[AgentChat] Cannot create session: backend server unavailable. Please start the backend server or configure VITE_API_BASE_URL.')
+        }
+      } else {
+        // For other errors, log normally
+        if (now - lastErrorTime > 5000) {
+          window.__lastCreateSessionError = now
+          console.error('Failed to create session:', error)
+        }
+      }
     }
   }, [activeChain, preferredChain])
 
@@ -601,7 +648,14 @@ const AgentChat = () => {
         return
       }
 
-      const balance = await walletService.getBalance(info.address)
+      let balance = '0'
+      try {
+        balance = await walletService.getBalance(info.address)
+      } catch (balanceError) {
+        console.warn('Failed to get wallet balance:', balanceError)
+        // 如果获取余额失败，使用默认值 0，不中断流程
+        balance = '0'
+      }
       const backendChain = resolveBackendChain({ chainId: info.chainId }) || preferredChain || null
       if (backendChain && backendChain !== preferredChain) {
         setPreferredChain(backendChain)
@@ -1006,9 +1060,16 @@ const AgentChat = () => {
       void loadWalletOverview({ chain: backendChain, silent: true })
     }
 
-    walletService.onChainChanged(handleChainChanged)
+    const setupChainListener = async () => {
+      try {
+        await walletService.onChainChanged(handleChainChanged)
+      } catch (error) {
+        console.warn('Failed to setup chain listener:', error)
+      }
+    }
+    setupChainListener()
     return () => {
-      walletService.removeListener('chainChanged', handleChainChanged)
+      walletService.removeListener('chainChanged', handleChainChanged).catch(console.error)
     }
   }, [loadWalletOverview, preferredChain, recordInteraction, refreshWallet])
 
@@ -1060,7 +1121,26 @@ const AgentChat = () => {
       await agentService.healthCheck()
       setConnectionStatus('connected')
     } catch (error) {
-      console.error('Connection check failed:', error)
+      // Only log connection errors occasionally to avoid spam
+      const now = Date.now()
+      const lastErrorTime = window.__lastHealthCheckError || 0
+      
+      if (now - lastErrorTime > 10000) { // Log every 10 seconds max
+        window.__lastHealthCheckError = now
+        const isConnectionError = 
+          error.code === 'ECONNREFUSED' || 
+          error.code === 'ERR_NETWORK' ||
+          error.message?.includes('ERR_CONNECTION_REFUSED') ||
+          error.message?.includes('Failed to fetch') ||
+          !error.response
+        
+        if (isConnectionError) {
+          console.warn('[AgentChat] Backend server unavailable. Please start the backend server or configure VITE_API_BASE_URL.')
+        } else {
+          console.error('Connection check failed:', error)
+        }
+      }
+      
       setConnectionStatus('disconnected')
     }
   }, [])
@@ -1434,10 +1514,17 @@ const AgentChat = () => {
       }
     }
 
-    initLanguage()
-    checkConnection()
-    createSession().then(() => setSessionReady(true))
-    refreshWallet()
+    try {
+      initLanguage()
+      checkConnection()
+      createSession().then(() => setSessionReady(true)).catch(err => console.error('Failed to create session:', err))
+      refreshWallet().catch(err => {
+        console.warn('Failed to refresh wallet:', err)
+        // 不中断流程，只是记录警告
+      })
+    } catch (error) {
+      console.error('Error in AgentChat initialization:', error)
+    }
 
     if (typeof window !== 'undefined') {
       window.addEventListener('wallet-changed', handleWalletChanged)

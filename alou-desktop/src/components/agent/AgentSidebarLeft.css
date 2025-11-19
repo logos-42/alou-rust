@@ -8,11 +8,14 @@
   width: var(--left-column-width, 300px);
   transition:
     width 0.28s ease,
-    padding 0.2s ease;
+    padding 0.2s ease,
+    background 0.3s ease;
 }
 
+/* 暗夜模式 - 纯黑色左侧边栏 */
 .app-shell.dark-mode .sidebar-left {
-  background: rgba(15, 23, 42, 0.78);
+  background: #000000; /* 纯黑色背景 */
+  border-right-color: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-left .sidebar-header {

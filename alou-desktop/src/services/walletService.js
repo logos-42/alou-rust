@@ -5,13 +5,57 @@
 class WalletService {
   constructor() {
     this.ethereum = typeof window !== 'undefined' ? window.ethereum : null
+    this.desktopWalletService = null
   }
 
-  getProvider() {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      this.ethereum = window.ethereum
+  // 延迟加载 desktopWalletService 以避免循环依赖
+  async getDesktopWalletService() {
+    if (!this.desktopWalletService && typeof window !== 'undefined') {
+      try {
+        // 动态导入以避免循环依赖
+        const { desktopWalletService } = await import('@/services/desktopWalletService')
+        this.desktopWalletService = desktopWalletService
+      } catch (error) {
+        // 如果导入失败，返回 null
+        console.warn('Failed to load desktopWalletService:', error)
+      }
     }
-    return this.ethereum
+    return this.desktopWalletService
+  }
+
+  isDesktop() {
+    if (typeof window === 'undefined') return false
+    return window.__TAURI__ !== undefined
+  }
+
+  async getProvider() {
+    try {
+      // 如果是桌面环境且没有浏览器钱包，尝试使用桌面钱包服务
+      if (this.isDesktop() && typeof window !== 'undefined' && !window.ethereum) {
+        try {
+          const desktopService = await this.getDesktopWalletService()
+          if (desktopService && desktopService.isConnected && desktopService.isConnected()) {
+            // 返回桌面钱包的 provider（如果已连接）
+            const provider = await desktopService.getProvider()
+            if (provider) {
+              return provider
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to get desktop wallet provider:', error)
+          // 继续尝试浏览器钱包
+        }
+      }
+      
+      if (typeof window !== 'undefined' && window.ethereum) {
+        this.ethereum = window.ethereum
+        return this.ethereum
+      }
+    } catch (error) {
+      console.error('Error in getProvider:', error)
+    }
+    
+    return null
   }
 
   /**
@@ -23,7 +67,7 @@ class WalletService {
       throw new Error('Wallet not available')
     }
 
-    const provider = this.getProvider()
+    const provider = await this.getProvider()
     let accounts = []
 
     if (forceSelect) {
@@ -69,7 +113,7 @@ class WalletService {
     }
 
     try {
-      const provider = this.getProvider()
+      const provider = await this.getProvider()
       const accounts = await provider.request({ method: 'eth_accounts' })
       return Array.isArray(accounts) ? accounts : []
     } catch (error) {
@@ -82,17 +126,26 @@ class WalletService {
    * Check if wallet is available
    */
   isWalletAvailable() {
-    return Boolean(this.getProvider())
+    // 检查浏览器钱包
+    if (typeof window !== 'undefined' && window.ethereum) {
+      return true
+    }
+    
+    // 桌面环境：如果有保存的钱包地址，返回 true
+    // 注意：这里不检查桌面钱包是否已连接，因为这会触发异步操作
+    // 实际连接状态会在 getCurrentWalletInfo 中检查
+    if (this.isDesktop()) {
+      const savedAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+      return savedAddress !== null
+    }
+    
+    return false
   }
 
   /**
    * Get current wallet info
    */
   async getCurrentWalletInfo() {
-    if (!this.isWalletAvailable()) {
-      return null
-    }
-
     try {
       const address = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
       const walletType = typeof window !== 'undefined' ? localStorage.getItem('wallet_type') : null
@@ -100,6 +153,32 @@ class WalletService {
 
       if (!address) {
         return null
+      }
+
+      // 如果是桌面环境且钱包类型是桌面钱包，尝试从桌面钱包服务获取最新信息
+      if (this.isDesktop() && (walletType === 'walletconnect' || walletType === 'local')) {
+        try {
+          const desktopService = await this.getDesktopWalletService()
+          if (desktopService && desktopService.isConnected()) {
+            try {
+              const accounts = await desktopService.getAccounts()
+              const currentChainId = await desktopService.getCurrentChainId()
+              if (accounts.length > 0) {
+                return {
+                  address: accounts[0],
+                  chainId: currentChainId || chainId || '0x1',
+                  walletType: walletType || 'walletconnect',
+                }
+              }
+            } catch (error) {
+              console.warn('Failed to get wallet info from desktop service:', error)
+              // 继续使用 localStorage 中的信息
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to load desktop wallet service:', error)
+          // 继续使用 localStorage 中的信息
+        }
       }
 
       return {
@@ -117,19 +196,78 @@ class WalletService {
    * Get current network chain ID
    */
   async getCurrentChainId() {
-    if (!this.isWalletAvailable()) {
-      throw new Error('Wallet not available')
-    }
-
     try {
-      const provider = this.getProvider()
-      const chainId = await provider.request({ method: 'eth_chainId' })
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('wallet_chain_id', chainId)
+      // 如果是桌面环境且使用桌面钱包，使用桌面钱包服务
+      if (this.isDesktop()) {
+        try {
+          const desktopService = await this.getDesktopWalletService()
+          const walletType = typeof window !== 'undefined' ? localStorage.getItem('wallet_type') : null
+          if (desktopService && (walletType === 'walletconnect' || walletType === 'local')) {
+            try {
+              return await desktopService.getCurrentChainId()
+            } catch (error) {
+              console.warn('Failed to get chain ID from desktop service:', error)
+              // 继续尝试使用浏览器钱包或 localStorage
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to load desktop wallet service:', error)
+          // 继续尝试使用浏览器钱包或 localStorage
+        }
       }
-      return chainId
+
+      // 使用浏览器钱包
+      if (!this.isWalletAvailable()) {
+        // 如果钱包不可用，尝试从 localStorage 读取
+        const savedChainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+        if (savedChainId) {
+          return savedChainId
+        }
+        throw new Error('Wallet not available')
+      }
+
+      const provider = await this.getProvider()
+      if (!provider) {
+        const savedChainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+        if (savedChainId) {
+          return savedChainId
+        }
+        throw new Error('No wallet provider available')
+      }
+
+      // 处理不同的 provider 类型
+      if (provider.request) {
+        const chainId = await provider.request({ method: 'eth_chainId' })
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('wallet_chain_id', chainId)
+        }
+        return chainId
+      }
+
+      // 处理 ethers Provider
+      if (provider.getNetwork) {
+        const network = await provider.getNetwork()
+        const chainId = `0x${network.chainId.toString(16)}`
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('wallet_chain_id', chainId)
+        }
+        return chainId
+      }
+
+      // 回退到 localStorage
+      const savedChainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+      if (savedChainId) {
+        return savedChainId
+      }
+
+      throw new Error('Unsupported wallet provider')
     } catch (error) {
       console.error('Failed to get chain ID:', error)
+      // 最后尝试从 localStorage 读取
+      const savedChainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+      if (savedChainId) {
+        return savedChainId
+      }
       throw error
     }
   }
@@ -143,7 +281,7 @@ class WalletService {
     }
 
     try {
-      const provider = this.getProvider()
+      const provider = await this.getProvider()
 
       await provider.request({
         method: 'wallet_switchEthereumChain',
@@ -183,7 +321,7 @@ class WalletService {
     }
 
     try {
-      const provider = this.getProvider()
+      const provider = await this.getProvider()
 
       await provider.request({
         method: 'wallet_addEthereumChain',
@@ -224,10 +362,6 @@ class WalletService {
    * Get wallet balance
    */
   async getBalance(address) {
-    if (!this.isWalletAvailable()) {
-      throw new Error('Wallet not available')
-    }
-
     try {
       const targetAddress =
         address || (typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null)
@@ -235,18 +369,72 @@ class WalletService {
         throw new Error('No wallet address available')
       }
 
-      const provider = this.getProvider()
-      const balance = await provider.request({
-        method: 'eth_getBalance',
-        params: [targetAddress, 'latest'],
-      })
+      // 如果是桌面环境且使用桌面钱包，使用桌面钱包服务
+      if (this.isDesktop() && typeof window !== 'undefined') {
+        try {
+          const desktopService = await this.getDesktopWalletService()
+          const walletType = localStorage.getItem('wallet_type')
+          if (desktopService && (walletType === 'walletconnect' || walletType === 'local')) {
+            try {
+              if (desktopService.isConnected && desktopService.isConnected()) {
+                const balance = await desktopService.getBalance(targetAddress)
+                if (balance !== undefined && balance !== null) {
+                  return balance
+                }
+              }
+            } catch (error) {
+              console.warn('Failed to get balance from desktop service:', error)
+              // 继续尝试使用浏览器钱包或返回默认值
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to load desktop wallet service:', error)
+          // 继续尝试使用浏览器钱包
+        }
+      }
 
-      // Convert from wei to ether
-      const ethBalance = (parseInt(balance, 16) / 1e18).toFixed(6)
-      return ethBalance
+      // 使用浏览器钱包
+      if (!this.isWalletAvailable()) {
+        // 如果没有钱包，返回 0 而不是抛出错误
+        return '0'
+      }
+
+      try {
+        const provider = await this.getProvider()
+        if (!provider) {
+          // 如果没有 provider，返回 0
+          return '0'
+        }
+
+        // 处理 ethers.js provider
+        if (provider.request && typeof provider.request === 'function') {
+          const balance = await provider.request({
+            method: 'eth_getBalance',
+            params: [targetAddress, 'latest'],
+          })
+          // Convert from wei to ether
+          const ethBalance = (parseInt(balance, 16) / 1e18).toFixed(6)
+          return ethBalance
+        }
+
+        // 处理 ethers Provider
+        if (provider.getBalance && typeof provider.getBalance === 'function') {
+          const { ethers } = await import('ethers')
+          const balance = await provider.getBalance(targetAddress)
+          return ethers.formatEther(balance)
+        }
+
+        // 如果都不支持，返回默认值
+        return '0'
+      } catch (error) {
+        console.warn('Failed to get balance from provider:', error)
+        // 返回默认值而不是抛出错误
+        return '0'
+      }
     } catch (error) {
       console.error('Failed to get balance:', error)
-      throw error
+      // 返回默认值而不是抛出错误，避免组件崩溃
+      return '0'
     }
   }
 
@@ -277,7 +465,7 @@ class WalletService {
           }
 
           try {
-            const provider = this.getProvider()
+            const provider = await this.getProvider()
             await provider.request({
               method: instruction.method,
               params: [{ chainId }],
@@ -290,7 +478,7 @@ class WalletService {
           } catch (error) {
             // Try fallback if available
             if (error.code === 4902 && instruction.fallback) {
-              const provider = this.getProvider()
+              const provider = await this.getProvider()
               await provider.request({
                 method: instruction.fallback.method,
                 params: [instruction.fallback.params],
@@ -347,7 +535,7 @@ class WalletService {
       throw new Error('Wallet not available')
     }
 
-    const provider = this.getProvider()
+    const provider = await this.getProvider()
     const params = { ...(rawParams || {}) }
 
     if (!params.from) {
@@ -384,35 +572,41 @@ class WalletService {
   /**
    * Listen to wallet events
    */
-  onAccountsChanged(callback) {
+  async onAccountsChanged(callback) {
     if (this.isWalletAvailable()) {
-      const provider = this.getProvider()
-      provider.on('accountsChanged', callback)
+      const provider = await this.getProvider()
+      if (provider && typeof provider.on === 'function') {
+        provider.on('accountsChanged', callback)
+      }
     }
   }
 
   /**
    * Listen to network changes
    */
-  onChainChanged(callback) {
+  async onChainChanged(callback) {
     if (this.isWalletAvailable()) {
-      const provider = this.getProvider()
-      provider.on('chainChanged', (chainId) => {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('wallet_chain_id', chainId)
-        }
-        callback(chainId)
-      })
+      const provider = await this.getProvider()
+      if (provider && typeof provider.on === 'function') {
+        provider.on('chainChanged', (chainId) => {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('wallet_chain_id', chainId)
+          }
+          callback(chainId)
+        })
+      }
     }
   }
 
   /**
    * Remove event listeners
    */
-  removeListener(event, callback) {
+  async removeListener(event, callback) {
     if (this.isWalletAvailable()) {
-      const provider = this.getProvider()
-      provider.removeListener(event, callback)
+      const provider = await this.getProvider()
+      if (provider && typeof provider.removeListener === 'function') {
+        provider.removeListener(event, callback)
+      }
     }
   }
 }

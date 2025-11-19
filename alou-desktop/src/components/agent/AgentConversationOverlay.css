@@ -20,11 +20,15 @@
   flex-direction: column;
   box-shadow: var(--shadow);
   pointer-events: auto;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease;
 }
 
+/* 暗夜模式 - 纯黑色对话栏 */
 .app-shell.dark-mode .conversation-panel {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(148, 163, 184, 0.16);
+  background: #000000; /* 纯黑色背景 */
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .conversation-panel header {

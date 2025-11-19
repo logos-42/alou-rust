@@ -12,8 +12,14 @@
   transform: translateX(0);
   transition:
     transform 0.32s ease,
-    box-shadow 0.32s ease;
+    box-shadow 0.32s ease,
+    background 0.3s ease;
   box-shadow: var(--shadow);
+}
+
+/* 暗夜模式 - 纯黑色右侧边栏 */
+.app-shell.dark-mode .sidebar-right {
+  background: #000000; /* 纯黑色背景 */
 }
 
 .sidebar-right.collapsed {
@@ -48,10 +54,10 @@
 }
 
 .app-shell.dark-mode .sidebar-right .collapse-toggle {
-  background: rgba(30, 41, 59, 0.96);
+  background: #000000; /* 纯黑色背景 */
   color: #ffffff;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  box-shadow: 0 14px 26px rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 14px 26px rgba(255, 255, 255, 0.05);
 }
 
 .sidebar-right .sidebar-content {
@@ -94,11 +100,12 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* 暗夜模式 - 纯黑色右侧边栏卡片 */
 .app-shell.dark-mode .sidebar-right section.wallet-card,
 .app-shell.dark-mode .sidebar-right section.history-card,
 .app-shell.dark-mode .sidebar-right section.context-card {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(148, 163, 184, 0.12);
+  background: #000000; /* 纯黑色背景 */
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-right section header {
