@@ -5,6 +5,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { walletService } from '@/services/walletService'
 import agentService from '@/services/agentService'
 import apiClient from '@/services/api'
+import agentAssetsService from '@/services/agentAssetsService'
 import { MCP_UI_TARGETS, requestMcpUiResource } from '@/services/mcpUiService'
 import { useAgentStream } from '@/hooks/useAgentStream'
 import ChatHeader from '@/components/ChatHeader'
@@ -13,7 +14,7 @@ import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
 import AgentCanvas from '@/components/agent/AgentCanvas'
 import AgentConsoleDock from '@/components/agent/AgentConsoleDock'
 import AgentConversationOverlay from '@/components/agent/AgentConversationOverlay'
-import DiapIdentityPanel from '@/components/agent/DiapIdentityPanel'
+import DiapPanelToggle from '@/components/agent/DiapPanelToggle'
 import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
@@ -32,6 +33,18 @@ import {
   useToolCallHandler,
 } from '@/hooks/useAgentChat'
 import './AgentChat.css'
+
+const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
+
+const resolveAgentAvatar = (agent) => {
+  if (!agent) return fallbackAvatar
+  if (agent.avatar) return agent.avatar
+  if (agent.avatar_url) return agent.avatar_url
+  if (agent.avatarCid || agent.avatar_cid) {
+    return agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
+  }
+  return fallbackAvatar
+}
 
 const AgentChat = () => {
   const navigate = useNavigate()
@@ -67,6 +80,7 @@ const AgentChat = () => {
   const [channelKeyword, setChannelKeyword] = useState('')
   const [activeChannelId, setActiveChannelId] = useState(null)
   const [channels, setChannels] = useState([])
+  const [showDiapPanel, setShowDiapPanel] = useState(true)
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
@@ -78,18 +92,38 @@ const AgentChat = () => {
     if (!agent) {
       return null
     }
-    const id = agent.did || agent.cid || agent.ipns || `agent_${Date.now()}`
-    const nameFromIpns = agent.ipns ? agent.ipns.replace(/^\/?ipns\//, '') : null
-    const nameFromDid = agent.did ? agent.did.split(':').filter(Boolean).slice(-1)[0] : null
-    const fallbackName = agent.cid || id
-    const displayName = agent.display_name || agent.name || nameFromIpns || nameFromDid || fallbackName
-    const statusLabel = agent.ipns
+    
+    // 过滤掉 mock IPNS 值
+    const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
+    const ipnsValue = agent.ipns
+    const isMockIpns = ipnsValue && (
+      ipnsValue.includes(mockIpns) ||
+      ipnsValue === mockIpns ||
+      ipnsValue === `/ipns/${mockIpns}`
+    )
+    
+    // 创建清理后的 agent 对象
+    const cleanedAgent = { ...agent }
+    if (isMockIpns) {
+      delete cleanedAgent.ipns
+    }
+    
+    // IPNS 应该优先于 DID 作为标识符
+    const id = cleanedAgent.ipns || cleanedAgent.did || cleanedAgent.cid || `agent_${Date.now()}`
+    const nameFromIpns = cleanedAgent.ipns ? cleanedAgent.ipns.replace(/^\/?ipns\//, '') : null
+    const nameFromDid = cleanedAgent.did ? cleanedAgent.did.split(':').filter(Boolean).slice(-1)[0] : null
+    const fallbackName = cleanedAgent.cid || id
+    // 显示名称也优先使用 IPNS
+    const displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid || fallbackName
+    const statusLabel = cleanedAgent.ipns
       ? 'IPNS 解析'
-      : agent.did
+      : cleanedAgent.did
         ? 'DID 解析'
-        : agent.agent_type === 'claude_agent_sdk'
+        : cleanedAgent.agent_type === 'claude_agent_sdk'
           ? '自定义智能体'
           : 'CID 解析'
+
+    const avatar = resolveAgentAvatar(cleanedAgent)
 
     return {
       id,
@@ -97,9 +131,10 @@ const AgentChat = () => {
       status: 'online',
       statusLabel,
       icon: '🛰️',
+      avatar,
       color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
       updatedAt: Math.floor(Date.now() / 1000),
-      meta: agent,
+      meta: cleanedAgent,
     }
   }, [])
 
@@ -286,11 +321,12 @@ const AgentChat = () => {
   )
 
   const agentProfile = useMemo(() => {
+    const avatar = resolveAgentAvatar(selectedAgent)
     if (!selectedAgent) {
       return {
         name: 'alou',
         role: 'Web3 Multi-Agent Coordinator',
-        avatar: 'https://avatars.githubusercontent.com/u/16309930?v=4',
+        avatar,
       }
     }
 
@@ -305,7 +341,7 @@ const AgentChat = () => {
     return {
       name: displayName,
       role,
-      avatar: 'https://avatars.githubusercontent.com/u/16309930?v=4',
+      avatar,
     }
   }, [selectedAgent])
 
@@ -1336,9 +1372,28 @@ const AgentChat = () => {
         setChannelError(null)
         void (async () => {
           try {
-            const agent = await agentService.resolveAgent(target, sessionId)
-            const refreshed = buildChannelFromAgent(agent)
-            setSelectedAgent(agent)
+            const resolvedAgent = await agentService.resolveAgent(target, sessionId)
+            // 如果解析后的 agent 没有 IPNS，但 channel.meta 有 IPNS，保留原来的 IPNS
+            const originalMeta = channel.meta ?? {}
+            // 合并原始 meta 和解析后的 agent，优先保留原始 meta 中的 IPNS 和其他重要字段
+            const mergedAgent = {
+              ...resolvedAgent,
+              // 优先使用原始 meta 中的 IPNS（如果存在）
+              ipns: originalMeta.ipns || resolvedAgent.ipns,
+              // 保留原始 meta 中的其他重要字段
+              display_name: originalMeta.display_name || resolvedAgent.display_name,
+              name: originalMeta.name || resolvedAgent.name,
+              avatar_cid: originalMeta.avatar_cid || resolvedAgent.avatar_cid,
+              avatar: originalMeta.avatar || resolvedAgent.avatar,
+              avatar_url: originalMeta.avatar_url || resolvedAgent.avatar_url,
+              // 保留原始 meta 中的 agent_type 和其他配置
+              agent_type: originalMeta.agent_type || resolvedAgent.agent_type,
+              role_description: originalMeta.role_description || resolvedAgent.role_description,
+              mcp_config_cid: originalMeta.mcp_config_cid || resolvedAgent.mcp_config_cid,
+              mcp_ports: originalMeta.mcp_ports || resolvedAgent.mcp_ports,
+            }
+            const refreshed = buildChannelFromAgent(mergedAgent)
+            setSelectedAgent(mergedAgent)
             if (refreshed) {
               setChannels((prev) => {
                 const others = prev.filter((item) => item.id !== channel.id)
@@ -1356,15 +1411,24 @@ const AgentChat = () => {
         })()
       }
 
+      // 过滤掉 mock IPNS 值
+      const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
+      const ipnsValue = channel.meta?.ipns
+      const isMockIpns = ipnsValue && (
+        ipnsValue.includes(mockIpns) ||
+        ipnsValue === mockIpns ||
+        ipnsValue === `/ipns/${mockIpns}`
+      )
+      
       void fetchAndOpenUiResource(
         MCP_UI_TARGETS.channelDetail,
         {
           channel_id: channel.id,
           did: channel.meta?.did,
           cid: channel.meta?.cid,
-          ipns: channel.meta?.ipns,
+          ipns: isMockIpns ? undefined : ipnsValue,
         },
-        { channelId: channel.id },
+        { channelId: channel.id, channel },
       )
     },
     [
@@ -1510,31 +1574,7 @@ const AgentChat = () => {
       return
     }
     dragStateRef.current.moved = false
-    void fetchAndOpenUiResource(
-      MCP_UI_TARGETS.agentProfile,
-      {
-        agent_id: agentProfile?.name,
-        session_id: sessionId,
-        chain: activeChain,
-      },
-      { agent: agentProfile?.name },
-    )
-  }, [activeChain, agentProfile, fetchAndOpenUiResource, sessionId])
-
-  const handleInspectSelectedAgent = useCallback(() => {
-    if (!selectedAgent) {
-      return
-    }
-    void fetchAndOpenUiResource(
-      MCP_UI_TARGETS.agentProfile,
-      {
-        agent_id: selectedAgent.did || selectedAgent.cid || selectedAgent.ipns,
-        session_id: sessionId,
-        metadata: selectedAgent,
-      },
-      { source: 'agent_profile_panel' },
-    )
-  }, [fetchAndOpenUiResource, selectedAgent, sessionId])
+  }, [])
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -1629,7 +1669,7 @@ const AgentChat = () => {
             onAgentActivate={handleAgentActivate}
           />
           {selectedAgent && (
-            <AgentProfilePanel agent={selectedAgent} onInspect={handleInspectSelectedAgent} />
+          <AgentProfilePanel agent={selectedAgent} />
           )}
         </div>
 
@@ -1693,26 +1733,14 @@ const AgentChat = () => {
         onUIAction={handleUiAction}
       />
 
-      {/* DIAP Identity Panel - Show when a Claude Agent SDK is selected */}
-      {activeChannelId && (
-        <div
-          className="diap-identity-overlay"
-          style={{
-            position: 'fixed',
-            bottom: '20px',
-            right: isSidebarCollapsed ? '20px' : '320px',
-            zIndex: 1000,
-            maxWidth: '400px',
-          }}
-        >
-          <DiapIdentityPanel
+      <DiapPanelToggle
             sessionId={activeChannelId}
-            onClose={() => {
-              // Optionally hide the panel
-            }}
+        isSidebarCollapsed={isSidebarCollapsed}
+        isDarkMode={isDarkMode}
+        showPanel={showDiapPanel}
+        onToggle={() => setShowDiapPanel((prev) => !prev)}
+        onClosePanel={() => setShowDiapPanel(false)}
           />
-        </div>
-      )}
 
       <button type="button" className="language-switch" onClick={toggleLanguage}>
         {languageLabel}

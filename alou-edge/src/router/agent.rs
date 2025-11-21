@@ -1,11 +1,11 @@
-use crate::agent::diap_identity::DiapIdentity;
+use crate::agent::diap_identity::{DiapIdentity, DiapIdentityConfig, DiapIdentityManager};
 use crate::agent::discovery::{AgentDiscovery, ResolvedAgent};
 use crate::agent::session::SessionManager;
 use crate::utils::error::AloudError;
 use crate::utils::time;
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use worker::*;
 
 use super::{json_response, json_response_with_status, ErrorResponse};
@@ -325,7 +325,7 @@ pub(crate) async fn handle_create_diap_identity(
         }
     };
 
-    // Check if identity already exists
+    // Check if identity already exists (session will be created automatically if it doesn't exist)
     if let Ok(Some(_)) = session_manager.get_diap_identity(&body.session_id).await {
         let error_response = ErrorResponse {
             error: "DIAP identity already exists for this session".to_string(),
@@ -447,8 +447,11 @@ pub(crate) async fn handle_create_claude_agent(
         session_manager
             .get_session(&sid)
             .await
-            .map_err(|e| ErrorResponse {
-                error: format!("Session not found: {}", e),
+            .map_err(|e| {
+                let error_response = ErrorResponse {
+                    error: format!("Session not found: {}", e),
+                };
+                worker::Error::RustError(error_response.error.clone())
             })?;
         sid
     } else {
@@ -456,8 +459,11 @@ pub(crate) async fn handle_create_claude_agent(
         session_manager
             .create_session(body.wallet_address.clone(), body.chain.clone())
             .await
-            .map_err(|e| ErrorResponse {
-                error: format!("Failed to create session: {}", e),
+            .map_err(|e| {
+                let error_response = ErrorResponse {
+                    error: format!("Failed to create session: {}", e),
+                };
+                worker::Error::RustError(error_response.error.clone())
             })?
     };
 
@@ -568,22 +574,38 @@ pub(crate) async fn handle_get_diap_identity(
         }
     };
 
-    match session_manager.get_diap_identity(&body.session_id).await {
-        Ok(Some(identity)) => json_response(&json!({
-            "session_id": body.session_id,
-            "identity": identity,
-        })),
-        Ok(None) => {
-            let error_response = ErrorResponse {
-                error: "DIAP identity not found for this session".to_string(),
-            };
-            json_response_with_status(&error_response, 404)
+    // First check if session exists
+    let session_result = session_manager.get_session(&body.session_id).await;
+    match session_result {
+        Ok(_) => {
+            // Session exists, try to get identity
+            match session_manager.get_diap_identity(&body.session_id).await {
+                Ok(Some(identity)) => json_response(&json!({
+                    "session_id": body.session_id,
+                    "identity": identity,
+                })),
+                Ok(None) => {
+                    let error_response = ErrorResponse {
+                        error: "DIAP identity not found for this session".to_string(),
+                    };
+                    json_response_with_status(&error_response, 404)
+                }
+                Err(e) => {
+                    console_error!("Failed to get DIAP identity for session {}: {}", body.session_id, e);
+                    let error_response = ErrorResponse {
+                        error: format!("Failed to get DIAP identity: {}", e),
+                    };
+                    json_response_with_status(&error_response, 500)
+                }
+            }
         }
         Err(e) => {
+            // Session doesn't exist
+            console_warn!("Session not found when getting DIAP identity: {} - {}", body.session_id, e);
             let error_response = ErrorResponse {
-                error: format!("Failed to get DIAP identity: {}", e),
+                error: format!("Session not found: {}", body.session_id),
             };
-            json_response_with_status(&error_response, 500)
+            json_response_with_status(&error_response, 404)
         }
     }
 }

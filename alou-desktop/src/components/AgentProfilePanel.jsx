@@ -6,8 +6,8 @@ const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
 const resolveAvatar = (agent) => {
   if (!agent) return fallbackAvatar
   if (agent.avatar_url) return agent.avatar_url
-  if (agent.avatarCid || agent.avatar_cid) {
-    return agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
+  if (agent.avatar || agent.avatarCid || agent.avatar_cid) {
+    return agent.avatar || agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
   }
   return fallbackAvatar
 }
@@ -43,7 +43,6 @@ const normalizePorts = (agent) => {
 function AgentProfilePanel({ agent, onInspect }) {
   const avatar = resolveAvatar(agent)
   const name = resolveName(agent)
-  const role = resolveRole(agent)
   const ports = normalizePorts(agent)
 
   return (
@@ -52,7 +51,6 @@ function AgentProfilePanel({ agent, onInspect }) {
         <img src={avatar} alt={name} />
         <div>
           <h3>{name}</h3>
-          <p>{role}</p>
         </div>
       </div>
       {ports.length > 0 && (

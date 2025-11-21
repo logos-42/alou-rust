@@ -48,7 +48,9 @@ id = "e0f682098b73485b940f1176417f417a"
 # JWT_SECRET - Secret for JWT token signing
 # ETH_RPC_URL - Ethereum RPC endpoint (e.g., Infura, Alchemy)
 # SOL_RPC_URL - Solana RPC endpoint
-
+  [vars.development]
+  DIAP_IPFS_API_URL = "http://127.0.0.1:5001"
+  DIAP_IPFS_GATEWAY_URL = "http://127.0.0.1:8080"
 # Production environment
 [env.production]
 name = "alou-edge-prod"

@@ -31,17 +31,54 @@ const encodeJson = (value) => {
 }
 
 export class AgentAssetsService {
+  /**
+   * 带重试的 IPFS 操作包装器
+   */
+  async withRetry(operation, operationName, maxRetries = 3, delayMs = 1000) {
+    let lastError
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await operation()
+      } catch (error) {
+        lastError = error
+        const errorMsg = error?.message || error?.toString() || ''
+        
+        // 如果是 502 错误，等待后重试
+        if (errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
+          if (i < maxRetries - 1) {
+            console.log(
+              `[AgentAssetsService] ${operationName} 遇到 502 错误，等待 ${delayMs}ms 后重试 (${i + 1}/${maxRetries})`
+            )
+            await new Promise((resolve) => setTimeout(resolve, delayMs))
+            continue
+          }
+        }
+        
+        // 其他错误或重试次数用完，直接抛出
+        throw error
+      }
+    }
+    throw lastError
+  }
+
   async uploadAvatar(file, options = {}) {
     if (!file) {
       return null
     }
     const dataBase64 = await base64FromFile(file)
-    const response = await invoke('ipfs_add_base64', {
-      dataBase64,
-      fileName: file.name,
-      ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
-    })
-    return response
+    return this.withRetry(
+      async () => {
+        const response = await invoke('ipfs_add_base64', {
+          dataBase64,
+          fileName: file.name,
+          ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
+        })
+        return response
+      },
+      '上传头像',
+      3,
+      1500
+    )
   }
 
   async uploadMcpConfig(mcpConfig, options = {}) {
@@ -49,12 +86,19 @@ export class AgentAssetsService {
       return null
     }
     const dataBase64 = encodeJson(mcpConfig)
-    const response = await invoke('ipfs_add_base64', {
-      dataBase64,
-      fileName: options.filename || 'mcp-config.json',
-      ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
-    })
-    return response
+    return this.withRetry(
+      async () => {
+        const response = await invoke('ipfs_add_base64', {
+          dataBase64,
+          fileName: options.filename || 'mcp-config.json',
+          ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
+        })
+        return response
+      },
+      '上传 MCP 配置',
+      3,
+      1500
+    )
   }
 
   resolveIpfsUri(cid) {

@@ -92,7 +92,11 @@ const AgentSidebarLeft = ({
             }}
           >
             <div className="channel-icon" style={{ background: channel.color }}>
-              {channel.icon}
+              {channel.avatar ? (
+                <img src={channel.avatar} alt={channel.name} />
+              ) : (
+                channel.icon
+              )}
               <span className={`status-indicator ${channel.status}`} />
             </div>
             {!isCollapsed && (
@@ -102,9 +106,11 @@ const AgentSidebarLeft = ({
                   <div className="channel-meta">
                     <span className={`status-dot ${channel.status}`} />
                     <span className="channel-status">{channel.statusLabel}</span>
-                    {channel.meta?.did && (
+                    {channel.meta?.ipns ? (
+                      <span className="channel-hint">· …{channel.meta.ipns.replace(/^\/?ipns\//, '').slice(-12)}</span>
+                    ) : channel.meta?.did ? (
                       <span className="channel-hint">· …{channel.meta.did.slice(-12)}</span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <div className="channel-date">{formatDate(channel.updatedAt)}</div>

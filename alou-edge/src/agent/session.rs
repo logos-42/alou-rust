@@ -258,8 +258,15 @@ impl SessionManager {
     }
 
     /// Set DIAP identity for a session
+    /// If the session doesn't exist, it will be created automatically
     pub async fn set_diap_identity(&self, session_id: &str, identity: DiapIdentity) -> Result<()> {
-        let mut session = self.get_session(session_id).await?;
+        let mut session = match self.get_session(session_id).await {
+            Ok(s) => s,
+            Err(_) => {
+                // Session doesn't exist, create it
+                Session::new(session_id.to_string(), None, None)
+            }
+        };
         session.diap_identity = Some(identity);
         session.updated_at = crate::utils::time::now_timestamp();
 

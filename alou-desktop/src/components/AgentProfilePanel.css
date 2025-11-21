@@ -1,50 +1,54 @@
 .agent-profile-panel {
   position: absolute;
-  top: 24px;
-  right: 50%;
+  top: 40px;
+  right: calc(50% - 30px);
   transform: translateX(50%);
-  width: 380px;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  border-radius: 18px;
-  padding: 18px;
+  width: 140px;
+  height: 140px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  padding: 18px 12px;
   color: #e2e8f0;
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
   cursor: pointer;
-  transition: border-color 0.2s ease;
+  transition: transform 0.2s ease;
   z-index: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
 }
 
 .agent-profile-panel:hover {
-  border-color: rgba(129, 140, 248, 0.8);
+  transform: translateX(50%) scale(1.05);
 }
 
 .agent-profile-panel__header {
   display: flex;
-  gap: 16px;
+  gap: 10px;
   align-items: center;
+  flex-direction: column;
+  text-align: center;
 }
 
 .agent-profile-panel__header img {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
   object-fit: cover;
+  border: 3px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.4);
 }
 
 .agent-profile-panel__header h3 {
   margin: 0;
-  font-size: 18px;
-}
-
-.agent-profile-panel__header p {
-  margin: 4px 0 0;
-  color: #94a3b8;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .agent-profile-panel__ports {
-  margin-top: 16px;
+  display: none;
 }
 
 .agent-profile-panel__ports > span {

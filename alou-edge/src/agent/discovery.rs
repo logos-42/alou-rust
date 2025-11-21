@@ -51,7 +51,7 @@ pub struct EncryptedPeerPayload {
 
 impl EncryptedPeerPayload {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_encrypted(source: &diap_rs_sdk::EncryptedPeerID) -> Self {
+    pub(crate) fn from_encrypted(source: &diap_rs_sdk::EncryptedPeerID) -> Self {
         use base64::engine::general_purpose::STANDARD;
         use base64::Engine;
 
