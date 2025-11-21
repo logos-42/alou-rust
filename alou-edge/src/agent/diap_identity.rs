@@ -88,6 +88,8 @@ impl DiapIdentityManager {
     pub async fn create_identity(&self) -> Result<DiapIdentity> {
         use diap_rs_sdk::identity_manager::IdentityManager;
         use diap_rs_sdk::IpfsClient;
+        use reqwest::Client;
+        use uuid::Uuid;
 
         // Create IPFS client
         let ipfs_client = IpfsClient::new_with_remote_node(
@@ -96,34 +98,91 @@ impl DiapIdentityManager {
             self.config.timeout_secs,
         );
 
-        // Create identity manager
-        let identity_manager = IdentityManager::new(ipfs_client.clone());
+        // Create identity manager (currently unused but kept for future SDK integration)
+        let _identity_manager = IdentityManager::new(ipfs_client.clone());
 
-        // Generate DID document using SDK
-        let did_document = identity_manager
-            .generate_did_document()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to generate DID document: {}", e)))?;
+        // Generate a new DID
+        let did = format!("did:alou:{}", Uuid::new_v4());
 
-        // Publish DID document to IPFS
-        let cid = identity_manager
-            .publish_to_ipfs(&did_document)
+        // Create a simple DID document
+        let did_document = serde_json::json!({
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": did,
+            "created": chrono::Utc::now().to_rfc3339(),
+            "service": []
+        });
+
+        // Serialize DID document
+        let doc_bytes = serde_json::to_vec(&did_document)
+            .map_err(|e| AloudError::AgentError(format!("Failed to serialize DID document: {}", e)))?;
+
+        // Publish to IPFS using reqwest
+        let http_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
+            .build()
+            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
+
+        let form = reqwest::multipart::Form::new()
+            .part("file", reqwest::multipart::Part::bytes(doc_bytes).file_name("did.json"));
+
+        let api_url = self.config.ipfs_api_url.trim_end_matches('/');
+        let add_url = format!("{}/api/v0/add?pin=true", api_url);
+
+        #[derive(Deserialize)]
+        struct IpfsAddResponse {
+            #[serde(rename = "Hash")]
+            hash: String,
+        }
+
+        let response = http_client
+            .post(&add_url)
+            .multipart(form)
+            .send()
             .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPFS: {}", e)))?;
+            .map_err(|e| AloudError::AgentError(format!("Failed to add to IPFS: {}", e)))?;
+
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read IPFS response: {}", e)))?;
+
+        // Parse response - IPFS returns newline-delimited JSON
+        let lines: Vec<&str> = response_text.trim().lines().collect();
+        let last_line = lines.last().ok_or_else(|| {
+            AloudError::AgentError("Empty response from IPFS add".to_string())
+        })?;
+
+        let parsed: IpfsAddResponse = serde_json::from_str(last_line)
+            .map_err(|e| AloudError::AgentError(format!("Failed to parse IPFS add response: {}", e)))?;
+
+        let cid = parsed.hash;
 
         // Publish to IPNS
-        let ipns_name = if let Some(ref key) = self.config.ipns_key {
-            identity_manager
-                .publish_to_ipns_with_key(&cid, key)
-                .await
-                .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPNS: {}", e)))?
-        } else {
-            identity_manager
-                .publish_to_ipns(&cid)
-                .await
-                .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPNS: {}", e)))?
-        };
+        let mut publish_url = format!("{}/api/v0/name/publish?arg=/ipfs/{}", api_url, cid);
+        if let Some(ref key) = self.config.ipns_key {
+            publish_url.push_str(&format!("&key={}", key));
+        }
 
+        #[derive(Deserialize)]
+        struct IpnsPublishResponse {
+            name: String,
+        }
+
+        let publish_response = http_client
+            .post(&publish_url)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPNS: {}", e)))?;
+
+        let publish_text = publish_response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read IPNS response: {}", e)))?;
+
+        let ipns_parsed: IpnsPublishResponse = serde_json::from_str(&publish_text)
+            .map_err(|e| AloudError::AgentError(format!("Failed to parse IPNS publish response: {}", e)))?;
+
+        let ipns_name = ipns_parsed.name;
         let ipns = if ipns_name.starts_with("/ipns/") {
             ipns_name
         } else {
@@ -134,7 +193,7 @@ impl DiapIdentityManager {
         let public_key = format!("pubkey_{}", ipns.trim_start_matches("/ipns/"));
 
         Ok(DiapIdentity::new(
-            did_document.id,
+            did,
             ipns,
             cid,
             public_key,
@@ -142,68 +201,22 @@ impl DiapIdentityManager {
         ))
     }
 
-    /// Add data to IPFS and return CID
+    /// Add data to IPFS and return CID (unused, kept for potential future use)
+    #[allow(dead_code)]
     async fn add_to_ipfs(&self, data: &[u8], filename: Option<String>) -> Result<String> {
-        use worker::{Request, RequestInit, Method, Fetch, Headers};
-        use js_sys::{Object, Reflect, Uint8Array};
-        use wasm_bindgen::{JsValue, JsCast};
+        use reqwest::Client;
+
+        let http_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
+            .build()
+            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
+
+        let file_name = filename.unwrap_or_else(|| "did.json".to_string());
+        let form = reqwest::multipart::Form::new()
+            .part("file", reqwest::multipart::Part::bytes(data.to_vec()).file_name(file_name));
 
         let api_url = self.config.ipfs_api_url.trim_end_matches('/');
-        let endpoint = format!("{}/api/v0/add?pin=true", api_url);
-
-        // Create FormData using js_sys
-        let form_data = js_sys::Object::new();
-        let file_name = filename.unwrap_or_else(|| "did.json".to_string());
-        
-        // Create a Blob from the data
-        let uint8_array = Uint8Array::new_with_length(data.len() as u32);
-        uint8_array.copy_from(data);
-        
-        let blob_options = js_sys::Object::new();
-        Reflect::set(&blob_options, &JsValue::from_str("type"), &JsValue::from_str("application/json"))
-            .map_err(|e| AloudError::AgentError(format!("Failed to set blob type: {:?}", e)))?;
-        
-        let blob = web_sys::Blob::new_with_u8_array_sequence_and_options(
-            &js_sys::Array::of1(&uint8_array.into()),
-            blob_options.as_ref(),
-        )
-        .map_err(|e| AloudError::AgentError(format!("Failed to create Blob: {:?}", e)))?;
-
-        // Create FormData and append the blob
-        let form_data_js = js_sys::Reflect::construct(
-            &js_sys::Function::new_no_args("FormData").into(),
-            &js_sys::Array::new(),
-        )
-        .map_err(|e| AloudError::AgentError(format!("Failed to create FormData: {:?}", e)))?;
-        
-        let form_data_obj: &web_sys::FormData = form_data_js.dyn_ref()
-            .ok_or_else(|| AloudError::AgentError("FormData is not available".to_string()))?;
-        
-        form_data_obj.append_with_blob("file", &blob)
-            .map_err(|e| AloudError::AgentError(format!("Failed to append file: {:?}", e)))?;
-
-        let mut init = RequestInit::new();
-        init.with_method(Method::Post);
-        init.with_body(Some(form_data_js.into()));
-
-        let request = Request::new_with_init(&endpoint, &init)
-            .map_err(|e| AloudError::AgentError(format!("Failed to create request: {}", e)))?;
-
-        let mut response = Fetch::Request(request)
-            .send()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("IPFS add request failed: {}", e)))?;
-
-        let response_text = response
-            .text()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("IPFS add response error: {}", e)))?;
-
-        // Parse response - IPFS returns newline-delimited JSON
-        let lines: Vec<&str> = response_text.trim().lines().collect();
-        let last_line = lines.last().ok_or_else(|| {
-            AloudError::AgentError("Empty response from IPFS add".to_string())
-        })?;
+        let add_url = format!("{}/api/v0/add?pin=true", api_url);
 
         #[derive(Deserialize)]
         struct IpfsAddResponse {
@@ -211,44 +224,62 @@ impl DiapIdentityManager {
             hash: String,
         }
 
+        let response = http_client
+            .post(&add_url)
+            .multipart(form)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to add to IPFS: {}", e)))?;
+
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read IPFS response: {}", e)))?;
+
+        // Parse response - IPFS returns newline-delimited JSON
+        let lines: Vec<&str> = response_text.trim().lines().collect();
+        let last_line = lines.last().ok_or_else(|| {
+            AloudError::AgentError("Empty response from IPFS add".to_string())
+        })?;
+
         let parsed: IpfsAddResponse = serde_json::from_str(last_line)
             .map_err(|e| AloudError::AgentError(format!("Failed to parse IPFS add response: {}", e)))?;
 
         Ok(parsed.hash)
     }
 
-    /// Publish CID to IPNS and return IPNS name
+    /// Publish CID to IPNS and return IPNS name (unused, kept for potential future use)
+    #[allow(dead_code)]
     async fn publish_ipns(&self, cid: &str) -> Result<String> {
-        use worker::{Request, RequestInit, Method, Fetch};
-        use wasm_bindgen::JsValue;
+        use reqwest::Client;
+
+        let http_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
+            .build()
+            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
 
         let api_url = self.config.ipfs_api_url.trim_end_matches('/');
-        let mut endpoint = format!("{}/api/v0/name/publish?arg=/ipfs/{}", api_url, cid);
+        let mut publish_url = format!("{}/api/v0/name/publish?arg=/ipfs/{}", api_url, cid);
 
         if let Some(ref key) = self.config.ipns_key {
-            endpoint.push_str(&format!("&key={}", key));
+            publish_url.push_str(&format!("&key={}", key));
         }
-
-        let mut init = RequestInit::new();
-        init.with_method(Method::Post);
-
-        let request = Request::new_with_init(&endpoint, &init)
-            .map_err(|e| AloudError::AgentError(format!("Failed to create IPNS publish request: {}", e)))?;
-
-        let mut response = Fetch::Request(request)
-            .send()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("IPNS publish request failed: {}", e)))?;
-
-        let response_text = response
-            .text()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("IPNS publish response error: {}", e)))?;
 
         #[derive(Deserialize)]
         struct IpnsPublishResponse {
             name: String,
         }
+
+        let response = http_client
+            .post(&publish_url)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPNS: {}", e)))?;
+
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read IPNS response: {}", e)))?;
 
         let parsed: IpnsPublishResponse = serde_json::from_str(&response_text)
             .map_err(|e| AloudError::AgentError(format!("Failed to parse IPNS publish response: {}", e)))?;
@@ -256,6 +287,7 @@ impl DiapIdentityManager {
         Ok(parsed.name)
     }
 
+    #[allow(dead_code)]
     fn simple_hash_fragment(input: &str) -> String {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -287,27 +319,49 @@ impl DiapIdentityManager {
         // Extract encrypted peer ID
         let encrypted_peer_id = identity_manager
             .extract_encrypted_peer_id(&did_document)
-            .map(|ep| EncryptedPeerPayload::from_encrypted(&ep));
+            .map(|ep| EncryptedPeerPayload::from_encrypted(&ep))
+            .ok();
 
         // Get IPNS from DID document service endpoints
-        let ipns = did_document
-            .service
-            .iter()
-            .find_map(|s| {
-                if s.service_endpoint.contains("ipns") {
-                    s.service_endpoint
-                        .split('/')
-                        .find(|part| part.starts_with("k51") || part.starts_with("/ipns/"))
-                        .map(|s| {
-                            if s.starts_with("/ipns/") {
-                                s.to_string()
-                            } else {
-                                format!("/ipns/{}", s)
-                            }
-                        })
-                } else {
-                    None
-                }
+        // Convert DID document to JSON to access service fields
+        let did_json = serde_json::to_value(&did_document)
+            .map_err(|e| AloudError::AgentError(format!("Failed to serialize DID document: {}", e)))?;
+
+        let ipns = did_json
+            .get("service")
+            .and_then(|services| services.as_array())
+            .and_then(|services| {
+                services.iter().find_map(|s| {
+                    // Access serviceEndpoint field (camelCase in DID document)
+                    let endpoint = s.get("serviceEndpoint")
+                        .and_then(|ep| ep.as_str())
+                        .or_else(|| {
+                            // Try as object with nested structure
+                            s.get("serviceEndpoint")
+                                .and_then(|ep| ep.as_object())
+                                .and_then(|obj| obj.get("type"))
+                                .and_then(|t| t.as_str())
+                                .filter(|t| *t == "ipns")
+                                .and_then(|_| s.get("id").and_then(|id| id.as_str()))
+                        });
+                    
+                    endpoint.and_then(|endpoint| {
+                        if endpoint.contains("ipns") {
+                            endpoint
+                                .split('/')
+                                .find(|part| part.starts_with("k51") || part.starts_with("/ipns/"))
+                                .map(|s| {
+                                    if s.starts_with("/ipns/") {
+                                        s.to_string()
+                                    } else {
+                                        format!("/ipns/{}", s)
+                                    }
+                                })
+                        } else {
+                            None
+                        }
+                    })
+                })
             })
             .unwrap_or_else(|| format!("/ipns/{}", cid));
 
