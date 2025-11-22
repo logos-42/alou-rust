@@ -14,6 +14,8 @@ pub struct DiapIdentity {
     pub public_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encrypted_peer_id: Option<EncryptedPeerPayload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ipns_key: Option<String>, // IPNS key name used for this identity
     pub is_registered: bool, // Whether registered on-chain
     #[serde(skip_serializing_if = "Option::is_none")]
     pub registered_address: Option<String>, // On-chain registered address
@@ -28,12 +30,24 @@ impl DiapIdentity {
         public_key: String,
         encrypted_peer_id: Option<EncryptedPeerPayload>,
     ) -> Self {
+        Self::new_with_ipns_key(did, ipns, cid, public_key, encrypted_peer_id, None)
+    }
+
+    pub fn new_with_ipns_key(
+        did: String,
+        ipns: String,
+        cid: String,
+        public_key: String,
+        encrypted_peer_id: Option<EncryptedPeerPayload>,
+        ipns_key: Option<String>,
+    ) -> Self {
         Self {
             did,
             ipns,
             cid,
             public_key,
             encrypted_peer_id,
+            ipns_key,
             is_registered: false,
             registered_address: None,
             created_at: crate::utils::time::now_timestamp(),
@@ -84,6 +98,62 @@ impl DiapIdentityManager {
         Ok(Self { config })
     }
 
+    /// Generate an IPNS key using IPFS API
+    /// Uses the IPFS API endpoint through HTTP client (via SDK's configuration)
+    async fn generate_ipns_key(&self, key_name: &str) -> Result<String> {
+        use reqwest::Client;
+
+        let http_client = Client::builder()
+            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
+            .build()
+            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
+
+        let api_url = self.config.ipfs_api_url.trim_end_matches('/');
+        let key_gen_url = format!("{}/api/v0/key/gen?arg={}&type=rsa&size=2048", api_url, key_name);
+
+        #[derive(Deserialize)]
+        struct KeyGenResponse {
+            #[serde(rename = "Name")]
+            name: String,
+            #[serde(rename = "Id")]
+            #[allow(dead_code)]
+            id: String,
+        }
+
+        let response = http_client
+            .post(&key_gen_url)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to generate IPNS key: {}", e)))?;
+
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read key gen response: {}", e)))?;
+
+        // IPFS may return error if key already exists, try to handle it gracefully
+        if response_text.contains("already exists") {
+            // Key already exists, return the key name
+            return Ok(key_name.to_string());
+        }
+
+        // Try to parse the response
+        let parsed: KeyGenResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                AloudError::AgentError(format!(
+                    "Failed to parse key gen response: {}. Response: {}",
+                    e,
+                    if response_text.len() > 200 {
+                        format!("{}...", &response_text[..200])
+                    } else {
+                        response_text.clone()
+                    }
+                ))
+            })?;
+
+        Ok(parsed.name)
+    }
+
     /// Create a new DIAP identity for an agent
     pub async fn create_identity(&self) -> Result<DiapIdentity> {
         use diap_rs_sdk::identity_manager::IdentityManager;
@@ -103,6 +173,13 @@ impl DiapIdentityManager {
 
         // Generate a new DID
         let did = format!("did:alou:{}", Uuid::new_v4());
+
+        // Extract DID hash for IPNS key naming
+        let did_hash = did.split(':').last().unwrap();
+        let ipns_key_name = format!("agent-{}", did_hash);
+
+        // Generate IPNS key using SDK (via IPFS API)
+        let generated_ipns_key = self.generate_ipns_key(&ipns_key_name).await?;
 
         // Create a simple DID document
         let did_document = serde_json::json!({
@@ -158,8 +235,10 @@ impl DiapIdentityManager {
         let cid = parsed.hash;
 
         // Publish to IPNS
+        // Priority: generated_ipns_key > config.ipns_key > default (Peer ID)
         let mut publish_url = format!("{}/api/v0/name/publish?arg=/ipfs/{}", api_url, cid);
-        if let Some(ref key) = self.config.ipns_key {
+        let ipns_key_to_use = Some(&generated_ipns_key).or(self.config.ipns_key.as_ref());
+        if let Some(ref key) = ipns_key_to_use {
             publish_url.push_str(&format!("&key={}", key));
         }
 
@@ -192,12 +271,13 @@ impl DiapIdentityManager {
         // Extract public key from IPNS name (or generate from IPNS key)
         let public_key = format!("pubkey_{}", ipns.trim_start_matches("/ipns/"));
 
-        Ok(DiapIdentity::new(
+        Ok(DiapIdentity::new_with_ipns_key(
             did,
             ipns,
             cid,
             public_key,
             None, // Encrypted peer ID would be generated during actual identity creation
+            Some(generated_ipns_key),
         ))
     }
 
@@ -368,12 +448,15 @@ impl DiapIdentityManager {
         // Extract public key from DID document (simplified)
         let public_key = "".to_string(); // Would need to extract from verificationMethod in DID document
 
-        Ok(DiapIdentity::new(
+        // Note: get_identity doesn't have access to the original IPNS key,
+        // so we set it to None for existing identities
+        Ok(DiapIdentity::new_with_ipns_key(
             did_document.id,
             ipns,
             cid.to_string(),
             public_key,
             encrypted_peer_id,
+            None, // IPNS key not available when retrieving existing identity
         ))
     }
 }

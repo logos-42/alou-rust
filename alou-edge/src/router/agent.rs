@@ -474,6 +474,7 @@ pub(crate) async fn handle_create_claude_agent(
             .public_key
             .clone()
             .unwrap_or_else(|| format!("pubkey_{}", provided_identity.ipns));
+        // Use new() which sets ipns_key to None for provided identities (backward compatible)
         let identity = DiapIdentity::new(
             provided_identity.did.clone(),
             provided_identity.ipns.clone(),

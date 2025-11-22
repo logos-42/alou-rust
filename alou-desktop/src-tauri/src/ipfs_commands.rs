@@ -144,6 +144,53 @@ pub async fn add_bytes_to_ipfs(
     })
 }
 
+pub async fn generate_ipns_key(
+    api_url: &str,
+    key_name: &str,
+) -> Result<String, String> {
+    let endpoint = format!("{}/api/v0/key/gen", normalize_base_url(api_url));
+    let client = create_ipfs_client();
+    
+    let request = client
+        .post(endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .query(&[("arg", key_name), ("type", "rsa"), ("size", "2048")]);
+
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("IPNS key generation request failed: {}", e))?;
+
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("IPNS key generation response error: {}", e))?;
+
+    // Handle case where key already exists
+    if body.contains("already exists") {
+        return Ok(key_name.to_string());
+    }
+
+    #[derive(Deserialize)]
+    struct KeyGenResponse {
+        #[serde(rename = "Name")]
+        name: String,
+        #[serde(rename = "Id")]
+        #[allow(dead_code)]
+        id: String,
+    }
+
+    let key_gen: KeyGenResponse = serde_json::from_str(&body)
+        .map_err(|e| format!("Failed to parse IPNS key generation response: {}. Response: {}", e, 
+            if body.len() > 200 {
+                format!("{}...", &body[..200])
+            } else {
+                body.clone()
+            }))?;
+
+    Ok(key_gen.name)
+}
+
 pub async fn publish_ipns_record(
     api_url: &str,
     cid: &str,

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::ipfs_commands::{add_bytes_to_ipfs, publish_ipns_record};
+use crate::ipfs_commands::{add_bytes_to_ipfs, generate_ipns_key, publish_ipns_record};
 use crate::utils::{default_ipfs_api_url, default_ipfs_gateway_url, normalize_base_url};
 
 #[derive(Default, Deserialize)]
@@ -66,8 +66,19 @@ pub async fn create_local_diap_identity(
         .map_err(|e| format!("Failed to serialize DID document: {}", e))?;
     let add_result = add_bytes_to_ipfs(&ipfs_api, doc_bytes, Some("did.json".to_string())).await?;
 
+    // Generate IPNS key based on DID if not provided
+    let ipns_key_to_use = if let Some(ref provided_key) = params.ipns_key {
+        provided_key.clone()
+    } else {
+        // Extract DID hash for IPNS key naming
+        let did_hash = did.split(':').last().unwrap();
+        let ipns_key_name = format!("agent-{}", did_hash);
+        // Generate IPNS key automatically
+        generate_ipns_key(&ipfs_api, &ipns_key_name).await?
+    };
+
     let ipns_name =
-        publish_ipns_record(&ipfs_api, &add_result.cid, params.ipns_key.clone()).await?;
+        publish_ipns_record(&ipfs_api, &add_result.cid, Some(ipns_key_to_use.clone())).await?;
     let ipns_path = format!("/ipns/{}", ipns_name);
     let gateway_url = format!("{}/ipfs/{}", normalize_base_url(&gateway), add_result.cid);
     let public_key = format!("pubkey_{}", ipns_name);
