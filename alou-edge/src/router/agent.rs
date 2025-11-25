@@ -304,18 +304,18 @@ fn simple_slug(value: &str) -> String {
     slug.trim_matches('-').chars().take(48).collect()
 }
 
-/// Create DIAP identity for a session
-pub(crate) async fn handle_create_diap_identity(
-    session_manager: &SessionManager,
+/// Get DIAP identity from IPNS (解析功能)
+pub(crate) async fn handle_get_diap_identity(
+    _session_manager: &SessionManager,
     env: &Env,
     req: &mut Request,
 ) -> Result<Response> {
     #[derive(Deserialize)]
-    struct CreateIdentityRequest {
-        session_id: String,
+    struct GetIdentityRequest {
+        ipns_name: String,
     }
 
-    let body: CreateIdentityRequest = match req.json().await {
+    let body: GetIdentityRequest = match req.json().await {
         Ok(body) => body,
         Err(e) => {
             let error_response = ErrorResponse {
@@ -324,14 +324,6 @@ pub(crate) async fn handle_create_diap_identity(
             return json_response_with_status(&error_response, 400);
         }
     };
-
-    // Check if identity already exists (session will be created automatically if it doesn't exist)
-    if let Ok(Some(_)) = session_manager.get_diap_identity(&body.session_id).await {
-        let error_response = ErrorResponse {
-            error: "DIAP identity already exists for this session".to_string(),
-        };
-        return json_response_with_status(&error_response, 409);
-    }
 
     // Get IPFS configuration from environment
     let ipfs_api_url = match env.var("DIAP_IPFS_API_URL") {
@@ -354,16 +346,14 @@ pub(crate) async fn handle_create_diap_identity(
         }
     };
 
-    let ipns_key = env.var("DIAP_IPNS_KEY").map(|v| v.to_string()).ok();
     let timeout_secs = env
         .var("DIAP_IPFS_TIMEOUT_SECS")
         .ok()
         .and_then(|v| v.to_string().parse::<u64>().ok())
         .unwrap_or(10);
 
-    // Create DIAP identity manager
+    // Create DIAP identity manager for resolution only
     let config = DiapIdentityConfig::new(ipfs_api_url, ipfs_gateway_url)
-        .with_ipns_key(ipns_key)
         .with_timeout(timeout_secs);
 
     let identity_manager = match DiapIdentityManager::new(config) {
@@ -376,30 +366,19 @@ pub(crate) async fn handle_create_diap_identity(
         }
     };
 
-    // Create identity
-    let identity = match identity_manager.create_identity().await {
+    // Resolve IPNS to get identity
+    let identity = match identity_manager.resolve_identity_from_ipns(&body.ipns_name).await {
         Ok(identity) => identity,
         Err(e) => {
             let error_response = ErrorResponse {
-                error: format!("Failed to create DIAP identity: {}", e),
+                error: format!("Failed to resolve identity from IPNS: {}", e),
             };
             return json_response_with_status(&error_response, 500);
         }
     };
 
-    // Store identity in session
-    if let Err(e) = session_manager
-        .set_diap_identity(&body.session_id, identity.clone())
-        .await
-    {
-        let error_response = ErrorResponse {
-            error: format!("Failed to store DIAP identity: {}", e),
-        };
-        return json_response_with_status(&error_response, 500);
-    }
-
     json_response(&json!({
-        "session_id": body.session_id,
+        "ipns_name": body.ipns_name,
         "identity": identity,
     }))
 }
@@ -546,17 +525,20 @@ pub(crate) async fn handle_create_claude_agent(
         );
     }
 
-    json_response(&json!({
+    // Build response with error handling
+    let response_json = json!({
         "session_id": session_id,
         "agent_type": "claude_agent_sdk",
         "name": body.name.unwrap_or_else(|| "Claude Agent SDK".to_string()),
         "diap_identity": identity,
         "agent_metadata": agent_metadata,
-    }))
+    });
+
+    json_response(&response_json)
 }
 
 /// Get DIAP identity for a session
-pub(crate) async fn handle_get_diap_identity(
+pub(crate) async fn handle_get_diap_identity_by_session(
     session_manager: &SessionManager,
     req: &mut Request,
 ) -> Result<Response> {
@@ -613,16 +595,20 @@ pub(crate) async fn handle_get_diap_identity(
 
 /// Register agent to DIAP network on-chain (returns encoded transaction)
 pub(crate) async fn handle_register_agent_onchain(
-    session_manager: &SessionManager,
+    _session_manager: &SessionManager,
     env: &Env,
     req: &mut Request,
 ) -> Result<Response> {
     use crate::router::diap::common::resolve_environment;
     use crate::web3::clients::DiapAgentNetworkClient;
+    use crate::agent::diap_identity::{DiapIdentity, DiapIdentityConfig, DiapIdentityManager};
 
     #[derive(Deserialize)]
     struct RegisterRequest {
-        session_id: String,
+        ipns: String,
+        did: String,
+        cid: String,
+        public_key: String,
         network: String,
         stake_amount: String,
         #[serde(default)]
@@ -641,23 +627,38 @@ pub(crate) async fn handle_register_agent_onchain(
         }
     };
 
-    // Get DIAP identity from session
-    let identity = match session_manager.get_diap_identity(&body.session_id).await {
-        Ok(Some(identity)) => identity,
-        Ok(None) => {
-            let error_response = ErrorResponse {
-                error: "DIAP identity not found for this session. Please create identity first."
-                    .to_string(),
-            };
-            return json_response_with_status(&error_response, 404);
+    // Create identity object from request
+    let identity = DiapIdentity::new(
+        body.did.clone(),
+        body.ipns.clone(),
+        body.cid.clone(),
+        body.public_key.clone(),
+        None,
+    );
+
+    // Optional: Validate identity using DIAP SDK
+    let ipfs_api_url = env.var("DIAP_IPFS_API_URL").ok().map(|v| v.to_string());
+    let ipfs_gateway_url = env.var("DIAP_IPFS_GATEWAY_URL").ok().map(|v| v.to_string());
+    
+    if let (Some(api_url), Some(gateway_url)) = (ipfs_api_url, ipfs_gateway_url) {
+        let timeout_secs = env
+            .var("DIAP_IPFS_TIMEOUT_SECS")
+            .ok()
+            .and_then(|v| v.to_string().parse::<u64>().ok())
+            .unwrap_or(10);
+        
+        let config = DiapIdentityConfig::new(api_url, gateway_url)
+            .with_timeout(timeout_secs);
+        
+        if let Ok(manager) = DiapIdentityManager::new(config) {
+            if let Err(e) = manager.validate_identity(&identity) {
+                let error_response = ErrorResponse {
+                    error: format!("Identity validation failed: {}", e),
+                };
+                return json_response_with_status(&error_response, 400);
+            }
         }
-        Err(e) => {
-            let error_response = ErrorResponse {
-                error: format!("Failed to get DIAP identity: {}", e),
-            };
-            return json_response_with_status(&error_response, 500);
-        }
-    };
+    }
 
     // Resolve contract environment
     let contract_env = match resolve_environment(env, &body.network) {
@@ -693,7 +694,6 @@ pub(crate) async fn handle_register_agent_onchain(
             let min_stake = client.min_stake_amount().await.ok();
 
             json_response(&json!({
-                "session_id": body.session_id,
                 "encoded_call": encoded,
                 "network": body.network,
                 "registration_fee": registration_fee,
@@ -703,6 +703,7 @@ pub(crate) async fn handle_register_agent_onchain(
                 "identity": {
                     "ipns": identity.ipns,
                     "did": identity.did,
+                    "cid": identity.cid,
                     "public_key": identity.public_key,
                 },
             }))

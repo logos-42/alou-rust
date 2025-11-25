@@ -21,7 +21,11 @@ use crate::ipfs_api::{
 };
 use crate::ipfs_commands::ipfs_add_base64;
 use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, stop_ipfs_node};
-use crate::diap::create_local_diap_identity;
+use crate::diap::{
+    create_local_diap_identity,
+    get_local_diap_identity,
+    update_local_diap_identity,
+};
 use crate::wallet::verify_wallet_signature;
 use crate::browser::{open_browser, test_ipfs_node_connection};
 use crate::sync::{
@@ -48,6 +52,8 @@ fn main() {
             test_ipfs_api_with_config,
             ipfs_add_base64,
             create_local_diap_identity,
+            get_local_diap_identity,
+            update_local_diap_identity,
             verify_wallet_signature,
             open_browser,
             test_ipfs_node_connection,

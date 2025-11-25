@@ -140,13 +140,34 @@ impl Router {
             }
         }
 
-        result.map(|r| {
-            let mut response = r.with_headers(headers);
-            let response_headers = response.headers_mut();
-            let _ = response_headers.set("X-Response-Time", &format!("{:.2}ms", duration_ms));
-            let _ = response_headers.set("X-Request-ID", &uuid::Uuid::new_v4().to_string());
-            response
-        })
+        match result {
+            Ok(r) => {
+                let mut response = r.with_headers(headers);
+                let response_headers = response.headers_mut();
+                let _ = response_headers.set("X-Response-Time", &format!("{:.2}ms", duration_ms));
+                let _ = response_headers.set("X-Request-ID", &uuid::Uuid::new_v4().to_string());
+                Ok(response)
+            }
+            Err(e) => {
+                // Create error response with CORS headers
+                let error_response = ErrorResponse {
+                    error: format!("Internal server error: {}", e),
+                };
+                let json = serde_json::to_string(&error_response)
+                    .unwrap_or_else(|_| r#"{"error":"Failed to serialize error"}"#.to_string());
+                
+                let mut response = Response::ok(json)
+                    .map_err(|_| worker::Error::RustError("Failed to create error response".to_string()))?
+                    .with_status(500)
+                    .with_headers(headers);
+                
+                let response_headers = response.headers_mut();
+                let _ = response_headers.set("Content-Type", "application/json; charset=utf-8");
+                let _ = response_headers.set("X-Response-Time", &format!("{:.2}ms", duration_ms));
+                let _ = response_headers.set("X-Request-ID", &uuid::Uuid::new_v4().to_string());
+                Ok(response)
+            }
+        }
     }
 
     async fn route_request(
@@ -208,11 +229,8 @@ impl Router {
             (Method::Post, "/api/agent/search") => {
                 agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
             }
-            (Method::Post, "/api/agent/diap/create-identity") => {
-                agent::handle_create_diap_identity(&self.session_manager, &env, req).await
-            }
             (Method::Post, "/api/agent/diap/get-identity") => {
-                agent::handle_get_diap_identity(&self.session_manager, req).await
+                agent::handle_get_diap_identity(&self.session_manager, &env, req).await
             }
             (Method::Post, "/api/agent/create-claude") => {
                 agent::handle_create_claude_agent(&self.session_manager, req).await

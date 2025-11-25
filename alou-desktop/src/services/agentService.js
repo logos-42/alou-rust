@@ -190,32 +190,47 @@ export class AgentService {
   }
 
   /**
-   * Create DIAP identity for a session
+   * Create DIAP identity for a session (using local Tauri command)
    */
-  async createDiapIdentity(sessionId) {
-    const response = await apiClient.post('/agent/diap/create-identity', {
+  async createDiapIdentity(sessionId, params = {}) {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const response = await invoke('create_local_diap_identity', {
+      params: {
       session_id: sessionId,
+        agent_name: params.agentName,
+        agent_description: params.agentDescription,
+        ipfs_api_url: params.ipfsApiUrl,
+        ipfs_gateway_url: params.ipfsGatewayUrl,
+        ipns_key: params.ipnsKey,
+      },
     })
-    return response.data
+    return { identity: response }
   }
 
   /**
-   * Get DIAP identity for a session
+   * Get DIAP identity from IPNS (using local Tauri command)
    */
-  async getDiapIdentity(sessionId) {
-    const response = await apiClient.post('/agent/diap/get-identity', {
-      session_id: sessionId,
+  async getDiapIdentity(ipnsName, ipfsApiUrl, ipfsGatewayUrl) {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const response = await invoke('get_local_diap_identity', {
+      ipns_name: ipnsName,
+      ipfs_api_url: ipfsApiUrl,
+      ipfs_gateway_url: ipfsGatewayUrl,
     })
-    return response.data
+    return { identity: response }
   }
 
   /**
    * Register agent to DIAP network on-chain
    * Returns encoded transaction that needs to be signed and broadcast
+   * Now receives identity information directly instead of session_id
    */
-  async registerAgentOnChain(sessionId, network, stakeAmount, useAa = false, salt = 0) {
+  async registerAgentOnChain(identity, network, stakeAmount, useAa = false, salt = 0) {
     const response = await apiClient.post('/agent/diap/register-onchain', {
-      session_id: sessionId,
+      ipns: identity.ipns,
+      did: identity.did,
+      cid: identity.cid,
+      public_key: identity.public_key,
       network,
       stake_amount: stakeAmount,
       use_aa: useAa,

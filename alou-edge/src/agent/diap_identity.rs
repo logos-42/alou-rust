@@ -98,188 +98,10 @@ impl DiapIdentityManager {
         Ok(Self { config })
     }
 
-    /// Generate an IPNS key using IPFS API
-    /// Uses the IPFS API endpoint through HTTP client (via SDK's configuration)
-    async fn generate_ipns_key(&self, key_name: &str) -> Result<String> {
-        use reqwest::Client;
+    // Note: generate_ipns_key() method removed - IPNS key generation is now handled by Desktop
 
-        let http_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
-            .build()
-            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
-
-        let api_url = self.config.ipfs_api_url.trim_end_matches('/');
-        let key_gen_url = format!("{}/api/v0/key/gen?arg={}&type=rsa&size=2048", api_url, key_name);
-
-        #[derive(Deserialize)]
-        struct KeyGenResponse {
-            #[serde(rename = "Name")]
-            name: String,
-            #[serde(rename = "Id")]
-            #[allow(dead_code)]
-            id: String,
-        }
-
-        let response = http_client
-            .post(&key_gen_url)
-            .send()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to generate IPNS key: {}", e)))?;
-
-        let response_text = response
-            .text()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to read key gen response: {}", e)))?;
-
-        // IPFS may return error if key already exists, try to handle it gracefully
-        if response_text.contains("already exists") {
-            // Key already exists, return the key name
-            return Ok(key_name.to_string());
-        }
-
-        // Try to parse the response
-        let parsed: KeyGenResponse = serde_json::from_str(&response_text)
-            .map_err(|e| {
-                AloudError::AgentError(format!(
-                    "Failed to parse key gen response: {}. Response: {}",
-                    e,
-                    if response_text.len() > 200 {
-                        format!("{}...", &response_text[..200])
-                    } else {
-                        response_text.clone()
-                    }
-                ))
-            })?;
-
-        Ok(parsed.name)
-    }
-
-    /// Create a new DIAP identity for an agent
-    pub async fn create_identity(&self) -> Result<DiapIdentity> {
-        use diap_rs_sdk::identity_manager::IdentityManager;
-        use diap_rs_sdk::IpfsClient;
-        use reqwest::Client;
-        use uuid::Uuid;
-
-        // Create IPFS client
-        let ipfs_client = IpfsClient::new_with_remote_node(
-            self.config.ipfs_api_url.clone(),
-            self.config.ipfs_gateway_url.clone(),
-            self.config.timeout_secs,
-        );
-
-        // Create identity manager (currently unused but kept for future SDK integration)
-        let _identity_manager = IdentityManager::new(ipfs_client.clone());
-
-        // Generate a new DID
-        let did = format!("did:alou:{}", Uuid::new_v4());
-
-        // Extract DID hash for IPNS key naming
-        let did_hash = did.split(':').last().unwrap();
-        let ipns_key_name = format!("agent-{}", did_hash);
-
-        // Generate IPNS key using SDK (via IPFS API)
-        let generated_ipns_key = self.generate_ipns_key(&ipns_key_name).await?;
-
-        // Create a simple DID document
-        let did_document = serde_json::json!({
-            "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": did,
-            "created": chrono::Utc::now().to_rfc3339(),
-            "service": []
-        });
-
-        // Serialize DID document
-        let doc_bytes = serde_json::to_vec(&did_document)
-            .map_err(|e| AloudError::AgentError(format!("Failed to serialize DID document: {}", e)))?;
-
-        // Publish to IPFS using reqwest
-        let http_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(self.config.timeout_secs))
-            .build()
-            .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
-
-        let form = reqwest::multipart::Form::new()
-            .part("file", reqwest::multipart::Part::bytes(doc_bytes).file_name("did.json"));
-
-        let api_url = self.config.ipfs_api_url.trim_end_matches('/');
-        let add_url = format!("{}/api/v0/add?pin=true", api_url);
-
-        #[derive(Deserialize)]
-        struct IpfsAddResponse {
-            #[serde(rename = "Hash")]
-            hash: String,
-        }
-
-        let response = http_client
-            .post(&add_url)
-            .multipart(form)
-            .send()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to add to IPFS: {}", e)))?;
-
-        let response_text = response
-            .text()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to read IPFS response: {}", e)))?;
-
-        // Parse response - IPFS returns newline-delimited JSON
-        let lines: Vec<&str> = response_text.trim().lines().collect();
-        let last_line = lines.last().ok_or_else(|| {
-            AloudError::AgentError("Empty response from IPFS add".to_string())
-        })?;
-
-        let parsed: IpfsAddResponse = serde_json::from_str(last_line)
-            .map_err(|e| AloudError::AgentError(format!("Failed to parse IPFS add response: {}", e)))?;
-
-        let cid = parsed.hash;
-
-        // Publish to IPNS
-        // Priority: generated_ipns_key > config.ipns_key > default (Peer ID)
-        let mut publish_url = format!("{}/api/v0/name/publish?arg=/ipfs/{}", api_url, cid);
-        let ipns_key_to_use = Some(&generated_ipns_key).or(self.config.ipns_key.as_ref());
-        if let Some(ref key) = ipns_key_to_use {
-            publish_url.push_str(&format!("&key={}", key));
-        }
-
-        #[derive(Deserialize)]
-        struct IpnsPublishResponse {
-            name: String,
-        }
-
-        let publish_response = http_client
-            .post(&publish_url)
-            .send()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to publish to IPNS: {}", e)))?;
-
-        let publish_text = publish_response
-            .text()
-            .await
-            .map_err(|e| AloudError::AgentError(format!("Failed to read IPNS response: {}", e)))?;
-
-        let ipns_parsed: IpnsPublishResponse = serde_json::from_str(&publish_text)
-            .map_err(|e| AloudError::AgentError(format!("Failed to parse IPNS publish response: {}", e)))?;
-
-        let ipns_name = ipns_parsed.name;
-        let ipns = if ipns_name.starts_with("/ipns/") {
-            ipns_name
-        } else {
-            format!("/ipns/{}", ipns_name)
-        };
-
-        // Extract public key from IPNS name (or generate from IPNS key)
-        let public_key = format!("pubkey_{}", ipns.trim_start_matches("/ipns/"));
-
-        Ok(DiapIdentity::new_with_ipns_key(
-            did,
-            ipns,
-            cid,
-            public_key,
-            None, // Encrypted peer ID would be generated during actual identity creation
-            Some(generated_ipns_key),
-        ))
-    }
+    // Note: create_identity() method removed - identity creation is now handled by Desktop
+    // Workers only provide resolution and validation functionality
 
     /// Add data to IPFS and return CID (unused, kept for potential future use)
     #[allow(dead_code)]
@@ -373,6 +195,52 @@ impl DiapIdentityManager {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         input.hash(&mut hasher);
         format!("{:x}", hasher.finish())
+    }
+
+    /// Resolve identity from IPNS name (解析功能)
+    pub async fn resolve_identity_from_ipns(&self, ipns_name: &str) -> Result<DiapIdentity> {
+        use diap_rs_sdk::IpfsClient;
+
+        // Create IPFS client
+        let ipfs_client = IpfsClient::new_with_remote_node(
+            self.config.ipfs_api_url.clone(),
+            self.config.ipfs_gateway_url.clone(),
+            self.config.timeout_secs,
+        );
+
+        // Resolve IPNS to CID
+        let cid = ipfs_client
+            .resolve_ipns(ipns_name)
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to resolve IPNS: {}", e)))?;
+
+        // Get identity from CID
+        self.get_identity(&cid).await
+    }
+
+    /// Validate identity information (验证功能)
+    pub fn validate_identity(&self, identity: &DiapIdentity) -> Result<()> {
+        // Validate IPNS format
+        if !identity.ipns.starts_with("/ipns/") && !identity.ipns.starts_with("k51") {
+            return Err(AloudError::AgentError("Invalid IPNS format".to_string()));
+        }
+
+        // Validate DID format
+        if !identity.did.starts_with("did:") {
+            return Err(AloudError::AgentError("Invalid DID format".to_string()));
+        }
+
+        // Validate CID format (basic check)
+        if identity.cid.is_empty() {
+            return Err(AloudError::AgentError("CID cannot be empty".to_string()));
+        }
+
+        // Validate public key format
+        if identity.public_key.is_empty() {
+            return Err(AloudError::AgentError("Public key cannot be empty".to_string()));
+        }
+
+        Ok(())
     }
 
     /// Get identity information from CID
@@ -499,21 +367,50 @@ pub struct DiapIdentityManager;
 #[cfg(target_arch = "wasm32")]
 impl DiapIdentityManager {
     pub fn new(_config: DiapIdentityConfig) -> Result<Self> {
-        Err(AloudError::AgentError(
-            "DIAP identity management is not available in WASM build".to_string(),
-        ))
+        // In WASM, we can't use reqwest, but we can still create the manager
+        // The actual IPFS operations will need to be done via external HTTP calls
+        Ok(Self)
     }
 
     pub async fn create_identity(&self) -> Result<DiapIdentity> {
         Err(AloudError::AgentError(
-            "DIAP identity management is not available in WASM build".to_string(),
+            "DIAP identity creation is not available in WASM build. Use Desktop app instead.".to_string(),
         ))
     }
 
     pub async fn get_identity(&self, _cid: &str) -> Result<DiapIdentity> {
         Err(AloudError::AgentError(
-            "DIAP identity management is not available in WASM build".to_string(),
+            "DIAP identity retrieval is not available in WASM build".to_string(),
         ))
+    }
+
+    /// Resolve identity from IPNS name (WASM stub - returns error)
+    pub async fn resolve_identity_from_ipns(&self, _ipns_name: &str) -> Result<DiapIdentity> {
+        Err(AloudError::AgentError(
+            "IPNS resolution is not available in WASM build. Use Desktop app or configure external IPFS gateway.".to_string(),
+        ))
+    }
+
+    /// Validate identity information (WASM stub - basic validation only)
+    pub fn validate_identity(&self, identity: &DiapIdentity) -> Result<()> {
+        // Basic format validation only (no network calls)
+        if !identity.ipns.starts_with("/ipns/") && !identity.ipns.starts_with("k51") {
+            return Err(AloudError::AgentError("Invalid IPNS format".to_string()));
+        }
+
+        if !identity.did.starts_with("did:") {
+            return Err(AloudError::AgentError("Invalid DID format".to_string()));
+        }
+
+        if identity.cid.is_empty() {
+            return Err(AloudError::AgentError("CID cannot be empty".to_string()));
+        }
+
+        if identity.public_key.is_empty() {
+            return Err(AloudError::AgentError("Public key cannot be empty".to_string()));
+        }
+
+        Ok(())
     }
 }
 

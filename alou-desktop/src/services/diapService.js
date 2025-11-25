@@ -35,13 +35,14 @@ class DiapService {
     throw lastError
   }
 
-  async createLocalIdentity({ name, description, ipfsApiUrl, ipfsGatewayUrl } = {}) {
+  async createLocalIdentity({ name, description, sessionId, ipfsApiUrl, ipfsGatewayUrl } = {}) {
     return this.withRetry(
       async () => {
         const response = await invoke('create_local_diap_identity', {
           params: {
             agent_name: name,
             agent_description: description,
+            session_id: sessionId,
             ipfs_api_url: ipfsApiUrl || DEFAULT_IPFS_API,
             ipfs_gateway_url: ipfsGatewayUrl || DEFAULT_IPFS_GATEWAY,
           },
@@ -49,6 +50,39 @@ class DiapService {
         return response
       },
       '创建 DIAP Identity',
+      3,
+      1500
+    )
+  }
+
+  async getLocalIdentity(ipnsName, ipfsApiUrl, ipfsGatewayUrl) {
+    return this.withRetry(
+      async () => {
+        const response = await invoke('get_local_diap_identity', {
+          ipns_name: ipnsName,
+          ipfs_api_url: ipfsApiUrl || DEFAULT_IPFS_API,
+          ipfs_gateway_url: ipfsGatewayUrl || DEFAULT_IPFS_GATEWAY,
+        })
+        return response
+      },
+      '获取 DIAP Identity',
+      3,
+      1500
+    )
+  }
+
+  async updateLocalIdentity(ipnsKey, cid, ipfsApiUrl, ipfsGatewayUrl) {
+    return this.withRetry(
+      async () => {
+        const response = await invoke('update_local_diap_identity', {
+          ipns_key: ipnsKey,
+          cid: cid,
+          ipfs_api_url: ipfsApiUrl || DEFAULT_IPFS_API,
+          ipfs_gateway_url: ipfsGatewayUrl || DEFAULT_IPFS_GATEWAY,
+        })
+        return response
+      },
+      '更新 DIAP Identity',
       3,
       1500
     )
