@@ -164,6 +164,20 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId }) {
           description: roleDescription.trim(),
         })
         console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
+        
+        // 保存 sessionId → IPNS 映射到 localStorage
+        if (diapIdentity && sessionId && typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(
+            `diap_identity_${sessionId}`,
+            JSON.stringify({
+              ipns: diapIdentity.ipns,
+              did: diapIdentity.did,
+              cid: diapIdentity.cid,
+              created_at: Date.now()
+            })
+          )
+          console.log('[CreateAgentModal] 已保存 identity 映射到 localStorage')
+        }
       } catch (err) {
         console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
         setError(

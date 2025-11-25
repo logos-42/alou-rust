@@ -232,6 +232,9 @@ impl Router {
             (Method::Post, "/api/agent/diap/get-identity") => {
                 agent::handle_get_diap_identity(&self.session_manager, &env, req).await
             }
+            (Method::Post, "/api/agent/diap/get-identity-by-session") => {
+                agent::handle_get_diap_identity_by_session(&self.session_manager, req).await
+            }
             (Method::Post, "/api/agent/create-claude") => {
                 agent::handle_create_claude_agent(&self.session_manager, req).await
             }

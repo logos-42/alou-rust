@@ -42,6 +42,14 @@ const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
       const response = await agentService.createDiapIdentity(sessionId)
       if (response.identity) {
         setIdentity(response.identity)
+        // 保存到 localStorage
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(
+            `diap_identity_${sessionId}`,
+            JSON.stringify(response.identity)
+          )
+          console.log('[DiapIdentityPanel] 已保存 identity 映射到 localStorage')
+        }
       }
     } catch (err) {
       console.error('Failed to create DIAP identity:', err)
