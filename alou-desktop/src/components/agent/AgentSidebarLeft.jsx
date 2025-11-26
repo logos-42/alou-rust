@@ -105,12 +105,44 @@ const AgentSidebarLeft = ({
                   <div className="channel-name">{channel.name}</div>
                   <div className="channel-meta">
                     <span className={`status-dot ${channel.status}`} />
-                    <span className="channel-status">{channel.statusLabel}</span>
-                    {channel.meta?.ipns ? (
-                      <span className="channel-hint">· …{channel.meta.ipns.replace(/^\/?ipns\//, '').slice(-12)}</span>
-                    ) : channel.meta?.did ? (
-                      <span className="channel-hint">· …{channel.meta.did.slice(-12)}</span>
-                    ) : null}
+                    {channel.meta?.agent_type === 'claude_agent_sdk' && (
+                      <span className="channel-badge badge-claude">Claude</span>
+                    )}
+                    {channel.meta?.ipns && (
+                      <span
+                        className={`channel-badge status-badge ${
+                          channel.meta?.diap_identity?.is_registered ? 'badge-success' : 'badge-warning'
+                        }`}
+                        aria-label={
+                          channel.meta?.diap_identity?.is_registered ? 'DIAP 已注册' : 'DIAP 未注册'
+                        }
+                      >
+                        <span className="status-icon">
+                          {channel.meta?.diap_identity?.is_registered ? (
+                            <svg viewBox="0 0 16 16">
+                              <path
+                                d="M3 8.5l3 3 7-7.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 16 16">
+                              <path
+                                d="M4 4l8 8M12 4l-8 8"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                          )}
+                        </span>
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="channel-date">{formatDate(channel.updatedAt)}</div>

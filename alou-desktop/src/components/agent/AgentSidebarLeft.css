@@ -6,6 +6,8 @@
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   width: var(--left-column-width, 300px);
+  height: 100%;
+  min-height: 0;
   transition:
     width 0.28s ease,
     padding 0.2s ease,
@@ -215,9 +217,58 @@
 .sidebar-left .channel-meta {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.sidebar-left .channel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.sidebar-left .channel-badge {
+  font-size: 0.62rem;
+  padding: 0.05rem 0.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: var(--primary-color);
+  background: rgba(99, 102, 241, 0.12);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  min-width: 20px;
+  justify-content: center;
+}
+
+.sidebar-left .channel-badge.badge-claude {
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #059669;
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.sidebar-left .channel-badge.badge-success {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.sidebar-left .channel-badge.badge-warning {
+  border-color: rgba(234, 179, 8, 0.45);
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.2);
+}
+
+.sidebar-left .channel-badge.status-badge .status-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+}
+
+.sidebar-left .channel-badge.status-badge svg {
+  width: 100%;
+  height: 100%;
 }
 
 .sidebar-left .channel-hint {

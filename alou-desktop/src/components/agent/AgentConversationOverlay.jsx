@@ -15,6 +15,11 @@ const AgentConversationOverlay = forwardRef(
       onInspectMessage,
       streamEvents = [],
       streamStatus = 'idle',
+      embedded = false,
+      title = '会话',
+      subtitle,
+      actions,
+      emptyState,
     },
     ref,
   ) => {
@@ -30,35 +35,64 @@ const AgentConversationOverlay = forwardRef(
       [],
     )
 
-    return (
-      <div className="conversation-overlay" style={style}>
-        <section className="conversation-panel">
-          <header>
-            <div className="title">
-              <span className="emoji">💬</span>
-              <span>会话上下文</span>
-            </div>
-            <div className={`status ${connectionStatus}`}>
-              <span className="dot" />
-              <span>{connectionStatusLabel}</span>
-            </div>
+    const header = (
+      <header>
+        <div className="title">
+          <span className="emoji">💬</span>
+          <div className="title-text">
+            <span>{title}</span>
+            {subtitle && <small>{subtitle}</small>}
+          </div>
+        </div>
+        <div className="header-actions">
+          <div className={`status ${connectionStatus}`}>
+            <span className="dot" />
+            <span>{connectionStatusLabel}</span>
+          </div>
+          {actions}
+          {!embedded && (
             <button type="button" className="close-btn" onClick={onClose}>
               ✕
             </button>
-          </header>
-          <div className="conversation-body">
-            <MessageList
-              ref={messageListRef}
-              messages={messages}
-              isLoading={isLoading}
-              loadingContent={
-                <div className="stream-panel-wrapper">
-                  <AgentStreamPanel events={streamEvents} status={streamStatus} />
-                </div>
-              }
-              onMessageSelect={onInspectMessage}
-            />
-          </div>
+          )}
+        </div>
+      </header>
+    )
+
+    const body = (
+      <div className="conversation-body">
+        {messages.length === 0 && !isLoading && emptyState ? (
+          emptyState
+        ) : (
+          <MessageList
+            ref={messageListRef}
+            messages={messages}
+            isLoading={isLoading}
+            loadingContent={
+              <div className="stream-panel-wrapper">
+                <AgentStreamPanel events={streamEvents} status={streamStatus} />
+              </div>
+            }
+            onMessageSelect={onInspectMessage}
+          />
+        )}
+      </div>
+    )
+
+    if (embedded) {
+      return (
+        <section className="conversation-panel embedded" style={style}>
+          {header}
+          {body}
+        </section>
+      )
+    }
+
+    return (
+      <div className="conversation-overlay" style={style}>
+        <section className="conversation-panel">
+          {header}
+          {body}
         </section>
       </div>
     )

@@ -266,6 +266,10 @@ const AgentChat = () => {
       sessionId,
     ],
   )
+  const loadChannelListRef = useRef(loadChannelList)
+  useEffect(() => {
+    loadChannelListRef.current = loadChannelList
+  }, [loadChannelList])
 
   useEffect(() => {
     return () => {
@@ -279,8 +283,8 @@ const AgentChat = () => {
     if (!isSessionReady) {
       return
     }
-    void loadChannelList(channelKeyword)
-  }, [channelKeyword, isSessionReady, loadChannelList])
+    loadChannelListRef.current(channelKeyword)
+  }, [channelKeyword, isSessionReady])
 
   const refreshChannels = useCallback(() => {
     void loadChannelList(channelKeyword)
@@ -293,7 +297,7 @@ const AgentChat = () => {
     () => (currentLanguage === 'zh' ? '中 / EN' : 'EN / 中'),
     [currentLanguage],
   )
-  const showConversationPanel = messages.length > 0 && isConversationVisible
+  const showConversationPanel = isConversationVisible
 
   const canvasRef = useRef(null)
   const conversationOverlayRef = useRef(null)
@@ -1299,20 +1303,9 @@ const AgentChat = () => {
   }, [recordInteraction])
 
   const openConversationPanel = useCallback(() => {
-    if (!isConversationVisible) {
-      setConversationVisible(true)
-      scrollToBottom()
-      const messageCount = messages.length
-      void fetchAndOpenUiResource(
-        MCP_UI_TARGETS.conversationDetail,
-        {
-          conversation_id: sessionId,
-          message_count: messageCount,
-        },
-        { source: 'conversation_panel' },
-      )
-    }
-  }, [fetchAndOpenUiResource, isConversationVisible, messages, scrollToBottom, sessionId])
+    setConversationVisible(true)
+    scrollToBottom()
+  }, [scrollToBottom])
 
   const closeConversationPanel = useCallback(() => {
     setConversationVisible(false)
@@ -1359,83 +1352,61 @@ const AgentChat = () => {
 
       setActiveChannelId(channel.id)
       setSelectedAgent(channel.meta ?? null)
+      setChannelError(null)
       recordInteraction('channel_selected', {
         channelId: channel.id,
         name: channel.name,
         status: channel.status,
         statusLabel: channel.statusLabel,
       })
+      openConversationPanel()
 
       const target = extractAgentTarget(channel.meta ?? channel)
-      if (target) {
-        setChannelLoading(true)
-        setChannelError(null)
-        void (async () => {
-          try {
-            const resolvedAgent = await agentService.resolveAgent(target, sessionId)
-            // 如果解析后的 agent 没有 IPNS，但 channel.meta 有 IPNS，保留原来的 IPNS
-            const originalMeta = channel.meta ?? {}
-            // 合并原始 meta 和解析后的 agent，优先保留原始 meta 中的 IPNS 和其他重要字段
-            const mergedAgent = {
-              ...resolvedAgent,
-              // 优先使用原始 meta 中的 IPNS（如果存在）
-              ipns: originalMeta.ipns || resolvedAgent.ipns,
-              // 保留原始 meta 中的其他重要字段
-              display_name: originalMeta.display_name || resolvedAgent.display_name,
-              name: originalMeta.name || resolvedAgent.name,
-              avatar_cid: originalMeta.avatar_cid || resolvedAgent.avatar_cid,
-              avatar: originalMeta.avatar || resolvedAgent.avatar,
-              avatar_url: originalMeta.avatar_url || resolvedAgent.avatar_url,
-              // 保留原始 meta 中的 agent_type 和其他配置
-              agent_type: originalMeta.agent_type || resolvedAgent.agent_type,
-              role_description: originalMeta.role_description || resolvedAgent.role_description,
-              mcp_config_cid: originalMeta.mcp_config_cid || resolvedAgent.mcp_config_cid,
-              mcp_ports: originalMeta.mcp_ports || resolvedAgent.mcp_ports,
-            }
-            const refreshed = buildChannelFromAgent(mergedAgent)
-            setSelectedAgent(mergedAgent)
-            if (refreshed) {
-              setChannels((prev) => {
-                const others = prev.filter((item) => item.id !== channel.id)
-                return [refreshed, ...others]
-              })
-              setActiveChannelId(refreshed.id)
-            }
-          } catch (error) {
-            const message = extractErrorMessage(error)
-            console.error('Failed to resolve agent', error)
-            setChannelError(message)
-          } finally {
-            setChannelLoading(false)
-          }
-        })()
+      if (!target) {
+        return
       }
 
-      // 过滤掉 mock IPNS 值
-      const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
-      const ipnsValue = channel.meta?.ipns
-      const isMockIpns = ipnsValue && (
-        ipnsValue.includes(mockIpns) ||
-        ipnsValue === mockIpns ||
-        ipnsValue === `/ipns/${mockIpns}`
-      )
-      
-      void fetchAndOpenUiResource(
-        MCP_UI_TARGETS.channelDetail,
-        {
-          channel_id: channel.id,
-          did: channel.meta?.did,
-          cid: channel.meta?.cid,
-          ipns: isMockIpns ? undefined : ipnsValue,
-        },
-        { channelId: channel.id, channel },
-      )
+      setChannelLoading(true)
+      void (async () => {
+        try {
+          const resolvedAgent = await agentService.resolveAgent(target, sessionId)
+          const originalMeta = channel.meta ?? {}
+          const mergedAgent = {
+            ...resolvedAgent,
+            ipns: originalMeta.ipns || resolvedAgent.ipns,
+            display_name: originalMeta.display_name || resolvedAgent.display_name,
+            name: originalMeta.name || resolvedAgent.name,
+            avatar_cid: originalMeta.avatar_cid || resolvedAgent.avatar_cid,
+            avatar: originalMeta.avatar || resolvedAgent.avatar,
+            avatar_url: originalMeta.avatar_url || resolvedAgent.avatar_url,
+            agent_type: originalMeta.agent_type || resolvedAgent.agent_type,
+            role_description: originalMeta.role_description || resolvedAgent.role_description,
+            mcp_config_cid: originalMeta.mcp_config_cid || resolvedAgent.mcp_config_cid,
+            mcp_ports: originalMeta.mcp_ports || resolvedAgent.mcp_ports,
+          }
+          const refreshed = buildChannelFromAgent(mergedAgent)
+          setSelectedAgent(mergedAgent)
+          if (refreshed) {
+            setChannels((prev) => {
+              const others = prev.filter((item) => item.id !== channel.id)
+              return [refreshed, ...others]
+            })
+            setActiveChannelId(refreshed.id)
+          }
+        } catch (error) {
+          const message = extractErrorMessage(error)
+          console.error('Failed to resolve agent', error)
+          setChannelError(message)
+        } finally {
+          setChannelLoading(false)
+        }
+      })()
     },
     [
       buildChannelFromAgent,
       extractAgentTarget,
       extractErrorMessage,
-      fetchAndOpenUiResource,
+      openConversationPanel,
       recordInteraction,
       sessionId,
     ],
@@ -1574,7 +1545,8 @@ const AgentChat = () => {
       return
     }
     dragStateRef.current.moved = false
-  }, [])
+    openConversationPanel()
+  }, [openConversationPanel])
 
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -1586,17 +1558,21 @@ const AgentChat = () => {
       }
     }
 
-    try {
-      initLanguage()
-      checkConnection()
-      createSession().then(() => setSessionReady(true)).catch(err => console.error('Failed to create session:', err))
-      refreshWallet().catch(err => {
-        console.warn('Failed to refresh wallet:', err)
-        // 不中断流程，只是记录警告
-      })
-    } catch (error) {
-      console.error('Error in AgentChat initialization:', error)
+    const bootstrap = async () => {
+      try {
+        initLanguage()
+        await Promise.all([
+          checkConnection(),
+          createSession().then(() => setSessionReady(true)),
+          refreshWallet().catch((err) => {
+            console.warn('Failed to refresh wallet:', err)
+          }),
+        ])
+      } catch (error) {
+        console.error('Error in AgentChat initialization:', error)
+      }
     }
+    bootstrap()
 
     if (typeof window !== 'undefined') {
       window.addEventListener('wallet-changed', handleWalletChanged)
@@ -1611,15 +1587,8 @@ const AgentChat = () => {
         window.removeEventListener('pointerup', handleGlobalPointerUp)
       }
     }
-  }, [
-    checkConnection,
-    createSession,
-    handleGlobalPointerUp,
-    handleResize,
-    handleWalletChanged,
-    initLanguage,
-    refreshWallet,
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const shellClassName = [
     'app-shell',
@@ -1658,19 +1627,37 @@ const AgentChat = () => {
         />
 
         <div className="agent-center">
-          <AgentCanvas
-            ref={canvasRef}
-            agentProfile={agentProfile}
-            agentStyle={agentStyle}
-            onPointerDown={startDrag}
-            onPointerMove={onDrag}
-            onPointerUp={stopDrag}
-            onPointerLeave={stopDrag}
-            onAgentActivate={handleAgentActivate}
-          />
-          {selectedAgent && (
-          <AgentProfilePanel agent={selectedAgent} />
-          )}
+          <div className={`conversation-stack ${showConversationPanel ? 'open' : ''}`}>
+            <div className="agent-visual">
+              <AgentCanvas
+                ref={canvasRef}
+                agentProfile={agentProfile}
+                agentStyle={agentStyle}
+                onPointerDown={startDrag}
+                onPointerMove={onDrag}
+                onPointerUp={stopDrag}
+                onPointerLeave={stopDrag}
+                onAgentActivate={handleAgentActivate}
+              />
+              {selectedAgent && <AgentProfilePanel agent={selectedAgent} />}
+            </div>
+
+            <div className="conversation-shell">
+              <AgentConversationOverlay
+                ref={conversationOverlayRef}
+                connectionStatus={connectionStatus}
+                connectionStatusLabel={connectionStatusLabel}
+                messages={messages}
+                isLoading={isLoading}
+                onClose={closeConversationPanel}
+                onInspectMessage={handleInspectMessage}
+                streamEvents={streamEvents}
+                streamStatus={streamStatus}
+                embedded
+                subtitle={selectedAgent ? selectedAgent.display_name || selectedAgent.name : '请选择左侧智能体'}
+              />
+            </div>
+          </div>
         </div>
 
         <AgentSidebarRight
@@ -1691,20 +1678,6 @@ const AgentChat = () => {
           )}
         />
 
-        {showConversationPanel && (
-          <AgentConversationOverlay
-            ref={conversationOverlayRef}
-            style={conversationOverlayStyle}
-            connectionStatus={connectionStatus}
-            connectionStatusLabel={connectionStatusLabel}
-            messages={messages}
-            isLoading={isLoading}
-            onClose={closeConversationPanel}
-            onInspectMessage={handleInspectMessage}
-            streamEvents={streamEvents}
-            streamStatus={streamStatus}
-          />
-        )}
       </div>
 
       <AgentConsoleDock
