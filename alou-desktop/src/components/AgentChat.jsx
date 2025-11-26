@@ -5,7 +5,6 @@ import { useI18n } from '@/hooks/useI18n'
 import { walletService } from '@/services/walletService'
 import agentService from '@/services/agentService'
 import apiClient from '@/services/api'
-import agentAssetsService from '@/services/agentAssetsService'
 import { MCP_UI_TARGETS, requestMcpUiResource } from '@/services/mcpUiService'
 import { useAgentStream } from '@/hooks/useAgentStream'
 import ChatHeader from '@/components/ChatHeader'
@@ -32,19 +31,8 @@ import {
   resolveBackendChain,
   useToolCallHandler,
 } from '@/hooks/useAgentChat'
-import './AgentChat.css'
-
-const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
-
-const resolveAgentAvatar = (agent) => {
-  if (!agent) return fallbackAvatar
-  if (agent.avatar) return agent.avatar
-  if (agent.avatar_url) return agent.avatar_url
-  if (agent.avatarCid || agent.avatar_cid) {
-    return agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
-  }
-  return fallbackAvatar
-}
+import './AgentChat/index.css'
+import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage, computeAgentProfile } from './AgentChat/agentUtils'
 
 const AgentChat = () => {
   const navigate = useNavigate()
@@ -88,77 +76,9 @@ const AgentChat = () => {
   const searchDebounceRef = useRef(null)
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
 
-  const buildChannelFromAgent = useCallback((agent) => {
-    if (!agent) {
-      return null
-    }
-    
-    // 过滤掉 mock IPNS 值
-    const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
-    const ipnsValue = agent.ipns
-    const isMockIpns = ipnsValue && (
-      ipnsValue.includes(mockIpns) ||
-      ipnsValue === mockIpns ||
-      ipnsValue === `/ipns/${mockIpns}`
-    )
-    
-    // 创建清理后的 agent 对象
-    const cleanedAgent = { ...agent }
-    if (isMockIpns) {
-      delete cleanedAgent.ipns
-    }
-    
-    // IPNS 应该优先于 DID 作为标识符
-    const id = cleanedAgent.ipns || cleanedAgent.did || cleanedAgent.cid || `agent_${Date.now()}`
-    const nameFromIpns = cleanedAgent.ipns ? cleanedAgent.ipns.replace(/^\/?ipns\//, '') : null
-    const nameFromDid = cleanedAgent.did ? cleanedAgent.did.split(':').filter(Boolean).slice(-1)[0] : null
-    const fallbackName = cleanedAgent.cid || id
-    // 显示名称也优先使用 IPNS
-    const displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid || fallbackName
-    const statusLabel = cleanedAgent.ipns
-      ? 'IPNS 解析'
-      : cleanedAgent.did
-        ? 'DID 解析'
-        : cleanedAgent.agent_type === 'claude_agent_sdk'
-          ? '自定义智能体'
-          : 'CID 解析'
-
-    const avatar = resolveAgentAvatar(cleanedAgent)
-
-    return {
-      id,
-      name: displayName,
-      status: 'online',
-      statusLabel,
-      icon: '🛰️',
-      avatar,
-      color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-      updatedAt: Math.floor(Date.now() / 1000),
-      meta: cleanedAgent,
-    }
-  }, [])
-
-  const extractAgentTarget = useCallback((agent) => {
-    if (!agent) return null
-    if (agent.ipns) return agent.ipns
-    if (agent.did) return agent.did
-    if (agent.cid) return agent.cid
-    if (agent.meta) {
-      return agent.meta.ipns || agent.meta.did || agent.meta.cid || null
-    }
-    return null
-  }, [])
-
-  const extractErrorMessage = useCallback((error) => {
-    if (!error) return '未知错误'
-    if (error.response?.data?.error) {
-      return error.response.data.error
-    }
-    if (typeof error.message === 'string' && error.message.trim().length > 0) {
-      return error.message
-    }
-    return '请求失败'
-  }, [])
+  const buildChannelFromAgentCallback = useCallback(buildChannelFromAgent, [])
+  const extractAgentTargetCallback = useCallback(extractAgentTarget, [])
+  const extractErrorMessageCallback = useCallback(extractErrorMessage, [])
 
   const loadChannelList = useCallback(
     async (keyword = channelKeyword) => {
@@ -183,7 +103,7 @@ const AgentChat = () => {
         if (!query) {
           const session = await agentService.getSession(sessionId)
           const metadata = session?.agent_metadata
-          const channel = buildChannelFromAgent(metadata)
+          const channel = buildChannelFromAgentCallback(metadata)
 
           applyLatest(() => {
             if (channel) {
@@ -202,7 +122,7 @@ const AgentChat = () => {
 
         const response = await agentService.searchAgents(query)
         const agents = Array.isArray(response?.agents) ? response.agents : []
-        const mapped = agents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
+        const mapped = agents.map((agent) => buildChannelFromAgentCallback(agent)).filter(Boolean)
 
         applyLatest(() => {
           setChannels(mapped)
@@ -219,7 +139,7 @@ const AgentChat = () => {
 
         return mapped
       } catch (error) {
-        const message = extractErrorMessage(error)
+        const message = extractErrorMessageCallback(error)
         applyLatest(() => {
           // Only log connection errors occasionally to avoid spam
           const isConnectionError = 
@@ -260,9 +180,9 @@ const AgentChat = () => {
     },
     [
       activeChannelId,
-      buildChannelFromAgent,
+      buildChannelFromAgentCallback,
       channelKeyword,
-      extractErrorMessage,
+      extractErrorMessageCallback,
       sessionId,
     ],
   )
@@ -324,30 +244,7 @@ const AgentChat = () => {
     [loadChannelList],
   )
 
-  const agentProfile = useMemo(() => {
-    const avatar = resolveAgentAvatar(selectedAgent)
-    if (!selectedAgent) {
-      return {
-        name: 'alou',
-        role: 'Web3 Multi-Agent Coordinator',
-        avatar,
-      }
-    }
-
-    const displayName =
-      (selectedAgent.ipns && selectedAgent.ipns.replace(/^\/?ipns\//, '').slice(0, 42)) ||
-      (selectedAgent.did && selectedAgent.did.split(':').filter(Boolean).slice(-1)[0]) ||
-      selectedAgent.cid ||
-      '解析智能体'
-
-    const role = selectedAgent.did ? 'DID 智能体' : '去中心化智能体'
-
-    return {
-      name: displayName,
-      role,
-      avatar,
-    }
-  }, [selectedAgent])
+  const agentProfile = useMemo(() => computeAgentProfile(selectedAgent), [selectedAgent])
 
   const [walletSnapshot, setWalletSnapshot] = useState(null)
   const [preferredChain, setPreferredChain] = useState(null)
@@ -1361,7 +1258,7 @@ const AgentChat = () => {
       })
       openConversationPanel()
 
-      const target = extractAgentTarget(channel.meta ?? channel)
+      const target = extractAgentTargetCallback(channel.meta ?? channel)
       if (!target) {
         return
       }
@@ -1384,7 +1281,7 @@ const AgentChat = () => {
             mcp_config_cid: originalMeta.mcp_config_cid || resolvedAgent.mcp_config_cid,
             mcp_ports: originalMeta.mcp_ports || resolvedAgent.mcp_ports,
           }
-          const refreshed = buildChannelFromAgent(mergedAgent)
+          const refreshed = buildChannelFromAgentCallback(mergedAgent)
           setSelectedAgent(mergedAgent)
           if (refreshed) {
             setChannels((prev) => {
@@ -1394,7 +1291,7 @@ const AgentChat = () => {
             setActiveChannelId(refreshed.id)
           }
         } catch (error) {
-          const message = extractErrorMessage(error)
+          const message = extractErrorMessageCallback(error)
           console.error('Failed to resolve agent', error)
           setChannelError(message)
         } finally {
@@ -1403,9 +1300,9 @@ const AgentChat = () => {
       })()
     },
     [
-      buildChannelFromAgent,
-      extractAgentTarget,
-      extractErrorMessage,
+      buildChannelFromAgentCallback,
+      extractAgentTargetCallback,
+      extractErrorMessageCallback,
       openConversationPanel,
       recordInteraction,
       sessionId,
@@ -1423,7 +1320,7 @@ const AgentChat = () => {
       recordInteraction('create_channel', { target: parsedTarget })
       try {
         const agent = await agentService.resolveAgent(parsedTarget, sessionId)
-        const channel = buildChannelFromAgent(agent)
+        const channel = buildChannelFromAgentCallback(agent)
         if (!channel) {
           throw new Error('解析结果为空')
         }
@@ -1435,7 +1332,7 @@ const AgentChat = () => {
         setSelectedAgent(agent)
         setCreateAgentModalOpen(false)
       } catch (error) {
-        const message = extractErrorMessage(error)
+        const message = extractErrorMessageCallback(error)
         setChannelError(message)
         recordInteraction('create_channel_failed', { target: parsedTarget, error: message })
         throw new Error(message)
@@ -1444,8 +1341,8 @@ const AgentChat = () => {
       }
     },
     [
-      buildChannelFromAgent,
-      extractErrorMessage,
+      buildChannelFromAgentCallback,
+      extractErrorMessageCallback,
       recordInteraction,
       sessionId,
       setChannels,
@@ -1499,7 +1396,7 @@ const AgentChat = () => {
           metadata.ipns = metadata.ipns || diapIdentity.ipns
         }
 
-        const channel = buildChannelFromAgent(metadata)
+        const channel = buildChannelFromAgentCallback(metadata)
         if (channel) {
           setChannels((prev) => {
             const others = prev.filter((item) => item.id !== channel.id)
@@ -1512,7 +1409,7 @@ const AgentChat = () => {
         setCreateAgentModalOpen(false)
         return result
       } catch (error) {
-        const message = extractErrorMessage(error)
+        const message = extractErrorMessageCallback(error)
         setChannelError(message)
         recordInteraction('create_claude_agent_failed', { error: message })
         throw new Error(message)
@@ -1522,8 +1419,8 @@ const AgentChat = () => {
     },
     [
       activeChain,
-      buildChannelFromAgent,
-      extractErrorMessage,
+      buildChannelFromAgentCallback,
+      extractErrorMessageCallback,
       recordInteraction,
       resolveBackendChain,
       sessionId,
