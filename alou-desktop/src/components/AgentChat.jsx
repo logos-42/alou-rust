@@ -294,13 +294,34 @@ const AgentChat = () => {
     return walletSnapshot || userWalletInfo
   }, [activeChain, userWalletInfo, walletSnapshot])
 
+  const [selectedModelType, setSelectedModelType] = useState(null)
+
   const filteredChannels = useMemo(() => {
-    if (!channelKeyword.trim()) {
-      return channels
+    let filtered = channels
+
+    // 按关键词筛选
+    if (channelKeyword.trim()) {
+      const lower = channelKeyword.toLowerCase()
+      filtered = filtered.filter((channel) => channel.name.toLowerCase().includes(lower))
     }
-    const lower = channelKeyword.toLowerCase()
-    return channels.filter((channel) => channel.name.toLowerCase().includes(lower))
-  }, [channelKeyword, channels])
+
+    // 按模型类型筛选
+    if (selectedModelType) {
+      filtered = filtered.filter((channel) => {
+        const agentType = channel.meta?.agent_type || channel.meta?.model_type
+        if (selectedModelType === 'claude') {
+          return agentType === 'claude_agent_sdk'
+        }
+        if (selectedModelType === 'alou') {
+          return agentType === 'alou_agent' || agentType === 'alou'
+        }
+        // 对于其他模型类型，暂时返回 true（后续接入）
+        return true
+      })
+    }
+
+    return filtered
+  }, [channelKeyword, channels, selectedModelType])
 
   const agentStyle = useMemo(
     () => ({
@@ -1561,6 +1582,9 @@ const AgentChat = () => {
           onCreateChannel={createChannel}
           isCollapsed={isLeftSidebarCollapsed}
           onToggleCollapse={toggleLeftSidebar}
+          selectedModelType={selectedModelType}
+          onModelTypeChange={setSelectedModelType}
+          onShowIdentityPanel={() => setShowDiapPanel(true)}
         />
 
         <div className="agent-center">

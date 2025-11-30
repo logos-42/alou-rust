@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import DiapIdentityPanel from '@/components/agent/DiapIdentityPanel'
 import DiapPanelIcon from '@/assets/方-收缩2.png'
 
@@ -14,10 +14,47 @@ function DiapPanelToggle({
     return null
   }
 
+  const toggleButtonRef = useRef(null)
+  const panelRef = useRef(null)
+
+  useEffect(() => {
+    if (!showPanel) {
+      return undefined
+    }
+
+    const handlePointerDown = (event) => {
+      const panelEl = panelRef.current
+      const toggleEl = toggleButtonRef.current
+      if (
+        panelEl &&
+        !panelEl.contains(event.target) &&
+        toggleEl &&
+        !toggleEl.contains(event.target)
+      ) {
+        onClosePanel?.()
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClosePanel?.()
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showPanel, onClosePanel])
+
   return (
     <>
       <button
         type="button"
+        ref={toggleButtonRef}
         style={{
           position: 'fixed',
           top: '64px',
@@ -45,6 +82,7 @@ function DiapPanelToggle({
 
       {showPanel && (
         <div
+          ref={panelRef}
           className="diap-identity-overlay"
           style={{
             position: 'fixed',
