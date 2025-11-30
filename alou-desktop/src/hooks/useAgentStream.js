@@ -110,29 +110,7 @@ export const useAgentStream = (sessionId, options = {}) => {
         }
       } catch (error) {
         if (!stopped) {
-          // Only log connection errors occasionally to avoid spam
-          const isConnectionError = 
-            error.message?.includes('Failed to fetch') ||
-            error.message?.includes('ERR_CONNECTION_REFUSED') ||
-            error.name === 'TypeError'
-          
-          const now = Date.now()
-          const lastErrorTime = window.__lastProgressPollError || 0
-          
-          if (isConnectionError) {
-            // For connection errors, only log every 30 seconds
-            if (now - lastErrorTime > 30000) {
-              window.__lastProgressPollError = now
-              console.warn('[useAgentStream] Backend server unavailable, polling paused')
-            }
-          } else {
-            // For other errors, log normally but throttle
-            if (now - lastErrorTime > 10000) {
-              window.__lastProgressPollError = now
-              console.error('agent progress polling failed:', error)
-            }
-          }
-          
+          console.error('agent progress polling failed:', error)
           setState('error')
           scheduleNext(idleIntervalMs)
         }

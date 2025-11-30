@@ -36,6 +36,7 @@ struct IpfsAddApiResponse {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)] // Reserved for future IPNS publishing features
 struct IpnsPublishResponse {
     #[serde(rename = "Name")]
     name: String,
@@ -144,6 +145,7 @@ pub async fn add_bytes_to_ipfs(
     })
 }
 
+#[allow(dead_code)] // Exposed for future IPNS key management commands
 pub async fn generate_ipns_key(
     api_url: &str,
     key_name: &str,
@@ -191,6 +193,7 @@ pub async fn generate_ipns_key(
     Ok(key_gen.name)
 }
 
+#[allow(dead_code)] // Not wired into the UI yet; keep available for future IPNS features
 pub async fn publish_ipns_record(
     api_url: &str,
     cid: &str,

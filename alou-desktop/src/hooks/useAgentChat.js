@@ -1,16 +1,9 @@
 import { useCallback } from 'react'
 import { walletService } from '@/services/walletService'
 
-// Get API base URL - consistent with api.js configuration
-const getApiBaseUrl = () => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL
-  if (envUrl) return envUrl
-  return import.meta.env.DEV
-    ? 'http://127.0.0.1:8787'
-    : 'https://alou-edge.yuanjieliu65.workers.dev'
-}
-
-export const API_BASE_URL = getApiBaseUrl()
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 export const NODE_BOUNDARY = 140
 
@@ -364,3 +357,4 @@ export const useToolCallHandler = ({
     ],
   )
 }
+
