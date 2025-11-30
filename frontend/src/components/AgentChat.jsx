@@ -1552,7 +1552,9 @@ const AgentChat = () => {
                 streamEvents={streamEvents}
                 streamStatus={streamStatus}
                 embedded
-                subtitle={selectedAgent ? selectedAgent.display_name || selectedAgent.name : '请选择左侧智能体'}
+                avatar={agentProfile?.avatar}
+                title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
+                subtitle={null}
               />
             </div>
           </div>

@@ -1351,6 +1351,30 @@ const AgentChat = () => {
     ],
   )
 
+  const handleEarlyChannel = useCallback(
+    (earlyMetadata) => {
+      // 头像上传成功后立即显示频道
+      const channel = buildChannelFromAgentCallback(earlyMetadata)
+      if (channel) {
+        // 使用 avatar_cid 来匹配，避免重复
+        const matchKey = earlyMetadata.avatar_cid || earlyMetadata.cid
+        setChannels((prev) => {
+          // 移除可能存在的相同 avatar_cid 的频道
+          const others = prev.filter((item) => {
+            const itemAvatarCid = item.meta?.avatar_cid
+            const itemCid = item.meta?.cid
+            return itemAvatarCid !== matchKey && itemCid !== matchKey && item.id !== channel.id
+          })
+          return [channel, ...others]
+        })
+        setActiveChannelId(channel.id)
+        setSelectedAgent(earlyMetadata)
+        console.log('[AgentChat] 早期频道已显示，等待完整创建...')
+      }
+    },
+    [buildChannelFromAgentCallback, setChannels, setActiveChannelId, setSelectedAgent],
+  )
+
   const handleCreateAgentSubmit = useCallback(
     async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity }) => {
       setChannelLoading(true)
@@ -1399,8 +1423,23 @@ const AgentChat = () => {
 
         const channel = buildChannelFromAgentCallback(metadata)
         if (channel) {
+          // 使用 avatar_cid 来匹配早期频道，避免重复
+          const matchKey = avatarCid || metadata.cid
           setChannels((prev) => {
-            const others = prev.filter((item) => item.id !== channel.id)
+            // 移除可能存在的相同 avatar_cid 或 cid 的频道（包括早期频道）
+            const others = prev.filter((item) => {
+              const itemAvatarCid = item.meta?.avatar_cid
+              const itemCid = item.meta?.cid
+              // 保留不同 avatar_cid 的频道，或者 ID 匹配的频道（更新而不是替换）
+              if (item.id === channel.id) {
+                return false // 移除相同 ID 的旧频道
+              }
+              // 如果是早期频道的临时标识符，也要移除
+              if (matchKey && (itemAvatarCid === matchKey || itemCid === matchKey || itemCid === `temp_${matchKey}`)) {
+                return false // 移除相同 avatar_cid 的早期频道
+              }
+              return true
+            })
             return [channel, ...others]
           })
           setActiveChannelId(channel.id)
@@ -1552,7 +1591,9 @@ const AgentChat = () => {
                 streamEvents={streamEvents}
                 streamStatus={streamStatus}
                 embedded
-                subtitle={selectedAgent ? selectedAgent.display_name || selectedAgent.name : '请选择左侧智能体'}
+                avatar={agentProfile?.avatar}
+                title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
+                subtitle={null}
               />
             </div>
           </div>
@@ -1595,6 +1636,7 @@ const AgentChat = () => {
         onClose={closeCreateAgentModal}
         onSubmit={handleCreateAgentSubmit}
         onResolve={resolveExistingAgentTarget}
+        onEarlyChannel={handleEarlyChannel}
         sessionId={sessionId}
       />
 

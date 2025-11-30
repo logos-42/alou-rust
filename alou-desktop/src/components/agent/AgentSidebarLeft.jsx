@@ -4,11 +4,14 @@ import SearchIcon from '@/assets/搜索.png'
 import CreateIcon from '@/assets/创建.png'
 import './AgentSidebarLeft.css'
 
-const formatDate = (timestamp) =>
-  new Date(timestamp).toLocaleDateString('zh-CN', {
+const formatDate = (timestamp) => {
+  // 如果时间戳是秒级（小于 10000000000），转换为毫秒级
+  const msTimestamp = timestamp < 10000000000 ? timestamp * 1000 : timestamp
+  return new Date(msTimestamp).toLocaleDateString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
   })
+}
 
 const AgentSidebarLeft = ({
   channels = [],

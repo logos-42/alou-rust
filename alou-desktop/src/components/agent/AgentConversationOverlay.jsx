@@ -3,6 +3,8 @@ import MessageList from '@/components/MessageList'
 import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
 import './AgentConversationOverlay.css'
 
+const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
+
 const AgentConversationOverlay = forwardRef(
   (
     {
@@ -20,6 +22,7 @@ const AgentConversationOverlay = forwardRef(
       subtitle,
       actions,
       emptyState,
+      avatar,
     },
     ref,
   ) => {
@@ -35,10 +38,15 @@ const AgentConversationOverlay = forwardRef(
       [],
     )
 
+    const avatarSrc = avatar || DEFAULT_AVATAR
+    const avatarAlt = typeof title === 'string' ? title : '智能体'
+
     const header = (
       <header>
         <div className="title">
-          <span className="emoji">💬</span>
+          <span className="agent-avatar">
+            <img src={avatarSrc} alt={avatarAlt} />
+          </span>
           <div className="title-text">
             <span>{title}</span>
             {subtitle && <small>{subtitle}</small>}

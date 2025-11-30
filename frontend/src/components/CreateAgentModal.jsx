@@ -14,7 +14,7 @@ const emptyPort = () => ({
 
 const MAX_PORTS = 6
 
-function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId }) {
+function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onEarlyChannel }) {
   const [name, setName] = useState('')
   const [roleDescription, setRoleDescription] = useState('Web3 多代理协调智能体')
   const [avatarFile, setAvatarFile] = useState(null)
@@ -114,6 +114,21 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId }) {
           const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
           avatarCid = uploaded?.cid || null
           console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
+          
+          // 头像上传成功后，立即显示频道
+          if (avatarCid && onEarlyChannel) {
+            const fallbackName = name.trim() || 'agent'
+            const earlyMetadata = {
+              display_name: fallbackName,
+              name: fallbackName,
+              role_description: roleDescription.trim() || 'Web3 多代理协调智能体',
+              avatar_cid: avatarCid,
+              agent_type: 'claude_agent_sdk',
+              status: 'loading', // 标记为加载中
+            }
+            console.log('[CreateAgentModal] 立即显示频道，头像CID:', avatarCid)
+            onEarlyChannel(earlyMetadata)
+          }
         } catch (err) {
           console.error('[CreateAgentModal] 头像上传失败:', err)
           setError(

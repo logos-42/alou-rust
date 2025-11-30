@@ -251,7 +251,7 @@ export class AgentService {
           console.log(
             `[AgentService] localStorage 中没有找到映射，尝试从 Workers 获取 sessionId: ${sessionIdOrIpnsName}`
           )
-          const response = await apiClient.post('/api/agent/diap/get-identity-by-session', {
+          const response = await apiClient.post('/agent/diap/get-identity-by-session', {
             session_id: sessionIdOrIpnsName,
           })
           if (response.data && response.data.identity) {
