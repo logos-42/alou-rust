@@ -212,7 +212,11 @@ const AgentSidebarLeft = ({
             }}
           >
             <div className="channel-icon" style={{ background: channel.color }}>
-              {channel.icon}
+              {channel.avatar ? (
+                <img src={channel.avatar} alt={channel.name} />
+              ) : (
+                channel.icon
+              )}
               <span className={`status-indicator ${channel.status}`} />
             </div>
             {!isCollapsed && (

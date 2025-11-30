@@ -1,10 +1,39 @@
 .diap-identity-panel {
-  background: var(--bg-color, #fff);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 8px;
-  padding: 16px;
+  --panel-bg: #06060a;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-text: #f4f4f7;
+  --panel-muted: rgba(255, 255, 255, 0.7);
+  --code-bg: rgba(255, 255, 255, 0.05);
+  --code-border: rgba(255, 255, 255, 0.08);
+  --button-bg: #2e2e34;
+  --button-border: rgba(255, 255, 255, 0.12);
+  --button-bg-hover: #3a3a41;
+  --button-border-hover: rgba(255, 255, 255, 0.25);
+  --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 18px;
   margin: 16px 0;
   max-width: 600px;
+  color: var(--panel-text);
+  box-shadow: var(--panel-shadow);
+  transition: background 0.2s, color 0.2s, border 0.2s;
+}
+
+.diap-identity-panel.light {
+  --panel-bg: #f9fafc;
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --panel-text: #22252d;
+  --panel-muted: rgba(0, 0, 0, 0.55);
+  --code-bg: rgba(0, 0, 0, 0.02);
+  --code-border: rgba(0, 0, 0, 0.05);
+  --button-bg: #f0f2f7;
+  --button-border: rgba(0, 0, 0, 0.08);
+  --button-bg-hover: #e4e7ef;
+  --button-border-hover: rgba(0, 0, 0, 0.18);
+  --panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.15);
 }
 
 .diap-panel-header {
@@ -13,31 +42,35 @@
   align-items: center;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  border-bottom: 1px solid var(--panel-border);
 }
 
 .diap-panel-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+  color: var(--panel-text);
 }
 
 .close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 16px;
   cursor: pointer;
-  color: var(--text-color, #666);
+  color: var(--panel-text);
   padding: 0;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background 0.2s, color 0.2s;
 }
 
 .close-btn:hover {
-  color: var(--text-color, #000);
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--panel-text);
 }
 
 .diap-panel-content {
@@ -52,11 +85,16 @@
 }
 
 .diap-error {
-  background: #fee;
-  border: 1px solid #fcc;
-  border-radius: 4px;
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.5);
+  border-radius: 6px;
   padding: 12px;
   margin-bottom: 16px;
+  color: #fecaca;
+}
+.diap-identity-panel.light .diap-error {
+  background: #fee;
+  border-color: #fcc;
   color: #c33;
 }
 
@@ -67,22 +105,23 @@
 
 .diap-no-identity p {
   margin-bottom: 16px;
-  color: var(--text-color-secondary, #666);
+  color: var(--panel-muted);
 }
 
 .create-identity-btn {
-  background: var(--primary-color, #007bff);
-  color: white;
-  border: none;
-  border-radius: 4px;
+  background: var(--button-bg);
+  color: var(--panel-text);
+  border: 1px solid var(--button-border);
+  border-radius: 8px;
   padding: 10px 20px;
   font-size: 14px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: border 0.2s, background 0.2s;
 }
 
 .create-identity-btn:hover:not(:disabled) {
-  background: var(--primary-color-hover, #0056b3);
+  background: var(--button-bg-hover);
+  border-color: var(--button-border-hover);
 }
 
 .create-identity-btn:disabled {
@@ -105,7 +144,7 @@
 .diap-field label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-color-secondary, #666);
+  color: var(--panel-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -118,28 +157,29 @@
 
 .diap-value code {
   flex: 1;
-  background: var(--code-bg, #f5f5f5);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 4px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
   padding: 8px 12px;
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 12px;
   word-break: break-all;
-  color: var(--text-color, #333);
+  color: var(--panel-text);
 }
 
 .copy-btn {
-  background: none;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
   padding: 4px 8px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  transition: background 0.2s, border 0.2s;
 }
 
 .copy-btn:hover {
-  background: var(--hover-bg, #f0f0f0);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .status-registered {
@@ -191,16 +231,16 @@
 }
 
 .register-info {
-  background: var(--info-bg, #e7f3ff);
-  border: 1px solid var(--info-border, #b3d9ff);
-  border-radius: 4px;
+  background: rgba(84, 120, 255, 0.1);
+  border: 1px solid rgba(84, 120, 255, 0.3);
+  border-radius: 8px;
   padding: 12px;
   margin-top: 8px;
 }
 
 .info-text {
   font-size: 12px;
-  color: var(--text-color-secondary, #666);
+  color: var(--panel-muted);
   margin: 4px 0;
 }
 
@@ -213,15 +253,46 @@
 
 .encoded-call code {
   flex: 1;
-  background: var(--code-bg, #f5f5f5);
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 4px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
   padding: 8px 12px;
   font-family: 'Monaco', 'Courier New', monospace;
   font-size: 11px;
   word-break: break-all;
-  color: var(--text-color, #333);
+  color: var(--panel-text);
   max-height: 100px;
   overflow-y: auto;
+}
+
+.diap-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  min-height: calc(2em + 4px);
+  display: flex;
+  align-items: center;
+  max-width: min(320px, 90vw);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: diap-toast-in 200ms ease-out;
+  z-index: 1000;
+}
+
+@keyframes diap-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 

@@ -157,7 +157,7 @@ const LoginView = () => {
         </div>
 
         <h1 className="title">连接钱包</h1>
-        <p className="subtitle">选择您的加密钱包以安全登录</p>
+        <p className="subtitle">选择您的加密钱包以安全登录（浏览器版）</p>
 
         {error && (
           <div className="error-message">
@@ -196,6 +196,24 @@ const LoginView = () => {
             </button>
           ))}
         </div>
+        {!hasMetaMask && (
+          <div className="browser-notice">
+            <p>⚠️ 未检测到 MetaMask 插件，请先安装 MetaMask 浏览器扩展</p>
+            <a
+              href="https://metamask.io/download/"
+              target="_blank"
+              rel="noreferrer"
+              className="install-link"
+            >
+              下载 MetaMask
+            </a>
+          </div>
+        )}
+        {hasMetaMask && (
+          <div className="browser-success">
+            <p>✅ 已检测到 MetaMask，点击上方按钮即可连接</p>
+          </div>
+        )}
 
         <div className="security-notice">
           <div className="notice-icon">🔒</div>

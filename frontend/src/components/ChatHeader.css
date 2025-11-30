@@ -118,6 +118,17 @@
   font-weight: 500;
 }
 
+/* Dark mode – use translucent dark button to match desktop */
+.app-shell.dark-mode .top-nav .login-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.app-shell.dark-mode .top-nav .login-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .top-nav .user-menu {
   position: relative;
 }

@@ -1038,7 +1038,11 @@ const AgentChat = () => {
     }
     setupChainListener()
     return () => {
-      walletService.removeListener('chainChanged', handleChainChanged).catch(console.error)
+      try {
+        walletService.removeListener('chainChanged', handleChainChanged)
+      } catch (error) {
+        console.warn('Failed to remove chain listener:', error)
+      }
     }
   }, [loadWalletOverview, preferredChain, recordInteraction, refreshWallet])
 

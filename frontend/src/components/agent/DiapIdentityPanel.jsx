@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react'
 import agentService from '@/services/agentService'
 import './DiapIdentityPanel.css'
 
-const DiapIdentityPanel = ({ sessionId, onClose }) => {
+const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
   const [identity, setIdentity] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [registering, setRegistering] = useState(false)
   const [error, setError] = useState(null)
   const [registerInfo, setRegisterInfo] = useState(null)
+  const [toastMessage, setToastMessage] = useState(null)
 
   useEffect(() => {
     if (sessionId) {
@@ -23,10 +24,20 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
       const response = await agentService.getDiapIdentity(sessionId)
       if (response.identity) {
         setIdentity(response.identity)
+      } else {
+        setIdentity(null)
       }
     } catch (err) {
       console.error('Failed to load DIAP identity:', err)
-      setError(err.message || '加载身份信息失败')
+      // Treat 400 (identity not created) as an empty state instead of an error
+      if (err?.response?.status === 400) {
+        setIdentity(null)
+        setError(null)
+      } else {
+        const message = err.message || '加载身份信息失败'
+        setError(message)
+        setToastMessage(message)
+      }
     } finally {
       setLoading(false)
     }
@@ -42,7 +53,9 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
       }
     } catch (err) {
       console.error('Failed to create DIAP identity:', err)
-      setError(err.message || '创建身份失败')
+      const message = err.message || '创建身份失败'
+      setError(message)
+      setToastMessage(message)
     } finally {
       setCreating(false)
     }
@@ -74,7 +87,9 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
       await loadIdentity()
     } catch (err) {
       console.error('Failed to register agent on-chain:', err)
-      setError(err.message || '注册到链上失败')
+      const message = err.message || '注册到链上失败'
+      setError(message)
+      setToastMessage(message)
     } finally {
       setRegistering(false)
     }
@@ -86,9 +101,17 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
     })
   }
 
+  useEffect(() => {
+    if (!toastMessage) {
+      return undefined
+    }
+    const timer = setTimeout(() => setToastMessage(null), 5000)
+    return () => clearTimeout(timer)
+  }, [toastMessage])
+
   if (loading) {
     return (
-      <div className="diap-identity-panel">
+      <div className={`diap-identity-panel ${isDarkMode ? 'dark' : 'light'}`}>
         <div className="diap-panel-header">
           <h3>DIAP 身份</h3>
           {onClose && (
@@ -103,7 +126,7 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
   }
 
   return (
-    <div className="diap-identity-panel">
+    <div className={`diap-identity-panel ${isDarkMode ? 'dark' : 'light'}`}>
       <div className="diap-panel-header">
         <h3>DIAP 身份</h3>
         {onClose && (
@@ -249,9 +272,13 @@ const DiapIdentityPanel = ({ sessionId, onClose }) => {
           </div>
         )}
       </div>
+      {toastMessage && (
+        <div className="diap-toast" role="status" aria-live="polite">
+          {toastMessage}
+        </div>
+      )}
     </div>
   )
 }
 
 export default DiapIdentityPanel
-
