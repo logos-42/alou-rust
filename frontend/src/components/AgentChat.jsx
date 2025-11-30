@@ -1607,13 +1607,13 @@ const AgentChat = () => {
       />
 
       <DiapPanelToggle
-            sessionId={activeChannelId}
+        sessionId={sessionId}
         isSidebarCollapsed={isSidebarCollapsed}
         isDarkMode={isDarkMode}
         showPanel={showDiapPanel}
         onToggle={() => setShowDiapPanel((prev) => !prev)}
         onClosePanel={() => setShowDiapPanel(false)}
-          />
+      />
 
       <button type="button" className="language-switch" onClick={toggleLanguage} title={languageLabel}>
         <img src={TranslationIcon} alt="翻译" className="language-icon" />

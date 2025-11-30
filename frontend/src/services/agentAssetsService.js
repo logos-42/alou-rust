@@ -1,5 +1,7 @@
-import { invoke } from '@tauri-apps/api/core'
-
+/**
+ * Agent Assets Service - 前端版本（使用 HTTP API）
+ * 前端版本不使用 Tauri，直接通过 IPFS HTTP API 上传文件
+ */
 const DEFAULT_GATEWAY =
   import.meta.env.VITE_IPFS_GATEWAY_URL?.replace(/\/$/, '') || 'https://ipfs.io'
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
@@ -42,7 +44,7 @@ export class AgentAssetsService {
       } catch (error) {
         lastError = error
         const errorMsg = error?.message || error?.toString() || ''
-        
+
         // 如果是 502 错误，等待后重试
         if (errorMsg.includes('502') || errorMsg.includes('Bad Gateway')) {
           if (i < maxRetries - 1) {
@@ -53,7 +55,7 @@ export class AgentAssetsService {
             continue
           }
         }
-        
+
         // 其他错误或重试次数用完，直接抛出
         throw error
       }
@@ -61,19 +63,55 @@ export class AgentAssetsService {
     throw lastError
   }
 
+  /**
+   * 上传文件到 IPFS（使用 HTTP API）
+   */
+  async uploadToIpfs(file, fileName, ipfsApiUrl = DEFAULT_IPFS_API) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${ipfsApiUrl}/api/v0/add`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`IPFS 上传失败: ${response.status} ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    return {
+      cid: result.Hash,
+      name: result.Name || fileName,
+      size: result.Size,
+    }
+  }
+
+  /**
+   * 上传 Base64 数据到 IPFS（使用 HTTP API）
+   */
+  async uploadBase64ToIpfs(dataBase64, fileName, ipfsApiUrl = DEFAULT_IPFS_API) {
+    // 将 Base64 转换为 Blob
+    const binaryString = atob(dataBase64)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    const blob = new Blob([bytes])
+    const file = new File([blob], fileName, { type: 'application/octet-stream' })
+
+    return this.uploadToIpfs(file, fileName, ipfsApiUrl)
+  }
+
   async uploadAvatar(file, options = {}) {
     if (!file) {
       return null
     }
-    const dataBase64 = await base64FromFile(file)
+    const ipfsApiUrl = options.ipfsApiUrl || DEFAULT_IPFS_API
     return this.withRetry(
       async () => {
-        const response = await invoke('ipfs_add_base64', {
-          dataBase64,
-          fileName: file.name,
-          ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
-        })
-        return response
+        const result = await this.uploadToIpfs(file, file.name, ipfsApiUrl)
+        return result
       },
       '上传头像',
       3,
@@ -86,14 +124,12 @@ export class AgentAssetsService {
       return null
     }
     const dataBase64 = encodeJson(mcpConfig)
+    const fileName = options.filename || 'mcp-config.json'
+    const ipfsApiUrl = options.ipfsApiUrl || DEFAULT_IPFS_API
     return this.withRetry(
       async () => {
-        const response = await invoke('ipfs_add_base64', {
-          dataBase64,
-          fileName: options.filename || 'mcp-config.json',
-          ipfsApiUrl: options.ipfsApiUrl || DEFAULT_IPFS_API,
-        })
-        return response
+        const result = await this.uploadBase64ToIpfs(dataBase64, fileName, ipfsApiUrl)
+        return result
       },
       '上传 MCP 配置',
       3,
@@ -109,4 +145,3 @@ export class AgentAssetsService {
 }
 
 export default new AgentAssetsService()
-
