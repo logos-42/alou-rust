@@ -1,4 +1,5 @@
 .app-shell {
+  /* 默认使用白色主题 */
   --primary-color: #6366f1;
   --primary-hover: #5855eb;
   --secondary-color: rgba(99, 102, 241, 0.12);
@@ -14,8 +15,8 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--background);
-  color: var(--text-primary);
+  background: #ffffff; /* 默认白色背景 */
+  color: #0f172a;
   transition:
     background 0.3s ease,
     color 0.3s ease;
@@ -23,24 +24,89 @@
   backdrop-filter: blur(24px);
 }
 
+/* 暗夜模式 - 纯黑色主题 */
 .app-shell.dark-mode {
-  --primary-color: #818cf8;
-  --primary-hover: #6366f1;
-  --secondary-color: rgba(129, 140, 248, 0.16);
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border-color: rgba(148, 163, 184, 0.2);
-  --background: #0f172a;
-  --surface: rgba(15, 23, 42, 0.78);
-  --shadow: 0 12px 32px rgba(2, 6, 23, 0.55);
+  --primary-color: #ffffff;
+  --primary-hover: #cccccc;
+  --secondary-color: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #aaaaaa;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --background: #000000; /* 纯黑色背景 */
+  --surface: rgba(255, 255, 255, 0.05);
+  --shadow: 0 12px 32px rgba(255, 255, 255, 0.05);
+  background: #000000; /* 纯黑色背景 */
+  color: #ffffff;
 }
 
 .workspace {
   position: relative;
   flex: 1;
+  height: 100%;
   display: grid;
   grid-template-columns: var(--left-column-width) 1fr;
+  grid-template-rows: 1fr;
   overflow: hidden;
+  min-height: 0;
+}
+
+.agent-center {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-height: 0;
+  padding: 1.5rem;
+}
+
+.conversation-stack {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.conversation-stack .agent-visual {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.3s ease,
+    opacity 0.3s ease;
+}
+
+.conversation-stack .conversation-shell {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(20px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.conversation-stack .conversation-shell > section {
+  height: 100%;
+  width: min(960px, 100%);
+  margin: 0 auto;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.conversation-stack.open .agent-visual {
+  transform: scale(0.9);
+  opacity: 0.3;
+}
+
+.conversation-stack.open .conversation-shell {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .language-switch {
@@ -50,31 +116,54 @@
   z-index: 40;
   border: none;
   border-radius: 999px;
-  padding: 0.45rem 1rem;
-  background: rgba(15, 23, 42, 0.88);
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
   cursor: pointer;
-  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.35);
+  box-shadow: 0 16px 30px rgba(255, 255, 255, 0.1);
   transition:
     background 0.2s ease,
     transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.language-switch .language-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* 浅色模式下图标显示为灰色 */
+.app-shell:not(.dark-mode) .language-switch {
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.1);
+}
+
+.app-shell:not(.dark-mode) .language-switch:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.app-shell:not(.dark-mode) .language-switch .language-icon {
+  filter: brightness(0) invert(0.4);
 }
 
 .language-switch:hover {
-  background: rgba(15, 23, 42, 1);
+  background: rgba(255, 255, 255, 0.2);
   transform: translateY(-2px);
 }
 
 .app-shell.dark-mode .language-switch {
-  background: rgba(99, 102, 241, 0.88);
-  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 30px rgba(255, 255, 255, 0.1);
 }
 
 .app-shell.dark-mode .language-switch:hover {
-  background: rgba(99, 102, 241, 1);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .app-shell.collapsed-left {

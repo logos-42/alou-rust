@@ -77,7 +77,8 @@ class DesktopWalletService {
           throw error
         }
 
-        this.walletConnectProvider = await EthereumProvider.init({
+        // WalletConnect 配置选项
+        const providerOptions = {
           projectId,
           chains: [1], // Ethereum Mainnet
           optionalChains: [5, 137, 80001], // Goerli, Polygon, Mumbai
@@ -88,6 +89,25 @@ class DesktopWalletService {
             url: window.location.origin, // 使用当前页面 URL 而不是硬编码
             icons: ['https://alou.app/icon.png'],
           },
+        }
+
+        // 在 Tauri 环境中，可能需要特殊处理 WebSocket 连接
+        console.log('[DesktopWalletService] Initializing WalletConnect with options:', {
+          projectId: projectId.substring(0, 10) + '...',
+          chains: providerOptions.chains,
+          url: providerOptions.metadata.url,
+        })
+
+        this.walletConnectProvider = await EthereumProvider.init(providerOptions)
+
+        // 监听连接错误
+        this.walletConnectProvider.on?.('disconnect', (error) => {
+          console.error('[DesktopWalletService] WalletConnect disconnected:', error)
+        })
+
+        // 监听会话过期
+        this.walletConnectProvider.on?.('session_delete', (event) => {
+          console.log('[DesktopWalletService] WalletConnect session deleted:', event)
         })
 
         return this.walletConnectProvider
@@ -127,7 +147,13 @@ class DesktopWalletService {
 
       // 监听断开连接
       this.walletConnectProvider.on('disconnect', () => {
+        console.log('[DesktopWalletService] WalletConnect disconnected')
         this.disconnect()
+      })
+
+      // 监听 session 变化
+      this.walletConnectProvider.on?.('session_update', (event) => {
+        console.log('[DesktopWalletService] Session updated:', event)
       })
 
       return {
@@ -150,33 +176,63 @@ class DesktopWalletService {
 
     // 如果已经有session，返回null（已连接）
     if (this.walletConnectProvider.session) {
+      console.log('[DesktopWalletService] Session already exists, skipping QR generation')
       return null
     }
 
+    // 如果URI已经存在，直接返回
+    if (this.walletConnectProvider.uri) {
+      console.log('[DesktopWalletService] URI already exists, returning existing URI')
+      return this.walletConnectProvider.uri
+    }
+
     return new Promise((resolve, reject) => {
+      let resolved = false
+      
       // 监听 URI 事件
       const uriHandler = (uri) => {
+        if (resolved) return
+        resolved = true
+        console.log('[DesktopWalletService] display_uri event received:', uri ? 'URI received' : 'null')
         this.walletConnectProvider.off('display_uri', uriHandler)
-        resolve(uri)
+        if (uri) {
+          resolve(uri)
+        } else {
+          reject(new Error('URI is empty'))
+        }
       }
 
       this.walletConnectProvider.on('display_uri', uriHandler)
 
-      // 触发enable以生成URI（如果尚未生成）
-      if (!this.walletConnectProvider.uri) {
-        this.walletConnectProvider.enable().catch((err) => {
+      // 触发enable以生成URI
+      console.log('[DesktopWalletService] Calling provider.enable() to generate QR URI...')
+      this.walletConnectProvider.enable().then(() => {
+        // enable() 成功后，URI 应该通过 display_uri 事件传递
+        // 但如果 URI 已经存在，直接返回
+        if (!resolved && this.walletConnectProvider.uri) {
+          resolved = true
+          console.log('[DesktopWalletService] URI available after enable()')
+          this.walletConnectProvider.off('display_uri', uriHandler)
+          resolve(this.walletConnectProvider.uri)
+        }
+      }).catch((err) => {
+        if (!resolved) {
+          resolved = true
+          console.error('[DesktopWalletService] enable() failed:', err)
           this.walletConnectProvider.off('display_uri', uriHandler)
           reject(err)
-        })
-      } else {
-        resolve(this.walletConnectProvider.uri)
-      }
+        }
+      })
 
-      // 超时处理
+      // 超时处理（增加到60秒，因为网络请求可能需要时间）
       setTimeout(() => {
-        this.walletConnectProvider.off('display_uri', uriHandler)
-        reject(new Error('QR code generation timeout'))
-      }, 30000)
+        if (!resolved) {
+          resolved = true
+          console.error('[DesktopWalletService] QR code generation timeout after 60s')
+          this.walletConnectProvider.off('display_uri', uriHandler)
+          reject(new Error('QR code generation timeout (60s)'))
+        }
+      }, 60000)
     })
   }
 
@@ -355,7 +411,21 @@ class DesktopWalletService {
    */
   async getAccounts() {
     if (!this.provider) {
-      return []
+      console.log('[DesktopWalletService] getAccounts: No provider available')
+      // 如果 WalletConnect provider 存在但 ethers provider 不存在，尝试创建
+      if (this.walletConnectProvider && this.walletType === 'walletconnect') {
+        try {
+          console.log('[DesktopWalletService] Creating provider from WalletConnect provider')
+          const { BrowserProvider } = await import('ethers')
+          this.provider = new BrowserProvider(this.walletConnectProvider)
+          console.log('[DesktopWalletService] Provider created successfully')
+        } catch (createError) {
+          console.error('[DesktopWalletService] Failed to create provider:', createError)
+          return []
+        }
+      } else {
+        return []
+      }
     }
 
     try {
@@ -363,11 +433,31 @@ class DesktopWalletService {
         return [this.localWallet.address]
       }
 
+      // 对于 WalletConnect，确保 session 存在
+      if (this.walletType === 'walletconnect' && this.walletConnectProvider) {
+        const hasSession = this.walletConnectProvider.session || 
+                          this.walletConnectProvider.client?.session
+        if (!hasSession) {
+          console.log('[DesktopWalletService] WalletConnect session not established yet')
+          return []
+        }
+      }
+
       const signer = await this.provider.getSigner()
       const address = await signer.getAddress()
+      console.log('[DesktopWalletService] getAccounts: Successfully got address:', address)
       return [address]
     } catch (error) {
-      console.error('Get accounts error:', error)
+      console.error('[DesktopWalletService] Get accounts error:', error)
+      // 提供更详细的错误信息
+      if (error.message) {
+        console.error('[DesktopWalletService] Error details:', error.message, {
+          providerExists: !!this.provider,
+          walletType: this.walletType,
+          hasWalletConnectProvider: !!this.walletConnectProvider,
+          hasSession: !!(this.walletConnectProvider?.session)
+        })
+      }
       return []
     }
   }

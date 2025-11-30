@@ -58,6 +58,17 @@ export class IpfsService {
         return { success: false, error: 'Failed to download Kubo binary' }
       }
       
+      // 检查是否是端口占用错误
+      if (errorMsg.includes('端口') && errorMsg.includes('5001') || errorMsg.includes('port') && errorMsg.includes('5001')) {
+        console.warn('IPFS 端口 5001 已被占用，将尝试使用现有的 IPFS 实例')
+        // 不返回错误，允许使用已存在的 IPFS 实例
+        return { 
+          success: true, 
+          message: '使用已存在的 IPFS 实例',
+          warning: '检测到另一个 IPFS 实例正在运行，将使用现有实例'
+        }
+      }
+      
       console.error('Failed to start IPFS node:', error)
       return { success: false, error: errorMsg }
     }

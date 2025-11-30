@@ -116,17 +116,40 @@
   z-index: 40;
   border: none;
   border-radius: 999px;
-  padding: 0.45rem 1rem;
+  padding: 0.5rem;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
   cursor: pointer;
   box-shadow: 0 16px 30px rgba(255, 255, 255, 0.1);
   transition:
     background 0.2s ease,
     transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.language-switch .language-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+/* 浅色模式下图标显示为灰色 */
+.app-shell:not(.dark-mode) .language-switch {
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.1);
+}
+
+.app-shell:not(.dark-mode) .language-switch:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.app-shell:not(.dark-mode) .language-switch .language-icon {
+  filter: brightness(0) invert(0.4);
 }
 
 .language-switch:hover {

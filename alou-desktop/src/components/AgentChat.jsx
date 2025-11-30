@@ -17,6 +17,7 @@ import DiapPanelToggle from '@/components/agent/DiapPanelToggle'
 import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
+import TranslationIcon from '@/assets/icon_翻译.png'
 import {
   ACTION_LABELS,
   API_BASE_URL,
@@ -1612,8 +1613,8 @@ const AgentChat = () => {
         onClosePanel={() => setShowDiapPanel(false)}
           />
 
-      <button type="button" className="language-switch" onClick={toggleLanguage}>
-        {languageLabel}
+      <button type="button" className="language-switch" onClick={toggleLanguage} title={languageLabel}>
+        <img src={TranslationIcon} alt="翻译" className="language-icon" />
       </button>
     </div>
   )

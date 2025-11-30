@@ -207,9 +207,26 @@ const LoginView = () => {
     }
   }, []) // 只在组件挂载时执行一次
 
-  const goBack = useCallback(() => {
-    navigate('/')
-  }, [navigate])
+  // 关闭窗口函数（桌面版关闭窗口，浏览器版返回首页）
+  const closeWindow = useCallback(async () => {
+    if (isDesktop) {
+      // 桌面版：关闭窗口
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window')
+        const appWindow = getCurrentWindow()
+        await appWindow.close()
+      } catch (error) {
+        console.error('Failed to close window:', error)
+        // 如果关闭失败，尝试导航回首页
+        navigate('/')
+      }
+    } else {
+      // 浏览器版：返回首页
+      navigate('/')
+    }
+  }, [isDesktop, navigate])
+
+  const goBack = closeWindow
 
   const connectMetaMask = useCallback(async () => {
     try {
@@ -344,15 +361,10 @@ const LoginView = () => {
     setError(err || '连接钱包失败')
   }, [])
 
-  const handleConnectionCancel = useCallback(() => {
-    // 桌面版取消时保持在 WalletConnect 模式（不返回选项列表）
-    // 浏览器版取消时清空连接模式
-    if (!isDesktop) {
-      setConnectionMode(null)
-    }
-    // 桌面版保持当前模式，不重置
-    setError('')
-  }, [isDesktop])
+  const handleConnectionCancel = useCallback(async () => {
+    // 取消时关闭窗口（和右上角关闭按钮共用功能）
+    await closeWindow()
+  }, [closeWindow])
 
   const handleNewWalletCreated = useCallback((walletData) => {
     setNewWalletData(walletData)
