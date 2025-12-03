@@ -222,7 +222,7 @@ const LoginView = () => {
       }
     } else {
       // 浏览器版：返回首页
-      navigate('/')
+    navigate('/')
     }
   }, [isDesktop, navigate])
 

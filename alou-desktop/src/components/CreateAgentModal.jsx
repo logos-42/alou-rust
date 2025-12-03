@@ -159,64 +159,64 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onE
       // 在后台继续加载 MCP 配置和 DIAP Identity
       void (async () => {
         try {
-          const filteredPorts = mcpPorts
-            .filter((port) => port.label.trim() || port.endpoint.trim())
-            .map((port) => ({
-              ...port,
-              port: port.port ? Number(port.port) : undefined,
-            }))
+      const filteredPorts = mcpPorts
+        .filter((port) => port.label.trim() || port.endpoint.trim())
+        .map((port) => ({
+          ...port,
+          port: port.port ? Number(port.port) : undefined,
+        }))
 
-          let mcpConfigCid = null
-          if (filteredPorts.length > 0) {
-            try {
+      let mcpConfigCid = null
+      if (filteredPorts.length > 0) {
+        try {
               console.log('[CreateAgentModal] 后台开始上传 MCP 配置...')
-              const uploadedConfig = await agentAssetsService.uploadMcpConfig(
-                {
-                  ports: filteredPorts,
-                  generatedAt: Date.now(),
-                },
-                { sessionId },
-              )
-              mcpConfigCid = uploadedConfig?.cid || null
-              console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
-            } catch (err) {
-              console.error('[CreateAgentModal] MCP 配置上传失败:', err)
+          const uploadedConfig = await agentAssetsService.uploadMcpConfig(
+            {
+              ports: filteredPorts,
+              generatedAt: Date.now(),
+            },
+            { sessionId },
+          )
+          mcpConfigCid = uploadedConfig?.cid || null
+          console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
+        } catch (err) {
+          console.error('[CreateAgentModal] MCP 配置上传失败:', err)
               // 不阻塞，只记录错误
-            }
-          }
+        }
+      }
 
-          let diapIdentity
-          try {
+      let diapIdentity
+      try {
             console.log('[CreateAgentModal] 后台开始创建 DIAP Identity...')
-            diapIdentity = await diapService.createLocalIdentity({
-              name: fallbackName,
-              description: roleDescription.trim(),
+        diapIdentity = await diapService.createLocalIdentity({
+          name: fallbackName,
+          description: roleDescription.trim(),
+        })
+        console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
+        
+        // 保存 sessionId → IPNS 映射到 localStorage
+        if (diapIdentity && sessionId && typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(
+            `diap_identity_${sessionId}`,
+            JSON.stringify({
+              ipns: diapIdentity.ipns,
+              did: diapIdentity.did,
+              cid: diapIdentity.cid,
+              created_at: Date.now()
             })
-            console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
-            
-            // 保存 sessionId → IPNS 映射到 localStorage
-            if (diapIdentity && sessionId && typeof window !== 'undefined' && window.localStorage) {
-              localStorage.setItem(
-                `diap_identity_${sessionId}`,
-                JSON.stringify({
-                  ipns: diapIdentity.ipns,
-                  did: diapIdentity.did,
-                  cid: diapIdentity.cid,
-                  created_at: Date.now()
-                })
-              )
-              console.log('[CreateAgentModal] 已保存 identity 映射到 localStorage')
-            }
+          )
+          console.log('[CreateAgentModal] 已保存 identity 映射到 localStorage')
+        }
             
             // 更新频道和智能体信息（通过重新调用 onSubmit 或更新现有频道）
-            await onSubmit({
-              name: fallbackName,
-              roleDescription: roleDescription.trim() || 'Web3 多代理协调智能体',
-              avatarCid,
-              mcpConfigCid,
-              mcpPorts: filteredPorts,
-              diapIdentity,
-            })
+      await onSubmit({
+        name: fallbackName,
+        roleDescription: roleDescription.trim() || 'Web3 多代理协调智能体',
+        avatarCid,
+        mcpConfigCid,
+        mcpPorts: filteredPorts,
+        diapIdentity,
+      })
           } catch (err) {
             console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
             // 不阻塞，只记录错误，但至少提交MCP配置
