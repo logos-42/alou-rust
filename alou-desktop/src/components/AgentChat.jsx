@@ -16,6 +16,7 @@ import AgentConversationOverlay from '@/components/agent/AgentConversationOverla
 import DiapPanelToggle from '@/components/agent/DiapPanelToggle'
 import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
+import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
@@ -26,6 +27,7 @@ import { useAgentDrag } from './AgentChat/useAgentDrag'
 import { useAgentMessages } from './AgentChat/useAgentMessages'
 import { useAgentWallet } from './AgentChat/useAgentWallet'
 import { useChannelManager } from './AgentChat/useChannelManager'
+import { useAgentInvite } from './AgentChat/useAgentInvite'
 
 // Utils & Constants
 import { resolveBackendChain, useToolCallHandler } from '@/hooks/useAgentChat'
@@ -122,7 +124,7 @@ const AgentChat = () => {
     connectionStatus,
     setConnectionStatus,
     connectionStatusLabel,
-    sessionId,
+      sessionId,
     setSessionId,
     isSessionReady,
     setSessionReady,
@@ -237,7 +239,24 @@ const AgentChat = () => {
     selectChannel,
     resolveExistingAgentTarget,
     saveAgentToStorage,
+    deleteChannel,
   } = channelManager
+
+  // ==================== 7. Invite State Hook ====================
+  const inviteState = useAgentInvite({
+    deleteChannel,
+    resolveExistingAgentTarget,
+    recordInteraction,
+  })
+
+  const {
+    isInviteModalOpen,
+    inviteTargetChannel,
+    handleInviteToChannel,
+    closeInviteModal,
+    handleDeleteChannel,
+    handleInviteSubmit,
+  } = inviteState
 
   // ==================== Stream Events ====================
   const handleStreamEvent = useCallback(
@@ -668,6 +687,8 @@ const AgentChat = () => {
           onRefresh={refreshChannels}
           onSelectChannel={selectChannel}
           onCreateChannel={createChannel}
+          onDeleteChannel={handleDeleteChannel}
+          onInviteToChannel={handleInviteToChannel}
           isCollapsed={isLeftSidebarCollapsed}
           onToggleCollapse={toggleLeftSidebar}
           selectedModelType={selectedModelType}
@@ -749,6 +770,14 @@ const AgentChat = () => {
         onResolve={resolveExistingAgentTarget}
         onEarlyChannel={handleEarlyChannel}
         sessionId={sessionId}
+      />
+
+      <InviteAgentModal
+        isOpen={isInviteModalOpen}
+        onClose={closeInviteModal}
+        targetChannel={inviteTargetChannel}
+        onInvite={handleInviteSubmit}
+        onResolve={resolveExistingAgentTarget}
       />
 
       <McpModal

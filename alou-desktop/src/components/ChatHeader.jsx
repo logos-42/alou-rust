@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import AlouLogo from '@/../src-tauri/icons/Square30x30Logo.png'
 import './ChatHeader.css'
 
 const statusTextMap = {
@@ -44,7 +45,7 @@ const ChatHeader = ({
     <nav className="top-nav">
       <div className="nav-content">
         <div className="logo-section">
-          <div className="logo">💖</div>
+          <img src={AlouLogo} alt="Alou" className="logo" />
           <h1 className="app-title">Alou</h1>
         </div>
 

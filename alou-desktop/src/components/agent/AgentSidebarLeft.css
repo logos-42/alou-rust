@@ -467,6 +467,77 @@
   color: var(--text-secondary);
 }
 
+/* Channel Actions - 删除和邀请按钮 */
+.sidebar-left .channel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-left .channel-item:hover .channel-actions {
+  opacity: 1;
+}
+
+.sidebar-left .channel-action-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.sidebar-left .channel-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-left .channel-action-btn.invite-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.sidebar-left .channel-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn.invite-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* Alou Logo 样式 */
+.sidebar-left .brand-icon.alou-logo {
+  width: 30px;
+  height: 30px;
+  filter: none;
+  opacity: 1;
+  border-radius: 6px;
+}
+
+.app-shell.dark-mode .sidebar-left .brand-icon.alou-logo {
+  filter: none;
+  opacity: 1;
+}
+
 .sidebar-left .status-indicator {
   position: absolute;
   right: 4px;
