@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import agentService from '@/services/agentService'
+import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
 import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from './agentUtils'
 
 export const useChannelManager = ({
@@ -22,6 +23,12 @@ export const useChannelManager = ({
 }) => {
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
+
+  // 本地持久化
+  const hasHydrated = useAgentStoreHydration()
+  const storedAgents = useAgentStore((state) => state.agents)
+  const addAgentToStore = useAgentStore((state) => state.addAgent)
+  const importAgentToStore = useAgentStore((state) => state.importAgent)
 
   const loadChannelList = useCallback(
     async (keyword = channelKeyword) => {
@@ -258,6 +265,21 @@ export const useChannelManager = ({
         })
         setActiveChannelId(channel.id)
         setSelectedAgent(agent)
+        
+        // 保存到本地存储
+        try {
+          const result = importAgentToStore({
+            ...agent,
+            sessionId,
+            id: agent.ipns || agent.cid || agent.did || parsedTarget,
+          })
+          if (result.isNew) {
+            console.log('[useChannelManager] 从网络导入新智能体到本地存储:', result.agent.id)
+          }
+        } catch (storeError) {
+          console.error('[useChannelManager] 导入智能体到本地存储失败:', storeError)
+        }
+        
         return channel
       } catch (error) {
         const message = extractErrorMessage(error)
@@ -269,6 +291,7 @@ export const useChannelManager = ({
       }
     },
     [
+      importAgentToStore,
       recordInteraction,
       sessionId,
       setActiveChannelId,
@@ -279,12 +302,67 @@ export const useChannelManager = ({
     ],
   )
 
+  // 从本地存储加载智能体到 channels（在 hydration 完成后）
+  useEffect(() => {
+    if (!hasHydrated || !isSessionReady) {
+      return
+    }
+
+    // 如果本地存储有智能体，加载到 channels
+    if (storedAgents && storedAgents.length > 0) {
+      console.log(`[useChannelManager] 从本地存储加载 ${storedAgents.length} 个智能体`)
+      
+      const localChannels = storedAgents
+        .map(agent => buildChannelFromAgent(agent))
+        .filter(Boolean)
+      
+      if (localChannels.length > 0) {
+        setChannels(prev => {
+          // 合并去重（本地存储的智能体添加到列表末尾）
+          const existingIds = new Set(prev.map(c => c.id))
+          const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
+          
+          if (newChannels.length > 0) {
+            console.log(`[useChannelManager] 合并 ${newChannels.length} 个本地智能体到频道列表`)
+            return [...prev, ...newChannels]
+          }
+          return prev
+        })
+        
+        // 如果没有活动频道，选择第一个本地智能体
+        if (!activeChannelId && localChannels.length > 0) {
+          setActiveChannelId(localChannels[0].id)
+          setSelectedAgent(localChannels[0].meta)
+        }
+      }
+    }
+  }, [hasHydrated, isSessionReady, storedAgents, activeChannelId, setChannels, setActiveChannelId, setSelectedAgent])
+
+  // 保存新创建的智能体到本地存储
+  const saveAgentToStorage = useCallback((agentMetadata) => {
+    try {
+      addAgentToStore({
+        ...agentMetadata,
+        sessionId,
+        id: agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}`,
+      })
+      console.log('[useChannelManager] 智能体已保存到本地存储:', agentMetadata.display_name || agentMetadata.name)
+      return true
+    } catch (error) {
+      console.error('[useChannelManager] 保存智能体到本地存储失败:', error)
+      return false
+    }
+  }, [addAgentToStore, sessionId])
+
   return {
     loadChannelList,
     refreshChannels,
     handleChannelKeywordChange,
     selectChannel,
     resolveExistingAgentTarget,
+    saveAgentToStorage,
+    hasHydrated,
+    storedAgents,
     channelRequestIdRef,
     searchDebounceRef,
   }

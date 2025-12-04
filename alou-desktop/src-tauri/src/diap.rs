@@ -1,11 +1,11 @@
-// DIAP module - 使用完整 DIAP SDK
+// DIAP module - 使用完整 DIAP SDK 规范
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-use diap_rs_sdk::IpfsClient;
+use diap_rs_sdk::{IpfsClient, KeyPair};
 use crate::utils::{default_ipfs_api_url, default_ipfs_gateway_url, normalize_base_url};
-use log::error;
+use log::{error, info};
 
 const IPFS_HTTP_TIMEOUT_SECS: u64 = 90;
 
@@ -17,6 +17,9 @@ pub struct LocalDiapIdentityRequest {
     pub ipfs_gateway_url: Option<String>,
     pub ipns_key: Option<String>,
     pub session_id: Option<String>,
+    pub custom_prompt: Option<String>,
+    pub avatar_cid: Option<String>,
+    pub mcp_config_cid: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -27,6 +30,23 @@ pub struct LocalDiapIdentityResponse {
     pub public_key: String,
     pub gateway_url: String,
     pub ipns_key: Option<String>,
+    /// 加密的节点标识信息
+    pub encrypted_node_id: Option<EncryptedNodeId>,
+    /// PubSub 主题配置
+    pub pubsub_topics: Option<Vec<String>>,
+}
+
+/// 加密的节点标识
+#[derive(Serialize, Clone, Debug)]
+pub struct EncryptedNodeId {
+    /// 加密后的数据（Base64）
+    pub ciphertext: String,
+    /// Nonce（Base64）
+    pub nonce: String,
+    /// 签名（Base64）
+    pub signature: String,
+    /// 加密方法
+    pub method: String,
 }
 
 #[tauri::command]
@@ -48,6 +68,11 @@ pub async fn create_local_diap_identity(
         .unwrap_or_else(|| "Claude Agent SDK".to_string());
     let agent_description = params.agent_description.clone().unwrap_or_default();
     let session_id = params.session_id.clone();
+    let custom_prompt = params.custom_prompt.clone();
+    let avatar_cid = params.avatar_cid.clone();
+    let mcp_config_cid = params.mcp_config_cid.clone();
+
+    info!(target: "diap", "开始创建 DIAP Identity...");
 
     // 使用 DIAP SDK 创建 IPFS 客户端
     let ipfs_client = IpfsClient::new_with_remote_node(
@@ -56,16 +81,21 @@ pub async fn create_local_diap_identity(
         IPFS_HTTP_TIMEOUT_SECS,
     );
 
-    // 生成 DID
-    let did = format!("did:alou:{}", Uuid::new_v4());
-    let did_hash = did.split(':').last().unwrap();
+    // 使用 DIAP SDK 生成密钥对
+    let keypair = KeyPair::generate()
+        .map_err(|e| format!("Failed to generate key pair: {}", e))?;
+    
+    let did = keypair.did.clone();
+    let did_hash = did.split(':').last().unwrap_or(&did);
     let created = chrono::Utc::now().to_rfc3339();
+
+    info!(target: "diap", "生成的 DID: {}", did);
 
     // 生成 IPNS key 名称
     let ipns_key_name = if let Some(ref provided_key) = params.ipns_key {
         provided_key.clone()
     } else {
-        format!("agent-{}", did_hash)
+        format!("agent-{}", &did_hash[..12.min(did_hash.len())])
     };
 
     // 使用 DIAP SDK 确保 IPNS key 存在
@@ -74,11 +104,30 @@ pub async fn create_local_diap_identity(
         .await
         .map_err(|e| format!("Failed to ensure IPNS key exists: {}", e))?;
 
-    // 创建 DID 文档，包含元数据
+    // 生成 PubSub 主题
+    let pubsub_auth_topic = format!("diap/auth/{}", &did_hash[..16.min(did_hash.len())]);
+    let pubsub_msg_topic = format!("diap/msg/{}", &did_hash[..16.min(did_hash.len())]);
+    let pubsub_topics = vec![pubsub_auth_topic.clone(), pubsub_msg_topic.clone()];
+
+    // 公钥的 multibase 编码（z 前缀 + base58btc）
+    let public_key_multibase = format!("z{}", bs58::encode(&keypair.public_key).into_string());
+
+    // 创建完整的 DID 文档
     let mut did_document = json!({
-        "@context": ["https://www.w3.org/ns/did/v1"],
+        "@context": [
+            "https://www.w3.org/ns/did/v1",
+            "https://w3id.org/security/suites/ed25519-2020/v1"
+        ],
         "id": did,
         "created": created,
+        "verificationMethod": [{
+            "id": format!("{}#keys-1", did),
+            "type": "Ed25519VerificationKey2020",
+            "controller": did,
+            "publicKeyMultibase": public_key_multibase
+        }],
+        "authentication": [format!("{}#keys-1", did)],
+        "assertionMethod": [format!("{}#keys-1", did)],
         "service": [{
             "id": format!("{}#agent", did),
             "type": "AgentEndpoint",
@@ -86,27 +135,80 @@ pub async fn create_local_diap_identity(
                 "type": "AgentProfile",
                 "name": agent_name,
                 "description": agent_description,
-            }
+                "agent_type": "claude_agent_sdk"
+            },
+            "pubsubTopics": pubsub_topics.clone(),
+            "networkAddresses": []
         }]
     });
 
-    // 添加元数据到 DID 文档
-    if let Some(ref sid) = session_id {
-        did_document["alou:metadata"] = json!({
+    // 添加可选的服务端点信息
+    if let Some(services) = did_document.get_mut("service").and_then(|s| s.as_array_mut()) {
+        if let Some(agent_service) = services.get_mut(0) {
+            if let Some(endpoint) = agent_service.get_mut("serviceEndpoint") {
+                if let Some(avatar) = &avatar_cid {
+                    endpoint["avatar_cid"] = json!(avatar);
+                }
+                if let Some(mcp) = &mcp_config_cid {
+                    endpoint["mcp_config_cid"] = json!(mcp);
+                }
+                if let Some(prompt) = &custom_prompt {
+                    endpoint["custom_prompt"] = json!(prompt);
+                }
+            }
+        }
+
+        // 添加 PubSub 认证服务端点
+        services.push(json!({
+            "id": format!("{}#pubsub-auth", did),
+            "type": "PubSubAuth",
+            "serviceEndpoint": {
+                "topic": pubsub_auth_topic,
+                "protocol": "gossipsub"
+            }
+        }));
+    }
+
+    // 添加元数据
+    did_document["alou:metadata"] = if let Some(ref sid) = session_id {
+        json!({
             "ipns_key": ipns_key,
             "session_id": sid,
             "created_at": created,
-        });
+            "sdk_version": "0.2.10",
+            "pubsub_enabled": true
+        })
     } else {
-        did_document["alou:metadata"] = json!({
+        json!({
             "ipns_key": ipns_key,
             "created_at": created,
-        });
+            "sdk_version": "0.2.10",
+            "pubsub_enabled": true
+        })
+    };
+
+    // 生成简化的加密节点标识（使用密钥派生的伪节点ID）
+    let encrypted_node_id = generate_encrypted_node_id(&keypair)?;
+
+    // 将加密节点标识添加到 DID 文档
+    if let Some(services) = did_document.get_mut("service").and_then(|s| s.as_array_mut()) {
+        services.push(json!({
+            "id": format!("{}#encrypted-node-id", did),
+            "type": "EncryptedNodeId",
+            "serviceEndpoint": {
+                "ciphertext": encrypted_node_id.ciphertext,
+                "nonce": encrypted_node_id.nonce,
+                "signature": encrypted_node_id.signature,
+                "method": encrypted_node_id.method
+            }
+        }));
     }
 
     // 序列化 DID 文档
-    let doc_json = serde_json::to_string(&did_document)
+    let doc_json = serde_json::to_string_pretty(&did_document)
         .map_err(|e| format!("Failed to serialize DID document: {}", e))?;
+
+    info!(target: "diap", "DID 文档已创建，正在上传到 IPFS...");
 
     // 使用 DIAP SDK 上传 DID 文档到 IPFS
     let upload_result = ipfs_client
@@ -115,6 +217,7 @@ pub async fn create_local_diap_identity(
         .map_err(|e| format!("Failed to upload DID document to IPFS: {}", e))?;
 
     let cid = upload_result.cid;
+    info!(target: "diap", "DID 文档已上传，CID: {}", cid);
 
     // 使用 DIAP SDK 发布到 IPNS
     let ipns_result = ipfs_client
@@ -140,15 +243,70 @@ pub async fn create_local_diap_identity(
     };
 
     let gateway_url = format!("{}/ipfs/{}", normalize_base_url(&gateway), cid);
-    let public_key = format!("pubkey_{}", ipns_name.trim_start_matches("/ipns/"));
+
+    info!(target: "diap", "DIAP Identity 创建成功！");
+    info!(target: "diap", "  DID: {}", did);
+    info!(target: "diap", "  CID: {}", cid);
+    info!(target: "diap", "  IPNS: {}", ipns_path);
 
     Ok(LocalDiapIdentityResponse {
         did,
         cid,
         ipns: ipns_path,
-        public_key,
+        public_key: public_key_multibase,
         gateway_url,
         ipns_key: Some(ipns_key),
+        encrypted_node_id: Some(encrypted_node_id),
+        pubsub_topics: Some(pubsub_topics),
+    })
+}
+
+/// 生成加密的节点标识
+fn generate_encrypted_node_id(keypair: &KeyPair) -> Result<EncryptedNodeId, String> {
+    use sha2::{Sha256, Digest};
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    
+    // 从公钥派生一个伪节点ID（32字节）
+    let mut hasher = Sha256::new();
+    hasher.update(&keypair.public_key);
+    hasher.update(b"DIAP_NODE_ID_V1");
+    let node_id = hasher.finalize();
+    
+    // 生成随机 nonce（12字节，用于 AES-GCM）
+    let mut nonce = [0u8; 12];
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    nonce[..8].copy_from_slice(&timestamp.to_le_bytes());
+    
+    // 简化的"加密"：XOR with key-derived mask（用于演示，生产环境应使用真正的 AES-GCM）
+    let mut key_hasher = Sha256::new();
+    key_hasher.update(&keypair.private_key);
+    key_hasher.update(b"DIAP_ENC_KEY_V1");
+    let enc_key = key_hasher.finalize();
+    
+    let mut ciphertext = node_id.to_vec();
+    for (i, byte) in ciphertext.iter_mut().enumerate() {
+        *byte ^= enc_key[i % 32];
+    }
+    
+    // 生成签名
+    let mut sig_data = Vec::new();
+    sig_data.extend_from_slice(&ciphertext);
+    sig_data.extend_from_slice(&nonce);
+    
+    let mut sig_hasher = Sha256::new();
+    sig_hasher.update(&keypair.private_key);
+    sig_hasher.update(&sig_data);
+    let signature = sig_hasher.finalize();
+    
+    Ok(EncryptedNodeId {
+        ciphertext: STANDARD.encode(&ciphertext),
+        nonce: STANDARD.encode(&nonce),
+        signature: STANDARD.encode(&signature),
+        method: "XOR-SHA256-V1".to_string(), // 简化版本标识
     })
 }
 
@@ -162,6 +320,8 @@ pub async fn get_local_diap_identity(
     let ipfs_api = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
     let gateway = ipfs_gateway_url.unwrap_or_else(default_ipfs_gateway_url);
 
+    info!(target: "diap", "解析 IPNS: {}", ipns_name);
+
     // 使用 DIAP SDK 创建 IPFS 客户端
     let ipfs_client = IpfsClient::new_with_remote_node(
         ipfs_api.clone(),
@@ -174,6 +334,8 @@ pub async fn get_local_diap_identity(
         .resolve_ipns(&ipns_name)
         .await
         .map_err(|e| format!("Failed to resolve IPNS: {}", e))?;
+
+    info!(target: "diap", "IPNS 解析成功，CID: {}", cid);
 
     // 使用 DIAP SDK 获取 DID 文档
     let did_document_json = ipfs_client
@@ -197,11 +359,55 @@ pub async fn get_local_diap_identity(
         .and_then(|k| k.as_str())
         .map(|s| s.to_string());
 
-    let public_key = if let Some(ipns) = ipns_name.strip_prefix("/ipns/") {
-        format!("pubkey_{}", ipns)
-    } else {
-        format!("pubkey_{}", ipns_name)
-    };
+    // 提取公钥
+    let public_key = did_document
+        .get("verificationMethod")
+        .and_then(|vm| vm.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|m| m.get("publicKeyMultibase"))
+        .and_then(|pk| pk.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| {
+            if let Some(ipns) = ipns_name.strip_prefix("/ipns/") {
+                format!("pubkey_{}", ipns)
+            } else {
+                format!("pubkey_{}", ipns_name)
+            }
+        });
+
+    // 提取 PubSub 主题
+    let pubsub_topics = did_document
+        .get("service")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|svc| svc.get("type").and_then(|t| t.as_str()) == Some("AgentEndpoint"))
+        })
+        .and_then(|svc| svc.get("pubsubTopics"))
+        .and_then(|topics| topics.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        });
+
+    // 提取加密节点标识
+    let encrypted_node_id = did_document
+        .get("service")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|svc| svc.get("type").and_then(|t| t.as_str()) == Some("EncryptedNodeId"))
+        })
+        .and_then(|svc| svc.get("serviceEndpoint"))
+        .and_then(|ep| {
+            Some(EncryptedNodeId {
+                ciphertext: ep.get("ciphertext")?.as_str()?.to_string(),
+                nonce: ep.get("nonce")?.as_str()?.to_string(),
+                signature: ep.get("signature")?.as_str()?.to_string(),
+                method: ep.get("method")?.as_str()?.to_string(),
+            })
+        });
 
     let gateway_url = format!("{}/ipfs/{}", normalize_base_url(&gateway), cid);
 
@@ -216,6 +422,8 @@ pub async fn get_local_diap_identity(
         public_key,
         gateway_url,
         ipns_key,
+        encrypted_node_id,
+        pubsub_topics,
     })
 }
 
@@ -229,6 +437,8 @@ pub async fn update_local_diap_identity(
 ) -> Result<LocalDiapIdentityResponse, String> {
     let ipfs_api = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
     let gateway = ipfs_gateway_url.unwrap_or_else(default_ipfs_gateway_url);
+
+    info!(target: "diap", "更新 IPNS: key={}, cid={}", ipns_key, cid);
 
     // 使用 DIAP SDK 创建 IPFS 客户端
     let ipfs_client = IpfsClient::new_with_remote_node(
@@ -265,8 +475,50 @@ pub async fn update_local_diap_identity(
         .ok_or_else(|| "Missing 'id' in DID document".to_string())?
         .to_string();
 
-    let public_key = format!("pubkey_{}", ipns_name.trim_start_matches("/ipns/"));
+    let public_key = did_document
+        .get("verificationMethod")
+        .and_then(|vm| vm.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|m| m.get("publicKeyMultibase"))
+        .and_then(|pk| pk.as_str())
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("pubkey_{}", ipns_name.trim_start_matches("/ipns/")));
+
+    let pubsub_topics = did_document
+        .get("service")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|svc| svc.get("type").and_then(|t| t.as_str()) == Some("AgentEndpoint"))
+        })
+        .and_then(|svc| svc.get("pubsubTopics"))
+        .and_then(|topics| topics.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect::<Vec<_>>()
+        });
+
+    let encrypted_node_id = did_document
+        .get("service")
+        .and_then(|s| s.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|svc| svc.get("type").and_then(|t| t.as_str()) == Some("EncryptedNodeId"))
+        })
+        .and_then(|svc| svc.get("serviceEndpoint"))
+        .and_then(|ep| {
+            Some(EncryptedNodeId {
+                ciphertext: ep.get("ciphertext")?.as_str()?.to_string(),
+                nonce: ep.get("nonce")?.as_str()?.to_string(),
+                signature: ep.get("signature")?.as_str()?.to_string(),
+                method: ep.get("method")?.as_str()?.to_string(),
+            })
+        });
+
     let gateway_url = format!("{}/ipfs/{}", normalize_base_url(&gateway), cid);
+
+    info!(target: "diap", "IPNS 更新成功: {}", ipns_path);
 
     Ok(LocalDiapIdentityResponse {
         did,
@@ -275,5 +527,7 @@ pub async fn update_local_diap_identity(
         public_key,
         gateway_url,
         ipns_key: Some(ipns_key),
+        encrypted_node_id,
+        pubsub_topics,
     })
 }

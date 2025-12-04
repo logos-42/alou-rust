@@ -39,6 +39,7 @@ uuid = { version = "1.7", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 diap-rs-sdk = { version = "0.2.10", default-features = false, features = ["embedded-noir"] }
 log = "0.4"
+bs58 = "0.5"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem

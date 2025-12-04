@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import agentAssetsService from '@/services/agentAssetsService'
+import agentService from '@/services/agentService'
 import diapService from '@/services/diapService'
 import ipfsService from '@/services/ipfsService'
 import './CreateAgentModal.css'
@@ -14,7 +15,7 @@ const emptyPort = () => ({
 
 const MAX_PORTS = 6
 
-function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onEarlyChannel }) {
+function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent, sessionId, onEarlyChannel }) {
   const [name, setName] = useState('')
   const [roleDescription, setRoleDescription] = useState('Web3 多代理协调智能体')
   const [avatarFile, setAvatarFile] = useState(null)
@@ -23,6 +24,9 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onE
   const [existingAgentTarget, setExistingAgentTarget] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  // 解析预览状态
+  const [resolvedAgent, setResolvedAgent] = useState(null)
+  const [showImportConfirm, setShowImportConfirm] = useState(false)
 
   const canAddMorePorts = useMemo(() => mcpPorts.length < MAX_PORTS, [mcpPorts])
 
@@ -249,14 +253,67 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onE
       return
     }
     setError(null)
+    setResolvedAgent(null)
+    setShowImportConfirm(false)
     setIsLoading(true)
+    
     try {
-      await onResolve(target)
-      setIsLoading(false)
+      // 使用 agentService 从网络加载智能体
+      console.log('[CreateAgentModal] 开始解析智能体:', target)
+      const result = await agentService.loadAgentFromNetwork(target)
+      
+      if (result.success && result.agent) {
+        console.log('[CreateAgentModal] 解析成功:', result.agent)
+        setResolvedAgent(result.agent)
+        setShowImportConfirm(true)
+        setIsLoading(false)
+      } else {
+        // 降级到原有的 onResolve 方法
+        if (onResolve) {
+          await onResolve(target)
+        }
+        setIsLoading(false)
+        if (!result.success) {
+          setError(result.error || '解析失败，请检查标识是否正确')
+        }
+      }
     } catch (err) {
+      console.error('[CreateAgentModal] 解析失败:', err)
       setIsLoading(false)
-      setError(err?.message || '解析失败')
+      setError(err?.message || '解析失败，请检查标识是否正确')
     }
+  }
+
+  const handleConfirmImport = async () => {
+    if (!resolvedAgent) return
+    
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      console.log('[CreateAgentModal] 确认导入智能体:', resolvedAgent)
+      
+      // 调用父组件的导入方法
+      if (onImportAgent) {
+        await onImportAgent(resolvedAgent)
+      }
+      
+      // 清理状态并关闭
+      setResolvedAgent(null)
+      setShowImportConfirm(false)
+      setExistingAgentTarget('')
+      setIsLoading(false)
+      onClose()
+    } catch (err) {
+      console.error('[CreateAgentModal] 导入失败:', err)
+      setError(err?.message || '导入失败')
+      setIsLoading(false)
+    }
+  }
+
+  const handleCancelImport = () => {
+    setResolvedAgent(null)
+    setShowImportConfirm(false)
   }
 
   return (
@@ -360,12 +417,66 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, sessionId, onE
                 placeholder="输入 IPNS / CID / DID"
                 value={existingAgentTarget}
                 onChange={(event) => setExistingAgentTarget(event.target.value)}
+                disabled={showImportConfirm}
               />
-              <button type="button" onClick={handleResolveExisting}>
-                解析
+              <button type="button" onClick={handleResolveExisting} disabled={showImportConfirm || isLoading}>
+                {isLoading && !showImportConfirm ? '解析中...' : '解析'}
               </button>
             </div>
           </div>
+
+          {/* 导入确认预览 */}
+          {showImportConfirm && resolvedAgent && (
+            <div className="agent-modal__import-preview">
+              <div className="agent-modal__import-preview-header">
+                <span>🔍 解析成功，确认导入以下智能体？</span>
+              </div>
+              <div className="agent-modal__import-preview-content">
+                <div className="agent-modal__import-preview-row">
+                  <strong>名称：</strong>
+                  <span>{resolvedAgent.name || resolvedAgent.display_name || '未命名智能体'}</span>
+                </div>
+                {resolvedAgent.role_description && (
+                  <div className="agent-modal__import-preview-row">
+                    <strong>描述：</strong>
+                    <span>{resolvedAgent.role_description}</span>
+                  </div>
+                )}
+                {resolvedAgent.did && (
+                  <div className="agent-modal__import-preview-row">
+                    <strong>DID：</strong>
+                    <span className="agent-modal__import-preview-mono">{resolvedAgent.did}</span>
+                  </div>
+                )}
+                {resolvedAgent.ipns && (
+                  <div className="agent-modal__import-preview-row">
+                    <strong>IPNS：</strong>
+                    <span className="agent-modal__import-preview-mono">{resolvedAgent.ipns}</span>
+                  </div>
+                )}
+                {resolvedAgent.cid && (
+                  <div className="agent-modal__import-preview-row">
+                    <strong>CID：</strong>
+                    <span className="agent-modal__import-preview-mono">{resolvedAgent.cid}</span>
+                  </div>
+                )}
+                {resolvedAgent.pubsub_topics && resolvedAgent.pubsub_topics.length > 0 && (
+                  <div className="agent-modal__import-preview-row">
+                    <strong>PubSub：</strong>
+                    <span>{resolvedAgent.pubsub_topics.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+              <div className="agent-modal__import-preview-actions">
+                <button type="button" className="ghost" onClick={handleCancelImport} disabled={isLoading}>
+                  取消
+                </button>
+                <button type="button" onClick={handleConfirmImport} disabled={isLoading}>
+                  {isLoading ? '导入中...' : '确认导入'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && <div className="agent-modal__error">{error}</div>}
 

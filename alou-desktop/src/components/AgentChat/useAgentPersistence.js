@@ -1,5 +1,5 @@
-import { useCallback, useEffect } from 'react'
-import useAgentStore from '@/stores/agentStore'
+import { useCallback, useEffect, useState } from 'react'
+import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
 import { buildChannelFromAgent } from './agentUtils'
 
 /**
@@ -7,20 +7,28 @@ import { buildChannelFromAgent } from './agentUtils'
  * 处理智能体的本地持久化，与 agentStore 集成
  */
 export const useAgentPersistence = ({ sessionId, channels, setChannels }) => {
+  // Hydration 状态
+  const hasHydrated = useAgentStoreHydration()
+  const [isReady, setIsReady] = useState(false)
+  
   // Agent Store hooks
-  const agentStoreInit = useAgentStore((state) => state.init)
   const addAgentToStore = useAgentStore((state) => state.addAgent)
   const getAgentFromStore = useAgentStore((state) => state.getAgent)
+  const getAgentByTarget = useAgentStore((state) => state.getAgentByTarget)
+  const importAgentToStore = useAgentStore((state) => state.importAgent)
   const storedAgents = useAgentStore((state) => state.agents)
 
-  // 初始化：从localStorage加载已保存的智能体
+  // 等待 hydration 完成
   useEffect(() => {
-    agentStoreInit()
-  }, [agentStoreInit])
+    if (hasHydrated) {
+      console.log(`[useAgentPersistence] Store hydration 完成，已加载 ${storedAgents.length} 个智能体`)
+      setIsReady(true)
+    }
+  }, [hasHydrated, storedAgents.length])
 
   // 从本地存储加载智能体到channels
   const loadStoredAgents = useCallback(() => {
-    if (!storedAgents || storedAgents.length === 0) {
+    if (!isReady || !storedAgents || storedAgents.length === 0) {
       return []
     }
 
@@ -29,7 +37,7 @@ export const useAgentPersistence = ({ sessionId, channels, setChannels }) => {
       .filter(Boolean)
     
     return localChannels
-  }, [storedAgents])
+  }, [storedAgents, isReady])
 
   // 合并后端和本地存储的智能体
   const mergeAgentsWithStorage = useCallback((backendChannels = []) => {
@@ -76,12 +84,37 @@ export const useAgentPersistence = ({ sessionId, channels, setChannels }) => {
     return getAgentFromStore(idOrSessionId)
   }, [getAgentFromStore])
 
+  // 从网络导入智能体（IPFS/IPNS 解析后添加到本地）
+  const importAgentFromNetwork = useCallback((agentData) => {
+    try {
+      const result = importAgentToStore(agentData)
+      
+      if (result.isNew) {
+        console.log('[useAgentPersistence] 从网络导入新智能体:', result.agent.id)
+      } else {
+        console.log('[useAgentPersistence] 智能体已存在:', result.agent.id)
+      }
+      
+      return result
+    } catch (error) {
+      console.error('[useAgentPersistence] 从网络导入智能体失败:', error)
+      return { agent: null, isNew: false, error }
+    }
+  }, [importAgentToStore])
+
+  // 检查智能体是否已存在于本地
+  const isAgentStored = useCallback((target) => {
+    return getAgentByTarget(target) !== null
+  }, [getAgentByTarget])
+
   return {
+    isReady,
     storedAgents,
     loadStoredAgents,
     mergeAgentsWithStorage,
     saveAgentToStorage,
     getStoredAgent,
+    importAgentFromNetwork,
+    isAgentStored,
   }
 }
-

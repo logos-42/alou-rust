@@ -3,6 +3,13 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tauri::{State, Manager};
 
+// Windows 平台特定配置 - 用于隐藏终端窗口
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 use crate::ipfs_api::test_ipfs_api_ready;
 use crate::kubo::{binary_name, ensure_kubo_binary};
 use crate::utils::app_data_dir;
@@ -62,10 +69,15 @@ pub async fn get_ipfs_info(
         ipfs_state.data_dir.clone()
     };
 
-    let output = Command::new(&kubo_bin)
-        .arg("id")
-        .env("IPFS_PATH", &data_dir)
-        .output()
+    let mut cmd = Command::new(&kubo_bin);
+    cmd.arg("id")
+        .env("IPFS_PATH", &data_dir);
+    
+    // Windows: 隐藏终端窗口
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let output = cmd.output()
         .map_err(|e| format!("Failed to get IPFS info: {}", e))?;
 
     if !output.status.success() {
@@ -183,11 +195,16 @@ pub async fn launch_ipfs_node(
     // Initialize IPFS if not already initialized
     let repo_config = data_dir.join("config");
     if !repo_config.exists() {
-        let init_output = Command::new(&kubo_bin)
-            .arg("init")
+        let mut init_cmd = Command::new(&kubo_bin);
+        init_cmd.arg("init")
             .arg("--profile=server")
-            .env("IPFS_PATH", &data_dir)
-            .output()
+            .env("IPFS_PATH", &data_dir);
+        
+        // Windows: 隐藏初始化命令的终端窗口
+        #[cfg(target_os = "windows")]
+        init_cmd.creation_flags(CREATE_NO_WINDOW);
+        
+        let init_output = init_cmd.output()
             .map_err(|e| format!("Failed to initialize IPFS: {}", e))?;
 
         if !init_output.status.success() {
@@ -199,12 +216,17 @@ pub async fn launch_ipfs_node(
     }
 
     // Start IPFS daemon
-    let child = Command::new(&kubo_bin)
-        .arg("daemon")
+    let mut cmd = Command::new(&kubo_bin);
+    cmd.arg("daemon")
         .env("IPFS_PATH", &data_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    
+    // Windows: 隐藏终端窗口，使 Kubo 完全在后台运行
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    
+    let child = cmd.spawn()
         .map_err(|e| format!("Failed to start IPFS daemon: {}", e))?;
 
     ipfs_state.process = Some(child);

@@ -1,14 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
-import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
 import agentService from '@/services/agentService'
 import { MCP_UI_TARGETS } from '@/services/mcpUiService'
 import { useAgentStream } from '@/hooks/useAgentStream'
-import { resolveBackendChain, useToolCallHandler } from '@/hooks/useAgentChat'
 
-// UI Components
+// Components
 import ChatHeader from '@/components/ChatHeader'
 import AgentSidebarLeft from '@/components/agent/AgentSidebarLeft'
 import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
@@ -21,47 +19,54 @@ import CreateAgentModal from '@/components/CreateAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
-// Custom Hooks
-import { useAgentConnection } from './AgentChat/useAgentConnection'
-import { useAgentWallet } from './AgentChat/useAgentWallet'
-import { useAgentMessages } from './AgentChat/useAgentMessages'
-import { useAgentDrag } from './AgentChat/useAgentDrag'
+// Hooks
 import { useAgentUI } from './AgentChat/useAgentUI'
+import { useAgentConnection } from './AgentChat/useAgentConnection'
+import { useAgentDrag } from './AgentChat/useAgentDrag'
+import { useAgentMessages } from './AgentChat/useAgentMessages'
+import { useAgentWallet } from './AgentChat/useAgentWallet'
 import { useChannelManager } from './AgentChat/useChannelManager'
-import { buildChannelFromAgent, computeAgentProfile, extractErrorMessage } from './AgentChat/agentUtils'
 
+// Utils & Constants
+import { resolveBackendChain, useToolCallHandler } from '@/hooks/useAgentChat'
+import { computeAgentProfile, buildChannelFromAgent } from './AgentChat/agentUtils'
 import './AgentChat/index.css'
 
+/**
+ * AgentChat - 主智能体聊天组件
+ * 
+ * 通过组合多个专用 hooks 来管理不同的功能域：
+ * - useAgentUI: UI 状态（暗黑模式、侧边栏、交互日志等）
+ * - useAgentConnection: 连接状态和会话管理
+ * - useAgentDrag: 智能体节点拖拽
+ * - useAgentMessages: 消息和对话管理
+ * - useAgentWallet: 钱包状态和交易
+ * - useChannelManager: 频道列表和智能体选择
+ */
 const AgentChat = () => {
   const navigate = useNavigate()
 
-  // Auth Store
+  // ==================== Auth Store ====================
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const logout = useAuthStore((state) => state.logout)
   const userNameGetter = useAuthStore((state) => state.userName)
   const userName = useMemo(() => userNameGetter?.() ?? 'User', [userNameGetter])
 
-  // Agent Store for persistence
-  const addAgentToStore = useAgentStore((state) => state.addAgent)
-  const storedAgents = useAgentStore((state) => state.agents)
-
-  // i18n
+  // ==================== i18n ====================
   const { t, initLanguage, setLanguage, currentLanguage } = useI18n()
   const languageLabel = useMemo(
     () => (currentLanguage === 'zh' ? '中 / EN' : 'EN / 中'),
     [currentLanguage],
   )
 
-  // Refs
+  // ==================== Refs ====================
   const canvasRef = useRef(null)
   const conversationOverlayRef = useRef(null)
   const consoleDockRef = useRef(null)
 
-  // Chain State (shared between hooks)
+  // ==================== Shared State ====================
+  // 这些状态需要在多个 hooks 之间共享，所以保留在父组件
   const [preferredChain, setPreferredChain] = useState(null)
-  const [transactions, setTransactions] = useState([])
-
-  // Channel State (shared)
   const [channelKeyword, setChannelKeyword] = useState('')
   const [channels, setChannels] = useState([])
   const [activeChannelId, setActiveChannelId] = useState(null)
@@ -71,80 +76,144 @@ const AgentChat = () => {
   const [selectedModelType, setSelectedModelType] = useState(null)
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
 
-  // ============================================
-  // Custom Hooks
-  // ============================================
-
-  // 1. UI State Hook
+  // ==================== 1. UI State Hook ====================
   const uiState = useAgentUI({
-    sessionId: null,
+    sessionId: null, // 会在 connection 建立后更新
     viewportWidth: typeof window !== 'undefined' ? window.innerWidth : 1440,
   })
 
-  // 2. Connection State Hook
+  const {
+    isDarkMode,
+    isSidebarCollapsed,
+    isLeftSidebarCollapsed,
+    isInteractionCollapsed,
+    isConversationVisible,
+    setConversationVisible,
+    viewportWidth,
+    interactionLogs,
+    uiResource,
+    isUiModalOpen,
+    showDiapPanel,
+    setShowDiapPanel,
+    contextEventsRef,
+    recordInteraction,
+    openUiResource,
+    fetchAndOpenUiResource,
+    closeUiResource,
+    handleUiAction,
+    toggleSidebar,
+    toggleInteractionPanel,
+    toggleDarkMode,
+    toggleLeftSidebar,
+    openConversationPanel,
+    closeConversationPanel,
+    handleResize,
+    consoleDockStyle,
+  } = uiState
+
+  // ==================== 2. Connection State Hook ====================
   const connectionState = useAgentConnection({
     activeChain: preferredChain,
     preferredChain,
     setPreferredChain,
   })
 
-  // Compute active chain
-  const activeChain = useMemo(
-    () => resolveBackendChain({ chain: preferredChain }) || preferredChain,
-    [preferredChain],
-  )
+  const {
+    connectionStatus,
+    setConnectionStatus,
+    connectionStatusLabel,
+    sessionId,
+    setSessionId,
+    isSessionReady,
+    setSessionReady,
+    checkConnection,
+    createSession,
+  } = connectionState
 
-  // 3. Drag State Hook
+  // ==================== 3. Drag State Hook ====================
   const dragState = useAgentDrag({
     canvasRef,
-    recordInteraction: uiState.recordInteraction,
-    openConversationPanel: uiState.openConversationPanel,
+    recordInteraction,
+    openConversationPanel,
   })
 
-  // 4. Message State Hook
+  const {
+    agentPosition,
+    clampPosition,
+    startDrag,
+    onDrag,
+    stopDrag,
+    handleGlobalPointerUp,
+    handleAgentActivate,
+  } = dragState
+
+  // ==================== 4. Wallet State Hook ====================
+  // 注意：需要先定义 walletState，因为 messageState 的 handleToolCalls 需要它
+  const walletState = useAgentWallet({
+    sessionId,
+    activeChain: preferredChain,
+    preferredChain,
+    setPreferredChain,
+    recordInteraction,
+    appendMessage: null, // 会通过 handleToolCalls 传递
+    scrollToBottom: null, // 会通过 handleToolCalls 传递
+    setTransactions: undefined,
+  })
+
+  const {
+    walletSnapshot,
+    userWalletInfo,
+    transactions,
+    sidebarWallet,
+    refreshWallet,
+    loadWalletOverview,
+    handleTransactionBuild,
+    handleTransactionBroadcast,
+  } = walletState
+
+  // ==================== 5. Message State Hook ====================
   const messageState = useAgentMessages({
-    sessionId: connectionState.sessionId,
-    isSessionReady: connectionState.isSessionReady,
-    createSession: connectionState.createSession,
-    setSessionReady: connectionState.setSessionReady,
-    activeChain,
-    recordInteraction: uiState.recordInteraction,
+    sessionId,
+    setSessionId,
+    activeChain: preferredChain,
+    isSessionReady,
+    createSession,
+    setSessionReady,
+    recordInteraction,
     handleToolCalls: useCallback((toolCalls) => {
-      // Will be set up after walletState is defined
+      // 工具调用处理会在下面定义
     }, []),
     conversationOverlayRef,
     consoleDockRef,
-    isConversationVisible: uiState.isConversationVisible,
-    setConversationVisible: uiState.setConversationVisible,
+    contextEventsRef,
   })
 
-  // 5. Wallet State Hook
-  const walletState = useAgentWallet({
-    sessionId: connectionState.sessionId,
-    activeChain,
-    preferredChain,
-    setPreferredChain,
-    recordInteraction: uiState.recordInteraction,
-    appendMessage: messageState.appendMessage,
-    scrollToBottom: messageState.scrollToBottom,
-    setTransactions,
-  })
+  const {
+    messages,
+    currentMessage,
+    setCurrentMessage,
+    isLoading,
+    setIsLoading,
+    appendMessage,
+    scrollToBottom,
+    sendMessage: baseSendMessage,
+  } = messageState
 
-  // Tool call handler
+  // ==================== Tool Call Handler ====================
   const handleToolCalls = useToolCallHandler({
-    handleTransactionBuild: walletState.handleTransactionBuild,
-    handleTransactionBroadcast: walletState.handleTransactionBroadcast,
-    refreshWallet: walletState.refreshWallet,
-    recordInteraction: uiState.recordInteraction,
-    appendMessage: messageState.appendMessage,
-    scrollToBottom: messageState.scrollToBottom,
-    openUiResource: uiState.openUiResource,
+    handleTransactionBuild,
+    handleTransactionBroadcast,
+    refreshWallet,
+    recordInteraction,
+    appendMessage,
+    scrollToBottom,
+    openUiResource,
   })
 
-  // 6. Channel Manager Hook
+  // ==================== 6. Channel Manager Hook ====================
   const channelManager = useChannelManager({
-    sessionId: connectionState.sessionId,
-    isSessionReady: connectionState.isSessionReady,
+    sessionId,
+    isSessionReady,
     channelKeyword,
     setChannelKeyword,
     channels,
@@ -157,21 +226,81 @@ const AgentChat = () => {
     setChannelLoading,
     channelError,
     setChannelError,
-    recordInteraction: uiState.recordInteraction,
-    openConversationPanel: uiState.openConversationPanel,
+    recordInteraction,
+    openConversationPanel,
   })
 
-  // ============================================
-  // Computed Values
-  // ============================================
+  const {
+    loadChannelList,
+    refreshChannels,
+    handleChannelKeywordChange,
+    selectChannel,
+    resolveExistingAgentTarget,
+    saveAgentToStorage,
+  } = channelManager
 
+  // ==================== Stream Events ====================
+  const handleStreamEvent = useCallback(
+    (event) => {
+      if (!event) return
+
+      recordInteraction(
+        'stream_event',
+        { event: event.event, payload: event.payload },
+        event.label,
+      )
+
+      if (event.isFinal && event.timestamp) {
+        if (Array.isArray(event.payload?.tool_calls)) {
+          const uiCall = event.payload.tool_calls.find((call) => {
+            const result = call?.result
+            if (!result) return false
+            if (Array.isArray(result.resources) && result.resources.length > 0) return true
+            return Boolean(result.resource || result.uri)
+          })
+
+          if (uiCall?.result) {
+            const result = uiCall.result
+            if (Array.isArray(result.resources) && result.resources.length > 0) {
+              openUiResource(result.resources[0], { source: 'stream_final', toolCall: uiCall.name })
+            } else if (result.resource) {
+              openUiResource(result.resource, { source: 'stream_final', toolCall: uiCall.name })
+            } else if (result.uri) {
+              openUiResource(result, { source: 'stream_final', toolCall: uiCall.name })
+            }
+          }
+        }
+      }
+    },
+    [openUiResource, recordInteraction],
+  )
+
+  const { status: streamStatus, events: streamEvents } = useAgentStream(sessionId, {
+    enabled: isSessionReady,
+    onEvent: handleStreamEvent,
+  })
+
+  // 同步 stream 状态到连接状态
+  useEffect(() => {
+    if (streamStatus === 'error') {
+      setConnectionStatus('error')
+    } else if (streamStatus === 'active' || streamStatus === 'completed') {
+      setConnectionStatus('connected')
+    } else if (streamStatus === 'polling') {
+      setConnectionStatus('connecting')
+    } else {
+      setConnectionStatus('disconnected')
+    }
+  }, [streamStatus, setConnectionStatus])
+
+  // ==================== Computed Values ====================
   const agentProfile = useMemo(() => computeAgentProfile(selectedAgent), [selectedAgent])
 
   const agentStyle = useMemo(
     () => ({
-      transform: `translate(calc(-50% + ${dragState.agentPosition.x}px), calc(-50% + ${dragState.agentPosition.y}px))`,
+      transform: `translate(calc(-50% + ${agentPosition.x}px), calc(-50% + ${agentPosition.y}px))`,
     }),
-    [dragState.agentPosition],
+    [agentPosition],
   )
 
   const filteredChannels = useMemo(() => {
@@ -194,141 +323,91 @@ const AgentChat = () => {
     return filtered
   }, [channelKeyword, channels, selectedModelType])
 
-  const showConversationPanel = uiState.isConversationVisible
+  const showConversationPanel = isConversationVisible
 
-  // ============================================
-  // Stream Events
-  // ============================================
-
-  const handleStreamEvent = useCallback(
-    (event) => {
-      if (!event) return
-
-      uiState.recordInteraction('stream_event', {
-          event: event.event,
-          payload: event.payload,
-      }, event.label)
-
-      if (event.isFinal && event.timestamp && uiState.finalEventHandledRef.current !== event.timestamp) {
-        uiState.finalEventHandledRef.current = event.timestamp
-        if (Array.isArray(event.payload?.tool_calls)) {
-          const uiCall = event.payload.tool_calls.find((call) => {
-            const result = call?.result
-            if (!result) return false
-            if (Array.isArray(result.resources) && result.resources.length > 0) return true
-            return Boolean(result.resource || result.uri)
-          })
-
-          if (uiCall?.result) {
-            const result = uiCall.result
-            if (Array.isArray(result.resources) && result.resources.length > 0) {
-              uiState.openUiResource(result.resources[0], { source: 'stream_final', toolCall: uiCall.name })
-            } else if (result.resource) {
-              uiState.openUiResource(result.resource, { source: 'stream_final', toolCall: uiCall.name })
-            } else if (result.uri) {
-              uiState.openUiResource(result, { source: 'stream_final', toolCall: uiCall.name })
-            }
-          }
-        }
-      }
-    },
-    [uiState],
-  )
-
-  const { status: streamStatus, events: streamEvents } = useAgentStream(connectionState.sessionId, {
-    enabled: connectionState.isSessionReady,
-    onEvent: handleStreamEvent,
-  })
-
-  // Update connection status based on stream status
-  useEffect(() => {
-    if (streamStatus === 'error') {
-      connectionState.setConnectionStatus('error')
-    } else if (streamStatus === 'active' || streamStatus === 'completed') {
-      connectionState.setConnectionStatus('connected')
-    } else if (streamStatus === 'polling') {
-      connectionState.setConnectionStatus('connecting')
-    } else {
-      connectionState.setConnectionStatus('disconnected')
-    }
-  }, [streamStatus, connectionState])
-
-  // ============================================
-  // Event Handlers
-  // ============================================
-
+  // ==================== Event Handlers ====================
   const goToLogin = useCallback(() => {
-    uiState.recordInteraction('navigate_login')
+    recordInteraction('navigate_login')
     navigate('/login')
-  }, [navigate, uiState])
+  }, [navigate, recordInteraction])
 
   const goToWallet = useCallback(() => {
-    uiState.recordInteraction('navigate_wallet')
+    recordInteraction('navigate_wallet')
     navigate('/wallet')
-  }, [navigate, uiState])
+  }, [navigate, recordInteraction])
 
   const handleLogout = useCallback(async () => {
-    uiState.recordInteraction('logout')
+    recordInteraction('logout')
     await logout()
-  }, [logout, uiState])
+  }, [logout, recordInteraction])
 
   const toggleLanguage = useCallback(() => {
     const next = currentLanguage === 'zh' ? 'en' : 'zh'
     setLanguage(next)
-    uiState.recordInteraction('toggle_language', { language: next })
-  }, [currentLanguage, setLanguage, uiState])
+    recordInteraction('toggle_language', { language: next })
+  }, [currentLanguage, recordInteraction, setLanguage])
+
+  const handleWalletChanged = useCallback(
+    async (event) => {
+      const detail = event?.detail
+      recordInteraction('wallet_event', { address: detail?.address })
+      await refreshWallet()
+      await createSession()
+      setSessionReady(true)
+    },
+    [createSession, recordInteraction, refreshWallet, setSessionReady],
+  )
 
   const handleInspectWallet = useCallback(() => {
-    if (!connectionState.sessionId) return
-    void uiState.fetchAndOpenUiResource(
+    if (!sessionId) return
+    void fetchAndOpenUiResource(
       MCP_UI_TARGETS.walletOverview,
-      { session_id: connectionState.sessionId, chain: walletState.walletSnapshot?.chain },
+      { session_id: sessionId, chain: walletSnapshot?.chain },
       { source: 'wallet_card' },
     )
-  }, [connectionState.sessionId, uiState, walletState.walletSnapshot?.chain])
+  }, [fetchAndOpenUiResource, sessionId, walletSnapshot])
 
   const handleInspectTransaction = useCallback(
     (transaction) => {
       if (!transaction) return
       const transactionId = transaction.hash || transaction.id
       if (!transactionId) return
-      void uiState.fetchAndOpenUiResource(
+      void fetchAndOpenUiResource(
         MCP_UI_TARGETS.transactionDetail,
-        { session_id: connectionState.sessionId, transaction_id: transactionId, chain: walletState.walletSnapshot?.chain },
+        { session_id: sessionId, transaction_id: transactionId, chain: walletSnapshot?.chain },
         { source: 'transaction_list', transactionId },
       )
     },
-    [connectionState.sessionId, uiState, walletState.walletSnapshot?.chain],
+    [fetchAndOpenUiResource, sessionId, walletSnapshot],
   )
 
   const handleInspectMessage = useCallback(
     (message) => {
       if (!message?.id) return
-      void uiState.fetchAndOpenUiResource(
+      void fetchAndOpenUiResource(
         MCP_UI_TARGETS.conversationDetail,
         { message_id: message.id, role: message.type, timestamp: message.timestamp },
         { source: 'conversation', messageId: message.id },
       )
     },
-    [uiState],
+    [fetchAndOpenUiResource],
   )
 
   const createChannel = useCallback(() => {
     setCreateAgentModalOpen(true)
-    uiState.recordInteraction('open_create_agent_modal')
-  }, [uiState])
+    recordInteraction('open_create_agent_modal')
+  }, [recordInteraction])
 
   const closeCreateAgentModal = useCallback(() => {
     setCreateAgentModalOpen(false)
   }, [])
 
-  // Early channel display for agent creation
   const handleEarlyChannel = useCallback(
     (earlyMetadata) => {
       const channel = buildChannelFromAgent(earlyMetadata)
       if (channel) {
         const matchKey = earlyMetadata.avatar_cid || earlyMetadata.cid
-            setChannels((prev) => {
+        setChannels((prev) => {
           const others = prev.filter((item) => {
             const itemAvatarCid = item.meta?.avatar_cid
             const itemCid = item.meta?.cid
@@ -341,25 +420,26 @@ const AgentChat = () => {
         console.log('[AgentChat] 早期频道已显示，等待完整创建...')
       }
     },
-    [],
+    [setChannels, setActiveChannelId, setSelectedAgent],
   )
 
-  // Create agent submit handler
   const handleCreateAgentSubmit = useCallback(
     async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity }) => {
       setChannelLoading(true)
       setChannelError(null)
-      uiState.recordInteraction('create_claude_agent', { name })
+      recordInteraction('create_claude_agent', { name })
 
       try {
-        const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-        const chainId = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
-        const detectedChain = resolveBackendChain({ chainId, chain: activeChain })
+        const walletAddress =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+        const chainId =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+        const detectedChain = resolveBackendChain({ chainId, chain: preferredChain })
 
         const result = await agentService.createClaudeAgent({
-          sessionId: connectionState.sessionId,
+          sessionId,
           walletAddress,
-          chain: detectedChain || activeChain,
+          chain: detectedChain || preferredChain,
           name,
           roleDescription,
           avatarCid,
@@ -390,20 +470,15 @@ const AgentChat = () => {
 
         const channel = buildChannelFromAgent(metadata)
         if (channel) {
-          try {
-            addAgentToStore({ ...metadata, sessionId: connectionState.sessionId, id: channel.id })
-            console.log('[AgentChat] 智能体已保存到本地存储')
-          } catch (error) {
-            console.error('[AgentChat] 保存智能体到本地存储失败:', error)
-          }
-
           const matchKey = avatarCid || metadata.cid
           setChannels((prev) => {
             const others = prev.filter((item) => {
               const itemAvatarCid = item.meta?.avatar_cid
               const itemCid = item.meta?.cid
               if (item.id === channel.id) return false
-              if (matchKey && (itemAvatarCid === matchKey || itemCid === matchKey || itemCid === `temp_${matchKey}`)) return false
+              if (matchKey && (itemAvatarCid === matchKey || itemCid === matchKey || itemCid === `temp_${matchKey}`)) {
+                return false
+              }
               return true
             })
             return [channel, ...others]
@@ -413,42 +488,128 @@ const AgentChat = () => {
 
         setSelectedAgent(metadata)
         setCreateAgentModalOpen(false)
+
+        // 保存到本地存储
+        saveAgentToStorage(metadata)
+
         return result
       } catch (error) {
-        const message = extractErrorMessage(error)
+        const message = error instanceof Error ? error.message : String(error)
         setChannelError(message)
-        uiState.recordInteraction('create_claude_agent_failed', { error: message })
+        recordInteraction('create_claude_agent_failed', { error: message })
         throw new Error(message)
       } finally {
         setChannelLoading(false)
       }
     },
-    [activeChain, addAgentToStore, connectionState.sessionId, uiState],
+    [preferredChain, recordInteraction, saveAgentToStorage, sessionId],
   )
 
-  // ============================================
-  // Initialization Effect
-  // ============================================
+  // ==================== Send Message with Tool Calls ====================
+  const sendMessage = useCallback(async () => {
+    const text = currentMessage.trim()
+    if (!text || isLoading) return
 
-  useEffect(() => {
-    // Initialize dark mode
-    if (typeof localStorage !== 'undefined') {
-      const savedTheme = localStorage.getItem('alou-theme')
-      if (savedTheme) {
-        uiState.setIsDarkMode(savedTheme === 'dark')
-      } else if (typeof window !== 'undefined') {
-        uiState.setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches)
-      }
+    if (!isSessionReady) {
+      await createSession()
+      setSessionReady(true)
     }
 
-    // Bootstrap
+    const userMessage = {
+      id: `user_${Date.now()}`,
+      type: 'user',
+      content: text,
+      timestamp: Date.now(),
+    }
+
+    appendMessage(userMessage)
+    setCurrentMessage('')
+    setIsLoading(true)
+    recordInteraction('user_message', { content: text })
+    scrollToBottom()
+
+    const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
+
+    try {
+      const walletAddress =
+        typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/agent/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message: text,
+          wallet_address: walletAddress || undefined,
+          chain: preferredChain || undefined,
+          context_events: contextSnapshot,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.tool_calls) {
+        await handleToolCalls(data.tool_calls)
+      }
+
+      const assistantMessage = {
+        id: `assistant_${Date.now()}`,
+        type: 'assistant',
+        content: data.content || data.response || '收到响应',
+        timestamp: data.timestamp || Date.now(),
+        source: data.source || 'alou-edge',
+      }
+      appendMessage(assistantMessage)
+
+      if (data.session_id) {
+        setSessionId(data.session_id)
+      }
+    } catch (error) {
+      appendMessage({
+        id: `error_${Date.now()}`,
+        type: 'assistant',
+        content: `❌ 抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
+        timestamp: Date.now(),
+        source: 'error',
+      })
+    } finally {
+      setIsLoading(false)
+      scrollToBottom()
+      consoleDockRef.current?.adjustInputHeight?.()
+    }
+  }, [
+    appendMessage,
+    contextEventsRef,
+    createSession,
+    currentMessage,
+    handleToolCalls,
+    isLoading,
+    isSessionReady,
+    preferredChain,
+    recordInteraction,
+    scrollToBottom,
+    sessionId,
+    setCurrentMessage,
+    setIsLoading,
+    setSessionId,
+    setSessionReady,
+  ])
+
+  // ==================== Bootstrap Effect ====================
+  useEffect(() => {
     const bootstrap = async () => {
       try {
         initLanguage()
         await Promise.all([
-          connectionState.checkConnection(),
-          connectionState.createSession().then(() => connectionState.setSessionReady(true)),
-          walletState.refreshWallet().catch((err) => console.warn('Failed to refresh wallet:', err)),
+          checkConnection(),
+          createSession().then(() => setSessionReady(true)),
+          refreshWallet().catch((err) => {
+            console.warn('Failed to refresh wallet:', err)
+          }),
         ])
       } catch (error) {
         console.error('Error in AgentChat initialization:', error)
@@ -458,45 +619,39 @@ const AgentChat = () => {
 
     // Event listeners
     if (typeof window !== 'undefined') {
-      const handleWalletChanged = async (event) => {
-        const detail = event?.detail
-        uiState.recordInteraction('wallet_event', { address: detail?.address })
-        await walletState.refreshWallet()
-        await connectionState.createSession()
-        connectionState.setSessionReady(true)
-      }
-
       window.addEventListener('wallet-changed', handleWalletChanged)
-      window.addEventListener('resize', uiState.handleResize)
-      window.addEventListener('pointerup', dragState.handleGlobalPointerUp)
+      window.addEventListener('resize', handleResize)
+      window.addEventListener('pointerup', handleGlobalPointerUp)
+    }
 
     return () => {
+      if (typeof window !== 'undefined') {
         window.removeEventListener('wallet-changed', handleWalletChanged)
-        window.removeEventListener('resize', uiState.handleResize)
-        window.removeEventListener('pointerup', dragState.handleGlobalPointerUp)
+        window.removeEventListener('resize', handleResize)
+        window.removeEventListener('pointerup', handleGlobalPointerUp)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ============================================
-  // Render
-  // ============================================
-
+  // ==================== Shell Class Name ====================
   const shellClassName = [
     'app-shell',
-    uiState.isDarkMode ? 'dark-mode' : '',
-    uiState.isLeftSidebarCollapsed ? 'collapsed-left' : '',
-  ].filter(Boolean).join(' ')
+    isDarkMode ? 'dark-mode' : '',
+    isLeftSidebarCollapsed ? 'collapsed-left' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
+  // ==================== Render ====================
   return (
     <div className={shellClassName}>
       <ChatHeader
-        connectionStatus={connectionState.connectionStatus}
-        isDarkMode={uiState.isDarkMode}
+        connectionStatus={connectionStatus}
+        isDarkMode={isDarkMode}
         isAuthenticated={isAuthenticated}
         userName={userName}
-        onToggleTheme={uiState.toggleDarkMode}
+        onToggleTheme={toggleDarkMode}
         onGoToLogin={goToLogin}
         onGoToWallet={goToWallet}
         onLogout={handleLogout}
@@ -509,15 +664,15 @@ const AgentChat = () => {
           keyword={channelKeyword}
           isLoading={isChannelLoading}
           errorMessage={channelError}
-          onKeywordChange={channelManager.handleChannelKeywordChange}
-          onRefresh={channelManager.refreshChannels}
-          onSelectChannel={channelManager.selectChannel}
+          onKeywordChange={handleChannelKeywordChange}
+          onRefresh={refreshChannels}
+          onSelectChannel={selectChannel}
           onCreateChannel={createChannel}
-          isCollapsed={uiState.isLeftSidebarCollapsed}
-          onToggleCollapse={uiState.toggleLeftSidebar}
+          isCollapsed={isLeftSidebarCollapsed}
+          onToggleCollapse={toggleLeftSidebar}
           selectedModelType={selectedModelType}
           onModelTypeChange={setSelectedModelType}
-          onShowIdentityPanel={() => uiState.setShowDiapPanel(true)}
+          onShowIdentityPanel={() => setShowDiapPanel(true)}
         />
 
         <div className="agent-center">
@@ -527,11 +682,11 @@ const AgentChat = () => {
                 ref={canvasRef}
                 agentProfile={agentProfile}
                 agentStyle={agentStyle}
-                onPointerDown={dragState.startDrag}
-                onPointerMove={dragState.onDrag}
-                onPointerUp={dragState.stopDrag}
-                onPointerLeave={dragState.stopDrag}
-                onAgentActivate={dragState.handleAgentActivate}
+                onPointerDown={startDrag}
+                onPointerMove={onDrag}
+                onPointerUp={stopDrag}
+                onPointerLeave={stopDrag}
+                onAgentActivate={handleAgentActivate}
               />
               {selectedAgent && <AgentProfilePanel agent={selectedAgent} />}
             </div>
@@ -539,11 +694,11 @@ const AgentChat = () => {
             <div className="conversation-shell">
               <AgentConversationOverlay
                 ref={conversationOverlayRef}
-                connectionStatus={connectionState.connectionStatus}
-                connectionStatusLabel={connectionState.connectionStatusLabel}
-                messages={messageState.messages}
-                isLoading={messageState.isLoading}
-                onClose={uiState.closeConversationPanel}
+                connectionStatus={connectionStatus}
+                connectionStatusLabel={connectionStatusLabel}
+                messages={messages}
+                isLoading={isLoading}
+                onClose={closeConversationPanel}
                 onInspectMessage={handleInspectMessage}
                 streamEvents={streamEvents}
                 streamStatus={streamStatus}
@@ -557,14 +712,14 @@ const AgentChat = () => {
         </div>
 
         <AgentSidebarRight
-          walletSnapshot={walletState.sidebarWallet}
+          walletSnapshot={sidebarWallet}
           transactions={transactions}
-          interactionLogs={uiState.interactionLogs}
-          isInteractionCollapsed={uiState.isInteractionCollapsed}
-          isCollapsed={uiState.isSidebarCollapsed}
-          onRefreshWallet={walletState.refreshWallet}
-          onToggleInteraction={uiState.toggleInteractionPanel}
-          onToggleCollapse={uiState.toggleSidebar}
+          interactionLogs={interactionLogs}
+          isInteractionCollapsed={isInteractionCollapsed}
+          isCollapsed={isSidebarCollapsed}
+          onRefreshWallet={refreshWallet}
+          onToggleInteraction={toggleInteractionPanel}
+          onToggleCollapse={toggleSidebar}
           onInspectWallet={handleInspectWallet}
           onInspectTransaction={handleInspectTransaction}
           connectActionSlot={() => (
@@ -577,38 +732,38 @@ const AgentChat = () => {
 
       <AgentConsoleDock
         ref={consoleDockRef}
-        value={messageState.currentMessage}
-        onChange={messageState.setCurrentMessage}
-        isLoading={messageState.isLoading}
-        style={uiState.consoleDockStyle}
-        showOpenButton={!showConversationPanel && messageState.messages.length > 0}
-        onSend={messageState.sendMessage}
-        onNewLine={() => messageState.setCurrentMessage((prev) => `${prev}\n`)}
-        onOpenConversation={uiState.openConversationPanel}
+        value={currentMessage}
+        onChange={setCurrentMessage}
+        isLoading={isLoading}
+        style={consoleDockStyle}
+        showOpenButton={!showConversationPanel && messages.length > 0}
+        onSend={sendMessage}
+        onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}
+        onOpenConversation={openConversationPanel}
       />
 
       <CreateAgentModal
         isOpen={isCreateAgentModalOpen}
         onClose={closeCreateAgentModal}
         onSubmit={handleCreateAgentSubmit}
-        onResolve={channelManager.resolveExistingAgentTarget}
+        onResolve={resolveExistingAgentTarget}
         onEarlyChannel={handleEarlyChannel}
-        sessionId={connectionState.sessionId}
+        sessionId={sessionId}
       />
 
       <McpModal
-        resource={uiState.isUiModalOpen ? uiState.uiResource : null}
-        onClose={uiState.closeUiResource}
-        onUIAction={uiState.handleUiAction}
+        resource={isUiModalOpen ? uiResource : null}
+        onClose={closeUiResource}
+        onUIAction={handleUiAction}
       />
 
       <DiapPanelToggle
-        sessionId={connectionState.sessionId}
-        isSidebarCollapsed={uiState.isSidebarCollapsed}
-        isDarkMode={uiState.isDarkMode}
-        showPanel={uiState.showDiapPanel}
-        onToggle={() => uiState.setShowDiapPanel((prev) => !prev)}
-        onClosePanel={() => uiState.setShowDiapPanel(false)}
+        sessionId={sessionId}
+        isSidebarCollapsed={isSidebarCollapsed}
+        isDarkMode={isDarkMode}
+        showPanel={showDiapPanel}
+        onToggle={() => setShowDiapPanel((prev) => !prev)}
+        onClosePanel={() => setShowDiapPanel(false)}
       />
 
       <button type="button" className="language-switch" onClick={toggleLanguage} title={languageLabel}>

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 /**
  * 智能体数据模型
@@ -25,74 +25,18 @@ import { persist } from 'zustand/middleware'
 
 const STORAGE_KEY = 'alou_agents'
 
-/**
- * 从localStorage加载智能体列表
- */
-const loadAgentsFromStorage = () => {
-  if (typeof window === 'undefined') return []
-  
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return []
-    
-    const parsed = JSON.parse(stored)
-    if (!Array.isArray(parsed)) {
-      console.warn('[AgentStore] 存储的数据格式不正确，重置为空数组')
-      return []
-    }
-    
-    // 验证数据完整性
-    return parsed.filter(agent => {
-      if (!agent.id || !agent.sessionId) {
-        console.warn('[AgentStore] 发现无效的智能体数据，已过滤:', agent)
-        return false
-      }
-      return true
-    })
-  } catch (error) {
-    console.error('[AgentStore] 从localStorage加载智能体失败:', error)
-    // 如果数据损坏，清空存储
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch (e) {
-      console.error('[AgentStore] 清空损坏的存储失败:', e)
-    }
-    return []
-  }
-}
-
-/**
- * 保存智能体列表到localStorage
- */
-const saveAgentsToStorage = (agents) => {
-  if (typeof window === 'undefined') return false
-  
-  try {
-    const serialized = JSON.stringify(agents)
-    localStorage.setItem(STORAGE_KEY, serialized)
-    return true
-  } catch (error) {
-    console.error('[AgentStore] 保存智能体到localStorage失败:', error)
-    // 检查是否是存储空间不足
-    if (error.name === 'QuotaExceededError') {
-      console.error('[AgentStore] localStorage存储空间不足，请清理数据')
-    }
-    return false
-  }
-}
-
 const useAgentStore = create(
   persist(
     (set, get) => ({
       // 智能体列表
       agents: [],
       
-      // 初始化：从localStorage加载
-      init: () => {
-        const loaded = loadAgentsFromStorage()
-        set({ agents: loaded })
-        console.log(`[AgentStore] 已加载 ${loaded.length} 个智能体`)
-        return loaded
+      // hydration 状态
+      _hasHydrated: false,
+      
+      // 设置 hydration 完成状态
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state })
       },
       
       // 添加智能体
@@ -134,17 +78,14 @@ const useAgentStore = create(
             ...newAgent,
             created_at: updatedAgents[existingIndex].created_at, // 保留原始创建时间
           }
+          console.log(`[AgentStore] 更新智能体: ${newAgent.id}`)
         } else {
           // 添加新智能体
           updatedAgents = [newAgent, ...agents]
+          console.log(`[AgentStore] 添加新智能体: ${newAgent.id}`)
         }
         
         set({ agents: updatedAgents })
-        const saved = saveAgentsToStorage(updatedAgents)
-        if (!saved) {
-          console.error('[AgentStore] 保存智能体失败')
-        }
-        
         return newAgent
       },
       
@@ -168,11 +109,7 @@ const useAgentStore = create(
         }
         
         set({ agents: updatedAgents })
-        const saved = saveAgentsToStorage(updatedAgents)
-        if (!saved) {
-          console.error('[AgentStore] 更新智能体失败')
-        }
-        
+        console.log(`[AgentStore] 更新智能体: ${idOrSessionId}`)
         return updatedAgents[index]
       },
       
@@ -184,11 +121,7 @@ const useAgentStore = create(
         )
         
         set({ agents: filtered })
-        const saved = saveAgentsToStorage(filtered)
-        if (!saved) {
-          console.error('[AgentStore] 删除智能体失败')
-        }
-        
+        console.log(`[AgentStore] 删除智能体: ${idOrSessionId}`)
         return filtered
       },
       
@@ -211,26 +144,86 @@ const useAgentStore = create(
       // 清空所有智能体
       clearAgents: () => {
         set({ agents: [] })
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(STORAGE_KEY)
+        console.log('[AgentStore] 清空所有智能体')
+      },
+      
+      // 从网络导入智能体（用于 IPFS/IPNS 解析后添加）
+      importAgent: (agentData) => {
+        const agents = get().agents
+        
+        // 检查是否已存在
+        const target = agentData.ipns || agentData.cid || agentData.did
+        const existing = agents.find(
+          a => a.ipns === target || a.cid === target || a.did === target
+        )
+        
+        if (existing) {
+          console.log(`[AgentStore] 智能体已存在: ${target}`)
+          return { agent: existing, isNew: false }
         }
+        
+        const newAgent = get().addAgent({
+          ...agentData,
+          imported_at: Date.now(),
+          source: 'network',
+        })
+        
+        console.log(`[AgentStore] 从网络导入智能体: ${target}`)
+        return { agent: newAgent, isNew: true }
       },
     }),
     {
       name: STORAGE_KEY,
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ agents: state.agents }),
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error('[AgentStore] Hydration 失败:', error)
+        } else if (state) {
+          console.log(`[AgentStore] Hydration 完成，已加载 ${state.agents?.length || 0} 个智能体`)
+          state.setHasHydrated(true)
+        }
+      },
+      // 数据迁移：处理旧版本数据格式
+      migrate: (persistedState, version) => {
+        if (version === 0) {
+          // 验证数据完整性
+          const agents = persistedState.agents || []
+          persistedState.agents = agents.filter(agent => {
+            if (!agent.id && !agent.sessionId) {
+              console.warn('[AgentStore] 迁移时过滤无效数据:', agent)
+              return false
+            }
+            return true
+          })
+        }
+        return persistedState
+      },
+      version: 1,
     }
   )
 )
 
-// 自动初始化
-if (typeof window !== 'undefined') {
-  // 在模块加载时初始化
-  const store = useAgentStore.getState()
-  if (store.agents.length === 0) {
-    store.init()
-  }
+// 等待 hydration 完成的 hook
+export const useAgentStoreHydration = () => {
+  return useAgentStore((state) => state._hasHydrated)
+}
+
+// 等待 hydration 完成的 Promise
+export const waitForHydration = () => {
+  return new Promise((resolve) => {
+    if (useAgentStore.getState()._hasHydrated) {
+      resolve()
+      return
+    }
+    
+    const unsubscribe = useAgentStore.subscribe((state) => {
+      if (state._hasHydrated) {
+        unsubscribe()
+        resolve()
+      }
+    })
+  })
 }
 
 export default useAgentStore
-
