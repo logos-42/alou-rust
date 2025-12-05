@@ -45,9 +45,26 @@ export const useAgentMessages = ({
       return
     }
 
-    if (!isSessionReady) {
-      await createSession()
-      setSessionReady(true)
+    // 确保 session 创建成功
+    let currentSessionId = sessionId
+    if (!isSessionReady || sessionId.startsWith('frontend_')) {
+      try {
+        console.log('[useAgentMessages] 创建新会话...')
+        await createSession()
+        setSessionReady(true)
+        // 等待一下让 sessionId 更新
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      } catch (sessionErr) {
+        console.error('[useAgentMessages] 会话创建失败:', sessionErr)
+        appendMessage({
+          id: `error_${Date.now()}`,
+          type: 'assistant',
+          content: '❌ 无法连接到后端服务，请检查网络连接或稍后重试。',
+          timestamp: Date.now(),
+          source: 'error',
+        })
+        return
+      }
     }
 
     const userMessage = {
@@ -69,9 +86,13 @@ export const useAgentMessages = ({
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
 
+      // 使用最新的 sessionId（可能在 createSession 后更新了）
+      const actualSessionId = sessionId.startsWith('frontend_') ? currentSessionId : sessionId
+      console.log('[useAgentMessages] 发送消息，sessionId:', actualSessionId)
+
       const data = await apiClient
         .post('/agent/chat', {
-          session_id: sessionId,
+          session_id: actualSessionId,
           message: text,
           wallet_address: walletAddress || undefined,
           chain: activeChain || undefined,
@@ -96,10 +117,24 @@ export const useAgentMessages = ({
         setSessionId(data.session_id)
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
+      const statusCode = error?.response?.status
+      
+      let friendlyMessage = `❌ 抱歉，发生了错误：${errorMessage}`
+      if (statusCode === 404) {
+        friendlyMessage = '❌ 会话已过期，请刷新页面重试。'
+        // 重置 session 状态
+        setSessionReady(false)
+      } else if (statusCode === 500) {
+        friendlyMessage = '❌ 服务器内部错误，请稍后重试。'
+      } else if (!error?.response) {
+        friendlyMessage = '❌ 无法连接到服务器，请检查网络连接。'
+      }
+      
       appendMessage({
         id: `error_${Date.now()}`,
         type: 'assistant',
-        content: `❌ 抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
+        content: friendlyMessage,
         timestamp: Date.now(),
         source: 'error',
       })

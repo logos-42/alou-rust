@@ -215,9 +215,23 @@ const AgentSidebarLeft = ({
           >
             <div className="channel-icon" style={{ background: channel.color }}>
               {channel.avatar ? (
-                <img src={channel.avatar} alt={channel.name} />
+                <img 
+                  src={channel.avatar} 
+                  alt={channel.name}
+                  onError={(e) => {
+                    // 图片加载失败时隐藏图片，显示默认图标
+                    e.target.style.display = 'none'
+                    const parent = e.target.parentElement
+                    if (parent && !parent.querySelector('.fallback-icon')) {
+                      const fallback = document.createElement('span')
+                      fallback.className = 'fallback-icon'
+                      fallback.textContent = channel.icon || channel.name?.charAt(0) || '🤖'
+                      parent.insertBefore(fallback, e.target)
+                    }
+                  }}
+                />
               ) : (
-                channel.icon
+                channel.icon || channel.name?.charAt(0) || '🤖'
               )}
               <span className={`status-indicator ${channel.status}`} />
             </div>

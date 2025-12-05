@@ -203,6 +203,15 @@
   border-radius: inherit;
 }
 
+.sidebar-left .channel-icon .fallback-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 .sidebar-left .channel-info {
   display: flex;
   flex-direction: column;

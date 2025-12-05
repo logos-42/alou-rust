@@ -21,15 +21,43 @@ const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
     try {
       setLoading(true)
       setError(null)
-      const response = await agentService.getDiapIdentity(sessionId)
-      if (response.identity) {
-        setIdentity(response.identity)
+      
+      // 首先尝试从 localStorage 加载
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const storedIdentity = localStorage.getItem(`diap_identity_${sessionId}`)
+        if (storedIdentity) {
+          try {
+            const identity = JSON.parse(storedIdentity)
+            console.log('[DiapIdentityPanel] 从 localStorage 加载 DIAP 身份:', sessionId)
+            setIdentity(identity)
+            return // 加载成功，直接返回
+          } catch (parseErr) {
+            console.warn('[DiapIdentityPanel] 解析 localStorage 数据失败:', parseErr)
+          }
+        }
+      }
+      
+      // localStorage 没有，尝试从网络加载
+      try {
+        const response = await agentService.getDiapIdentity(sessionId)
+        if (response.identity) {
+          setIdentity(response.identity)
+          // 保存到 localStorage 以便下次快速加载
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem(
+              `diap_identity_${sessionId}`,
+              JSON.stringify(response.identity)
+            )
+          }
+        }
+      } catch (networkErr) {
+        // 网络加载失败不设置错误，因为身份可能确实不存在
+        console.log('[DiapIdentityPanel] 网络加载失败，身份可能尚未创建:', networkErr.message)
       }
     } catch (err) {
       console.error('Failed to load DIAP identity:', err)
-      const message = err.message || '加载身份信息失败'
-      setError(message)
-      setToastMessage(message)
+      // 只有在严重错误时才显示错误
+      // 身份不存在不算错误，用户可以点击创建
     } finally {
       setLoading(false)
     }
@@ -42,6 +70,15 @@ const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
       const response = await agentService.createDiapIdentity(sessionId)
       if (response.identity) {
         setIdentity(response.identity)
+        // 保存到 localStorage，以便后续加载
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(
+            `diap_identity_${sessionId}`,
+            JSON.stringify(response.identity)
+          )
+          console.log('[DiapIdentityPanel] DIAP 身份已保存到 localStorage:', sessionId)
+        }
+        setToastMessage('DIAP 身份创建成功！')
       }
     } catch (err) {
       console.error('Failed to create DIAP identity:', err)

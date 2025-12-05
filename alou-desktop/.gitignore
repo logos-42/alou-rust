@@ -32,5 +32,7 @@ src-tauri/Cargo.lock
 .env.local
 .env.*.local
 
+docs/
+
 DIAP-Rust-SDK/
 DIAP-Rust-SDK/target/

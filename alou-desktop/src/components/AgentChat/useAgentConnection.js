@@ -64,8 +64,11 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
         setPreferredChain(detectedChain)
       }
 
+      console.log('[useAgentConnection] 正在创建会话...')
       const data = await agentService.createSession(walletAddress || undefined)
+      console.log('[useAgentConnection] 会话创建成功:', data.session_id)
       setSessionId(data.session_id)
+      return data.session_id
     } catch (error) {
       const isConnectionError =
         error.code === 'ECONNREFUSED' ||
@@ -90,6 +93,8 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
           console.error('Failed to create session:', error)
         }
       }
+      // 抛出错误以便调用方处理
+      throw error
     }
   }, [activeChain, preferredChain, setPreferredChain])
 
