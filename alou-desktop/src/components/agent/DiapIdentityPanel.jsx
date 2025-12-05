@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import agentService from '@/services/agentService'
+import useAgentStore from '@/stores/agentStore'
 import './DiapIdentityPanel.css'
 
-const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
+const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
   const [identity, setIdentity] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -10,113 +11,141 @@ const DiapIdentityPanel = ({ sessionId, onClose, isDarkMode = false }) => {
   const [error, setError] = useState(null)
   const [registerInfo, setRegisterInfo] = useState(null)
   const [toastMessage, setToastMessage] = useState(null)
-
-  const loadIdentity = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      // 首先尝试从 localStorage 加载
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const storedIdentity = localStorage.getItem(`diap_identity_${sessionId}`)
-        if (storedIdentity) {
-          try {
-            const identity = JSON.parse(storedIdentity)
-            console.log('[DiapIdentityPanel] 从 localStorage 加载 DIAP 身份:', sessionId, identity)
-            setIdentity(identity)
-            setLoading(false)
-            return // 加载成功，直接返回
-          } catch (parseErr) {
-            console.warn('[DiapIdentityPanel] 解析 localStorage 数据失败:', parseErr)
-            // 解析失败，继续尝试网络加载
-          }
-        } else {
-          console.log('[DiapIdentityPanel] localStorage 中没有找到身份，key:', `diap_identity_${sessionId}`)
-        }
-      }
-      
-      // localStorage 没有，尝试从网络加载
-      try {
-        console.log('[DiapIdentityPanel] 尝试从网络加载身份，sessionId:', sessionId)
-        const response = await agentService.getDiapIdentity(sessionId)
-        if (response.identity) {
-          console.log('[DiapIdentityPanel] 从网络加载成功:', response.identity)
-          setIdentity(response.identity)
-          // 保存到 localStorage 以便下次快速加载
-          if (typeof window !== 'undefined' && window.localStorage) {
-            localStorage.setItem(
-              `diap_identity_${sessionId}`,
-              JSON.stringify(response.identity)
-            )
-            console.log('[DiapIdentityPanel] 已保存到 localStorage')
-          }
-        } else {
-          console.log('[DiapIdentityPanel] 网络响应中没有 identity')
-          setIdentity(null)
-        }
-      } catch (networkErr) {
-        // 网络加载失败不设置错误，因为身份可能确实不存在
-        console.log('[DiapIdentityPanel] 网络加载失败，身份可能尚未创建:', networkErr.message)
-        setIdentity(null)
-      }
-    } catch (err) {
-      console.error('[DiapIdentityPanel] 加载 DIAP 身份失败:', err)
-      setIdentity(null)
-      // 只有在严重错误时才显示错误
-      // 身份不存在不算错误，用户可以点击创建
-    } finally {
-      setLoading(false)
-    }
-  }, [sessionId])
+  
+  const updateAgent = useAgentStore((state) => state.updateAgent)
 
   useEffect(() => {
     if (sessionId) {
       loadIdentity()
     }
-  }, [sessionId, loadIdentity])
+  }, [sessionId, selectedAgent])
+
+  const loadIdentity = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // 优先级1: 从 selectedAgent 元数据中查找
+      if (selectedAgent?.diapIdentity) {
+        console.log('[DiapIdentityPanel] 从智能体元数据加载 DIAP 身份:', selectedAgent.diapIdentity.ipns || selectedAgent.diapIdentity.did)
+        setIdentity(selectedAgent.diapIdentity)
+        setLoading(false)
+        return
+      }
+      
+      // 优先级2: 从 IPNS/CID/DID 查找（如果智能体有这些标识）
+      const agentTarget = selectedAgent?.ipns || selectedAgent?.cid || selectedAgent?.did
+      if (agentTarget) {
+        try {
+          const response = await agentService.getDiapIdentity(agentTarget)
+          if (response.identity) {
+            console.log('[DiapIdentityPanel] 从 IPNS/CID/DID 加载 DIAP 身份:', agentTarget)
+            setIdentity(response.identity)
+            // 更新智能体元数据
+            if (selectedAgent?.id) {
+              updateAgent(selectedAgent.id, { diapIdentity: response.identity })
+            }
+            setLoading(false)
+            return
+          }
+        } catch (targetErr) {
+          console.log('[DiapIdentityPanel] 从 IPNS/CID/DID 加载失败:', targetErr.message)
+        }
+      }
+      
+      // 优先级3: 从 localStorage 加载（使用 sessionId）
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const storedIdentity = localStorage.getItem(`diap_identity_${sessionId}`)
+        if (storedIdentity) {
+          try {
+            const identity = JSON.parse(storedIdentity)
+            console.log('[DiapIdentityPanel] 从 localStorage 加载 DIAP 身份:', sessionId)
+            setIdentity(identity)
+            // 如果智能体存在，更新其元数据
+            if (selectedAgent?.id) {
+              updateAgent(selectedAgent.id, { diapIdentity: identity })
+            }
+            setLoading(false)
+            return
+          } catch (parseErr) {
+            console.warn('[DiapIdentityPanel] 解析 localStorage 数据失败:', parseErr)
+          }
+        }
+      }
+      
+      // 优先级4: 从网络加载（使用 sessionId）
+      try {
+        const response = await agentService.getDiapIdentity(sessionId)
+        if (response.identity) {
+          setIdentity(response.identity)
+          // 保存到 localStorage 和智能体元数据
+          if (typeof window !== 'undefined' && window.localStorage) {
+            localStorage.setItem(
+              `diap_identity_${sessionId}`,
+              JSON.stringify(response.identity)
+            )
+          }
+          if (selectedAgent?.id) {
+            updateAgent(selectedAgent.id, { diapIdentity: response.identity })
+          }
+        }
+      } catch (networkErr) {
+        // 网络加载失败不设置错误，因为身份可能确实不存在
+        console.log('[DiapIdentityPanel] 网络加载失败，身份可能尚未创建:', networkErr.message)
+      }
+    } catch (err) {
+      console.error('Failed to load DIAP identity:', err)
+      // 只有在严重错误时才显示错误
+      // 身份不存在不算错误，用户可以点击创建
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleCreateIdentity = async () => {
     try {
       setCreating(true)
       setError(null)
-      console.log('[DiapIdentityPanel] 开始创建 DIAP 身份，sessionId:', sessionId)
       const response = await agentService.createDiapIdentity(sessionId)
-      console.log('[DiapIdentityPanel] 创建响应:', response)
       if (response.identity) {
-        const identity = response.identity
-        console.log('[DiapIdentityPanel] 创建的身份信息:', identity)
+        setIdentity(response.identity)
         
-        // 保存到 localStorage，以便后续加载
+        // 保存到 localStorage（使用 sessionId）
         if (typeof window !== 'undefined' && window.localStorage) {
           localStorage.setItem(
             `diap_identity_${sessionId}`,
-            JSON.stringify(identity)
+            JSON.stringify(response.identity)
           )
-          console.log('[DiapIdentityPanel] DIAP 身份已保存到 localStorage，key:', `diap_identity_${sessionId}`)
-          
-          // 验证保存是否成功
-          const saved = localStorage.getItem(`diap_identity_${sessionId}`)
-          if (saved) {
-            console.log('[DiapIdentityPanel] 验证：localStorage 保存成功')
-          } else {
-            console.error('[DiapIdentityPanel] 验证失败：localStorage 保存失败')
-          }
+          console.log('[DiapIdentityPanel] DIAP 身份已保存到 localStorage:', sessionId)
         }
         
-        // 更新状态以显示身份信息
-        setIdentity(identity)
-        setToastMessage('DIAP 身份创建成功！')
+        // 保存到智能体元数据（使用 IPNS/CID/DID 作为 key）
+        if (selectedAgent?.id) {
+          updateAgent(selectedAgent.id, { 
+            diapIdentity: response.identity,
+            ipns: response.identity.ipns,
+            cid: response.identity.cid,
+            did: response.identity.did,
+          })
+          console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据:', selectedAgent.id)
+        } else if (response.identity.ipns || response.identity.cid || response.identity.did) {
+          // 如果没有 selectedAgent，使用 IPNS/CID/DID 作为 key 保存
+          const agentId = response.identity.ipns || response.identity.cid || response.identity.did
+          updateAgent(agentId, {
+            id: agentId,
+            sessionId,
+            diapIdentity: response.identity,
+            ipns: response.identity.ipns,
+            cid: response.identity.cid,
+            did: response.identity.did,
+          })
+          console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据（新）:', agentId)
+        }
         
-        // 重新加载以确保显示最新信息
-        setTimeout(() => {
-          loadIdentity()
-        }, 100)
-      } else {
-        console.warn('[DiapIdentityPanel] 创建响应中没有 identity 字段')
-        setToastMessage('创建成功，但未返回身份信息')
+        setToastMessage('DIAP 身份创建成功！')
       }
     } catch (err) {
-      console.error('[DiapIdentityPanel] 创建 DIAP 身份失败:', err)
+      console.error('Failed to create DIAP identity:', err)
       const message = err.message || '创建身份失败'
       setError(message)
       setToastMessage(message)

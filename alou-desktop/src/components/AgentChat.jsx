@@ -160,7 +160,7 @@ const AgentChat = () => {
     appendMessage: null, // 会通过 handleToolCalls 传递
     scrollToBottom: null, // 会通过 handleToolCalls 传递
     setTransactions: undefined,
-  })
+        })
 
   const {
     walletSnapshot,
@@ -418,7 +418,7 @@ const AgentChat = () => {
   }, [recordInteraction])
 
   const closeCreateAgentModal = useCallback(() => {
-    setCreateAgentModalOpen(false)
+        setCreateAgentModalOpen(false)
   }, [])
 
   const handleEarlyChannel = useCallback(
@@ -788,6 +788,7 @@ const AgentChat = () => {
 
       <DiapPanelToggle
         sessionId={sessionId}
+        selectedAgent={selectedAgent}
         isSidebarCollapsed={isSidebarCollapsed}
         isDarkMode={isDarkMode}
         showPanel={showDiapPanel}
