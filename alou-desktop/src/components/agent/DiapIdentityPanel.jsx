@@ -28,9 +28,19 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       // 优先级1: 从 selectedAgent 元数据中查找
       if (selectedAgent?.diapIdentity) {
         console.log('[DiapIdentityPanel] 从智能体元数据加载 DIAP 身份:', selectedAgent.diapIdentity.ipns || selectedAgent.diapIdentity.did)
+        console.log('[DiapIdentityPanel] 完整身份信息:', selectedAgent.diapIdentity)
         setIdentity(selectedAgent.diapIdentity)
         setLoading(false)
         return
+      } else {
+        console.log('[DiapIdentityPanel] selectedAgent 信息:', {
+          hasSelectedAgent: !!selectedAgent,
+          hasDiapIdentity: !!selectedAgent?.diapIdentity,
+          agentId: selectedAgent?.id,
+          ipns: selectedAgent?.ipns,
+          cid: selectedAgent?.cid,
+          did: selectedAgent?.did,
+        })
       }
       
       // 优先级2: 从 IPNS/CID/DID 查找（如果智能体有这些标识）
