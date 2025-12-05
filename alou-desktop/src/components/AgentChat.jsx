@@ -553,7 +553,10 @@ const AgentChat = () => {
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/agent/chat`, {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+        (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+      
+      const response = await fetch(`${API_BASE_URL}/api/agent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
