@@ -60,6 +60,7 @@ const useAgentStore = create(
           did: agentData.did || agentData.diapIdentity?.did || null,
           diapIdentity: agentData.diapIdentity || null,
           customPrompt: agentData.customPrompt || null,
+          messages_cid: agentData.messages_cid || null, // 消息历史的 IPFS CID
           created_at: agentData.created_at || now,
           updated_at: now,
         }

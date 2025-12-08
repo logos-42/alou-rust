@@ -145,9 +145,65 @@ impl AgentCore {
         context.recent_events = recent_events.clone();
         context.event_summary = event_summary.clone();
 
-        // Use dynamic system prompt based on wallet status
-        let mut system_prompt =
-            prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref());
+        // 获取 agent_metadata 以便使用智能体特定的 prompt
+        let agent_metadata = self
+            .session_manager
+            .get_agent_metadata(session_id)
+            .await
+            .ok()
+            .flatten();
+
+        // 确定系统 prompt：优先使用智能体的 customPrompt 或 role_description
+        let mut system_prompt = if let Some(ref metadata) = agent_metadata {
+            // 优先使用 customPrompt
+            if let Some(custom_prompt) = metadata.get("customPrompt").and_then(|v| v.as_str()) {
+                if !custom_prompt.is_empty() {
+                    let mut prompt = custom_prompt.to_string();
+                    // 添加钱包和链信息
+                    if let Some(w) = wallet.as_deref() {
+                        prompt.push_str(&format!("\n\n当前用户钱包地址: {}", w));
+                    }
+                    if let Some(c) = chain.as_deref() {
+                        prompt.push_str(&format!("\n当前链: {}", c));
+                    }
+                    prompt
+                } else {
+                    prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
+                }
+            }
+            // 其次使用 role_description 构建 prompt
+            else if let Some(role_desc) = metadata.get("role_description").and_then(|v| v.as_str())
+            {
+                if !role_desc.is_empty() {
+                    let agent_name = metadata
+                        .get("display_name")
+                        .and_then(|v| v.as_str())
+                        .or_else(|| metadata.get("name").and_then(|v| v.as_str()))
+                        .unwrap_or("智能体");
+
+                    let mut prompt = format!("你是 {}。\n\n{}", agent_name, role_desc);
+                    // 添加钱包和链信息
+                    if let Some(w) = wallet.as_deref() {
+                        prompt.push_str(&format!("\n\n当前用户钱包地址: {}", w));
+                    }
+                    if let Some(c) = chain.as_deref() {
+                        prompt.push_str(&format!("\n当前链: {}", c));
+                    }
+                    prompt
+                } else {
+                    prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
+                }
+            }
+            // 否则使用默认 prompt
+            else {
+                prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
+            }
+        } else {
+            // 没有 agent_metadata，使用默认 prompt
+            prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
+        };
+
+        // 添加 UI 交互快照
         if let Some(summary) = event_summary.as_ref() {
             if !summary.is_empty() {
                 system_prompt.push_str("\n\n[最近 UI 交互快照]\n");

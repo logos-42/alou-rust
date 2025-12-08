@@ -1,14 +1,18 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import apiClient from '@/services/api'
-import { resolveBackendChain } from '@/hooks/useAgentChat'
+import agentService from '@/services/agentService'
+import useAgentStore from '@/stores/agentStore'
 
 /**
  * Hook for managing messages and conversation
+ * 按频道分开存储消息，支持 IPFS 持久化
  */
 export const useAgentMessages = ({
   sessionId,
   setSessionId,
   activeChain,
+  activeChannelId,
+  selectedAgent,
   isSessionReady,
   createSession,
   setSessionReady,
@@ -18,20 +22,72 @@ export const useAgentMessages = ({
   consoleDockRef,
   contextEventsRef,
 }) => {
-  const [messages, setMessages] = useState([])
+  // 按频道存储消息：Map<channelId, Message[]>
+  const [messagesByChannel, setMessagesByChannel] = useState({})
   const [currentMessage, setCurrentMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isConversationVisible, setConversationVisible] = useState(false)
+  
+  // 跟踪已保存过的消息数量，避免重复保存
+  const savedMessageCountRef = useRef({})
+  
+  // 获取 agentStore 方法
+  const updateAgent = useAgentStore((state) => state.updateAgent)
 
+  // 当前频道的消息
+  const messages = useMemo(() => {
+    return messagesByChannel[activeChannelId] || []
+  }, [messagesByChannel, activeChannelId])
+
+  // 添加消息到指定频道
   const appendMessage = useCallback(
-    (message) => {
-      setMessages((prev) => [...prev, message])
+    (message, channelId = activeChannelId) => {
+      if (!channelId) {
+        console.warn('[useAgentMessages] 无法添加消息：没有活动频道')
+        return
+      }
+      
+      setMessagesByChannel((prev) => {
+        const channelMessages = prev[channelId] || []
+        return {
+          ...prev,
+          [channelId]: [...channelMessages, message],
+        }
+      })
+      
       if (!isConversationVisible) {
         setConversationVisible(true)
       }
     },
-    [isConversationVisible],
+    [activeChannelId, isConversationVisible],
   )
+
+  // 设置指定频道的所有消息（用于从 IPFS 加载）
+  const setMessagesForChannel = useCallback((channelId, messages) => {
+    if (!channelId) return
+    
+    setMessagesByChannel((prev) => ({
+      ...prev,
+      [channelId]: messages,
+    }))
+    
+    // 更新已保存计数
+    savedMessageCountRef.current[channelId] = messages.length
+  }, [])
+
+  // 清空指定频道的消息
+  const clearMessagesForChannel = useCallback((channelId) => {
+    if (!channelId) return
+    
+    setMessagesByChannel((prev) => {
+      const newMap = { ...prev }
+      delete newMap[channelId]
+      return newMap
+    })
+    
+    // 重置保存计数
+    delete savedMessageCountRef.current[channelId]
+  }, [])
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -39,9 +95,67 @@ export const useAgentMessages = ({
     })
   }, [conversationOverlayRef])
 
+  // 保存消息到 IPFS
+  const saveMessagesToIpfs = useCallback(async (channelId, agentId) => {
+    const channelMessages = messagesByChannel[channelId] || []
+    const savedCount = savedMessageCountRef.current[channelId] || 0
+    
+    // 如果没有新消息，跳过保存
+    if (channelMessages.length === 0 || channelMessages.length <= savedCount) {
+      return null
+    }
+    
+    try {
+      console.log(`[useAgentMessages] 保存 ${channelMessages.length} 条消息到 IPFS，频道: ${channelId}`)
+      
+      const cid = await agentService.uploadMessagesToIpfs(channelMessages, agentId)
+      
+      // 更新 agentStore 中的 messages_cid
+      if (cid && agentId) {
+        updateAgent(agentId, { messages_cid: cid })
+        console.log(`[useAgentMessages] 消息已保存到 IPFS，CID: ${cid}`)
+      }
+      
+      // 更新已保存计数
+      savedMessageCountRef.current[channelId] = channelMessages.length
+      
+      return cid
+    } catch (error) {
+      console.error('[useAgentMessages] 保存消息到 IPFS 失败:', error)
+      return null
+    }
+  }, [messagesByChannel, updateAgent])
+
+  // 从 IPFS 加载消息
+  const loadMessagesFromIpfs = useCallback(async (channelId, messagesCid) => {
+    if (!channelId || !messagesCid) return false
+    
+    try {
+      console.log(`[useAgentMessages] 从 IPFS 加载消息，CID: ${messagesCid}`)
+      
+      const data = await agentService.loadMessagesFromIpfs(messagesCid)
+      
+      if (data && data.messages && Array.isArray(data.messages)) {
+        setMessagesForChannel(channelId, data.messages)
+        console.log(`[useAgentMessages] 已加载 ${data.messages.length} 条消息`)
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('[useAgentMessages] 从 IPFS 加载消息失败:', error)
+      return false
+    }
+  }, [setMessagesForChannel])
+
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
     if (!text || isLoading) {
+      return
+    }
+
+    if (!activeChannelId) {
+      console.warn('[useAgentMessages] 无法发送消息：没有活动频道')
       return
     }
 
@@ -62,7 +176,7 @@ export const useAgentMessages = ({
           content: '❌ 无法连接到后端服务，请检查网络连接或稍后重试。',
           timestamp: Date.now(),
           source: 'error',
-        })
+        }, activeChannelId)
         return
       }
     }
@@ -74,7 +188,7 @@ export const useAgentMessages = ({
       timestamp: Date.now(),
     }
 
-    appendMessage(userMessage)
+    appendMessage(userMessage, activeChannelId)
     setCurrentMessage('')
     setIsLoading(true)
     recordInteraction('user_message', { content: text })
@@ -88,7 +202,7 @@ export const useAgentMessages = ({
 
       // 使用最新的 sessionId（可能在 createSession 后更新了）
       const actualSessionId = sessionId.startsWith('frontend_') ? currentSessionId : sessionId
-      console.log('[useAgentMessages] 发送消息，sessionId:', actualSessionId)
+      console.log('[useAgentMessages] 发送消息，sessionId:', actualSessionId, '频道:', activeChannelId)
 
       const data = await apiClient
         .post('/agent/chat', {
@@ -97,6 +211,13 @@ export const useAgentMessages = ({
           wallet_address: walletAddress || undefined,
           chain: activeChain || undefined,
           context_events: contextSnapshot,
+          // 传递智能体信息，让后端使用正确的 prompt
+          agent_id: activeChannelId,
+          agent_info: selectedAgent ? {
+            name: selectedAgent.display_name || selectedAgent.name,
+            role_description: selectedAgent.role_description,
+            custom_prompt: selectedAgent.customPrompt,
+          } : undefined,
         })
         .then((response) => response.data)
 
@@ -111,7 +232,7 @@ export const useAgentMessages = ({
         timestamp: data.timestamp || Date.now(),
         source: data.source || 'alou-edge',
       }
-      appendMessage(assistantMessage)
+      appendMessage(assistantMessage, activeChannelId)
 
       if (data.session_id) {
         setSessionId(data.session_id)
@@ -137,7 +258,7 @@ export const useAgentMessages = ({
         content: friendlyMessage,
         timestamp: Date.now(),
         source: 'error',
-      })
+      }, activeChannelId)
     } finally {
       setIsLoading(false)
       scrollToBottom()
@@ -145,6 +266,7 @@ export const useAgentMessages = ({
     }
   }, [
     activeChain,
+    activeChannelId,
     appendMessage,
     consoleDockRef,
     contextEventsRef,
@@ -155,6 +277,7 @@ export const useAgentMessages = ({
     isSessionReady,
     recordInteraction,
     scrollToBottom,
+    selectedAgent,
     sessionId,
     setSessionId,
     setSessionReady,
@@ -169,9 +292,38 @@ export const useAgentMessages = ({
     setConversationVisible(false)
   }, [])
 
+  // 当关闭对话面板或切换频道时，保存消息到 IPFS
+  const previousChannelRef = useRef(activeChannelId)
+  useEffect(() => {
+    const prevChannel = previousChannelRef.current
+    
+    // 如果频道发生变化，保存之前频道的消息
+    if (prevChannel && prevChannel !== activeChannelId) {
+      const prevMessages = messagesByChannel[prevChannel] || []
+      const savedCount = savedMessageCountRef.current[prevChannel] || 0
+      
+      if (prevMessages.length > savedCount) {
+        // 异步保存，不阻塞
+        const agentId = prevChannel
+        saveMessagesToIpfs(prevChannel, agentId).catch(err => {
+          console.error('[useAgentMessages] 切换频道时保存消息失败:', err)
+        })
+      }
+    }
+    
+    previousChannelRef.current = activeChannelId
+  }, [activeChannelId, messagesByChannel, saveMessagesToIpfs])
+
   return {
     messages,
-    setMessages,
+    messagesByChannel,
+    setMessages: (msgs) => {
+      if (activeChannelId) {
+        setMessagesForChannel(activeChannelId, msgs)
+      }
+    },
+    setMessagesForChannel,
+    clearMessagesForChannel,
     currentMessage,
     setCurrentMessage,
     isLoading,
@@ -183,5 +335,7 @@ export const useAgentMessages = ({
     sendMessage,
     openConversationPanel,
     closeConversationPanel,
+    saveMessagesToIpfs,
+    loadMessagesFromIpfs,
   }
 }

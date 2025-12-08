@@ -178,6 +178,8 @@ const AgentChat = () => {
     sessionId,
     setSessionId,
     activeChain: preferredChain,
+    activeChannelId,
+    selectedAgent,
     isSessionReady,
     createSession,
     setSessionReady,
@@ -192,6 +194,8 @@ const AgentChat = () => {
 
   const {
     messages,
+    messagesByChannel,
+    setMessagesForChannel,
     currentMessage,
     setCurrentMessage,
     isLoading,
@@ -199,6 +203,8 @@ const AgentChat = () => {
     appendMessage,
     scrollToBottom,
     sendMessage: baseSendMessage,
+    saveMessagesToIpfs,
+    loadMessagesFromIpfs,
   } = messageState
 
   // ==================== Tool Call Handler ====================
@@ -230,6 +236,7 @@ const AgentChat = () => {
     setChannelError,
     recordInteraction,
     openConversationPanel,
+    loadMessagesFromIpfs,
   })
 
   const {

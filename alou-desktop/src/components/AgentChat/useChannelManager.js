@@ -20,6 +20,7 @@ export const useChannelManager = ({
   setChannelError,
   recordInteraction,
   openConversationPanel,
+  loadMessagesFromIpfs, // 新增：加载历史消息的回调
 }) => {
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
@@ -199,6 +200,14 @@ export const useChannelManager = ({
       })
       openConversationPanel()
 
+      // 尝试从 IPFS 加载历史消息
+      const meta = channel.meta ?? {}
+      if (meta.messages_cid && loadMessagesFromIpfs) {
+        loadMessagesFromIpfs(channel.id, meta.messages_cid).catch((err) => {
+          console.error('[useChannelManager] 加载历史消息失败:', err)
+        })
+      }
+
       // 只有当需要解析更多信息时才调用后端
       const target = extractAgentTarget(channel.meta ?? channel)
       if (!target) {
@@ -206,7 +215,6 @@ export const useChannelManager = ({
       }
 
       // 如果已经有完整信息，不需要再次解析
-      const meta = channel.meta ?? {}
       if (meta.did && meta.display_name) {
         // 已有完整数据，无需重新解析
         return
@@ -250,6 +258,7 @@ export const useChannelManager = ({
       })()
     },
     [
+      loadMessagesFromIpfs,
       openConversationPanel,
       recordInteraction,
       sessionId,

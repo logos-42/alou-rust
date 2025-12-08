@@ -46,13 +46,34 @@ export class AgentService {
 
   /**
    * Resolve agent metadata via DIAP/IPFS
+   * 解析后端返回的 did_document 来提取智能体元数据（名称、头像等）
    */
   async resolveAgent(target, sessionId) {
     const response = await apiClient.post('/agent/resolve', {
       target,
       session_id: sessionId,
     })
-    return response.data
+    
+    const resolvedAgent = response.data
+    
+    // 如果包含 did_document，解析它来提取智能体元数据
+    if (resolvedAgent.did_document) {
+      const parsedAgent = this._parseDidDocumentToAgent(resolvedAgent.did_document, {
+        cid: resolvedAgent.cid,
+        ipns: resolvedAgent.ipns || null,
+      })
+      
+      // 合并解析后的元数据和原始数据
+      return {
+        ...resolvedAgent,
+        ...parsedAgent,
+        // 保留原始的 did_document 以便后续使用
+        did_document: resolvedAgent.did_document,
+      }
+    }
+    
+    // 如果没有 did_document（fallback 情况），直接返回
+    return resolvedAgent
   }
 
   /**
@@ -540,6 +561,66 @@ export class AgentService {
         ipns: additionalInfo.ipns,
         public_key: didDocument.verificationMethod?.[0]?.publicKeyMultibase || null,
       },
+    }
+  }
+
+  /**
+   * 上传消息到 IPFS
+   * @param {Array} messages - 消息数组
+   * @param {string} agentId - 智能体 ID
+   * @returns {Promise<string>} CID
+   */
+  async uploadMessagesToIpfs(messages, agentId) {
+    const messagesData = {
+      agent_id: agentId,
+      messages: messages,
+      timestamp: Date.now(),
+      version: '1.0',
+    }
+    
+    const jsonData = JSON.stringify(messagesData, null, 2)
+    
+    try {
+      // 使用 IPFS HTTP API 上传
+      const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
+        method: 'POST',
+        body: new Blob([jsonData], { type: 'application/json' }),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`IPFS 上传失败: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      return result.Hash
+    } catch (error) {
+      console.error('[AgentService] 上传消息到 IPFS 失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 从 IPFS 加载消息
+   * @param {string} cid - 消息 CID
+   * @returns {Promise<Object>} 消息数据
+   */
+  async loadMessagesFromIpfs(cid) {
+    try {
+      const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipfs/${cid}`
+      const response = await fetch(gatewayUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      })
+      
+      if (!response.ok) {
+        throw new Error(`IPFS Gateway 返回错误: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error('[AgentService] 从 IPFS 加载消息失败:', error)
+      throw error
     }
   }
 }
