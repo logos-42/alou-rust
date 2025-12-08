@@ -260,6 +260,7 @@ export const agent = {
 
     // ==================== Sidebar ====================
     'agent.sidebar.loading': 'Loading agents...',
+    'agent.sidebar.empty': 'No agents yet. Please enter IPNS / CID / DID above to search.',
     'agent.sidebar.connectNow': 'Connect Now',
     'agent.sidebar.filtered': 'Filtered: ',
     'agent.sidebar.expandList': 'Expand agent list',
