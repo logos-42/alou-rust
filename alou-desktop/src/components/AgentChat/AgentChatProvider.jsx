@@ -62,7 +62,7 @@ export const AgentChatProvider = ({ children }) => {
   const [channelKeyword, setChannelKeyword] = useState('')
   const [activeChannelId, setActiveChannelId] = useState(null)
   const [channels, setChannels] = useState([])
-  const [showDiapPanel, setShowDiapPanel] = useState(true)
+  const [showDiapPanel, setShowDiapPanel] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
