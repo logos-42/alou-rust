@@ -755,7 +755,7 @@ const AgentChat = () => {
           onInspectTransaction={handleInspectTransaction}
           connectActionSlot={() => (
             <button type="button" onClick={goToWallet}>
-              立即连接
+              {t('agent.sidebar.connectNow')}
             </button>
           )}
         />

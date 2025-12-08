@@ -69,13 +69,32 @@ export const login = {
     'login.localWallet.createButton': '创建',
 
     // ==================== WalletConnect QR ====================
-    'login.walletconnect.scanTitle': '扫描二维码',
+    'login.walletconnect.scanTitle': '使用移动钱包扫码连接',
     'login.walletconnect.scanDesc': '使用手机钱包 APP 扫描连接',
+    'login.walletconnect.step1': '1. 打开您的移动钱包应用（MetaMask、Trust Wallet等）',
+    'login.walletconnect.step2': '2. 扫描下方二维码',
+    'login.walletconnect.step3': '3. 在钱包中确认连接',
     'login.walletconnect.copyLink': '复制链接',
-    'login.walletconnect.openInBrowser': '在浏览器中使用钱包插件登录',
+    'login.walletconnect.openInBrowser': '在浏览器中打开',
+    'login.walletconnect.openInBrowserTitle': '在浏览器中使用钱包插件登录',
     'login.walletconnect.generating': '正在生成二维码...',
     'login.walletconnect.expired': '二维码已过期，请刷新',
     'login.walletconnect.refreshQR': '刷新二维码',
+    'login.walletconnect.browserOption.title': '想使用浏览器中的 MetaMask？',
+    'login.walletconnect.browserOption.desc': '点击下方按钮在浏览器中打开，浏览器会自动与 MetaMask 插件互动',
+
+    // 错误消息补充
+    'login.error.signatureVerifyFailed': '签名验证失败',
+    'login.error.connectionFailed.prefix': '连接失败：',
+    'login.error.connectionTimeout': '连接超时，请重试扫描二维码',
+    'login.error.cannotOpenBrowser': '无法自动打开浏览器，请手动访问：',
+    'login.error.cannotOpenBrowserPrefix': '无法打开浏览器：',
+    'login.error.walletConnectNotConfigured': 'WalletConnect 未配置：需要在 .env 文件中设置 VITE_WALLETCONNECT_PROJECT_ID',
+    'login.error.walletConnectProjectIdMissing': 'WalletConnect 未配置：需要在 .env 文件中设置 VITE_WALLETCONNECT_PROJECT_ID，访问 https://cloud.walletconnect.com 获取 Project ID',
+    'login.error.qrCodeTimeout': '生成二维码超时，可能是网络连接问题。请检查：\n1. 网络连接是否正常\n2. 防火墙是否阻止了 WebSocket 连接\n3. 可以尝试点击"在浏览器中打开"使用浏览器版本',
+    'login.error.wsConnectionFailed': '无法连接到 WalletConnect 服务器。请检查：\n1. 网络连接是否正常\n2. 防火墙或代理设置\n3. 可以尝试点击"在浏览器中打开"使用浏览器版本\n\n如果问题持续，请检查控制台查看详细错误信息',
+    'login.error.qrCodeGenerationFailed': '生成二维码失败：{error}\n\n提示：可以尝试点击"在浏览器中打开"使用浏览器版本',
+    'login.error.initWalletConnectFailed': '初始化WalletConnect失败',
   },
   en: {
     // ==================== Page Title ====================
@@ -143,13 +162,32 @@ export const login = {
     'login.localWallet.createButton': 'Create',
 
     // ==================== WalletConnect QR ====================
-    'login.walletconnect.scanTitle': 'Scan QR Code',
+    'login.walletconnect.scanTitle': 'Scan with Mobile Wallet',
     'login.walletconnect.scanDesc': 'Use your mobile wallet app to scan and connect',
+    'login.walletconnect.step1': '1. Open your mobile wallet app (MetaMask, Trust Wallet, etc.)',
+    'login.walletconnect.step2': '2. Scan the QR code below',
+    'login.walletconnect.step3': '3. Confirm the connection in your wallet',
     'login.walletconnect.copyLink': 'Copy Link',
-    'login.walletconnect.openInBrowser': 'Login with wallet plugin in browser',
+    'login.walletconnect.openInBrowser': 'Open in Browser',
+    'login.walletconnect.openInBrowserTitle': 'Login with wallet plugin in browser',
     'login.walletconnect.generating': 'Generating QR code...',
     'login.walletconnect.expired': 'QR code expired, please refresh',
     'login.walletconnect.refreshQR': 'Refresh QR Code',
+    'login.walletconnect.browserOption.title': 'Want to use MetaMask in browser?',
+    'login.walletconnect.browserOption.desc': 'Click the button below to open in browser, it will automatically interact with MetaMask plugin',
+
+    // Additional error messages
+    'login.error.signatureVerifyFailed': 'Signature verification failed',
+    'login.error.connectionFailed.prefix': 'Connection failed: ',
+    'login.error.connectionTimeout': 'Connection timeout, please try scanning QR code again',
+    'login.error.cannotOpenBrowser': 'Cannot open browser automatically, please visit manually: ',
+    'login.error.cannotOpenBrowserPrefix': 'Cannot open browser: ',
+    'login.error.walletConnectNotConfigured': 'WalletConnect not configured: Please set VITE_WALLETCONNECT_PROJECT_ID in .env file',
+    'login.error.walletConnectProjectIdMissing': 'WalletConnect not configured: Please set VITE_WALLETCONNECT_PROJECT_ID in .env file, visit https://cloud.walletconnect.com to get Project ID',
+    'login.error.qrCodeTimeout': 'QR code generation timeout, might be network issue. Please check:\n1. Network connection\n2. Firewall blocking WebSocket\n3. Try clicking "Open in Browser" to use browser version',
+    'login.error.wsConnectionFailed': 'Cannot connect to WalletConnect server. Please check:\n1. Network connection\n2. Firewall or proxy settings\n3. Try clicking "Open in Browser" to use browser version\n\nIf issue persists, check console for details',
+    'login.error.qrCodeGenerationFailed': 'QR code generation failed: {error}\n\nTip: Try clicking "Open in Browser" to use browser version',
+    'login.error.initWalletConnectFailed': 'Failed to initialize WalletConnect',
   },
 }
 

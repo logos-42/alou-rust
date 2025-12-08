@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import CollapseIcon from '@/assets/侧边栏收缩.png'
 import SearchIcon from '@/assets/搜索.png'
 import CreateIcon from '@/assets/创建.png'
+import { useI18n } from '@/hooks/useI18n'
 import './AgentSidebarLeft.css'
 
 const formatDate = (timestamp) => {
@@ -45,6 +46,7 @@ const AgentSidebarLeft = ({
   onModelTypeChange,
   onShowIdentityPanel,
 }) => {
+  const { t } = useI18n()
   const sidebarClassName = `sidebar-left${isCollapsed ? ' collapsed' : ''}`
   const [modelMenuState, setModelMenuState] = useState({ visible: false, top: 0, left: 0, width: 0 })
   const menuRef = useRef(null)
@@ -137,7 +139,7 @@ const AgentSidebarLeft = ({
           type="button"
           className="brand-toggle"
           onClick={() => onToggleCollapse?.()}
-          aria-label={isCollapsed ? '展开智能体列表' : '折叠智能体列表'}
+          aria-label={isCollapsed ? t('agent.sidebar.expandList') : t('agent.sidebar.collapseList')}
         >
           <img src={CollapseIcon} alt="折叠" className="brand-icon" />
         </button>
@@ -153,7 +155,7 @@ const AgentSidebarLeft = ({
           <input
             type="text"
             value={keyword}
-            placeholder="搜索智能体"
+            placeholder={t('agent.list.search.placeholder')}
             onChange={(event) => onKeywordChange?.(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -167,7 +169,7 @@ const AgentSidebarLeft = ({
 
       {!isCollapsed && selectedModelLabel && (
         <div className="model-filter-chip">
-          <span>已筛选：{selectedModelLabel}</span>
+          <span>{t('agent.sidebar.filtered')}{selectedModelLabel}</span>
           <button
             type="button"
             onClick={() => {
@@ -175,7 +177,7 @@ const AgentSidebarLeft = ({
               closeModelMenu()
               onShowIdentityPanel?.()
             }}
-            aria-label="清除模型筛选"
+            aria-label={t('agent.sidebar.clearFilter')}
           >
             ×
           </button>
@@ -183,7 +185,7 @@ const AgentSidebarLeft = ({
       )}
 
       <div className="channel-list">
-        {isLoading && <div className="channel-placeholder">正在加载智能体...</div>}
+        {isLoading && <div className="channel-placeholder">{t('agent.sidebar.loading')}</div>}
         {!isLoading && errorMessage && (
           <div className="channel-placeholder channel-error">
             <div>{errorMessage}</div>

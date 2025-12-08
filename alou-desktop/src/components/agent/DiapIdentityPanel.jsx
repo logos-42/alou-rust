@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
+import { useI18n } from '@/hooks/useI18n'
 import './DiapIdentityPanel.css'
 
 const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
+  const { t } = useI18n()
   const [identity, setIdentity] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -152,11 +154,11 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
           console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据（新）:', agentId)
         }
         
-        setToastMessage('DIAP 身份创建成功！')
+        setToastMessage(t('agent.diap.createSuccess'))
       }
     } catch (err) {
       console.error('Failed to create DIAP identity:', err)
-      const message = err.message || '创建身份失败'
+      const message = err.message || t('agent.diap.createFailed')
       setError(message)
       setToastMessage(message)
     } finally {
@@ -190,7 +192,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       await loadIdentity()
     } catch (err) {
       console.error('Failed to register agent on-chain:', err)
-      const message = err.message || '注册到链上失败'
+      const message = err.message || t('agent.diap.registerFailed')
       setError(message)
       setToastMessage(message)
     } finally {
@@ -214,14 +216,14 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     return (
       <div className={`diap-identity-panel ${isDarkMode ? 'dark' : 'light'}`}>
         <div className="diap-panel-header">
-          <h3>DIAP 身份</h3>
+          <h3>{t('agent.diap.title')}</h3>
           {onClose && (
             <button type="button" className="close-btn" onClick={onClose}>
               ×
             </button>
           )}
         </div>
-        <div className="diap-panel-content loading">加载中...</div>
+        <div className="diap-panel-content loading">{t('common.loading')}</div>
       </div>
     )
   }
@@ -229,7 +231,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   return (
     <div className={`diap-identity-panel ${isDarkMode ? 'dark' : 'light'}`}>
       <div className="diap-panel-header">
-        <h3>DIAP 身份</h3>
+        <h3>{t('agent.diap.title')}</h3>
         {onClose && (
           <button type="button" className="close-btn" onClick={onClose}>
             ×
@@ -239,27 +241,27 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       <div className="diap-panel-content">
         {!identity ? (
           <div className="diap-no-identity">
-            <p>此智能体尚未创建 DIAP 身份</p>
+            <p>{t('agent.diap.noIdentity')}</p>
             <button
               type="button"
               className="create-identity-btn"
               onClick={handleCreateIdentity}
               disabled={creating}
             >
-              {creating ? '创建中...' : '创建 DIAP 身份'}
+              {creating ? t('agent.diap.creating') : t('agent.diap.create')}
             </button>
           </div>
         ) : (
           <div className="diap-identity-info">
             <div className="diap-field">
-              <label>DID</label>
+              <label>{t('agent.diap.did')}</label>
               <div className="diap-value">
                 <code>{identity.did}</code>
                 <button
                   type="button"
                   className="copy-btn"
                   onClick={() => copyToClipboard(identity.did)}
-                  title="复制"
+                  title={t('agent.diap.copy')}
                 >
                   📋
                 </button>
@@ -267,14 +269,14 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             </div>
 
             <div className="diap-field">
-              <label>IPNS</label>
+              <label>{t('agent.diap.ipns')}</label>
               <div className="diap-value">
                 <code>{identity.ipns}</code>
                 <button
                   type="button"
                   className="copy-btn"
                   onClick={() => copyToClipboard(identity.ipns)}
-                  title="复制"
+                  title={t('agent.diap.copy')}
                 >
                   📋
                 </button>
@@ -282,14 +284,14 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             </div>
 
             <div className="diap-field">
-              <label>CID</label>
+              <label>{t('agent.diap.cid')}</label>
               <div className="diap-value">
                 <code>{identity.cid}</code>
                 <button
                   type="button"
                   className="copy-btn"
                   onClick={() => copyToClipboard(identity.cid)}
-                  title="复制"
+                  title={t('agent.diap.copy')}
                 >
                   📋
                 </button>
@@ -297,11 +299,11 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             </div>
 
             <div className="diap-field">
-              <label>链上注册状态</label>
+              <label>{t('agent.diap.registrationStatus')}</label>
               <div className="diap-value">
                 {identity.is_registered ? (
                   <span className="status-registered">
-                    ✓ 已注册
+                    ✓ {t('agent.diap.registered')}
                     {identity.registered_address && (
                       <code className="registered-address">
                         {identity.registered_address}
@@ -310,14 +312,14 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                   </span>
                 ) : (
                   <div className="register-section">
-                    <span className="status-unregistered">未注册</span>
+                    <span className="status-unregistered">{t('agent.diap.notRegistered')}</span>
                     <button
                       type="button"
                       className="register-btn"
                       onClick={handleRegisterOnChain}
                       disabled={registering}
                     >
-                      {registering ? '注册中...' : '注册到链上'}
+                      {registering ? t('agent.diap.registering') : t('agent.diap.register')}
                     </button>
                   </div>
                 )}
@@ -326,10 +328,10 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
 
             {registerInfo && (
               <div className="diap-field register-info">
-                <label>注册交易信息</label>
+                <label>{t('agent.diap.registerTxInfo')}</label>
                 <div className="diap-value">
                   <p className="info-text">
-                    已生成编码交易，请使用钱包签名并广播此交易：
+                    {t('agent.diap.registerTxHint')}
                   </p>
                   <div className="encoded-call">
                     <code>{registerInfo.encoded_call?.data || 'N/A'}</code>
@@ -337,19 +339,19 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                       type="button"
                       className="copy-btn"
                       onClick={() => copyToClipboard(registerInfo.encoded_call?.data || '')}
-                      title="复制"
+                      title={t('agent.diap.copy')}
                     >
                       📋
                     </button>
                   </div>
                   {registerInfo.registration_fee && (
                     <p className="info-text">
-                      注册费用: {registerInfo.registration_fee} wei
+                      {t('agent.diap.registrationFee')}: {registerInfo.registration_fee} wei
                     </p>
                   )}
                   {registerInfo.min_stake_amount && (
                     <p className="info-text">
-                      最小质押: {registerInfo.min_stake_amount} wei
+                      {t('agent.diap.minStakeAmount')}: {registerInfo.min_stake_amount} wei
                     </p>
                   )}
                 </div>
@@ -358,9 +360,9 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
 
             {identity.created_at && (
               <div className="diap-field">
-                <label>创建时间</label>
+                <label>{t('agent.diap.createdAt')}</label>
                 <div className="diap-value">
-                  {new Date(identity.created_at * 1000).toLocaleString('zh-CN')}
+                  {new Date(identity.created_at * 1000).toLocaleString()}
                 </div>
               </div>
             )}

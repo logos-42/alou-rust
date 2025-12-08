@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { desktopWalletService } from '@/services/desktopWalletService'
+import { useI18n } from '@/hooks/useI18n'
 import './WalletConnectQR.css'
 
 const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
+  const { t } = useI18n()
   const [qrUri, setQrUri] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
 
@@ -86,7 +88,7 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
                 onConnected({ address, chainId, walletType: 'walletconnect' })
               } else {
                 console.error('[WalletConnectQR] Signature verification failed')
-                onError('签名验证失败')
+                onError(t('login.error.signatureVerifyFailed'))
               }
             } else {
               console.warn('[WalletConnectQR] No accounts found, will retry via polling')
@@ -95,7 +97,7 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
           } catch (error) {
             console.error('[WalletConnectQR] Connection error:', error)
             if (isMounted) {
-              onError(error.message || '连接失败：' + (error.message || '未知错误'))
+              onError(error.message || t('login.error.connectionFailed.prefix') + (error.message || t('common.unknownError')))
             }
           } finally {
             if (isMounted) {
@@ -233,7 +235,7 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
               console.warn('[WalletConnectQR] Polling timeout after', maxPollAttempts, 'attempts')
               clearInterval(checkConnectionInterval)
               if (isMounted) {
-                onError('连接超时，请重试扫描二维码')
+                onError(t('login.error.connectionTimeout'))
               }
             } else if (pollAttempts % 10 === 0) {
               // 每 10 次尝试打印一次日志
@@ -279,13 +281,13 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
           if (isMounted) {
             setIsConnecting(false)
             if (uriError.code === 'WALLETCONNECT_PROJECT_ID_MISSING') {
-              onError('WalletConnect 未配置：需要在 .env 文件中设置 VITE_WALLETCONNECT_PROJECT_ID')
+              onError(t('login.error.walletConnectNotConfigured'))
             } else if (uriError.message?.includes('timeout')) {
-              onError('生成二维码超时，可能是网络连接问题。请检查：\n1. 网络连接是否正常\n2. 防火墙是否阻止了 WebSocket 连接\n3. 可以尝试点击"在浏览器中打开"使用浏览器版本')
+              onError(t('login.error.qrCodeTimeout'))
             } else if (uriError.message?.includes('WebSocket') || uriError.message?.includes('connection')) {
-              onError('无法连接到 WalletConnect 服务器。请检查：\n1. 网络连接是否正常\n2. 防火墙或代理设置\n3. 可以尝试点击"在浏览器中打开"使用浏览器版本\n\n如果问题持续，请检查控制台查看详细错误信息')
+              onError(t('login.error.wsConnectionFailed'))
             } else {
-              onError('生成二维码失败：' + (uriError.message || '未知错误') + '\n\n提示：可以尝试点击"在浏览器中打开"使用浏览器版本')
+              onError(t('login.error.qrCodeGenerationFailed', { error: uriError.message || t('common.unknownError') }))
             }
           }
         }
@@ -293,9 +295,9 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
         console.error('WalletConnect init error:', error)
         if (isMounted) {
           if (error.code === 'WALLETCONNECT_PROJECT_ID_MISSING') {
-            onError('WalletConnect 未配置：需要在 .env 文件中设置 VITE_WALLETCONNECT_PROJECT_ID，访问 https://cloud.walletconnect.com 获取 Project ID')
+            onError(t('login.error.walletConnectProjectIdMissing'))
           } else {
-            onError(error.message || '初始化WalletConnect失败')
+            onError(error.message || t('login.error.initWalletConnectFailed'))
           }
           setIsConnecting(false)
         }
@@ -423,13 +425,13 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
       }
       
       // 如果所有方法都失败，显示错误和链接
-      onError(`无法自动打开浏览器，请手动访问：${loginUrl}`)
+      onError(t('login.error.cannotOpenBrowser') + loginUrl)
     } catch (error) {
       console.error('[WalletConnectQR] Failed to open browser:', error)
       const productionUrl = import.meta.env.VITE_APP_URL || import.meta.env.VITE_BASE_URL || 'https://alou.onl'
       const devUrl = import.meta.env.DEV ? 'http://localhost:1420' : productionUrl
       const loginUrl = `${devUrl}/login`
-      onError(`无法打开浏览器：${error.message || '未知错误'}。请手动访问：${loginUrl}`)
+      onError(t('login.error.cannotOpenBrowserPrefix') + (error.message || t('common.unknownError')) + '. ' + t('login.error.cannotOpenBrowser') + loginUrl)
     }
   }
 
@@ -438,11 +440,11 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
   return (
     <div className="wallet-connect-qr">
       <div className="qr-container">
-        <h3>使用移动钱包扫码连接</h3>
+        <h3>{t('login.walletconnect.scanTitle')}</h3>
         <p className="qr-instructions">
-          1. 打开您的移动钱包应用（MetaMask、Trust Wallet等）<br />
-          2. 扫描下方二维码<br />
-          3. 在钱包中确认连接
+          {t('login.walletconnect.step1')}<br />
+          {t('login.walletconnect.step2')}<br />
+          {t('login.walletconnect.step3')}
         </p>
 
         {qrUri ? (
@@ -457,7 +459,7 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
                 <rect x="7" y="7" width="10" height="10" />
                 <path d="M7 3v4M17 3v4M3 7h4M3 17h4M21 7h-4M21 17h-4M7 21v-4M17 21v-4" />
               </svg>
-              <p>正在生成二维码...</p>
+              <p>{t('login.walletconnect.generating')}</p>
             </div>
           </div>
         )}
@@ -466,8 +468,8 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
           <div className="qr-browser-hint">
             <div className="qr-browser-icon">🌐</div>
             <div className="qr-browser-text">
-              <p className="qr-browser-title">想使用浏览器中的 MetaMask？</p>
-              <p className="qr-browser-desc">点击下方按钮在浏览器中打开，浏览器会自动与 MetaMask 插件互动</p>
+              <p className="qr-browser-title">{t('login.walletconnect.browserOption.title')}</p>
+              <p className="qr-browser-desc">{t('login.walletconnect.browserOption.desc')}</p>
             </div>
           </div>
         </div>
@@ -477,17 +479,17 @@ const WalletConnectQR = ({ onConnected, onError, onCancel }) => {
             type="button" 
             onClick={handleOpenBrowser} 
             className="browser-btn"
-            title="在浏览器中使用钱包插件登录"
+            title={t('login.walletconnect.openInBrowserTitle')}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <polyline points="15 3 21 3 21 9" />
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
-            在浏览器中打开
+            {t('login.walletconnect.openInBrowser')}
           </button>
           <button type="button" onClick={handleCancel} className="cancel-btn">
-            取消
+            {t('common.cancel')}
           </button>
         </div>
       </div>
