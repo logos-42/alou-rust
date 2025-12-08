@@ -1,18 +1,30 @@
-// 多语言配置
-export const messages = {
+/**
+ * 旧版翻译 key（向后兼容）
+ *
+ * 这些是旧代码中使用的扁平化 key，保留以确保向后兼容。
+ * 新代码应使用命名空间格式的 key（如 agent.create.title）
+ *
+ * TODO: 逐步迁移旧代码后删除此文件
+ */
+export const legacy = {
   zh: {
+    // 应用基础
     appTitle: 'Alou智能助手',
     connected: '已连接',
     disconnected: '连接失败',
     connecting: '连接中...',
     login: '登录',
     logout: '退出登录',
+
+    // 设置
     walletManagement: '钱包管理',
     settings: '设置',
     language: '语言',
     theme: '主题',
     darkMode: '深色模式',
     lightMode: '浅色模式',
+
+    // 对话
     welcome: '欢迎使用Alou智能助手',
     welcomeDesc: '我是区块链支付的AI助手，很高兴为您提供智能服务。',
     inputPlaceholder: '输入您的问题...（Enter发送，Shift+Enter换行）',
@@ -23,37 +35,8 @@ export const messages = {
     transactionHistory: '交易历史',
     error: '抱歉，发生了错误',
     networkError: '请检查网络连接或稍后重试',
-  },
-  en: {
-    appTitle: 'Alou AI Assistant',
-    connected: 'Connected',
-    disconnected: 'Disconnected',
-    connecting: 'Connecting...',
-    login: 'Login',
-    logout: 'Logout',
-    walletManagement: 'Wallet',
-    settings: 'Settings',
-    language: 'Language',
-    theme: 'Theme',
-    darkMode: 'Dark Mode',
-    lightMode: 'Light Mode',
-    welcome: 'Welcome to Alou AI Assistant',
-    welcomeDesc: 'I am your blockchain payment AI assistant, happy to help you.',
-    inputPlaceholder: 'Type your question... (Enter to send, Shift+Enter for new line)',
-    send: 'Send',
-    thinking: 'AI is thinking...',
-    queryBalance: 'Query Balance',
-    sendTokens: 'Send Tokens',
-    transactionHistory: 'Transaction History',
-    error: 'Sorry, an error occurred',
-    networkError: 'Please check your network connection or try again later',
-  },
-}
 
-// 钱包相关翻译
-export const walletMessages = {
-  zh: {
-    ...messages.zh,
+    // 钱包相关
     back: '返回',
     connectWallet: '连接钱包',
     connectWalletDesc: '连接你的钱包以开始使用',
@@ -65,6 +48,8 @@ export const walletMessages = {
     noTransactions: '暂无交易记录',
     sent: '发送',
     received: '接收',
+
+    // 合约钱包
     agentContractWallet: '智能体合约钱包',
     createContractWallet: '创建合约钱包',
     noContractWallet: '还没有合约钱包',
@@ -74,6 +59,8 @@ export const walletMessages = {
     deposit: '存入',
     withdraw: '提取',
     manage: '管理',
+
+    // 签名
     signatureRequest: '签名请求',
     from: '从',
     to: '到',
@@ -83,6 +70,8 @@ export const walletMessages = {
     cancel: '取消',
     confirm: '确认',
     signing: '签名中',
+
+    // 状态
     installMetaMask: '请先安装 MetaMask',
     connectionFailed: '连接失败',
     walletConnectComingSoon: 'WalletConnect 即将推出',
@@ -93,10 +82,14 @@ export const walletMessages = {
     contractManagementComingSoon: '合约管理功能即将推出',
     transactionSent: '交易已发送',
     transactionFailed: '交易失败',
+
+    // 时间
     justNow: '刚刚',
     minutesAgo: '分钟前',
     hoursAgo: '小时前',
     daysAgo: '天前',
+
+    // 其他
     agentAssets: '智能体资产',
     refresh: '刷新',
     noWalletConnected: '尚未连接钱包',
@@ -106,7 +99,35 @@ export const walletMessages = {
     collapse: '收起',
   },
   en: {
-    ...messages.en,
+    // App basics
+    appTitle: 'Alou AI Assistant',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    connecting: 'Connecting...',
+    login: 'Login',
+    logout: 'Logout',
+
+    // Settings
+    walletManagement: 'Wallet',
+    settings: 'Settings',
+    language: 'Language',
+    theme: 'Theme',
+    darkMode: 'Dark Mode',
+    lightMode: 'Light Mode',
+
+    // Chat
+    welcome: 'Welcome to Alou AI Assistant',
+    welcomeDesc: 'I am your blockchain payment AI assistant, happy to help you.',
+    inputPlaceholder: 'Type your question... (Enter to send, Shift+Enter for new line)',
+    send: 'Send',
+    thinking: 'AI is thinking...',
+    queryBalance: 'Query Balance',
+    sendTokens: 'Send Tokens',
+    transactionHistory: 'Transaction History',
+    error: 'Sorry, an error occurred',
+    networkError: 'Please check your network connection or try again later',
+
+    // Wallet related
     back: 'Back',
     connectWallet: 'Connect Wallet',
     connectWalletDesc: 'Connect your wallet to get started',
@@ -118,6 +139,8 @@ export const walletMessages = {
     noTransactions: 'No transactions yet',
     sent: 'Sent',
     received: 'Received',
+
+    // Contract wallet
     agentContractWallet: 'Agent Contract Wallet',
     createContractWallet: 'Create Contract Wallet',
     noContractWallet: 'No contract wallet yet',
@@ -127,6 +150,8 @@ export const walletMessages = {
     deposit: 'Deposit',
     withdraw: 'Withdraw',
     manage: 'Manage',
+
+    // Signature
     signatureRequest: 'Signature Request',
     from: 'From',
     to: 'To',
@@ -136,6 +161,8 @@ export const walletMessages = {
     cancel: 'Cancel',
     confirm: 'Confirm',
     signing: 'Signing',
+
+    // Status
     installMetaMask: 'Please install MetaMask first',
     connectionFailed: 'Connection failed',
     walletConnectComingSoon: 'WalletConnect coming soon',
@@ -146,10 +173,14 @@ export const walletMessages = {
     contractManagementComingSoon: 'Contract management coming soon',
     transactionSent: 'Transaction sent',
     transactionFailed: 'Transaction failed',
+
+    // Time
     justNow: 'Just now',
     minutesAgo: ' minutes ago',
     hoursAgo: ' hours ago',
     daysAgo: ' days ago',
+
+    // Others
     agentAssets: 'Agent Assets',
     refresh: 'Refresh',
     noWalletConnected: 'No wallet connected',
@@ -159,3 +190,4 @@ export const walletMessages = {
     collapse: 'Collapse',
   },
 }
+

@@ -5,16 +5,17 @@ import { walletService } from '@/services/walletService'
 import { desktopWalletService } from '@/services/desktopWalletService'
 import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
+import { useI18n } from '@/hooks/useI18n'
 import './LoginView.css'
 
-const getWalletButtons = (isDesktop) => {
+const getWalletButtons = (isDesktop, t) => {
   if (isDesktop) {
     // 桌面版钱包选项
     return [
       {
         id: 'walletconnect',
-        name: 'WalletConnect',
-        description: () => '扫码连接移动钱包',
+        name: t('login.wallet.walletconnect'),
+        description: () => t('login.wallet.walletconnect.desc'),
         icon: (
           <svg width="40" height="40" viewBox="0 0 300 185" fill="none">
             <path
@@ -26,8 +27,8 @@ const getWalletButtons = (isDesktop) => {
       },
       {
         id: 'local',
-        name: '本地钱包',
-        description: () => '导入私钥或创建新钱包',
+        name: t('login.wallet.local'),
+        description: () => t('login.wallet.local.desc'),
         icon: (
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -42,8 +43,8 @@ const getWalletButtons = (isDesktop) => {
   return [
     {
       id: 'metamask',
-      name: 'MetaMask',
-      description: (hasMetaMask) => (hasMetaMask ? '已安装' : '需要安装浏览器插件'),
+      name: t('login.wallet.metamask'),
+      description: (hasMetaMask) => hasMetaMask ? t('login.wallet.metamask.installed') : t('login.wallet.metamask.notInstalled'),
       icon: (
         <img
           src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"
@@ -53,8 +54,8 @@ const getWalletButtons = (isDesktop) => {
     },
     {
       id: 'walletconnect',
-      name: 'WalletConnect',
-      description: () => '扫码连接移动钱包',
+      name: t('login.wallet.walletconnect'),
+      description: () => t('login.wallet.walletconnect.desc'),
       icon: (
         <svg width="40" height="40" viewBox="0 0 300 185" fill="none">
           <path
@@ -66,8 +67,8 @@ const getWalletButtons = (isDesktop) => {
     },
     {
       id: 'coinbase',
-      name: 'Coinbase Wallet',
-      description: () => '安全易用的加密钱包',
+      name: t('login.wallet.coinbase'),
+      description: () => t('login.wallet.coinbase.desc'),
       icon: (
         <svg width="40" height="40" viewBox="0 0 1024 1024" fill="none">
           <rect width="1024" height="1024" rx="512" fill="#FFFFFF" />
@@ -84,6 +85,7 @@ const getWalletButtons = (isDesktop) => {
 }
 
 const LoginView = () => {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const loginWithWeb3Wallet = useAuthStore((state) => state.loginWithWeb3Wallet)
   const [isLoading, setIsLoading] = useState(false)
@@ -235,7 +237,7 @@ const LoginView = () => {
       setError('')
 
       if (!walletService.isWalletAvailable()) {
-        throw new Error('请先安装 MetaMask 浏览器插件')
+        throw new Error(t('login.error.metamaskNotInstalled'))
       }
 
       let accounts = []
@@ -245,11 +247,11 @@ const LoginView = () => {
         if (requestError?.code === 4001) {
           throw requestError
         }
-        throw new Error(requestError?.message || '请求钱包账户失败')
+        throw new Error(requestError?.message || t('login.error.getAccountFailed'))
       }
 
       if (!accounts || accounts.length === 0) {
-        throw new Error('未能获取钱包地址')
+        throw new Error(t('login.error.noAccountRetrieved'))
       }
 
       const chainId = await walletService.getCurrentChainId()
@@ -286,19 +288,19 @@ const LoginView = () => {
       navigate('/')
     } catch (err) {
       if (err?.code === 4001) {
-        setError('您拒绝了连接请求，请在 MetaMask 中选择要连接的钱包')
+        setError(t('login.error.userRejected'))
       } else if (err?.code === -32002) {
-        setError('请在 MetaMask 中确认连接请求（可能已有待处理的请求）')
+        setError(t('login.error.pendingRequest'))
       } else if (err?.code === -32603) {
-        setError('MetaMask 内部错误，请刷新页面重试')
+        setError(t('login.error.internalError'))
       } else {
-        setError(err?.message || '连接 MetaMask 失败，请重试')
+        setError(err?.message || t('login.error.connectionFailed'))
       }
     } finally {
       setIsLoading(false)
       setCurrentWallet(null)
     }
-  }, [loginWithWeb3Wallet, navigate])
+  }, [loginWithWeb3Wallet, navigate, t])
 
   const handleWalletConnect = useCallback((id) => {
     if (isDesktop) {
@@ -310,7 +312,7 @@ const LoginView = () => {
         setConnectionMode('local')
         setError('')
       } else {
-        setError('该连接方式在桌面版不可用，请使用 WalletConnect 或本地钱包')
+        setError(t('login.error.notAvailableOnDesktop'))
       }
     } else {
       // 浏览器环境：直接尝试连接 MetaMask（如果可用）
@@ -320,13 +322,13 @@ const LoginView = () => {
         setIsLoading(false)
         setCurrentWallet(null)
         if (id === 'walletconnect') {
-          setError('WalletConnect 功能即将推出，请使用 MetaMask 浏览器插件')
+          setError(t('login.error.walletConnectComingSoon'))
         } else if (id === 'coinbase') {
-          setError('Coinbase Wallet 功能即将推出，请使用 MetaMask 浏览器插件')
+          setError(t('login.error.coinbaseComingSoon'))
         }
       }
     }
-  }, [isDesktop, connectMetaMask])
+  }, [isDesktop, connectMetaMask, t])
 
   const handleWalletClick = useCallback(
     (id) => {
@@ -351,15 +353,15 @@ const LoginView = () => {
         // 连接成功后，不需要重置 connectionMode，直接跳转
         navigate('/')
       } catch (err) {
-        setError(err.message || '登录失败')
+        setError(err.message || t('login.error.loginFailed'))
       }
     },
-    [loginWithWeb3Wallet, navigate]
+    [loginWithWeb3Wallet, navigate, t]
   )
 
   const handleWalletError = useCallback((err) => {
-    setError(err || '连接钱包失败')
-  }, [])
+    setError(err || t('login.error.connectionFailed'))
+  }, [t])
 
   const handleConnectionCancel = useCallback(async () => {
     // 取消时关闭窗口（和右上角关闭按钮共用功能）
@@ -379,7 +381,7 @@ const LoginView = () => {
 
   const wallets = useMemo(
     () => {
-      const buttons = getWalletButtons(isDesktop)
+      const buttons = getWalletButtons(isDesktop, t)
       return buttons.map((button) => ({
         ...button,
         description: typeof button.description === 'function'
@@ -387,13 +389,13 @@ const LoginView = () => {
           : button.description,
       }))
     },
-    [isDesktop, hasMetaMask],
+    [isDesktop, hasMetaMask, t],
   )
 
   return (
     <div className="login-container">
       <div className="login-box">
-        <button type="button" onClick={goBack} className="close-btn" title="返回">
+        <button type="button" onClick={goBack} className="close-btn" title={t('common.back')}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" />
           </svg>
@@ -403,11 +405,11 @@ const LoginView = () => {
           <div className="logo-icon">💰</div>
         </div>
 
-        <h1 className="title">连接钱包</h1>
+        <h1 className="title">{t('login.title')}</h1>
         <p className="subtitle">
           {isDesktop 
-            ? '使用手机钱包扫码连接，或在浏览器中使用钱包插件（桌面版）' 
-            : '选择您的加密钱包以安全登录（浏览器版）'}
+            ? t('login.subtitle.desktop')
+            : t('login.subtitle.browser')}
         </p>
 
         {error && (
@@ -443,19 +445,19 @@ const LoginView = () => {
                     className={`mode-btn active`}
                     onClick={() => setConnectionMode('walletconnect')}
                   >
-                    手机扫码
+                    {t('login.mode.phoneScan')}
                   </button>
                   <button
                     type="button"
                     className="mode-btn"
                     onClick={() => setConnectionMode('local')}
                   >
-                    本地钱包
+                    {t('login.mode.localWallet')}
                   </button>
                 </div>
 
                 <div className="desktop-notice">
-                  <p>💡 请选择连接方式：WalletConnect（手机扫码）或本地钱包</p>
+                  <p>{t('login.mode.selectHint')}</p>
                 </div>
               </>
             )}
@@ -467,14 +469,14 @@ const LoginView = () => {
                 className={`mode-btn ${connectionMode === 'walletconnect' ? 'active' : ''}`}
                 onClick={() => setConnectionMode('walletconnect')}
               >
-                手机扫码
+                {t('login.mode.phoneScan')}
               </button>
               <button
                 type="button"
                 className={`mode-btn ${connectionMode === 'local' ? 'active' : ''}`}
                 onClick={() => setConnectionMode('local')}
               >
-                本地钱包
+                {t('login.mode.localWallet')}
               </button>
             </div>
           </>
@@ -513,20 +515,20 @@ const LoginView = () => {
             </div>
             {!hasMetaMask && (
               <div className="browser-notice">
-                <p>⚠️ 未检测到 MetaMask 插件，请先安装 MetaMask 浏览器扩展</p>
+                <p>{t('login.status.metamaskNotDetected')}</p>
                 <a
                   href="https://metamask.io/download/"
                   target="_blank"
                   rel="noreferrer"
                   className="install-link"
                 >
-                  下载 MetaMask
+                  {t('login.help.downloadMetaMask')}
                 </a>
               </div>
             )}
             {hasMetaMask && (
               <div className="browser-success">
-                <p>✅ 已检测到 MetaMask，点击上方按钮即可连接</p>
+                <p>{t('login.status.metamaskDetected')}</p>
               </div>
             )}
           </>
@@ -535,39 +537,39 @@ const LoginView = () => {
         <div className="security-notice">
           <div className="notice-icon">🔒</div>
           <div className="notice-content">
-            <h3>安全提示</h3>
+            <h3>{t('login.security.title')}</h3>
             <ul>
-              <li>我们不会存储您的私钥或助记词</li>
-              <li>请确认您访问的是正确的网站</li>
-              <li>不要与他人分享您的钱包信息</li>
+              <li>{t('login.security.tip1')}</li>
+              <li>{t('login.security.tip2')}</li>
+              <li>{t('login.security.tip3')}</li>
             </ul>
           </div>
         </div>
 
         {!isDesktop && (
           <div className="help-section">
-            <p className="help-text">没有钱包？</p>
+            <p className="help-text">{t('login.help.noWallet')}</p>
             <a
               href="https://metamask.io/download/"
               target="_blank"
               rel="noreferrer"
               className="help-link"
             >
-              下载 MetaMask
+              {t('login.help.downloadMetaMask')}
             </a>
           </div>
         )}
 
         <p className="terms">
-          连接钱包即表示您同意我们的
+          {t('login.terms.prefix')}
           <a href="/terms" target="_blank" rel="noreferrer">
             {' '}
-            服务条款
+            {t('login.terms.termsOfService')}
           </a>
-          和
+          {t('login.terms.and')}
           <a href="/privacy" target="_blank" rel="noreferrer">
             {' '}
-            隐私政策
+            {t('login.terms.privacyPolicy')}
           </a>
         </p>
       </div>

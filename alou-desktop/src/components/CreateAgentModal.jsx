@@ -3,6 +3,7 @@ import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
 import diapService from '@/services/diapService'
 import ipfsService from '@/services/ipfsService'
+import { useI18n } from '@/hooks/useI18n'
 import './CreateAgentModal.css'
 
 const emptyPort = () => ({
@@ -16,8 +17,9 @@ const emptyPort = () => ({
 const MAX_PORTS = 6
 
 function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent, sessionId, onEarlyChannel }) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
-  const [roleDescription, setRoleDescription] = useState('Web3 多代理协调智能体')
+  const [roleDescription, setRoleDescription] = useState(t('agent.create.role.default'))
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [mcpPorts, setMcpPorts] = useState([emptyPort()])
@@ -88,10 +90,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
         // 尝试自动启动节点
         const startResult = await ipfsService.startNode(true)
         if (!startResult.success) {
-          setError(
-            'IPFS 节点未运行。请先启动 IPFS 节点后再创建智能体。错误: ' +
-              (startResult.error || '未知错误')
-          )
+          setError(t('agent.create.error.ipfsNotRunning'))
           setIsLoading(false)
           return
         }
@@ -126,7 +125,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             const earlyMetadata = {
               display_name: fallbackName,
               name: fallbackName,
-              role_description: roleDescription.trim() || 'Web3 多代理协调智能体',
+              role_description: roleDescription.trim() || t('agent.create.role.default'),
               avatar_cid: avatarCid,
               agent_type: 'claude_agent_sdk',
               cid: `temp_${avatarCid}`, // 临时 CID，用于匹配
@@ -150,7 +149,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
       // 头像上传成功后，立即提交基本信息（不等待MCP和DIAP）
       await onSubmit({
         name: fallbackName,
-        roleDescription: roleDescription.trim() || 'Web3 多代理协调智能体',
+        roleDescription: roleDescription.trim() || t('agent.create.role.default'),
         avatarCid,
         mcpConfigCid: null, // 将在后台加载
         mcpPorts: [],
@@ -215,7 +214,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             // 更新频道和智能体信息（通过重新调用 onSubmit 或更新现有频道）
       await onSubmit({
         name: fallbackName,
-        roleDescription: roleDescription.trim() || 'Web3 多代理协调智能体',
+        roleDescription: roleDescription.trim() || t('agent.create.role.default'),
         avatarCid,
         mcpConfigCid,
         mcpPorts: filteredPorts,
@@ -227,7 +226,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             if (mcpConfigCid) {
               await onSubmit({
                 name: fallbackName,
-                roleDescription: roleDescription.trim() || 'Web3 多代理协调智能体',
+                roleDescription: roleDescription.trim() || t('agent.create.role.default'),
                 avatarCid,
                 mcpConfigCid,
                 mcpPorts: filteredPorts,
@@ -306,7 +305,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
       onClose()
     } catch (err) {
       console.error('[CreateAgentModal] 导入失败:', err)
-      setError(err?.message || '导入失败')
+      setError(err?.message || t('agent.create.error.importFailed'))
       setIsLoading(false)
     }
   }
@@ -321,8 +320,8 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
       <div className="agent-modal">
         <div className="agent-modal__header">
           <div>
-            <h2>创建新的智能体</h2>
-            <p>上传头像、配置 MCP 端口，并保存到 IPFS</p>
+            <h2>{t('agent.create.title')}</h2>
+            <p>{t('agent.create.subtitle')}</p>
           </div>
           <button type="button" onClick={onClose} className="agent-modal__close">
             ✕
@@ -331,46 +330,46 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
 
         <form className="agent-modal__form" onSubmit={handleInternalSubmit}>
           <div className="agent-modal__field">
-            <span>智能体头像（IPFS）</span>
+            <span>{t('agent.create.avatar.label')}</span>
             <div className="agent-modal__avatar-upload">
               {avatarPreview ? (
-                <img src={avatarPreview} alt="预览" className="agent-modal__avatar-preview" />
+                <img src={avatarPreview} alt={t('agent.create.avatar.preview')} className="agent-modal__avatar-preview" />
               ) : (
-                <div className="agent-modal__avatar-placeholder">预览</div>
+                <div className="agent-modal__avatar-placeholder">{t('agent.create.avatar.preview')}</div>
               )}
               <label className="agent-modal__upload-button">
-                选择图片
+                {t('agent.create.avatar.select')}
                 <input type="file" accept="image/*" onChange={handleAvatarChange} />
               </label>
             </div>
           </div>
 
           <label className="agent-modal__field">
-            <span>智能体名称</span>
+            <span>{t('agent.create.name.label')}</span>
             <input
               type="text"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="例如：Alou Web3 调度"
+              placeholder={t('agent.create.name.placeholder')}
             />
           </label>
 
           <label className="agent-modal__field">
-            <span>角色设计说明</span>
+            <span>{t('agent.create.role.label')}</span>
             <textarea
               value={roleDescription}
               onChange={(event) => setRoleDescription(event.target.value)}
               rows={4}
-              placeholder="描述该智能体的职责、语气与工具使用策略"
+              placeholder={t('agent.create.role.placeholder')}
             />
           </label>
 
           <div className="agent-modal__field">
             <div className="agent-modal__field-header">
-              <span>MCP 端口配置</span>
+              <span>{t('agent.create.mcp.label')}</span>
               {canAddMorePorts && (
                 <button type="button" onClick={handleAddPort}>
-                  + 新增端口
+                  {t('agent.create.mcp.add')}
                 </button>
               )}
             </div>
@@ -379,30 +378,30 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
                 <div key={`port-${index}`} className="agent-modal__port-item">
                   <input
                     type="text"
-                    placeholder="端口名称"
+                    placeholder={t('agent.create.mcp.portName')}
                     value={port.label}
                     onChange={(event) => handlePortChange(index, 'label', event.target.value)}
                   />
                   <input
                     type="text"
-                    placeholder="Endpoint URL (wss:// 或 http://)"
+                    placeholder={t('agent.create.mcp.endpoint')}
                     value={port.endpoint}
                     onChange={(event) => handlePortChange(index, 'endpoint', event.target.value)}
                   />
                   <input
                     type="number"
-                    placeholder="端口"
+                    placeholder={t('agent.create.mcp.port')}
                     value={port.port}
                     onChange={(event) => handlePortChange(index, 'port', event.target.value)}
                   />
                   <input
                     type="text"
-                    placeholder="描述"
+                    placeholder={t('agent.create.mcp.description')}
                     value={port.description}
                     onChange={(event) => handlePortChange(index, 'description', event.target.value)}
                   />
                   <button type="button" onClick={() => handleRemovePort(index)}>
-                    移除
+                    {t('agent.create.mcp.remove')}
                   </button>
                 </div>
               ))}
@@ -410,17 +409,17 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
           </div>
 
           <div className="agent-modal__field agent-modal__field--resolve">
-            <span>解析已有智能体</span>
+            <span>{t('agent.create.resolve.label')}</span>
             <div className="agent-modal__resolve-row">
               <input
                 type="text"
-                placeholder="输入 IPNS / CID / DID"
+                placeholder={t('agent.create.resolve.placeholder')}
                 value={existingAgentTarget}
                 onChange={(event) => setExistingAgentTarget(event.target.value)}
                 disabled={showImportConfirm}
               />
               <button type="button" onClick={handleResolveExisting} disabled={showImportConfirm || isLoading}>
-                {isLoading && !showImportConfirm ? '解析中...' : '解析'}
+                {isLoading && !showImportConfirm ? t('agent.create.resolve.resolving') : t('agent.create.resolve.button')}
               </button>
             </div>
           </div>
@@ -429,50 +428,50 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
           {showImportConfirm && resolvedAgent && (
             <div className="agent-modal__import-preview">
               <div className="agent-modal__import-preview-header">
-                <span>🔍 解析成功，确认导入以下智能体？</span>
+                <span>{t('agent.create.resolve.success')}</span>
               </div>
               <div className="agent-modal__import-preview-content">
                 <div className="agent-modal__import-preview-row">
-                  <strong>名称：</strong>
-                  <span>{resolvedAgent.name || resolvedAgent.display_name || '未命名智能体'}</span>
+                  <strong>{t('agent.create.import.name')}</strong>
+                  <span>{resolvedAgent.name || resolvedAgent.display_name || t('agent.create.name.unnamed')}</span>
                 </div>
                 {resolvedAgent.role_description && (
                   <div className="agent-modal__import-preview-row">
-                    <strong>描述：</strong>
+                    <strong>{t('agent.create.import.description')}</strong>
                     <span>{resolvedAgent.role_description}</span>
                   </div>
                 )}
                 {resolvedAgent.did && (
                   <div className="agent-modal__import-preview-row">
-                    <strong>DID：</strong>
+                    <strong>{t('agent.create.import.did')}</strong>
                     <span className="agent-modal__import-preview-mono">{resolvedAgent.did}</span>
                   </div>
                 )}
                 {resolvedAgent.ipns && (
                   <div className="agent-modal__import-preview-row">
-                    <strong>IPNS：</strong>
+                    <strong>{t('agent.create.import.ipns')}</strong>
                     <span className="agent-modal__import-preview-mono">{resolvedAgent.ipns}</span>
                   </div>
                 )}
                 {resolvedAgent.cid && (
                   <div className="agent-modal__import-preview-row">
-                    <strong>CID：</strong>
+                    <strong>{t('agent.create.import.cid')}</strong>
                     <span className="agent-modal__import-preview-mono">{resolvedAgent.cid}</span>
                   </div>
                 )}
                 {resolvedAgent.pubsub_topics && resolvedAgent.pubsub_topics.length > 0 && (
                   <div className="agent-modal__import-preview-row">
-                    <strong>PubSub：</strong>
+                    <strong>{t('agent.create.import.pubsub')}</strong>
                     <span>{resolvedAgent.pubsub_topics.join(', ')}</span>
                   </div>
                 )}
               </div>
               <div className="agent-modal__import-preview-actions">
                 <button type="button" className="ghost" onClick={handleCancelImport} disabled={isLoading}>
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button type="button" onClick={handleConfirmImport} disabled={isLoading}>
-                  {isLoading ? '导入中...' : '确认导入'}
+                  {isLoading ? t('agent.create.import.importing') : t('agent.create.import.confirm')}
                 </button>
               </div>
             </div>
@@ -482,10 +481,10 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
 
           <div className="agent-modal__actions">
             <button type="button" className="ghost" onClick={onClose}>
-              取消
+              {t('common.cancel')}
             </button>
             <button type="submit" disabled={isLoading}>
-              {isLoading ? '创建中...' : '创建智能体'}
+              {isLoading ? t('agent.create.creating') : t('agent.create.submit')}
             </button>
           </div>
         </form>
@@ -495,4 +494,3 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
 }
 
 export default CreateAgentModal
-

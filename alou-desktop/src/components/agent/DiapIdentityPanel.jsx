@@ -85,9 +85,9 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       
       // 优先级4: 从网络加载（使用 sessionId）
       try {
-        const response = await agentService.getDiapIdentity(sessionId)
-        if (response.identity) {
-          setIdentity(response.identity)
+      const response = await agentService.getDiapIdentity(sessionId)
+      if (response.identity) {
+        setIdentity(response.identity)
           // 保存到 localStorage 和智能体元数据
           if (typeof window !== 'undefined' && window.localStorage) {
             localStorage.setItem(
