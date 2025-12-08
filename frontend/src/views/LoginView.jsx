@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { walletService } from '@/services/walletService'
+import AlouLogo from '@/assets/AlouLogo.png'
 import './LoginView.css'
 
 const walletButtons = [
@@ -153,7 +154,7 @@ const LoginView = () => {
         </button>
 
         <div className="logo">
-          <div className="logo-icon">💰</div>
+          <img src={AlouLogo} alt="Alou" className="logo-icon" />
         </div>
 
         <h1 className="title">连接钱包</h1>

@@ -33,7 +33,12 @@
 }
 
 .top-nav .logo {
-  font-size: 1.75rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  position: relative;
+  top: 0;
+  object-fit: contain;
 }
 
 .top-nav .app-title {
