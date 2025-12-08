@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30">
-  <!-- 使用Alou Logo作为favicon -->
-  <!-- 这是一个占位SVG，实际应该使用logo图片 -->
-  <!-- 为了更好的显示效果，建议直接使用PNG格式的favicon -->
-  <image href="/favicon.png" width="30" height="30" preserveAspectRatio="xMidYMid meet"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Alou Logo Favicon - 使用PNG图片作为favicon -->
+  <!-- 浏览器会自动使用PNG格式的favicon，SVG作为备用 -->
+  <image href="/favicon-32x32.png" width="32" height="32" preserveAspectRatio="xMidYMid meet"/>
 </svg>

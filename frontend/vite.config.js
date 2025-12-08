@@ -13,6 +13,7 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
+      external: ['@tauri-apps/api/window', '@tauri-apps/api/core'],
       output: {
         manualChunks: (id) => {
           if (id.includes('node_modules')) {

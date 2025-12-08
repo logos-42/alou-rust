@@ -209,30 +209,10 @@ const LoginView = () => {
     }
   }, []) // 只在组件挂载时执行一次
 
-  // 关闭窗口函数（桌面版关闭窗口，浏览器版返回首页）
-  const closeWindow = useCallback(async () => {
-    if (isDesktop) {
-      // 桌面版：关闭窗口
-      try {
-        // 检查是否在Tauri环境中
-        if (typeof window !== 'undefined' && window.__TAURI__) {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window')
-          const appWindow = getCurrentWindow()
-          await appWindow.close()
-        } else {
-          // 不在Tauri环境，导航回首页
-          navigate('/')
-        }
-      } catch (error) {
-        console.error('Failed to close window:', error)
-        // 如果关闭失败，尝试导航回首页
-        navigate('/')
-      }
-    } else {
-      // 浏览器版：返回首页
-      navigate('/')
-    }
-  }, [isDesktop, navigate])
+  // 关闭窗口函数（前端版：始终导航回首页，不使用Tauri API）
+  const closeWindow = useCallback(() => {
+    navigate('/')
+  }, [navigate])
 
   const goBack = closeWindow
 

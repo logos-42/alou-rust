@@ -128,6 +128,7 @@ export const agent = {
 
     // ==================== 侧边栏 ====================
     'agent.sidebar.loading': '正在加载智能体...',
+    'agent.sidebar.empty': '暂无智能体。请在上方输入 IPNS / CID / DID 搜索。',
     'agent.sidebar.connectNow': '立即连接',
     'agent.sidebar.filtered': '已筛选：',
     'agent.sidebar.expandList': '展开智能体列表',
@@ -259,6 +260,7 @@ export const agent = {
 
     // ==================== Sidebar ====================
     'agent.sidebar.loading': 'Loading agents...',
+    'agent.sidebar.empty': 'No agents yet. Please enter IPNS / CID / DID above to search.',
     'agent.sidebar.connectNow': 'Connect Now',
     'agent.sidebar.filtered': 'Filtered: ',
     'agent.sidebar.expandList': 'Expand agent list',

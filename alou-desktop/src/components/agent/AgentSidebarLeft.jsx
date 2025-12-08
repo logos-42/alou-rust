@@ -191,14 +191,14 @@ const AgentSidebarLeft = ({
             <div>{errorMessage}</div>
             {onRefresh && (
               <button type="button" onClick={onRefresh}>
-                重试
+                {t('common.retry')}
               </button>
             )}
           </div>
         )}
         {!isLoading && !errorMessage && channels.length === 0 && (
           <div className="channel-placeholder">
-            暂无智能体。请在上方输入 IPNS / CID / DID 搜索。
+            {t('agent.sidebar.empty')}
           </div>
         )}
         {channels.map((channel) => (
