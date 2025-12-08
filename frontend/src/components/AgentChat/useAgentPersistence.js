@@ -118,4 +118,3 @@ export const useAgentPersistence = ({ sessionId, channels, setChannels }) => {
     isAgentStored,
   }
 }
-

@@ -58,11 +58,9 @@ const AgentConversationOverlay = forwardRef(
             <span>{connectionStatusLabel}</span>
           </div>
           {actions}
-          {!embedded && (
-            <button type="button" className="close-btn" onClick={onClose}>
-              ✕
-            </button>
-          )}
+          <button type="button" className="close-btn" onClick={onClose} title="关闭对话">
+            ✕
+          </button>
         </div>
       </header>
     )

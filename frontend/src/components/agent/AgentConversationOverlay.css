@@ -20,11 +20,41 @@
   flex-direction: column;
   box-shadow: var(--shadow);
   pointer-events: auto;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease;
 }
 
+/* Embedded panel */
+.conversation-panel.embedded {
+  position: relative;
+  width: 100%;
+  height: auto;
+  min-height: 320px;
+  border-radius: 1.25rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  box-shadow: none;
+}
+
+.conversation-panel.embedded .conversation-body {
+  padding-right: 0;
+  border-radius: 1rem;
+  border: 1px dashed rgba(15, 23, 42, 0.08);
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.app-shell.dark-mode .conversation-panel.embedded .conversation-body {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 暗夜模式 - 纯黑色对话栏 */
 .app-shell.dark-mode .conversation-panel {
-  background: rgba(15, 23, 42, 0.78);
-  border-color: rgba(148, 163, 184, 0.16);
+  background: #000000; /* 纯黑色背景 */
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .conversation-panel header {
@@ -47,7 +77,7 @@
   height: 36px;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid rgba(15, 23, 42, 0.1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -144,4 +174,20 @@
 .stream-panel-wrapper .agent-stream-panel {
   margin: 0;
   pointer-events: auto;
+}
+
+.conversation-empty {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.app-shell.dark-mode .conversation-empty {
+  background: rgba(255, 255, 255, 0.05);
 }

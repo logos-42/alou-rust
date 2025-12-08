@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import CollapseIcon from '@/assets/侧边栏收缩.png'
 import SearchIcon from '@/assets/搜索.png'
 import CreateIcon from '@/assets/创建.png'
+import { useI18n } from '@/hooks/useI18n'
 import './AgentSidebarLeft.css'
 
 const formatDate = (timestamp) => {
@@ -36,6 +37,8 @@ const AgentSidebarLeft = ({
   onKeywordChange,
   onSelectChannel,
   onCreateChannel,
+  onDeleteChannel,
+  onInviteToChannel,
   onRefresh,
   isCollapsed = false,
   onToggleCollapse,
@@ -43,6 +46,7 @@ const AgentSidebarLeft = ({
   onModelTypeChange,
   onShowIdentityPanel,
 }) => {
+  const { t } = useI18n()
   const sidebarClassName = `sidebar-left${isCollapsed ? ' collapsed' : ''}`
   const [modelMenuState, setModelMenuState] = useState({ visible: false, top: 0, left: 0, width: 0 })
   const menuRef = useRef(null)
@@ -135,9 +139,9 @@ const AgentSidebarLeft = ({
           type="button"
           className="brand-toggle"
           onClick={() => onToggleCollapse?.()}
-          aria-label={isCollapsed ? '展开智能体列表' : '折叠智能体列表'}
+          aria-label={isCollapsed ? t('agent.sidebar.expandList') : t('agent.sidebar.collapseList')}
         >
-          <img src={CollapseIcon} alt="Alou" className="brand-icon" />
+          <img src={CollapseIcon} alt="折叠" className="brand-icon" />
         </button>
         {!isCollapsed && (
           <button type="button" className="new-channel-btn" onClick={onCreateChannel}>
@@ -151,7 +155,7 @@ const AgentSidebarLeft = ({
           <input
             type="text"
             value={keyword}
-            placeholder="搜索智能体"
+            placeholder={t('agent.list.search.placeholder')}
             onChange={(event) => onKeywordChange?.(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -165,7 +169,7 @@ const AgentSidebarLeft = ({
 
       {!isCollapsed && selectedModelLabel && (
         <div className="model-filter-chip">
-          <span>已筛选：{selectedModelLabel}</span>
+          <span>{t('agent.sidebar.filtered')}{selectedModelLabel}</span>
           <button
             type="button"
             onClick={() => {
@@ -173,7 +177,7 @@ const AgentSidebarLeft = ({
               closeModelMenu()
               onShowIdentityPanel?.()
             }}
-            aria-label="清除模型筛选"
+            aria-label={t('agent.sidebar.clearFilter')}
           >
             ×
           </button>
@@ -181,7 +185,7 @@ const AgentSidebarLeft = ({
       )}
 
       <div className="channel-list">
-        {isLoading && <div className="channel-placeholder">正在加载智能体...</div>}
+        {isLoading && <div className="channel-placeholder">{t('agent.sidebar.loading')}</div>}
         {!isLoading && errorMessage && (
           <div className="channel-placeholder channel-error">
             <div>{errorMessage}</div>
@@ -213,9 +217,23 @@ const AgentSidebarLeft = ({
           >
             <div className="channel-icon" style={{ background: channel.color }}>
               {channel.avatar ? (
-                <img src={channel.avatar} alt={channel.name} />
+                <img 
+                  src={channel.avatar} 
+                  alt={channel.name}
+                  onError={(e) => {
+                    // 图片加载失败时隐藏图片，显示默认图标
+                    e.target.style.display = 'none'
+                    const parent = e.target.parentElement
+                    if (parent && !parent.querySelector('.fallback-icon')) {
+                      const fallback = document.createElement('span')
+                      fallback.className = 'fallback-icon'
+                      fallback.textContent = channel.icon || channel.name?.charAt(0) || '🤖'
+                      parent.insertBefore(fallback, e.target)
+                    }
+                  }}
+                />
               ) : (
-                channel.icon
+                channel.icon || channel.name?.charAt(0) || '🤖'
               )}
               <span className={`status-indicator ${channel.status}`} />
             </div>
@@ -235,7 +253,7 @@ const AgentSidebarLeft = ({
                         style={{ cursor: 'pointer' }}
                         title="点击筛选模型类型"
                       >
-                        Claude
+                        Agent
                       </span>
                     )}
                     {channel.meta?.ipns && (
@@ -288,7 +306,56 @@ const AgentSidebarLeft = ({
                     )}
                   </div>
                 </div>
-                <div className="channel-date">{formatDate(channel.updatedAt)}</div>
+                <div className="channel-actions">
+                  <button
+                    type="button"
+                    className="channel-action-btn invite-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onInviteToChannel?.(channel)
+                    }}
+                    title="邀请其他智能体"
+                    aria-label="邀请其他智能体加入群组"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none">
+                      <path
+                        d="M10 4v12M4 10h12"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                      <circle
+                        cx="10"
+                        cy="10"
+                        r="8"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        opacity="0.5"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="channel-action-btn delete-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (window.confirm(`确定要删除智能体 "${channel.name}" 吗？`)) {
+                        onDeleteChannel?.(channel)
+                      }
+                    }}
+                    title="删除智能体"
+                    aria-label="删除智能体"
+                  >
+                    <svg viewBox="0 0 20 20" fill="none">
+                      <path
+                        d="M6 6l8 8M14 6l-8 8"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
               </>
             )}
           </div>

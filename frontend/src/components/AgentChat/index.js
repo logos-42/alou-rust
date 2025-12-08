@@ -6,7 +6,6 @@ export { useAgentDrag } from './useAgentDrag'
 export { useAgentUI } from './useAgentUI'
 export { useChannelManager } from './useChannelManager'
 export { useAgentPersistence } from './useAgentPersistence'
-export { useAgentInvite } from './useAgentInvite'
 
 // Export utility functions
 export {

@@ -6,13 +6,17 @@
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   width: var(--left-column-width, 300px);
+  height: 100%;
+  min-height: 0;
   transition:
     width 0.28s ease,
-    padding 0.2s ease;
+    padding 0.2s ease,
+    background 0.3s ease;
 }
 
+/* 暗夜模式 - 纯黑色左侧边栏 */
 .app-shell.dark-mode .sidebar-left {
-  background: #000000;
+  background: #000000; /* 纯黑色背景 */
   border-right-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -83,9 +87,6 @@
 .app-shell.dark-mode .sidebar-left .new-channel-btn img {
   filter: brightness(0) invert(1);
   opacity: 0.95;
-}
-.app-shell.dark-mode .sidebar-left .channel-search .search-icon {
-  filter: brightness(0) invert(1);
 }
 
 .sidebar-left .channel-search {
@@ -192,6 +193,23 @@
   font-size: 1.05rem;
   font-weight: 600;
   position: relative;
+  overflow: hidden;
+}
+
+.sidebar-left .channel-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.sidebar-left .channel-icon .fallback-icon {
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .sidebar-left .channel-info {
@@ -211,6 +229,12 @@
   gap: 0.35rem;
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.sidebar-left .channel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
 }
 
 .sidebar-left .channel-badge {
@@ -243,29 +267,6 @@
   background: rgba(16, 185, 129, 0.28);
   border-color: rgba(16, 185, 129, 0.5);
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-}
-
-.sidebar-left .channel-badge.badge-success {
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.15);
-}
-
-.sidebar-left .channel-badge.badge-warning {
-  border-color: rgba(234, 179, 8, 0.45);
-  color: #b45309;
-  background: rgba(234, 179, 8, 0.2);
-}
-
-.sidebar-left .channel-badge.status-badge .status-icon {
-  width: 14px;
-  height: 14px;
-  display: inline-flex;
-}
-
-.sidebar-left .channel-badge.status-badge svg {
-  width: 100%;
-  height: 100%;
 }
 
 .model-filter-menu {
@@ -362,6 +363,10 @@
   color: var(--text-primary, #ffffff);
 }
 
+.model-filter-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
 .model-filter-item.active {
   background: rgba(99, 102, 241, 0.2);
   color: var(--primary-color, #6366f1);
@@ -418,6 +423,29 @@
   background: rgba(249, 115, 22, 0.2);
 }
 
+.sidebar-left .channel-badge.badge-success {
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.sidebar-left .channel-badge.badge-warning {
+  border-color: rgba(234, 179, 8, 0.45);
+  color: #b45309;
+  background: rgba(234, 179, 8, 0.2);
+}
+
+.sidebar-left .channel-badge.status-badge .status-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+}
+
+.sidebar-left .channel-badge.status-badge svg {
+  width: 100%;
+  height: 100%;
+}
+
 .sidebar-left .channel-hint {
   font-size: 0.7rem;
   color: var(--text-secondary);
@@ -446,6 +474,77 @@
 .sidebar-left .channel-date {
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+/* Channel Actions - 删除和邀请按钮 */
+.sidebar-left .channel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-left .channel-item:hover .channel-actions {
+  opacity: 1;
+}
+
+.sidebar-left .channel-action-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(148, 163, 184, 0.15);
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.sidebar-left .channel-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sidebar-left .channel-action-btn.invite-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+  color: #059669;
+}
+
+.sidebar-left .channel-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn.invite-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* Alou Logo 样式 */
+.sidebar-left .brand-icon.alou-logo {
+  width: 30px;
+  height: 30px;
+  filter: none;
+  opacity: 1;
+  border-radius: 6px;
+}
+
+.app-shell.dark-mode .sidebar-left .brand-icon.alou-logo {
+  filter: none;
+  opacity: 1;
 }
 
 .sidebar-left .status-indicator {

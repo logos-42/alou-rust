@@ -20,7 +20,7 @@ export const useAgentUI = ({
   const [interactionLogs, setInteractionLogs] = useState([])
   const [uiResource, setUiResource] = useState(null)
   const [isUiModalOpen, setUiModalOpen] = useState(false)
-  const [showDiapPanel, setShowDiapPanel] = useState(true)
+  const [showDiapPanel, setShowDiapPanel] = useState(false)
 
   const finalEventHandledRef = useRef(null)
   const contextEventsRef = useRef([])
@@ -248,4 +248,3 @@ export const useAgentUI = ({
     consoleDockStyle,
   }
 }
-

@@ -4,6 +4,7 @@ import DiapPanelIcon from '@/assets/方-收缩2.png'
 
 function DiapPanelToggle({
   sessionId,
+  selectedAgent,
   isSidebarCollapsed,
   isDarkMode,
   showPanel,
@@ -92,7 +93,12 @@ function DiapPanelToggle({
             maxWidth: '360px',
           }}
         >
-          <DiapIdentityPanel sessionId={sessionId} onClose={onClosePanel} isDarkMode={isDarkMode} />
+          <DiapIdentityPanel 
+            sessionId={sessionId} 
+            selectedAgent={selectedAgent}
+            onClose={onClosePanel} 
+            isDarkMode={isDarkMode} 
+          />
         </div>
       )}
     </>
