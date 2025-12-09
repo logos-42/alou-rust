@@ -37,6 +37,9 @@ export const useAgentMessages = ({
   // 跟踪已保存过的消息数量，避免重复保存
   const savedMessageCountRef = useRef({})
   
+  // 按智能体存储 AbortController：Map<channelId, AbortController>
+  const abortControllersByAgent = useRef({})
+  
   // 获取 agentStore 方法
   const updateAgent = useAgentStore((state) => state.updateAgent)
   
@@ -232,6 +235,10 @@ export const useAgentMessages = ({
 
       console.log('[useAgentMessages] 发送消息，sessionId:', agentSessionId, '智能体:', targetAgentId)
 
+      // 创建 AbortController 用于终止请求
+      const abortController = new AbortController()
+      abortControllersByAgent.current[targetAgentId] = abortController
+
       const agentInfo = targetAgent || selectedAgent
       const data = await apiClient
         .post('/agent/chat', {
@@ -246,6 +253,8 @@ export const useAgentMessages = ({
             role_description: agentInfo.role_description,
             custom_prompt: agentInfo.customPrompt,
           } : undefined,
+        }, {
+          signal: abortController.signal, // 添加 abort signal 用于终止请求
         })
         .then((response) => response.data)
 
@@ -270,6 +279,19 @@ export const useAgentMessages = ({
         }
       }
     } catch (error) {
+      // 如果是用户主动取消，不显示错误消息
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        console.log('[useAgentMessages] 用户取消了智能体执行:', targetAgentId)
+        appendMessage({
+          id: `cancel_${Date.now()}`,
+          type: 'assistant',
+          content: '⏹️ 执行已终止',
+          timestamp: Date.now(),
+          source: 'cancel',
+        }, targetAgentId)
+        return
+      }
+      
       const errorMessage = error instanceof Error ? error.message : '未知错误'
       const statusCode = error?.response?.status
       
@@ -291,6 +313,8 @@ export const useAgentMessages = ({
         source: 'error',
       }, targetAgentId)
     } finally {
+      // 清理 AbortController
+      delete abortControllersByAgent.current[targetAgentId]
       setAgentLoading(targetAgentId, false)
       scrollToBottom()
       consoleDockRef.current?.adjustInputHeight?.()
@@ -367,6 +391,28 @@ export const useAgentMessages = ({
     previousChannelRef.current = activeChannelId
   }, [activeChannelId, messagesByChannel, saveMessagesToIpfs])
 
+  /**
+   * 终止指定智能体的执行
+   */
+  const cancelAgentExecution = useCallback((agentId) => {
+    const controller = abortControllersByAgent.current[agentId]
+    if (controller) {
+      console.log('[useAgentMessages] 终止智能体执行:', agentId)
+      controller.abort()
+      delete abortControllersByAgent.current[agentId]
+      setAgentLoading(agentId, false)
+      
+      // 添加终止消息
+      appendMessage({
+        id: `cancel_${Date.now()}`,
+        type: 'assistant',
+        content: '⏹️ 执行已终止',
+        timestamp: Date.now(),
+        source: 'cancel',
+      }, agentId)
+    }
+  }, [appendMessage, setAgentLoading])
+
   return {
     messages,
     messagesByChannel,
@@ -392,6 +438,7 @@ export const useAgentMessages = ({
     scrollToBottom,
     sendMessage,
     sendMessageToAgent, // 新增：发送到指定智能体
+    cancelAgentExecution, // 新增：终止智能体执行
     openConversationPanel,
     closeConversationPanel,
     saveMessagesToIpfs,

@@ -205,6 +205,7 @@ const AgentChat = () => {
     loadingByAgent,
     isAgentLoading,
     sendMessageToAgent,
+    cancelAgentExecution,
     appendMessage,
     scrollToBottom,
     sendMessage: baseSendMessage,
@@ -502,21 +503,42 @@ const AgentChat = () => {
       const channel = buildChannelFromAgent(earlyMetadata)
       if (channel) {
         // 确保 tempId 保存在 channel.meta 中用于后续匹配
-        if (earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_')) {
-          channel.tempId = earlyMetadata.cid
+        const tempId = earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_') 
+          ? earlyMetadata.cid 
+          : null
+        if (tempId) {
+          channel.tempId = tempId
           if (channel.meta) {
-            channel.meta.tempId = earlyMetadata.cid
+            channel.meta.tempId = tempId
           }
         }
         
         setChannels((prev) => {
-          // 移除可能重复的频道
+          // 如果已有相同 tempId 的频道，更新它；否则添加新频道
+          if (tempId) {
+            const existingIndex = prev.findIndex((item) => 
+              item.tempId === tempId || 
+              item.id === tempId || 
+              item.meta?.tempId === tempId ||
+              item.meta?.cid === tempId
+            )
+            if (existingIndex >= 0) {
+              // 更新现有频道（保留位置）
+              const updated = [...prev]
+              updated[existingIndex] = channel
+              console.log('[AgentChat] 更新早期频道（头像已上传）:', tempId)
+              return updated
+            }
+          }
+          
+          // 移除可能重复的频道（相同 ID）
           const others = prev.filter((item) => item.id !== channel.id)
+          console.log('[AgentChat] 添加早期频道:', channel.id, 'tempId:', tempId)
           return [channel, ...others]
         })
         setActiveChannelId(channel.id)
         setSelectedAgent(earlyMetadata)
-        console.log('[AgentChat] 早期频道已显示，tempId:', channel.tempId, '等待完整创建...')
+        console.log('[AgentChat] 早期频道已显示，tempId:', tempId, '等待完整创建...')
       }
     },
     [setChannels, setActiveChannelId, setSelectedAgent],
@@ -640,99 +662,36 @@ const AgentChat = () => {
   )
 
   // ==================== Send Message with Tool Calls ====================
+  // 使用 sendMessageToAgent 实现多智能体独立执行空间
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
-    if (!text || isLoading) return
+    if (!text || !activeChannelId) {
+      return
+    }
+
+    // 检查当前智能体是否正在执行
+    if (isAgentLoading(activeChannelId)) {
+      console.log('[AgentChat] 智能体正在执行中，跳过:', activeChannelId)
+      return
+    }
 
     if (!isSessionReady) {
       await createSession()
       setSessionReady(true)
     }
 
-    const userMessage = {
-      id: `user_${Date.now()}`,
-      type: 'user',
-      content: text,
-      timestamp: Date.now(),
-    }
-
-    appendMessage(userMessage)
+    // 使用 sendMessageToAgent 发送消息（支持多智能体并发）
     setCurrentMessage('')
-    setIsLoading(true)
-    recordInteraction('user_message', { content: text })
-    scrollToBottom()
-
-    const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
-
-    try {
-      const walletAddress =
-        typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-        (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
-      
-      const response = await fetch(`${API_BASE_URL}/api/agent/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: text,
-          wallet_address: walletAddress || undefined,
-          chain: preferredChain || undefined,
-          context_events: contextSnapshot,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.tool_calls) {
-        await handleToolCalls(data.tool_calls)
-      }
-
-      const assistantMessage = {
-        id: `assistant_${Date.now()}`,
-        type: 'assistant',
-        content: data.content || data.response || '收到响应',
-        timestamp: data.timestamp || Date.now(),
-        source: data.source || 'alou-edge',
-      }
-      appendMessage(assistantMessage)
-
-      if (data.session_id) {
-        setSessionId(data.session_id)
-      }
-    } catch (error) {
-      appendMessage({
-        id: `error_${Date.now()}`,
-        type: 'assistant',
-        content: `❌ 抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
-        timestamp: Date.now(),
-        source: 'error',
-      })
-    } finally {
-      setIsLoading(false)
-      scrollToBottom()
-      consoleDockRef.current?.adjustInputHeight?.()
-    }
+    await sendMessageToAgent(activeChannelId, text, selectedAgent)
   }, [
-    appendMessage,
-    contextEventsRef,
+    activeChannelId,
     createSession,
     currentMessage,
-    handleToolCalls,
-    isLoading,
+    isAgentLoading,
     isSessionReady,
-    preferredChain,
-    recordInteraction,
-    scrollToBottom,
-    sessionId,
+    selectedAgent,
+    sendMessageToAgent,
     setCurrentMessage,
-    setIsLoading,
-    setSessionId,
     setSessionReady,
   ])
 
@@ -836,7 +795,7 @@ const AgentChat = () => {
                 connectionStatus={connectionStatus}
                 connectionStatusLabel={connectionStatusLabel}
                 messages={messages}
-                isLoading={isLoading}
+                isLoading={isAgentLoading(activeChannelId)}
                 onClose={closeConversationPanel}
                 onInspectMessage={handleInspectMessage}
                 streamEvents={streamEvents}
@@ -873,10 +832,15 @@ const AgentChat = () => {
         ref={consoleDockRef}
         value={currentMessage}
         onChange={setCurrentMessage}
-        isLoading={isLoading}
+        isLoading={isAgentLoading(activeChannelId)}
         style={consoleDockStyle}
         showOpenButton={!showConversationPanel && messages.length > 0}
         onSend={sendMessage}
+        onCancel={() => {
+          if (activeChannelId) {
+            cancelAgentExecution(activeChannelId)
+          }
+        }}
         onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}
         onOpenConversation={openConversationPanel}
       />

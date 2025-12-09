@@ -132,7 +132,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             return
           }
 
-          // 上传头像
+          // 上传头像（优先上传，完成后立即更新频道）
           let avatarCid = null
           if (avatarFile) {
             try {
@@ -140,6 +140,26 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
               const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
               avatarCid = uploaded?.cid || null
               console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
+              
+              // 头像上传成功后，立即更新频道显示
+              if (avatarCid && onEarlyChannel) {
+                const earlyMetadata = {
+                  display_name: fallbackName,
+                  name: fallbackName,
+                  role_description: finalRoleDescription,
+                  avatar_cid: avatarCid,
+                  avatar_url: null, // 清除本地预览，使用 CID
+                  agent_type: 'claude_agent_sdk',
+                  cid: tempId,
+                  did: null,
+                  ipns: null,
+                  diapIdentity: null,
+                  sessionId,
+                  status: 'creating',
+                }
+                console.log('[CreateAgentModal] 头像上传完成，立即更新频道:', tempId)
+                onEarlyChannel(earlyMetadata)
+              }
             } catch (err) {
               console.error('[CreateAgentModal] 头像上传失败:', err)
             }

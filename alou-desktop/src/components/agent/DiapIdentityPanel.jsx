@@ -86,10 +86,11 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       }
       
       // 优先级4: 从网络加载（使用 sessionId）
+      // 注意：404 错误是正常的，表示身份尚未创建，不应该显示错误
       try {
-      const response = await agentService.getDiapIdentity(sessionId)
-      if (response.identity) {
-        setIdentity(response.identity)
+        const response = await agentService.getDiapIdentity(sessionId)
+        if (response.identity) {
+          setIdentity(response.identity)
           // 保存到 localStorage 和智能体元数据
           if (typeof window !== 'undefined' && window.localStorage) {
             localStorage.setItem(
@@ -102,8 +103,15 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
           }
         }
       } catch (networkErr) {
-        // 网络加载失败不设置错误，因为身份可能确实不存在
-        console.log('[DiapIdentityPanel] 网络加载失败，身份可能尚未创建:', networkErr.message)
+        // 404 错误是正常的（身份尚未创建），其他错误才记录警告
+        const is404 = networkErr?.response?.status === 404 || 
+                     networkErr?.message?.includes('404') ||
+                     networkErr?.message?.includes('not found')
+        if (!is404) {
+          console.warn('[DiapIdentityPanel] 网络加载失败:', networkErr.message)
+        } else {
+          console.log('[DiapIdentityPanel] 身份尚未创建（这是正常的）')
+        }
       }
     } catch (err) {
       console.error('Failed to load DIAP identity:', err)

@@ -1,9 +1,11 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import sendIcon from '@/assets/向上·发送 2.png'
+import cancelIcon from '@/assets/终止0.2.png'
 import './ChatInput.css'
 
 const ChatInput = forwardRef(
-  ({ value, onChange, onSend, onNewLine, isLoading = false, autoFocus = false }, ref) => {
+  ({ value, onChange, onSend, onNewLine, onCancel, isLoading = false, autoFocus = false }, ref) => {
     const { t } = useI18n()
     const textareaRef = useRef(null)
 
@@ -49,6 +51,7 @@ const ChatInput = forwardRef(
     }
 
     const disabled = !value?.trim() || isLoading
+    const showCancel = isLoading && onCancel
 
     return (
       <div className="input-area">
@@ -64,29 +67,26 @@ const ChatInput = forwardRef(
               placeholder={t('inputPlaceholder')}
             />
             <div className="button-group">
-              <button
-                type="button"
-                className="send-btn"
-                onClick={onSend}
-                disabled={disabled}
-                title={t('send')}
-              >
-                {!isLoading ? (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="loading-icon"
-                  >
-                    <path d="M12,4V2A10,10 0 0,0 2,12H4A8,8 0 0,1 12,4Z" />
-                  </svg>
-                )}
-              </button>
+              {showCancel ? (
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={onCancel}
+                  title="终止执行"
+                >
+                  <img src={cancelIcon} alt="终止" width="20" height="20" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="send-btn"
+                  onClick={onSend}
+                  disabled={disabled}
+                  title={t('send')}
+                >
+                  <img src={sendIcon} alt="发送" width="20" height="20" />
+                </button>
+              )}
             </div>
           </div>
         </div>
