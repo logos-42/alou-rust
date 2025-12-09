@@ -16,6 +16,7 @@ use worker::*;
 mod agent;
 mod blockchain;
 mod diap;
+mod pubsub;
 mod session;
 mod wallet;
 
@@ -28,13 +29,15 @@ pub struct Router {
     query_tool: Option<QueryTool>,
     transaction_tool: Option<TransactionTool>,
     broadcast_tool: Option<BroadcastTool>,
+    pubsub_manager: pubsub::PubSubManager,
     metrics: MetricsCollector,
 }
 
 impl Router {
     pub fn new(kv: KvStore) -> Self {
         let session_store = kv.clone();
-        let wallet_store = kv;
+        let wallet_store = kv.clone();
+        let pubsub_store = kv;
         Self {
             session_manager: SessionManager::new(session_store),
             agent_wallet_tool: AgentWalletTool::new(wallet_store),
@@ -44,6 +47,7 @@ impl Router {
             query_tool: None,
             transaction_tool: None,
             broadcast_tool: None,
+            pubsub_manager: pubsub::PubSubManager::new(pubsub_store),
             metrics: MetricsCollector::new(),
         }
     }
@@ -283,6 +287,14 @@ impl Router {
             }
             (Method::Post, "/api/diap/timelock") => diap::handle_timelock_request(env, req).await,
             (Method::Post, "/api/diap/account") => diap::handle_account_request(env, req).await,
+
+            // PubSub endpoints for group chat and agent communication
+            (Method::Post, "/api/pubsub/publish") => {
+                pubsub::handle_publish(&self.pubsub_manager, req).await
+            }
+            (Method::Get, "/api/pubsub/messages") => {
+                pubsub::handle_get_messages(&self.pubsub_manager, req).await
+            }
 
             _ => {
                 console_log!("Route not found: {} {}", method.to_string(), path);

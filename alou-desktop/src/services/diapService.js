@@ -35,7 +35,7 @@ class DiapService {
     throw lastError
   }
 
-  async createLocalIdentity({ name, description, sessionId, ipfsApiUrl, ipfsGatewayUrl } = {}) {
+  async createLocalIdentity({ name, description, sessionId, avatarCid, mcpConfigCid, customPrompt, ipfsApiUrl, ipfsGatewayUrl } = {}) {
     return this.withRetry(
       async () => {
         const response = await invoke('create_local_diap_identity', {
@@ -43,6 +43,9 @@ class DiapService {
             agent_name: name,
             agent_description: description,
             session_id: sessionId,
+            avatar_cid: avatarCid,
+            mcp_config_cid: mcpConfigCid,
+            custom_prompt: customPrompt,
             ipfs_api_url: ipfsApiUrl || DEFAULT_IPFS_API,
             ipfs_gateway_url: ipfsGatewayUrl || DEFAULT_IPFS_GATEWAY,
           },

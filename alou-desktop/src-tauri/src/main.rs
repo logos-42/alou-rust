@@ -19,7 +19,13 @@ use crate::kubo::download_kubo_binary;
 use crate::ipfs_api::{
     diagnose_ipfs_api, get_ipfs_api_address, test_ipfs_api, test_ipfs_api_with_config,
 };
-use crate::ipfs_commands::ipfs_add_base64;
+use crate::ipfs_commands::{
+    ipfs_add_base64,
+    ipfs_pubsub_publish,
+    ipfs_pubsub_subscribe_once,
+    ipfs_pubsub_peers,
+    ipfs_pubsub_ls,
+};
 use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, stop_ipfs_node};
 use crate::diap::{
     create_local_diap_identity,
@@ -51,6 +57,12 @@ fn main() {
             test_ipfs_api,
             test_ipfs_api_with_config,
             ipfs_add_base64,
+            // PubSub commands
+            ipfs_pubsub_publish,
+            ipfs_pubsub_subscribe_once,
+            ipfs_pubsub_peers,
+            ipfs_pubsub_ls,
+            // DIAP commands
             create_local_diap_identity,
             get_local_diap_identity,
             update_local_diap_identity,

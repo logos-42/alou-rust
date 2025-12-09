@@ -514,42 +514,122 @@ export class AgentService {
    * @private
    */
   _parseDidDocumentToAgent(didDocument, additionalInfo = {}) {
+    console.log('[AgentService] 解析 DID 文档:', JSON.stringify(didDocument, null, 2))
+    
     // 从 DID 文档中提取智能体信息
     const did = didDocument.id || didDocument.did || null
     
     // 从 service 数组中提取智能体配置
     const services = didDocument.service || []
-    const agentService = services.find(s => 
-      s.type === 'AgentEndpoint' || s.id?.includes('#agent')
+    console.log('[AgentService] 找到 services:', services.length, services)
+    
+    // 尝试多种方式查找 AgentEndpoint 服务
+    let agentService = services.find(s => 
+      s.type === 'AgentEndpoint' || s.type === 'agent' || s.id?.includes('#agent')
     )
     
-    const serviceEndpoint = agentService?.serviceEndpoint || {}
+    // 如果没有找到，尝试查找第一个包含 serviceEndpoint 的服务
+    if (!agentService) {
+      agentService = services.find(s => s.serviceEndpoint)
+    }
     
-    // 提取 metadata
-    const metadata = didDocument['alou:metadata'] || {}
+    // 如果还是没有找到，使用第一个服务
+    if (!agentService && services.length > 0) {
+      agentService = services[0]
+    }
+    
+    console.log('[AgentService] 找到 agentService:', agentService)
+    
+    // 提取 serviceEndpoint，支持多种结构
+    let serviceEndpoint = {}
+    if (agentService) {
+      // 如果 serviceEndpoint 是对象
+      if (typeof agentService.serviceEndpoint === 'object' && agentService.serviceEndpoint !== null) {
+        serviceEndpoint = agentService.serviceEndpoint
+      }
+      // 如果整个 service 对象就是配置
+      else if (agentService.name || agentService.avatar_cid) {
+        serviceEndpoint = agentService
+      }
+    }
+    
+    console.log('[AgentService] 提取的 serviceEndpoint:', serviceEndpoint)
+    
+    // 提取 metadata，支持多种位置
+    const metadata = didDocument['alou:metadata'] || 
+                     didDocument.metadata || 
+                     didDocument['@context']?.metadata ||
+                     {}
+    
+    console.log('[AgentService] 提取的 metadata:', metadata)
     
     // 提取 PubSub 主题
-    const pubsubTopics = agentService?.pubsubTopics || []
+    const pubsubTopics = agentService?.pubsubTopics || 
+                        agentService?.pubsub_topics ||
+                        serviceEndpoint.pubsub_topics ||
+                        []
     
     // 提取加密的 PeerID
     const encryptedPeerIdService = services.find(s => 
-      s.type === 'EncryptedPeerID' || s.id?.includes('#encryptedPeerId')
+      s.type === 'EncryptedPeerID' || 
+      s.type === 'encryptedPeerId' ||
+      s.id?.includes('#encryptedPeerId')
     )
+    
+    // 提取名字，支持多种字段名和位置
+    const name = serviceEndpoint.name || 
+                 serviceEndpoint.display_name ||
+                 metadata.agent_name ||
+                 metadata.name ||
+                 didDocument.name ||
+                 '未命名智能体'
+    
+    // 提取头像，支持多种字段名
+    const avatar_cid = serviceEndpoint.avatar_cid || 
+                      serviceEndpoint.avatarCid ||
+                      metadata.avatar_cid ||
+                      metadata.avatarCid ||
+                      null
+    
+    const avatar_url = serviceEndpoint.avatar_url ||
+                      serviceEndpoint.avatarUrl ||
+                      metadata.avatar_url ||
+                      metadata.avatarUrl ||
+                      null
+    
+    console.log('[AgentService] 解析结果 - name:', name, 'avatar_cid:', avatar_cid, 'avatar_url:', avatar_url)
     
     return {
       id: additionalInfo.cid || additionalInfo.ipns || did || `agent_${Date.now()}`,
       did,
       cid: additionalInfo.cid || null,
       ipns: additionalInfo.ipns || null,
-      name: serviceEndpoint.name || metadata.agent_name || '未命名智能体',
-      display_name: serviceEndpoint.name || metadata.agent_name || '未命名智能体',
-      role_description: serviceEndpoint.description || metadata.agent_description || '',
-      avatar_cid: serviceEndpoint.avatar_cid || null,
-      avatar_url: serviceEndpoint.avatar_url || null,
-      mcp_config_cid: serviceEndpoint.mcp_config_cid || null,
-      mcp_ports: serviceEndpoint.mcp_ports || [],
-      agent_type: serviceEndpoint.agent_type || 'claude_agent_sdk',
-      customPrompt: serviceEndpoint.custom_prompt || null,
+      name,
+      display_name: name,
+      role_description: serviceEndpoint.description || 
+                       serviceEndpoint.role_description ||
+                       metadata.agent_description ||
+                       metadata.description ||
+                       metadata.role_description ||
+                       '',
+      avatar_cid,
+      avatar_url,
+      mcp_config_cid: serviceEndpoint.mcp_config_cid || 
+                      serviceEndpoint.mcpConfigCid ||
+                      metadata.mcp_config_cid ||
+                      null,
+      mcp_ports: serviceEndpoint.mcp_ports || 
+                serviceEndpoint.mcpPorts ||
+                metadata.mcp_ports ||
+                [],
+      agent_type: serviceEndpoint.agent_type || 
+                 serviceEndpoint.agentType ||
+                 metadata.agent_type ||
+                 'claude_agent_sdk',
+      customPrompt: serviceEndpoint.custom_prompt || 
+                   serviceEndpoint.customPrompt ||
+                   metadata.custom_prompt ||
+                   null,
       pubsub_topics: pubsubTopics,
       encrypted_peer_id: encryptedPeerIdService?.serviceEndpoint || null,
       created_at: didDocument.created ? new Date(didDocument.created).getTime() : Date.now(),

@@ -392,26 +392,48 @@ export const useChannelManager = ({
   }, [addAgentToStore, sessionId])
 
   // 删除频道和本地存储的智能体
-  const deleteChannel = useCallback((channel) => {
+  const deleteChannel = useCallback(async (channel) => {
     if (!channel) return false
     
     const agentId = channel.meta?.ipns || channel.meta?.cid || channel.meta?.did || channel.id
+    const agentSessionId = channel.meta?.sessionId
     
-    // 从频道列表中删除
+    // 1. 从频道列表中删除
     setChannels((prev) => {
       const filtered = prev.filter((c) => c.id !== channel.id)
       return filtered
     })
     
-    // 从本地存储中删除
+    // 2. 从本地存储中删除
     try {
       removeAgentFromStore(agentId)
-      console.log('[useChannelManager] 已删除智能体:', channel.name, agentId)
+      console.log('[useChannelManager] 已从本地存储删除智能体:', channel.name, agentId)
     } catch (error) {
-      console.error('[useChannelManager] 删除智能体失败:', error)
+      console.error('[useChannelManager] 删除本地智能体失败:', error)
     }
     
-    // 如果删除的是当前活动频道，清除选中状态
+    // 3. 删除 localStorage 中的 DIAP identity 映射
+    if (agentSessionId && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.removeItem(`diap_identity_${agentSessionId}`)
+        console.log('[useChannelManager] 已删除 DIAP identity 映射:', agentSessionId)
+      } catch (error) {
+        console.error('[useChannelManager] 删除 DIAP identity 映射失败:', error)
+      }
+    }
+    
+    // 4. 调用后端 API 删除 session（异步，不阻塞 UI）
+    if (agentSessionId) {
+      agentService.deleteSession(agentSessionId)
+        .then(() => {
+          console.log('[useChannelManager] 已删除后端 session:', agentSessionId)
+        })
+        .catch((error) => {
+          console.error('[useChannelManager] 删除后端 session 失败:', error)
+        })
+    }
+    
+    // 5. 如果删除的是当前活动频道，清除选中状态
     if (channel.id === activeChannelId) {
       setActiveChannelId(null)
       setSelectedAgent(null)

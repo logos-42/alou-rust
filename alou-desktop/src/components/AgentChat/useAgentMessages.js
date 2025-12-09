@@ -6,6 +6,7 @@ import useAgentStore from '@/stores/agentStore'
 /**
  * Hook for managing messages and conversation
  * 按频道分开存储消息，支持 IPFS 持久化
+ * 支持多智能体独立执行空间
  */
 export const useAgentMessages = ({
   sessionId,
@@ -25,7 +26,12 @@ export const useAgentMessages = ({
   // 按频道存储消息：Map<channelId, Message[]>
   const [messagesByChannel, setMessagesByChannel] = useState({})
   const [currentMessage, setCurrentMessage] = useState('')
+  // 全局 loading 状态（向后兼容）
   const [isLoading, setIsLoading] = useState(false)
+  // 按智能体存储 loading 状态：Map<channelId, boolean>
+  const [loadingByAgent, setLoadingByAgent] = useState({})
+  // 按智能体存储 session：Map<channelId, sessionId>
+  const [sessionsByAgent, setSessionsByAgent] = useState({})
   const [isConversationVisible, setConversationVisible] = useState(false)
   
   // 跟踪已保存过的消息数量，避免重复保存
@@ -33,6 +39,20 @@ export const useAgentMessages = ({
   
   // 获取 agentStore 方法
   const updateAgent = useAgentStore((state) => state.updateAgent)
+  
+  // 获取指定智能体的 loading 状态
+  const isAgentLoading = useCallback((agentId) => {
+    return loadingByAgent[agentId] || false
+  }, [loadingByAgent])
+  
+  // 设置指定智能体的 loading 状态
+  const setAgentLoading = useCallback((agentId, loading) => {
+    setLoadingByAgent(prev => ({ ...prev, [agentId]: loading }))
+    // 同时更新全局 loading（如果是当前活动智能体）
+    if (agentId === activeChannelId) {
+      setIsLoading(loading)
+    }
+  }, [activeChannelId])
 
   // 当前频道的消息
   const messages = useMemo(() => {
@@ -148,50 +168,32 @@ export const useAgentMessages = ({
     }
   }, [setMessagesForChannel])
 
-  const sendMessage = useCallback(async () => {
-    const text = currentMessage.trim()
-    if (!text || isLoading) {
+  /**
+   * 发送消息到指定智能体
+   * 支持多智能体独立执行空间
+   */
+  const sendMessageToAgent = useCallback(async (targetAgentId, text, targetAgent = null) => {
+    if (!text?.trim() || !targetAgentId) {
+      console.warn('[useAgentMessages] 无法发送消息：缺少文本或目标智能体')
       return
     }
 
-    if (!activeChannelId) {
-      console.warn('[useAgentMessages] 无法发送消息：没有活动频道')
+    // 检查该智能体是否正在执行
+    if (loadingByAgent[targetAgentId]) {
+      console.log('[useAgentMessages] 智能体正在执行中，跳过:', targetAgentId)
       return
-    }
-
-    // 确保 session 创建成功
-    let currentSessionId = sessionId
-    if (!isSessionReady || sessionId.startsWith('frontend_')) {
-      try {
-        console.log('[useAgentMessages] 创建新会话...')
-        await createSession()
-        setSessionReady(true)
-        // 等待一下让 sessionId 更新
-        await new Promise((resolve) => setTimeout(resolve, 100))
-      } catch (sessionErr) {
-        console.error('[useAgentMessages] 会话创建失败:', sessionErr)
-        appendMessage({
-          id: `error_${Date.now()}`,
-          type: 'assistant',
-          content: '❌ 无法连接到后端服务，请检查网络连接或稍后重试。',
-          timestamp: Date.now(),
-          source: 'error',
-        }, activeChannelId)
-        return
-      }
     }
 
     const userMessage = {
-      id: `user_${Date.now()}`,
+      id: `user_${Date.now()}_${targetAgentId}`,
       type: 'user',
-      content: text,
+      content: text.trim(),
       timestamp: Date.now(),
     }
 
-    appendMessage(userMessage, activeChannelId)
-    setCurrentMessage('')
-    setIsLoading(true)
-    recordInteraction('user_message', { content: text })
+    appendMessage(userMessage, targetAgentId)
+    setAgentLoading(targetAgentId, true)
+    recordInteraction('user_message', { content: text, agentId: targetAgentId })
     scrollToBottom()
 
     const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
@@ -200,23 +202,49 @@ export const useAgentMessages = ({
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
 
-      // 使用最新的 sessionId（可能在 createSession 后更新了）
-      const actualSessionId = sessionId.startsWith('frontend_') ? currentSessionId : sessionId
-      console.log('[useAgentMessages] 发送消息，sessionId:', actualSessionId, '频道:', activeChannelId)
+      // 获取或创建该智能体的 session
+      let agentSessionId = sessionsByAgent[targetAgentId] || sessionId
+      
+      // 如果没有有效的 session，创建一个新的
+      if (!agentSessionId || agentSessionId.startsWith('frontend_')) {
+        try {
+          console.log('[useAgentMessages] 为智能体创建新会话:', targetAgentId)
+          await createSession()
+          setSessionReady(true)
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          agentSessionId = sessionId
+        } catch (sessionErr) {
+          console.error('[useAgentMessages] 会话创建失败:', sessionErr)
+          appendMessage({
+            id: `error_${Date.now()}`,
+            type: 'assistant',
+            content: '❌ 无法连接到后端服务，请检查网络连接或稍后重试。',
+            timestamp: Date.now(),
+            source: 'error',
+          }, targetAgentId)
+          setAgentLoading(targetAgentId, false)
+          return
+        }
+      }
 
+      // 保存该智能体的 session
+      setSessionsByAgent(prev => ({ ...prev, [targetAgentId]: agentSessionId }))
+
+      console.log('[useAgentMessages] 发送消息，sessionId:', agentSessionId, '智能体:', targetAgentId)
+
+      const agentInfo = targetAgent || selectedAgent
       const data = await apiClient
         .post('/agent/chat', {
-          session_id: actualSessionId,
-          message: text,
+          session_id: agentSessionId,
+          message: text.trim(),
           wallet_address: walletAddress || undefined,
           chain: activeChain || undefined,
           context_events: contextSnapshot,
-          // 传递智能体信息，让后端使用正确的 prompt
-          agent_id: activeChannelId,
-          agent_info: selectedAgent ? {
-            name: selectedAgent.display_name || selectedAgent.name,
-            role_description: selectedAgent.role_description,
-            custom_prompt: selectedAgent.customPrompt,
+          agent_id: targetAgentId,
+          agent_info: agentInfo ? {
+            name: agentInfo.display_name || agentInfo.name,
+            role_description: agentInfo.role_description,
+            custom_prompt: agentInfo.customPrompt,
           } : undefined,
         })
         .then((response) => response.data)
@@ -226,16 +254,20 @@ export const useAgentMessages = ({
       }
 
       const assistantMessage = {
-        id: `assistant_${Date.now()}`,
+        id: `assistant_${Date.now()}_${targetAgentId}`,
         type: 'assistant',
         content: data.content || data.response || '收到响应',
         timestamp: data.timestamp || Date.now(),
         source: data.source || 'alou-edge',
+        agentId: targetAgentId,
       }
-      appendMessage(assistantMessage, activeChannelId)
+      appendMessage(assistantMessage, targetAgentId)
 
       if (data.session_id) {
-        setSessionId(data.session_id)
+        setSessionsByAgent(prev => ({ ...prev, [targetAgentId]: data.session_id }))
+        if (targetAgentId === activeChannelId) {
+          setSessionId(data.session_id)
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : '未知错误'
@@ -244,7 +276,6 @@ export const useAgentMessages = ({
       let friendlyMessage = `❌ 抱歉，发生了错误：${errorMessage}`
       if (statusCode === 404) {
         friendlyMessage = '❌ 会话已过期，请刷新页面重试。'
-        // 重置 session 状态
         setSessionReady(false)
       } else if (statusCode === 500) {
         friendlyMessage = '❌ 服务器内部错误，请稍后重试。'
@@ -258,9 +289,9 @@ export const useAgentMessages = ({
         content: friendlyMessage,
         timestamp: Date.now(),
         source: 'error',
-      }, activeChannelId)
+      }, targetAgentId)
     } finally {
-      setIsLoading(false)
+      setAgentLoading(targetAgentId, false)
       scrollToBottom()
       consoleDockRef.current?.adjustInputHeight?.()
     }
@@ -271,16 +302,38 @@ export const useAgentMessages = ({
     consoleDockRef,
     contextEventsRef,
     createSession,
-    currentMessage,
     handleToolCalls,
-    isLoading,
-    isSessionReady,
+    loadingByAgent,
     recordInteraction,
     scrollToBottom,
     selectedAgent,
     sessionId,
+    sessionsByAgent,
+    setAgentLoading,
     setSessionId,
     setSessionReady,
+  ])
+
+  // 向后兼容的 sendMessage（发送到当前活动智能体）
+  const sendMessage = useCallback(async () => {
+    const text = currentMessage.trim()
+    if (!text || isLoading) {
+      return
+    }
+
+    if (!activeChannelId) {
+      console.warn('[useAgentMessages] 无法发送消息：没有活动频道')
+      return
+    }
+
+    setCurrentMessage('')
+    await sendMessageToAgent(activeChannelId, text, selectedAgent)
+  }, [
+    activeChannelId,
+    currentMessage,
+    isLoading,
+    selectedAgent,
+    sendMessageToAgent,
   ])
 
   const openConversationPanel = useCallback(() => {
@@ -328,11 +381,17 @@ export const useAgentMessages = ({
     setCurrentMessage,
     isLoading,
     setIsLoading,
+    // 多智能体独立执行空间
+    loadingByAgent,
+    isAgentLoading,
+    setAgentLoading,
+    sessionsByAgent,
     isConversationVisible,
     setConversationVisible,
     appendMessage,
     scrollToBottom,
     sendMessage,
+    sendMessageToAgent, // 新增：发送到指定智能体
     openConversationPanel,
     closeConversationPanel,
     saveMessagesToIpfs,

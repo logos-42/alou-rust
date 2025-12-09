@@ -239,3 +239,182 @@ pub async fn ipfs_add_base64(
     add_bytes_to_ipfs(&api_url, bytes, file_name).await
 }
 
+
+
+// ==================== PubSub Commands ====================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PubSubMessage {
+    pub data: String,
+    pub from: Option<String>,
+    pub seqno: Option<String>,
+    pub topic_ids: Option<Vec<String>>,
+}
+
+/// 发布消息到 IPFS PubSub 主题
+#[tauri::command]
+pub async fn ipfs_pubsub_publish(
+    topic: String,
+    message: String,
+    ipfs_api_url: Option<String>,
+) -> Result<bool, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let endpoint = format!("{}/api/v0/pubsub/pub", normalize_base_url(&api_url));
+    
+    let client = create_ipfs_client();
+    
+    // URL encode the message
+    let encoded_message = urlencoding::encode(&message).into_owned();
+    
+    let response = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .query(&[("arg", topic.as_str()), ("arg", encoded_message.as_str())])
+        .send()
+        .await
+        .map_err(|e| format!("PubSub publish failed: {}", e))?;
+    
+    if response.status().is_success() {
+        Ok(true)
+    } else {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        Err(format!("PubSub publish failed with status {}: {}", status, text))
+    }
+}
+
+/// 订阅 IPFS PubSub 主题并获取一次消息（带超时）
+#[tauri::command]
+pub async fn ipfs_pubsub_subscribe_once(
+    topic: String,
+    timeout_ms: Option<u64>,
+    ipfs_api_url: Option<String>,
+) -> Result<Vec<String>, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let endpoint = format!("{}/api/v0/pubsub/sub", normalize_base_url(&api_url));
+    let timeout = timeout_ms.unwrap_or(1000);
+    
+    let client = Client::builder()
+        .http1_only()
+        .timeout(std::time::Duration::from_millis(timeout))
+        .connect_timeout(std::time::Duration::from_millis(timeout))
+        .no_proxy()
+        .build()
+        .unwrap_or_else(|_| Client::new());
+    
+    let response = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .query(&[("arg", &topic)])
+        .send()
+        .await;
+    
+    match response {
+        Ok(resp) => {
+            if resp.status().is_success() {
+                let text = resp.text().await.unwrap_or_default();
+                // PubSub 返回的是 NDJSON 格式
+                let messages: Vec<String> = text
+                    .lines()
+                    .filter(|line| !line.trim().is_empty())
+                    .filter_map(|line| {
+                        // 尝试解析 JSON 并提取 data 字段
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
+                            if let Some(data) = json.get("data").and_then(|d| d.as_str()) {
+                                // data 是 base64 编码的
+                                if let Ok(decoded) = BASE64.decode(data) {
+                                    if let Ok(s) = String::from_utf8(decoded) {
+                                        return Some(s);
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+                Ok(messages)
+            } else {
+                Ok(vec![])
+            }
+        }
+        Err(_) => {
+            // 超时或连接错误，返回空列表（不是错误）
+            Ok(vec![])
+        }
+    }
+}
+
+/// 获取 PubSub 主题的订阅者列表
+#[tauri::command]
+pub async fn ipfs_pubsub_peers(
+    topic: Option<String>,
+    ipfs_api_url: Option<String>,
+) -> Result<Vec<String>, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let endpoint = format!("{}/api/v0/pubsub/peers", normalize_base_url(&api_url));
+    
+    let client = create_ipfs_client();
+    let mut request = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0");
+    
+    if let Some(t) = topic {
+        request = request.query(&[("arg", t)]);
+    }
+    
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("PubSub peers request failed: {}", e))?;
+    
+    if response.status().is_success() {
+        let text = response.text().await.unwrap_or_default();
+        
+        #[derive(Deserialize)]
+        struct PeersResponse {
+            #[serde(rename = "Strings")]
+            strings: Option<Vec<String>>,
+        }
+        
+        let parsed: PeersResponse = serde_json::from_str(&text)
+            .unwrap_or(PeersResponse { strings: None });
+        
+        Ok(parsed.strings.unwrap_or_default())
+    } else {
+        Ok(vec![])
+    }
+}
+
+/// 获取当前订阅的主题列表
+#[tauri::command]
+pub async fn ipfs_pubsub_ls(
+    ipfs_api_url: Option<String>,
+) -> Result<Vec<String>, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let endpoint = format!("{}/api/v0/pubsub/ls", normalize_base_url(&api_url));
+    
+    let client = create_ipfs_client();
+    let response = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("PubSub ls request failed: {}", e))?;
+    
+    if response.status().is_success() {
+        let text = response.text().await.unwrap_or_default();
+        
+        #[derive(Deserialize)]
+        struct LsResponse {
+            #[serde(rename = "Strings")]
+            strings: Option<Vec<String>>,
+        }
+        
+        let parsed: LsResponse = serde_json::from_str(&text)
+            .unwrap_or(LsResponse { strings: None });
+        
+        Ok(parsed.strings.unwrap_or_default())
+    } else {
+        Ok(vec![])
+    }
+}

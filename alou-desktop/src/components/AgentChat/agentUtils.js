@@ -2,13 +2,61 @@ import agentAssetsService from '@/services/agentAssetsService'
 
 export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
 
+/**
+ * 解析智能体头像 URL
+ * 支持多种来源：直接 URL、IPFS CID、嵌套对象中的头像
+ */
 export const resolveAgentAvatar = (agent) => {
   if (!agent) return fallbackAvatar
-  if (agent.avatar) return agent.avatar
-  if (agent.avatar_url) return agent.avatar_url
-  if (agent.avatarCid || agent.avatar_cid) {
-    return agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
+  
+  // 1. 直接 URL（已经是完整的 http/https URL）
+  if (agent.avatar && agent.avatar.startsWith('http')) return agent.avatar
+  if (agent.avatar_url && agent.avatar_url.startsWith('http')) return agent.avatar_url
+  
+  // 2. IPFS CID（支持多种格式）
+  const avatarCid = agent.avatarCid || agent.avatar_cid
+  if (avatarCid) {
+    // 如果已经是完整 URL
+    if (avatarCid.startsWith('http')) return avatarCid
+    // 如果是 IPFS CID 格式
+    if (avatarCid.startsWith('Qm') || avatarCid.startsWith('bafy') || avatarCid.startsWith('bafk')) {
+      return agentAssetsService.resolveIpfsUri(avatarCid)
+    }
   }
+  
+  // 3. 从 diapIdentity 中获取
+  if (agent.diapIdentity?.avatar_cid) {
+    const cid = agent.diapIdentity.avatar_cid
+    if (cid.startsWith('http')) return cid
+    return agentAssetsService.resolveIpfsUri(cid)
+  }
+  
+  // 4. 从 serviceEndpoint 中获取（远程智能体 DID 文档）
+  if (agent.serviceEndpoint?.avatar_cid) {
+    const cid = agent.serviceEndpoint.avatar_cid
+    if (cid.startsWith('http')) return cid
+    return agentAssetsService.resolveIpfsUri(cid)
+  }
+  
+  // 5. 从 meta 对象中获取（频道数据结构）
+  if (agent.meta) {
+    const metaAvatar = resolveAgentAvatar(agent.meta)
+    if (metaAvatar !== fallbackAvatar) return metaAvatar
+  }
+  
+  // 6. 从 did_document 的 service 中提取（完整 DID 文档）
+  if (agent.did_document?.service) {
+    const services = agent.did_document.service
+    for (const svc of services) {
+      const endpoint = svc.serviceEndpoint
+      if (endpoint?.avatar_cid) {
+        const cid = endpoint.avatar_cid
+        if (cid.startsWith('http')) return cid
+        return agentAssetsService.resolveIpfsUri(cid)
+      }
+    }
+  }
+  
   return fallbackAvatar
 }
 
@@ -39,20 +87,28 @@ export const buildChannelFromAgent = (agent) => {
   const fallbackName = cleanedAgent.cid || id
   // 显示名称也优先使用 IPNS
   const displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid || fallbackName
-  const statusLabel = cleanedAgent.ipns
-    ? 'IPNS 解析'
-    : cleanedAgent.did
-      ? 'DID 解析'
-      : cleanedAgent.agent_type === 'claude_agent_sdk'
-        ? '自定义智能体'
-        : 'CID 解析'
+  
+  // 判断是否是临时频道（正在创建中）
+  const isCreating = cleanedAgent.status === 'creating' || 
+    (cleanedAgent.cid && cleanedAgent.cid.startsWith('temp_')) ||
+    (id && id.startsWith('temp_'))
+  
+  const statusLabel = isCreating
+    ? '创建中...'
+    : cleanedAgent.ipns
+      ? 'IPNS 解析'
+      : cleanedAgent.did
+        ? 'DID 解析'
+        : cleanedAgent.agent_type === 'claude_agent_sdk'
+          ? '自定义智能体'
+          : 'CID 解析'
 
   const avatar = resolveAgentAvatar(cleanedAgent)
 
   return {
     id,
     name: displayName,
-    status: 'online',
+    status: isCreating ? 'creating' : 'online',
     statusLabel,
     icon: '🛰️',
     avatar,

@@ -28,6 +28,7 @@ import { useAgentMessages } from './AgentChat/useAgentMessages'
 import { useAgentWallet } from './AgentChat/useAgentWallet'
 import { useChannelManager } from './AgentChat/useChannelManager'
 import { useAgentInvite } from './AgentChat/useAgentInvite'
+import { useMultiAgentChat } from '@/hooks/useMultiAgentChat'
 
 // Utils & Constants
 import { resolveBackendChain, useToolCallHandler } from '@/hooks/useAgentChat'
@@ -200,6 +201,10 @@ const AgentChat = () => {
     setCurrentMessage,
     isLoading,
     setIsLoading,
+    // 多智能体独立执行空间
+    loadingByAgent,
+    isAgentLoading,
+    sendMessageToAgent,
     appendMessage,
     scrollToBottom,
     sendMessage: baseSendMessage,
@@ -264,6 +269,70 @@ const AgentChat = () => {
     handleDeleteChannel,
     handleInviteSubmit,
   } = inviteState
+
+  // ==================== 8. Multi-Agent Coordinator ====================
+  // 获取本地 DIAP 身份用于多智能体通信
+  const localIdentity = useMemo(() => {
+    if (selectedAgent?.diapIdentity) {
+      return selectedAgent.diapIdentity
+    }
+    // 尝试从 localStorage 获取
+    if (sessionId && typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`diap_identity_${sessionId}`)
+      if (stored) {
+        try {
+          return JSON.parse(stored)
+        } catch {
+          return null
+        }
+      }
+    }
+    return null
+  }, [selectedAgent, sessionId])
+
+  // 将所有频道中的智能体注册到协调器
+  const registeredAgentsForCoordinator = useMemo(() => {
+    return channels
+      .filter(ch => ch.meta)
+      .map(ch => ({
+        id: ch.id,
+        did: ch.meta.did,
+        ipns: ch.meta.ipns,
+        name: ch.meta.display_name || ch.meta.name,
+        display_name: ch.meta.display_name || ch.meta.name,
+        role_description: ch.meta.role_description,
+        pubsub_topics: ch.meta.pubsub_topics || [],
+      }))
+  }, [channels])
+
+  const multiAgentChat = useMultiAgentChat({
+    localIdentity,
+    registeredAgents: registeredAgentsForCoordinator,
+    onAgentMessage: useCallback((agentId, message) => {
+      console.log('[AgentChat] 收到智能体消息:', agentId, message)
+      // 将智能体间消息添加到对应频道
+      if (message.content) {
+        appendMessage({
+          id: message.id || `agent_${Date.now()}`,
+          type: 'assistant',
+          content: message.content,
+          timestamp: message.timestamp || Date.now(),
+          source: 'agent-coordinator',
+          fromAgent: message.from,
+        }, agentId)
+      }
+    }, [appendMessage]),
+    onGroupMessage: useCallback((groupId, message) => {
+      console.log('[AgentChat] 收到群聊消息:', groupId, message)
+    }, []),
+  })
+
+  const {
+    routeMessageToAgent,
+    sendToAgent,
+    analyzeIntent,
+    isCoordinatorReady,
+  } = multiAgentChat
 
   // ==================== Stream Events ====================
   const handleStreamEvent = useCallback(
@@ -432,28 +501,36 @@ const AgentChat = () => {
     (earlyMetadata) => {
       const channel = buildChannelFromAgent(earlyMetadata)
       if (channel) {
-        const matchKey = earlyMetadata.avatar_cid || earlyMetadata.cid
+        // 确保 tempId 保存在 channel.meta 中用于后续匹配
+        if (earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_')) {
+          channel.tempId = earlyMetadata.cid
+          if (channel.meta) {
+            channel.meta.tempId = earlyMetadata.cid
+          }
+        }
+        
         setChannels((prev) => {
-          const others = prev.filter((item) => {
-            const itemAvatarCid = item.meta?.avatar_cid
-            const itemCid = item.meta?.cid
-            return itemAvatarCid !== matchKey && itemCid !== matchKey && item.id !== channel.id
-          })
+          // 移除可能重复的频道
+          const others = prev.filter((item) => item.id !== channel.id)
           return [channel, ...others]
         })
         setActiveChannelId(channel.id)
         setSelectedAgent(earlyMetadata)
-        console.log('[AgentChat] 早期频道已显示，等待完整创建...')
+        console.log('[AgentChat] 早期频道已显示，tempId:', channel.tempId, '等待完整创建...')
       }
     },
     [setChannels, setActiveChannelId, setSelectedAgent],
   )
 
   const handleCreateAgentSubmit = useCallback(
-    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity }) => {
-      setChannelLoading(true)
+    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity, tempId }) => {
+      // 如果有 tempId，说明是后台更新，不需要显示 loading
+      const isBackgroundUpdate = !!tempId
+      if (!isBackgroundUpdate) {
+        setChannelLoading(true)
+      }
       setChannelError(null)
-      recordInteraction('create_claude_agent', { name })
+      recordInteraction('create_claude_agent', { name, isBackgroundUpdate })
 
       try {
         const walletAddress =
@@ -485,10 +562,11 @@ const AgentChat = () => {
           mcp_config_cid: mcpConfigCid,
           mcp_ports: mcpPorts,
           diap_identity: diapIdentity,
+          sessionId,
         }
 
         if (diapIdentity) {
-          metadata.diap_identity = diapIdentity
+          metadata.diapIdentity = diapIdentity
           metadata.did = metadata.did || diapIdentity.did
           metadata.cid = metadata.cid || diapIdentity.cid
           metadata.ipns = metadata.ipns || diapIdentity.ipns
@@ -496,39 +574,69 @@ const AgentChat = () => {
 
         const channel = buildChannelFromAgent(metadata)
         if (channel) {
-          const matchKey = avatarCid || metadata.cid
           setChannels((prev) => {
-            const others = prev.filter((item) => {
-              const itemAvatarCid = item.meta?.avatar_cid
-              const itemCid = item.meta?.cid
-              if (item.id === channel.id) return false
-              if (matchKey && (itemAvatarCid === matchKey || itemCid === matchKey || itemCid === `temp_${matchKey}`)) {
-                return false
-              }
-              return true
+            // 查找临时频道 - 使用多种方式匹配
+            const tempIndex = prev.findIndex((item) => {
+              // 1. 通过 tempId 属性匹配
+              if (tempId && item.tempId === tempId) return true
+              if (tempId && item.meta?.tempId === tempId) return true
+              // 2. 通过 id 匹配（临时频道的 id 就是 tempId）
+              if (tempId && item.id === tempId) return true
+              // 3. 通过 meta.cid 匹配
+              if (tempId && item.meta?.cid === tempId) return true
+              // 4. 检查是否是任何临时频道（以 temp_ 开头）
+              if (item.id && item.id.startsWith('temp_')) return true
+              if (item.meta?.cid && item.meta.cid.startsWith('temp_')) return true
+              return false
             })
-            return [channel, ...others]
+
+            if (tempIndex >= 0) {
+              // 更新临时频道为完整频道
+              const updated = [...prev]
+              const oldChannel = updated[tempIndex]
+              console.log('[AgentChat] 找到临时频道:', oldChannel.id, '-> 更新为:', channel.id)
+              updated[tempIndex] = channel
+              return updated
+            }
+
+            // 没有找到临时频道，检查是否已存在相同 ID 的频道
+            const existingIndex = prev.findIndex((item) => item.id === channel.id)
+            if (existingIndex >= 0) {
+              const updated = [...prev]
+              updated[existingIndex] = channel
+              console.log('[AgentChat] 更新已存在的频道:', channel.id)
+              return updated
+            }
+
+            // 添加新频道
+            console.log('[AgentChat] 添加新频道:', channel.id)
+            return [channel, ...prev]
           })
           setActiveChannelId(channel.id)
         }
 
         setSelectedAgent(metadata)
-        setCreateAgentModalOpen(false)
 
         // 保存到本地存储
         saveAgentToStorage(metadata)
 
+        console.log('[AgentChat] 智能体创建/更新完成:', metadata.did || metadata.cid)
         return result
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        setChannelError(message)
+        if (!isBackgroundUpdate) {
+          setChannelError(message)
+        }
         recordInteraction('create_claude_agent_failed', { error: message })
+        console.error('[AgentChat] 创建智能体失败:', message)
         throw new Error(message)
       } finally {
-        setChannelLoading(false)
+        if (!isBackgroundUpdate) {
+          setChannelLoading(false)
+        }
       }
     },
-    [preferredChain, recordInteraction, saveAgentToStorage, sessionId],
+    [preferredChain, recordInteraction, saveAgentToStorage, sessionId, setChannels, setActiveChannelId, setSelectedAgent],
   )
 
   // ==================== Send Message with Tool Calls ====================
