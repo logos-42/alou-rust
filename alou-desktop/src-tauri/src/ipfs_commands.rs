@@ -243,6 +243,8 @@ pub async fn ipfs_add_base64(
 
 // ==================== PubSub Commands ====================
 
+/// PubSub 消息结构体（预留，用于未来更完整的消息处理）
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PubSubMessage {
     pub data: String,

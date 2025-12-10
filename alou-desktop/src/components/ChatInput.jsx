@@ -77,13 +77,13 @@ const ChatInput = forwardRef(
                   <img src={cancelIcon} alt="终止" width="20" height="20" />
                 </button>
               ) : (
-                <button
-                  type="button"
-                  className="send-btn"
-                  onClick={onSend}
-                  disabled={disabled}
-                  title={t('send')}
-                >
+              <button
+                type="button"
+                className="send-btn"
+                onClick={onSend}
+                disabled={disabled}
+                title={t('send')}
+              >
                   <img src={sendIcon} alt="发送" width="20" height="20" />
                 </button>
               )}

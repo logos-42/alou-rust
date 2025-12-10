@@ -681,17 +681,17 @@ export class AgentService {
         return result.cid
       } else {
         // 网页版：使用 IPFS HTTP API（需要配置 CORS）
-        const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
-          method: 'POST',
-          body: new Blob([jsonData], { type: 'application/json' }),
-        })
-        
-        if (!response.ok) {
-          throw new Error(`IPFS 上传失败: ${response.status}`)
-        }
-        
-        const result = await response.json()
-        return result.Hash
+      const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
+        method: 'POST',
+        body: new Blob([jsonData], { type: 'application/json' }),
+      })
+      
+      if (!response.ok) {
+        throw new Error(`IPFS 上传失败: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      return result.Hash
       }
     } catch (error) {
       console.error('[AgentService] 上传消息到 IPFS 失败:', error)

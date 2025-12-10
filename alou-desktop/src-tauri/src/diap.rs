@@ -1,11 +1,11 @@
 // DIAP module - 使用完整 DIAP SDK 规范
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uuid::Uuid;
 
 use diap_rs_sdk::{IpfsClient, KeyPair};
 use crate::utils::{default_ipfs_api_url, default_ipfs_gateway_url, normalize_base_url};
-use log::{error, info};
+use log::{error, info, warn};
+use reqwest::Client;
 
 const IPFS_HTTP_TIMEOUT_SECS: u64 = 90;
 
@@ -48,6 +48,35 @@ pub struct EncryptedNodeId {
     /// 加密方法
     pub method: String,
 }
+
+/// 直接调用 IPFS API 提供内容到 DHT（桌面版专用，不依赖 SDK）
+async fn provide_to_dht_direct(api_url: &str, cid: &str) -> Result<(), String> {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+    
+    let url = format!("{}/api/v0/dht/provide?arg={}", normalize_base_url(api_url), cid);
+    
+    let response = client
+        .post(&url)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("DHT provide 请求失败: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("DHT provide 失败: {} - {}", status, text));
+    }
+    
+    info!(target: "diap", "✅ 成功提供内容到 DHT: {}", cid);
+    Ok(())
+}
+
+// 注意：publish_ipns_direct 函数已移除，现在使用 SDK 的 publish_ipns_direct 方法
 
 #[tauri::command]
 pub async fn create_local_diap_identity(
@@ -219,28 +248,66 @@ pub async fn create_local_diap_identity(
     let cid = upload_result.cid;
     info!(target: "diap", "DID 文档已上传，CID: {}", cid);
 
-    // 使用 DIAP SDK 发布到 IPNS
-    let ipns_result = ipfs_client
-        .publish_ipns(&cid, &ipns_key, "24h", "24h")
+    // 主动提供数据到 DHT，确保数据可以被其他节点发现
+    info!(target: "diap", "正在提供数据到 DHT...");
+    if let Err(e) = provide_to_dht_direct(&ipfs_api, &cid).await {
+        warn!(
+            target: "diap",
+            "DHT provide 失败（不影响上传，数据仍会被pin）: {}",
+            e
+        );
+    } else {
+        info!(target: "diap", "✅ 数据已提供到 DHT，CID: {}", cid);
+    }
+
+    // 使用 SDK 的 publish_ipns_direct 方法发布 IPNS（使用 allow-offline=false 确保在 DHT 中传播）
+    info!(target: "diap", "正在发布 IPNS 记录（确保在线传播）...");
+    let ipns_result = match ipfs_client
+        .publish_ipns_direct(&cid, &ipns_key, "24h", "24h")
         .await
-        .map_err(|e| {
+    {
+        Ok(result) => {
+            info!(target: "diap", "✅ IPNS 发布成功（在线模式，已传播到DHT）: {}", result.name);
+            result
+        }
+        Err(e) => {
             error!(
                 target: "diap",
-                "IPNS publish failed (cid={}, key={}, api={}): {:#}",
+                "IPNS publish_direct failed (cid={}, key={}, api={}): {}",
                 cid,
                 ipns_key,
                 ipfs_api,
                 e
             );
-            format!("Failed to publish to IPNS: {}", e)
-        })?;
+            // 如果直接发布失败，降级使用普通 publish_ipns（allow-offline=true）
+            warn!(target: "diap", "降级使用普通 IPNS 发布（allow-offline=true）...");
+            ipfs_client
+                .publish_ipns(&cid, &ipns_key, "24h", "24h")
+                .await
+                .map_err(|e| format!("SDK IPNS 发布也失败: {}", e))?
+        }
+    };
+    
+    let ipns_name = ipns_result.name;
 
-    let ipns_name = ipns_result.name.clone();
     let ipns_path = if ipns_name.starts_with("/ipns/") {
         ipns_name.clone()
     } else {
         format!("/ipns/{}", ipns_name)
     };
+
+    // 主动提供 IPNS 记录到 DHT，确保 IPNS 可以被其他节点发现
+    info!(target: "diap", "正在提供 IPNS 记录到 DHT...");
+    let ipns_name_for_dht = ipns_name.trim_start_matches("/ipns/");
+    if let Err(e) = provide_to_dht_direct(&ipfs_api, ipns_name_for_dht).await {
+        warn!(
+            target: "diap",
+            "IPNS DHT provide 失败（不影响发布）: {}",
+            e
+        );
+    } else {
+        info!(target: "diap", "✅ IPNS 记录已提供到 DHT，IPNS: {}", ipns_path);
+    }
 
     let gateway_url = format!("{}/ipfs/{}", normalize_base_url(&gateway), cid);
 
