@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import React from 'react'
+import { useI18n } from '@/hooks/useI18n'
 
 /**
  * useGroupChatButton - 群聊按钮 Hook
@@ -12,16 +13,18 @@ export const useGroupChatButton = ({
   openGroupChat,
   closeGroupChat,
 }) => {
+  const { t } = useI18n()
+  
   // 按钮配置
   const buttonConfig = useMemo(
     () => ({
       className: `group-chat-toggle-btn-fixed ${showGroupChat ? 'active' : ''}`,
       onClick: showGroupChat ? closeGroupChat : openGroupChat,
-      title: showGroupChat ? '关闭群聊' : '打开群聊',
-      'aria-label': showGroupChat ? '关闭群聊' : '打开群聊',
+      title: showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
+      'aria-label': showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
       disabled: !canOpenGroupChat && !showGroupChat,
     }),
-    [showGroupChat, canOpenGroupChat, openGroupChat, closeGroupChat],
+    [showGroupChat, canOpenGroupChat, openGroupChat, closeGroupChat, t],
   )
 
   // 包装对话面板的包装器组件

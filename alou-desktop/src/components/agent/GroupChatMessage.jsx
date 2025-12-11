@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react'
+import { useI18n } from '@/hooks/useI18n'
 import './GroupChatMessage.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -8,6 +9,7 @@ const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
  * 类似微信的群聊消息样式，显示发送者信息
  */
 const GroupChatMessage = ({ message }) => {
+  const { t, currentLanguage } = useI18n()
   const { id, type, from, fromName, avatar, content, timestamp, metadata } = message
 
   const formattedTime = useMemo(() => {
@@ -16,9 +18,11 @@ const GroupChatMessage = ({ message }) => {
     const now = new Date()
     const diff = now - date
 
+    const locale = currentLanguage === 'zh' ? 'zh-CN' : 'en-US'
+
     // 如果是今天，只显示时间
     if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
-      return date.toLocaleTimeString('zh-CN', {
+      return date.toLocaleTimeString(locale, {
         hour: '2-digit',
         minute: '2-digit',
       })
@@ -26,23 +30,23 @@ const GroupChatMessage = ({ message }) => {
 
     // 如果是昨天
     if (diff < 48 * 60 * 60 * 1000) {
-      return `昨天 ${date.toLocaleTimeString('zh-CN', {
+      return `${t('agent.groupChat.yesterday')} ${date.toLocaleTimeString(locale, {
         hour: '2-digit',
         minute: '2-digit',
       })}`
     }
 
     // 其他情况显示完整日期时间
-    return date.toLocaleString('zh-CN', {
+    return date.toLocaleString(locale, {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
     })
-  }, [timestamp])
+  }, [timestamp, currentLanguage, t])
 
   const avatarSrc = avatar || DEFAULT_AVATAR
-  const displayName = fromName || from || '未知'
+  const displayName = fromName || from || t('agent.groupChat.unknown')
 
   // 格式化消息内容
   const formatContent = (text) => {
@@ -75,7 +79,7 @@ const GroupChatMessage = ({ message }) => {
         <div className="task-message-content">
           <div className="task-header">
             <span className="task-icon">{isRequest ? '📋' : '✅'}</span>
-            <span className="task-type">{isRequest ? '任务请求' : '任务完成'}</span>
+            <span className="task-type">{isRequest ? t('agent.groupChat.taskRequest') : t('agent.groupChat.taskComplete')}</span>
             {metadata?.task_id && (
               <span className="task-id">#{metadata.task_id.slice(-8)}</span>
             )}

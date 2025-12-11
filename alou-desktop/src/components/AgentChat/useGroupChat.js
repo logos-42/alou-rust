@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import clusterActionService from '@/services/clusterActionService'
 import apiClient from '@/services/api'
 import useClusterActionStore from '@/stores/clusterActionStore'
+import { i18n } from '@/hooks/useI18n'
 
 /**
  * useGroupChat - 群聊状态管理 Hook
@@ -35,7 +36,7 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
       id: pubSubMsg.id || `msg_${Date.now()}_${Math.random()}`,
       type: pubSubMsg.msg_type || 'system',
       from: pubSubMsg.from || 'system',
-      fromName: pubSubMsg.from === 'system' ? '系统' : pubSubMsg.from,
+      fromName: pubSubMsg.from === 'system' ? i18n.t('agent.groupChat.system') : pubSubMsg.from,
       avatar: pubSubMsg.metadata?.avatar || null,
       content: pubSubMsg.content || '',
       timestamp: pubSubMsg.timestamp || Date.now(),
@@ -126,13 +127,14 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
         
         if (!hasWelcome) {
           const action = getActiveAction()
+          const description = action ? (action.description || actionId) : actionId
           const welcomeMessage = {
             id: `welcome_${actionId}`,
             type: 'system',
             from: 'system',
-            fromName: '系统',
+            fromName: i18n.t('agent.groupChat.system'),
             avatar: null,
-            content: action ? `群聊已创建：${action.description || actionId}` : `群聊已创建：${actionId}`,
+            content: i18n.t('agent.groupChat.created', { description }),
             timestamp: Date.now(),
             metadata: {},
           }

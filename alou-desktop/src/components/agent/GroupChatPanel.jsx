@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import GroupChatMessage from './GroupChatMessage'
+import { useI18n } from '@/hooks/useI18n'
 import './GroupChatPanel.css'
 
 /**
@@ -16,6 +17,7 @@ const GroupChatPanel = ({
   onRefresh,
   isLoading = false,
 }) => {
+  const { t } = useI18n()
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
@@ -50,15 +52,15 @@ const GroupChatPanel = ({
       <header className="group-chat-header">
         <div className="header-left">
           {onClose && (
-            <button type="button" className="close-btn" onClick={onClose} title="关闭群聊">
+            <button type="button" className="close-btn" onClick={onClose} title={t('agent.groupChat.close')}>
               ✕
             </button>
           )}
           <div className="group-icon">👥</div>
           <div className="header-info">
-            <div className="group-title">集群行动</div>
+            <div className="group-title">{t('agent.groupChat.title')}</div>
             <div className="group-subtitle">
-              {actionDescription || `行动 #${actionId?.slice(-8) || 'N/A'}`}
+              {actionDescription || `${t('agent.groupChat.action')} #${actionId?.slice(-8) || 'N/A'}`}
             </div>
           </div>
         </div>
@@ -70,7 +72,7 @@ const GroupChatPanel = ({
       {/* 参与智能体列表 - 已隐藏 */}
       {false && agents.length > 0 && (
         <div className="group-chat-agents">
-          <div className="agents-label">参与智能体 ({agents.length})</div>
+          <div className="agents-label">{t('agent.groupChat.participants')} ({agents.length})</div>
           <div className="agents-list">
             {agents.map((agent) => (
               <div key={agent.id || agent.agent_id} className="agent-item">
@@ -78,7 +80,7 @@ const GroupChatPanel = ({
                   <img src={agent.avatar || 'https://avatars.githubusercontent.com/u/16309930?v=4'} alt={agent.name || agent.agent_name} />
                 </div>
                 <div className="agent-info">
-                  <div className="agent-name">{agent.name || agent.agent_name || '智能体'}</div>
+                  <div className="agent-name">{agent.name || agent.agent_name || t('agent.type.claude')}</div>
                   {agent.mode && (
                     <div className="agent-mode">{agent.mode === 'agent' ? 'Agent' : 'Alou'}</div>
                   )}
@@ -94,8 +96,8 @@ const GroupChatPanel = ({
         {messages.length === 0 && !isLoading ? (
           <div className="empty-state">
             <div className="empty-icon">💬</div>
-            <div className="empty-text">暂无消息</div>
-            <div className="empty-hint">等待智能体开始协作...</div>
+            <div className="empty-text">{t('agent.groupChat.empty')}</div>
+            <div className="empty-hint">{t('agent.groupChat.emptyHint')}</div>
           </div>
         ) : (
           <>
@@ -110,7 +112,7 @@ const GroupChatPanel = ({
                     <span />
                     <span />
                   </div>
-                  <span className="typing-text">智能体正在协作...</span>
+                  <span className="typing-text">{t('agent.groupChat.typing')}</span>
                 </div>
               </div>
             )}
@@ -125,8 +127,8 @@ const GroupChatPanel = ({
           type="button"
           className="refresh-btn-fixed"
           onClick={onRefresh}
-          title="刷新"
-          aria-label="刷新"
+          title={t('agent.groupChat.refresh')}
+          aria-label={t('agent.groupChat.refresh')}
         >
           🔄
         </button>
@@ -141,7 +143,7 @@ const GroupChatPanel = ({
             setIsScrolledToBottom(true)
             scrollToBottom()
           }}
-          title="滚动到底部"
+          title={t('agent.groupChat.scrollToBottom')}
         >
           ↓
         </button>

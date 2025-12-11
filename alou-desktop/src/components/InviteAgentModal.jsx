@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import useAgentStore from '@/stores/agentStore'
+import { useI18n } from '@/hooks/useI18n'
 import './InviteAgentModal.css'
 
 /**
@@ -15,6 +16,7 @@ const InviteAgentModal = ({
   onInvite,
   onResolve,
 }) => {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState('internal') // 'internal' | 'external'
   const [externalTarget, setExternalTarget] = useState('')
   const [selectedAgents, setSelectedAgents] = useState([])
@@ -71,7 +73,7 @@ const InviteAgentModal = ({
 
   const handleInternalInvite = useCallback(async () => {
     if (selectedAgents.length === 0) {
-      setError('请选择至少一个智能体')
+      setError(t('agent.invite.error.selectAtLeastOne'))
       return
     }
     
@@ -83,16 +85,16 @@ const InviteAgentModal = ({
       onClose()
     } catch (err) {
       console.error('[InviteAgentModal] 邀请失败:', err)
-      setError(err.message || '邀请失败')
+      setError(err.message || t('agent.invite.error.inviteFailed'))
     } finally {
       setIsLoading(false)
     }
-  }, [selectedAgents, targetChannel, onInvite, onClose])
+  }, [selectedAgents, targetChannel, onInvite, onClose, t])
 
   const handleExternalInvite = useCallback(async () => {
     const target = externalTarget.trim()
     if (!target) {
-      setError('请输入 IPNS / CID / DID 标识')
+      setError(t('agent.invite.error.enterIdentifier'))
       return
     }
     
@@ -107,11 +109,11 @@ const InviteAgentModal = ({
         onClose()
       }
     } catch (err) {
-      setError(err.message || '解析或邀请失败')
+      setError(err.message || t('agent.invite.error.resolveFailed'))
     } finally {
       setIsLoading(false)
     }
-  }, [externalTarget, targetChannel, onInvite, onResolve, onClose])
+  }, [externalTarget, targetChannel, onInvite, onResolve, onClose, t])
 
   const handleClose = useCallback(() => {
     setSelectedAgents([])
@@ -135,9 +137,9 @@ const InviteAgentModal = ({
         onClick={(e) => e.stopPropagation()}
       >
         <header className="invite-modal-header">
-          <h2>邀请智能体到群组</h2>
+          <h2>{t('agent.invite.title')}</h2>
           <span className="target-channel">
-            频道: {targetChannel?.name || '未知'}
+            {t('agent.invite.channel')}: {targetChannel?.name || t('agent.invite.channel.unknown')}
           </span>
           <button type="button" className="close-btn" onClick={handleClose}>
             ✕
@@ -150,14 +152,14 @@ const InviteAgentModal = ({
             className={`tab-btn ${activeTab === 'internal' ? 'active' : ''}`}
             onClick={() => setActiveTab('internal')}
           >
-            从本地选择
+            {t('agent.invite.tab.local')}
           </button>
           <button
             type="button"
             className={`tab-btn ${activeTab === 'external' ? 'active' : ''}`}
             onClick={() => setActiveTab('external')}
           >
-            外部邀请
+            {t('agent.invite.tab.external')}
           </button>
         </div>
 
@@ -166,8 +168,8 @@ const InviteAgentModal = ({
             <div className="internal-invite">
               {availableAgents.length === 0 ? (
                 <div className="empty-state">
-                  <p>没有可邀请的智能体</p>
-                  <small>请先创建或导入其他智能体</small>
+                  <p>{t('agent.invite.local.empty')}</p>
+                  <small>{t('agent.invite.local.emptyHint')}</small>
                 </div>
               ) : (
                 <div className="agent-list">
@@ -221,7 +223,7 @@ const InviteAgentModal = ({
               
               {selectedAgents.length > 0 && (
                 <div className="selected-count">
-                  已选择 {selectedAgents.length} 个智能体
+                  {t('agent.invite.local.selected', { count: selectedAgents.length })}
                 </div>
               )}
             </div>
@@ -230,17 +232,17 @@ const InviteAgentModal = ({
           {activeTab === 'external' && (
             <div className="external-invite">
               <label htmlFor="external-target">
-                输入智能体的 IPNS / CID / DID 标识
+                {t('agent.invite.external.label')}
               </label>
               <input
                 id="external-target"
                 type="text"
                 value={externalTarget}
                 onChange={(e) => setExternalTarget(e.target.value)}
-                placeholder="例如: k51qzi5uqu5..."
+                placeholder={t('agent.invite.external.placeholder')}
               />
               <small>
-                通过 IPNS、CID 或 DID 从 IPFS 网络解析并邀请智能体
+                {t('agent.invite.external.hint')}
               </small>
             </div>
           )}
@@ -258,7 +260,7 @@ const InviteAgentModal = ({
               handleClose()
             }}
           >
-            取消
+            {t('agent.invite.cancel')}
           </button>
           <button
             type="button"
@@ -284,7 +286,7 @@ const InviteAgentModal = ({
             }}
             disabled={isLoading || (activeTab === 'internal' && (!selectedAgents || selectedAgents.length === 0)) || (activeTab === 'external' && !externalTarget.trim())}
           >
-            {isLoading ? '处理中...' : '邀请'}
+            {isLoading ? t('agent.invite.processing') : t('agent.invite.submit')}
           </button>
         </footer>
       </div>
