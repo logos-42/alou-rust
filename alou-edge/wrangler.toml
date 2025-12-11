@@ -1,19 +1,12 @@
 name = "alou-edge"
-main = "build/worker/shim.mjs"
+main = "src/worker.ts"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [build]
-command = "node ./scripts/worker-build.js"
-
-[build.upload]
-format = "modules"
-main = "./build/worker/shim.mjs"
-
-[[build.upload.rules]]
-type = "CompiledWasm"
-globs = ["**/*.wasm"]
-fallthrough = true
+command = "npm run build"
+# 确保在构建时先编译 Rust WASM，然后 wrangler 会处理 TypeScript
+# TypeScript 入口文件已在顶层 main 字段指定，wrangler 会自动编译并包含所有导入的模块
 
 [vars]
 ENVIRONMENT = "development"

@@ -6,10 +6,11 @@
   "type": "module",
   "scripts": {
     "clean": "node ./scripts/worker-build.js --clean-only",
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "build": "node ./scripts/worker-build.js",
+    "dev": "npm run build:cargo && wrangler dev",
+    "deploy": "npm run build:cargo && wrangler deploy",
+    "build": "npm run build:cargo && node ./scripts/worker-build.js",
     "build:cargo": "cargo build --target wasm32-unknown-unknown --release",
+    "build:ts": "tsc --noEmit",
     "test": "cargo test"
   },
   "keywords": [
@@ -24,6 +25,9 @@
     "url": "https://github.com/alou-pay/aloupay"
   },
   "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.61"
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241127.0",
     "typescript": "^5.7.2",

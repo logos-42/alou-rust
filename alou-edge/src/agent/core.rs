@@ -546,4 +546,9 @@ impl AgentCore {
             })
             .collect()
     }
+
+    /// Get MCP executor reference (for tool execution)
+    pub fn get_executor(&self) -> &McpExecutor {
+        &self.mcp_executor
+    }
 }

@@ -16,6 +16,7 @@ use worker::*;
 mod agent;
 mod blockchain;
 mod diap;
+mod mcp;
 mod pubsub;
 mod session;
 mod wallet;
@@ -248,6 +249,20 @@ impl Router {
             (Method::Get, "/api/agent/progress") => self.handle_agent_progress(req).await,
 
             (Method::Post, "/api/mcp/ui-resource") => self.handle_mcp_ui_resource(req).await,
+            (Method::Post, "/api/mcp/execute-tool") => {
+                if let Some(agent_core) = self.agent_core.as_ref() {
+                    mcp::handle_execute_tool(agent_core.get_executor(), req).await
+                } else {
+                    Response::error("Agent core not initialized", 500)
+                }
+            }
+            (Method::Get, "/api/mcp/tools") => {
+                if let Some(agent_core) = self.agent_core.as_ref() {
+                    mcp::handle_list_tools(agent_core.get_executor()).await
+                } else {
+                    Response::error("Agent core not initialized", 500)
+                }
+            }
 
             (Method::Post, "/api/blockchain/balance") => {
                 blockchain::handle_blockchain_balance(self.query_tool.as_ref(), req).await
