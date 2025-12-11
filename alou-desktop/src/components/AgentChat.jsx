@@ -10,6 +10,8 @@ import AgentSidebarRight from '@/components/agent/AgentSidebarRight'
 import AgentCanvas from '@/components/agent/AgentCanvas'
 import AgentConsoleDock from '@/components/agent/AgentConsoleDock'
 import AgentConversationOverlay from '@/components/agent/AgentConversationOverlay'
+import GroupChatPanel from '@/components/agent/GroupChatPanel'
+import SplitView from '@/components/common/SplitView'
 import DiapPanelToggle from '@/components/agent/DiapPanelToggle'
 import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
@@ -28,6 +30,8 @@ import { useAgentInvite } from './AgentChat/useAgentInvite'
 import { useMultiAgentCoordinator } from './AgentChat/useMultiAgentCoordinator'
 import { useAgentStreamHandler } from './AgentChat/useAgentStreamHandler'
 import { useAgentEventHandlers } from './AgentChat/useAgentEventHandlers'
+import { useGroupChatManager } from './AgentChat/useGroupChatManager'
+import { useGroupChatButton } from './AgentChat/useGroupChatButton'
 
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
@@ -112,6 +116,28 @@ const AgentChat = () => {
     handleResize,
     consoleDockStyle,
   } = uiState
+
+  // ==================== Group Chat Manager Hook ====================
+  // 需要在 useAgentUI 之后调用，因为需要 openConversationPanel
+  const groupChatManager = useGroupChatManager({
+    openConversationPanel,
+  })
+
+  const {
+    showGroupChat,
+    activeActionId,
+    activeAction,
+    groupChatMessages,
+    actionStatus,
+    splitPosition,
+    openGroupChat,
+    closeGroupChat,
+    closeGroupChatCompletely,
+    toggleGroupChat,
+    setSplitPosition,
+    hasActiveAction,
+    canOpenGroupChat,
+  } = groupChatManager
 
   // ==================== 2. Connection State Hook ====================
   const connectionState = useAgentConnection({
@@ -210,6 +236,10 @@ const AgentChat = () => {
     handleEarlyChannel,
   } = channelManager
 
+  // ==================== Tool Call Handler (需要先定义，因为 useAgentMessages 需要它) ====================
+  // 注意：这里先创建一个占位函数，实际的 handleToolCalls 会在 messageState 之后更新
+  const handleToolCallsRef = useRef(null)
+  
   // ==================== 6. Message State Hook ====================
   const messageState = useAgentMessages({
     sessionId,
@@ -222,7 +252,10 @@ const AgentChat = () => {
     setSessionReady,
     recordInteraction,
     handleToolCalls: useCallback((toolCalls) => {
-      // 工具调用处理会在下面定义
+      // 使用 ref 中的实际处理函数
+      if (handleToolCallsRef.current) {
+        handleToolCallsRef.current(toolCalls)
+      }
     }, []),
     conversationOverlayRef,
     consoleDockRef,
@@ -260,6 +293,11 @@ const AgentChat = () => {
     scrollToBottom,
     openUiResource,
   })
+  
+  // 使用 useEffect 更新 ref，确保在每次渲染后更新
+  useEffect(() => {
+    handleToolCallsRef.current = handleToolCalls
+  }, [handleToolCalls])
 
   // ==================== 7. Invite State Hook ====================
   const inviteState = useAgentInvite({
@@ -338,6 +376,15 @@ const AgentChat = () => {
 
   const showConversationPanel = isConversationVisible
 
+  // ==================== Group Chat Button Hook ====================
+  const { ConversationPanelWrapper } = useGroupChatButton({
+    showConversationPanel,
+    showGroupChat,
+    canOpenGroupChat,
+    openGroupChat,
+    closeGroupChat,
+  })
+
   // ==================== 11. Event Handlers ====================
   const eventHandlers = useAgentEventHandlers({
     navigate,
@@ -406,6 +453,7 @@ const AgentChat = () => {
     setCurrentMessage,
     setSessionReady,
   ])
+
 
   // ==================== Bootstrap Effect ====================
   useEffect(() => {
@@ -504,21 +552,66 @@ const AgentChat = () => {
             </div>
 
             <div className="conversation-shell">
-              <AgentConversationOverlay
-                ref={conversationOverlayRef}
-                connectionStatus={connectionStatus}
-                connectionStatusLabel={connectionStatusLabel}
-                messages={messages}
-                isLoading={isAgentLoading(activeChannelId)}
-                onClose={closeConversationPanel}
-                onInspectMessage={handleInspectMessage}
-                streamEvents={streamEvents}
-                streamStatus={streamStatus}
-                embedded
-                avatar={agentProfile?.avatar}
-                title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
-                subtitle={null}
-              />
+              {showGroupChat && activeActionId ? (
+                <SplitView
+                  left={
+                    <ConversationPanelWrapper>
+                      <AgentConversationOverlay
+                        ref={conversationOverlayRef}
+                        connectionStatus={connectionStatus}
+                        connectionStatusLabel={connectionStatusLabel}
+                        messages={messages}
+                        isLoading={isAgentLoading(activeChannelId)}
+                        onClose={closeConversationPanel}
+                        onInspectMessage={handleInspectMessage}
+                        streamEvents={streamEvents}
+                        streamStatus={streamStatus}
+                        embedded
+                        avatar={agentProfile?.avatar}
+                        title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
+                        subtitle={null}
+                      />
+                    </ConversationPanelWrapper>
+                  }
+                  right={
+                    <GroupChatPanel
+                      actionId={activeActionId}
+                      actionDescription={activeAction?.description || activeAction?.action?.description}
+                      agents={activeAction?.agents || activeAction?.action?.agents || []}
+                      messages={groupChatMessages}
+                      status={actionStatus}
+                      onClose={closeGroupChatCompletely}
+                      onRefresh={() => {
+                        // 刷新群聊消息的逻辑已在 useGroupChat 中处理
+                      }}
+                      isLoading={actionStatus === 'Running'}
+                    />
+                  }
+                  defaultPosition={splitPosition}
+                  minLeftWidth={30}
+                  minRightWidth={25}
+                  storageKey="agent-chat-split-position"
+                  onResize={setSplitPosition}
+                />
+              ) : (
+                <ConversationPanelWrapper>
+                  <AgentConversationOverlay
+                    ref={conversationOverlayRef}
+                    connectionStatus={connectionStatus}
+                    connectionStatusLabel={connectionStatusLabel}
+                    messages={messages}
+                    isLoading={isAgentLoading(activeChannelId)}
+                    onClose={closeConversationPanel}
+                    onInspectMessage={handleInspectMessage}
+                    streamEvents={streamEvents}
+                    streamStatus={streamStatus}
+                    embedded
+                    avatar={agentProfile?.avatar}
+                    title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
+                    subtitle={null}
+                  />
+                </ConversationPanelWrapper>
+              )}
             </div>
           </div>
         </div>

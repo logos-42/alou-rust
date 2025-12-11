@@ -41,6 +41,15 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config
 
+    // 静默处理 404 错误（后端可能未实现某些端点）
+    if (error.response?.status === 404) {
+      // 对于未实现的端点，静默处理，不输出错误
+      // 让调用方决定如何处理（通常会回退到本地模拟）
+      // 注意：浏览器控制台仍会显示 404，这是网络层面的，无法完全阻止
+      // 但我们可以通过端点检查机制来减少不必要的请求
+      return Promise.reject(error)
+    }
+
     // Check if it's a connection refused error
     const isConnectionError = 
       error.code === 'ECONNREFUSED' || 

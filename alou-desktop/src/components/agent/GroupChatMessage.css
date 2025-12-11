@@ -1,0 +1,309 @@
+.group-chat-message {
+  display: flex;
+  margin-bottom: 12px;
+  padding: 0 16px;
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 用户消息 */
+.group-chat-message.user-message {
+  flex-direction: row-reverse;
+}
+
+.group-chat-message.user-message .message-content-wrapper {
+  align-items: flex-end;
+}
+
+.group-chat-message.user-message .message-bubble {
+  background: var(--primary-color, #6366f1);
+  color: #ffffff;
+  border-radius: 8px 8px 2px 8px;
+}
+
+/* 智能体消息 */
+.group-chat-message.agent-message {
+  flex-direction: row;
+}
+
+.group-chat-message.agent-message .message-content-wrapper {
+  align-items: flex-start;
+}
+
+.group-chat-message.agent-message .message-bubble {
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  border-radius: 8px 8px 8px 2px;
+}
+
+/* 消息头像 */
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin: 0 8px;
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+}
+
+.message-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 消息内容包装器 */
+.message-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+  min-width: 0;
+}
+
+/* 消息头部 */
+.message-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--text-secondary, #475569);
+}
+
+.message-sender {
+  font-weight: 500;
+  color: var(--text-primary, #0f172a);
+}
+
+.message-time {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* 消息气泡 */
+.message-bubble {
+  padding: 8px 12px;
+  word-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.5;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.message-text {
+  font-size: 14px;
+}
+
+.message-text code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.user-message .message-text code {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 系统消息 */
+.system-message {
+  justify-content: center;
+  padding: 8px 16px;
+}
+
+.system-message-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #475569);
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+}
+
+.system-icon {
+  font-size: 14px;
+}
+
+.system-text {
+  flex: 1;
+}
+
+.system-time {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+/* 任务消息 */
+.task-message {
+  justify-content: center;
+  padding: 8px 16px;
+}
+
+.task-message-content {
+  width: 100%;
+  max-width: 500px;
+  padding: 12px;
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  border-radius: 8px;
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.task-request .task-message-content {
+  border-left: 3px solid var(--primary-color, #6366f1);
+}
+
+.task-result .task-message-content {
+  border-left: 3px solid #10b981;
+}
+
+.task-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #0f172a);
+}
+
+.task-icon {
+  font-size: 16px;
+}
+
+.task-type {
+  flex: 1;
+}
+
+.task-id {
+  font-size: 11px;
+  color: var(--text-secondary, #475569);
+  font-family: 'Courier New', monospace;
+}
+
+.task-body {
+  margin-bottom: 8px;
+}
+
+.task-description {
+  font-size: 14px;
+  color: var(--text-primary, #0f172a);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-type-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--secondary-color, rgba(99, 102, 241, 0.12));
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--primary-color, #6366f1);
+}
+
+.task-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.task-status.status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.task-status.status-running {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.task-status.status-completed {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.task-status.status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.task-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-secondary, #475569);
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+}
+
+.task-from {
+  font-weight: 500;
+}
+
+.task-time {
+  opacity: 0.7;
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .group-chat-message.agent-message .message-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #ffffff);
+}
+
+.app-shell.dark-mode .message-sender {
+  color: var(--text-primary, #ffffff);
+}
+
+.app-shell.dark-mode .system-message-content,
+.app-shell.dark-mode .task-message-content {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .task-status.status-pending {
+  background: rgba(254, 243, 199, 0.2);
+  color: #fbbf24;
+}
+
+.app-shell.dark-mode .task-status.status-running {
+  background: rgba(219, 234, 254, 0.2);
+  color: #60a5fa;
+}
+
+.app-shell.dark-mode .task-status.status-completed {
+  background: rgba(209, 250, 229, 0.2);
+  color: #34d399;
+}
+
+.app-shell.dark-mode .task-status.status-failed {
+  background: rgba(254, 226, 226, 0.2);
+  color: #f87171;
+}
+

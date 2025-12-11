@@ -3,11 +3,13 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease;
+  pointer-events: auto;
 }
 
 @keyframes fadeIn {

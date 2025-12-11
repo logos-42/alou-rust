@@ -1,7 +1,9 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import apiClient from '@/services/api'
 import agentService from '@/services/agentService'
+import clusterActionService from '@/services/clusterActionService'
 import useAgentStore from '@/stores/agentStore'
+import useClusterActionStore from '@/stores/clusterActionStore'
 
 /**
  * Hook for managing messages and conversation
@@ -175,6 +177,7 @@ export const useAgentMessages = ({
   /**
    * 发送消息到指定智能体
    * 支持多智能体独立执行空间
+   * 自动检测是否需要集群行动
    */
   const sendMessageToAgent = useCallback(async (targetAgentId, text, targetAgent = null) => {
     if (!text?.trim() || !targetAgentId) {
@@ -201,6 +204,73 @@ export const useAgentMessages = ({
     scrollToBottom()
 
     const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
+
+    // 尝试自动创建集群行动（如果任务需要多智能体协作）
+    try {
+      const { addAction, setActiveAction } = useClusterActionStore.getState()
+      const { getAgents } = useAgentStore.getState()
+      const availableAgents = getAgents().map((a) => a.sessionId || a.id).filter(Boolean)
+
+      if (availableAgents.length > 1) {
+        // 分析任务是否需要集群行动
+        const analysis = await clusterActionService.analyzeTask(text.trim(), availableAgents)
+
+        if (analysis?.analysis?.needs_cluster_action) {
+          console.log('[useAgentMessages] 检测到需要集群行动，创建中...', analysis)
+
+          // 创建集群行动
+          const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') || 'user' : 'user'
+          const createResult = await clusterActionService.createClusterAction(
+            text.trim(),
+            userId,
+            { auto_created: true, original_message: text.trim() },
+          )
+
+          if (createResult?.action) {
+            const action = createResult.action
+            addAction(action)
+
+            // 执行集群行动
+            const walletAddress =
+              typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+            await clusterActionService.executeClusterAction(
+              action.action_id,
+              walletAddress,
+              activeChain || undefined,
+            )
+
+            // 设置为活跃行动并打开群聊
+            setActiveAction(action.action_id)
+            // 注意：showGroupChat 状态需要在父组件中管理，这里通过事件通知
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(
+                new CustomEvent('cluster-action-created', {
+                  detail: { actionId: action.action_id },
+                }),
+              )
+            }
+
+            // 添加系统消息提示
+            appendMessage(
+              {
+                id: `system_${Date.now()}`,
+                type: 'assistant',
+                content: `🤖 检测到需要多智能体协作，已创建集群行动 #${action.action_id.slice(-8)}。正在执行中...`,
+                timestamp: Date.now(),
+                source: 'system',
+              },
+              targetAgentId,
+            )
+
+            setAgentLoading(targetAgentId, false)
+            return // 集群行动已创建，不再执行单智能体逻辑
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[useAgentMessages] 自动创建集群行动失败，继续单智能体处理:', error)
+      // 失败时继续执行单智能体逻辑
+    }
 
     try {
       const walletAddress =

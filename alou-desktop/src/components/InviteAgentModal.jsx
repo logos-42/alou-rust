@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import useAgentStore from '@/stores/agentStore'
 import './InviteAgentModal.css'
 
@@ -21,6 +21,29 @@ const InviteAgentModal = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  // 当模态框打开时，重置状态（使用 useRef 确保只执行一次）
+  const hasResetRef = useRef(false)
+  
+  useEffect(() => {
+    if (isOpen && !hasResetRef.current) {
+      hasResetRef.current = true
+      // 重置所有状态
+      setSelectedAgents([])
+      setExternalTarget('')
+      setError(null)
+      setActiveTab('internal')
+      setIsLoading(false)
+    } else if (!isOpen && hasResetRef.current) {
+      hasResetRef.current = false
+      // 关闭时也重置状态
+      setSelectedAgents([])
+      setExternalTarget('')
+      setError(null)
+      setActiveTab('internal')
+      setIsLoading(false)
+    }
+  }, [isOpen])
+
   // 获取本地存储的智能体列表（排除当前频道的智能体）
   const storedAgents = useAgentStore((state) => state.agents)
   const availableAgents = useMemo(() => {
@@ -32,14 +55,17 @@ const InviteAgentModal = ({
     })
   }, [storedAgents, targetChannel])
 
-  const toggleAgentSelection = useCallback((agent) => {
+  const toggleAgentSelection = useCallback((agent, e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     setSelectedAgents((prev) => {
       const agentId = agent.ipns || agent.cid || agent.did || agent.id
       const isSelected = prev.some(a => (a.ipns || a.cid || a.did || a.id) === agentId)
-      if (isSelected) {
-        return prev.filter(a => (a.ipns || a.cid || a.did || a.id) !== agentId)
-      }
-      return [...prev, agent]
+      return isSelected
+        ? prev.filter(a => (a.ipns || a.cid || a.did || a.id) !== agentId)
+        : [...prev, agent]
     })
   }, [])
 
@@ -56,6 +82,7 @@ const InviteAgentModal = ({
       await onInvite?.(targetChannel, selectedAgents, 'internal')
       onClose()
     } catch (err) {
+      console.error('[InviteAgentModal] 邀请失败:', err)
       setError(err.message || '邀请失败')
     } finally {
       setIsLoading(false)
@@ -94,11 +121,19 @@ const InviteAgentModal = ({
     onClose()
   }, [onClose])
 
-  if (!isOpen) return null
+  if (!isOpen) {
+    return null
+  }
 
   return (
-    <div className="invite-modal-overlay" onClick={handleClose}>
-      <div className="invite-modal" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="invite-modal-overlay" 
+      onClick={handleClose}
+    >
+      <div 
+        className="invite-modal" 
+        onClick={(e) => e.stopPropagation()}
+      >
         <header className="invite-modal-header">
           <h2>邀请智能体到群组</h2>
           <span className="target-channel">
@@ -145,7 +180,20 @@ const InviteAgentModal = ({
                       <div
                         key={agentId}
                         className={`agent-item ${isSelected ? 'selected' : ''}`}
-                        onClick={() => toggleAgentSelection(agent)}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          toggleAgentSelection(agent, e)
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            toggleAgentSelection(agent, e)
+                          }
+                        }}
                       >
                         <div className="agent-avatar">
                           {agent.avatar_url ? (
@@ -201,14 +249,40 @@ const InviteAgentModal = ({
         </div>
 
         <footer className="invite-modal-footer">
-          <button type="button" className="cancel-btn" onClick={handleClose}>
+          <button 
+            type="button" 
+            className="cancel-btn" 
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              handleClose()
+            }}
+          >
             取消
           </button>
           <button
             type="button"
             className="invite-btn"
-            onClick={activeTab === 'internal' ? handleInternalInvite : handleExternalInvite}
-            disabled={isLoading || (activeTab === 'internal' && selectedAgents.length === 0) || (activeTab === 'external' && !externalTarget.trim())}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              
+              // 检查按钮是否被禁用
+              const isDisabled = isLoading || 
+                (activeTab === 'internal' && (!selectedAgents || selectedAgents.length === 0)) || 
+                (activeTab === 'external' && !externalTarget.trim())
+              
+              if (isDisabled) {
+                return
+              }
+              
+              if (activeTab === 'internal') {
+                handleInternalInvite()
+              } else {
+                handleExternalInvite()
+              }
+            }}
+            disabled={isLoading || (activeTab === 'internal' && (!selectedAgents || selectedAgents.length === 0)) || (activeTab === 'external' && !externalTarget.trim())}
           >
             {isLoading ? '处理中...' : '邀请'}
           </button>

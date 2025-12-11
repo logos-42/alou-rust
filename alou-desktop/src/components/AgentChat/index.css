@@ -88,6 +88,70 @@
     transform 0.3s ease;
 }
 
+/* 对话面板包装器 - 用于定位群聊按钮 */
+.conversation-panel-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* 群聊切换按钮 - 跟随对话面板 */
+.group-chat-toggle-btn-fixed {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1000;
+  border: none;
+  background: rgba(148, 163, 184, 0.18);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.group-chat-toggle-btn-fixed:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.group-chat-toggle-btn-fixed:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.group-chat-toggle-btn-fixed:disabled:hover {
+  background: rgba(148, 163, 184, 0.18);
+  transform: none;
+}
+
+.group-chat-toggle-btn-fixed.active {
+  background: var(--primary-color, #6366f1);
+  color: #ffffff;
+}
+
+.group-chat-toggle-btn-fixed.active:hover {
+  background: var(--primary-hover, #5855eb);
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .group-chat-toggle-btn-fixed {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .group-chat-toggle-btn-fixed:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
+}
+
 .conversation-stack .conversation-shell > section {
   height: 100%;
   width: 100%;
