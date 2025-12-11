@@ -105,6 +105,12 @@ export const buildChannelFromAgent = (agent) => {
 
   const avatar = resolveAgentAvatar(cleanedAgent)
 
+  // 确保 meta 对象有 mode 字段（默认为 'agent'）
+  const metaWithMode = {
+    ...cleanedAgent,
+    mode: cleanedAgent.mode || 'agent',
+  }
+
   return {
     id,
     name: displayName,
@@ -114,7 +120,7 @@ export const buildChannelFromAgent = (agent) => {
     avatar,
     color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
     updatedAt: Math.floor(Date.now() / 1000),
-    meta: cleanedAgent,
+    meta: metaWithMode,
   }
 }
 

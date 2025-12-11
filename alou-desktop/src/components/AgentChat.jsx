@@ -2,9 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
-import agentService from '@/services/agentService'
-import { MCP_UI_TARGETS } from '@/services/mcpUiService'
-import { useAgentStream } from '@/hooks/useAgentStream'
 
 // Components
 import ChatHeader from '@/components/ChatHeader'
@@ -28,11 +25,13 @@ import { useAgentMessages } from './AgentChat/useAgentMessages'
 import { useAgentWallet } from './AgentChat/useAgentWallet'
 import { useChannelManager } from './AgentChat/useChannelManager'
 import { useAgentInvite } from './AgentChat/useAgentInvite'
-import { useMultiAgentChat } from '@/hooks/useMultiAgentChat'
+import { useMultiAgentCoordinator } from './AgentChat/useMultiAgentCoordinator'
+import { useAgentStreamHandler } from './AgentChat/useAgentStreamHandler'
+import { useAgentEventHandlers } from './AgentChat/useAgentEventHandlers'
 
 // Utils & Constants
-import { resolveBackendChain, useToolCallHandler } from '@/hooks/useAgentChat'
-import { computeAgentProfile, buildChannelFromAgent } from './AgentChat/agentUtils'
+import { useToolCallHandler } from '@/hooks/useAgentChat'
+import { computeAgentProfile } from './AgentChat/agentUtils'
 import './AgentChat/index.css'
 
 /**
@@ -77,7 +76,6 @@ const AgentChat = () => {
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
-  const [currentMode, setCurrentMode] = useState('agent') // 当前模式：'agent' 或 'alou'
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
 
   // ==================== 1. UI State Hook ====================
@@ -175,7 +173,44 @@ const AgentChat = () => {
     handleTransactionBroadcast,
   } = walletState
 
-  // ==================== 5. Message State Hook ====================
+  // ==================== 5. Channel Manager Hook ====================
+  // 需要在 useAgentMessages 之前调用，因为 useAgentMessages 需要 currentMode
+  const channelManager = useChannelManager({
+    sessionId,
+    isSessionReady,
+    channelKeyword,
+    setChannelKeyword,
+    channels,
+    setChannels,
+    activeChannelId,
+    setActiveChannelId,
+    selectedAgent,
+    setSelectedAgent,
+    isChannelLoading,
+    setChannelLoading,
+    channelError,
+    setChannelError,
+    recordInteraction,
+    openConversationPanel,
+    loadMessagesFromIpfs: null, // 会在 useAgentMessages 之后更新
+    preferredChain,
+  })
+
+  const {
+    loadChannelList,
+    refreshChannels,
+    handleChannelKeywordChange,
+    selectChannel,
+    resolveExistingAgentTarget,
+    saveAgentToStorage,
+    deleteChannel,
+    currentMode,
+    handleModeChange,
+    handleCreateAgentSubmit,
+    handleEarlyChannel,
+  } = channelManager
+
+  // ==================== 6. Message State Hook ====================
   const messageState = useAgentMessages({
     sessionId,
     setSessionId,
@@ -192,7 +227,7 @@ const AgentChat = () => {
     conversationOverlayRef,
     consoleDockRef,
     contextEventsRef,
-    currentMode, // 传递当前模式
+    currentMode, // 传递当前模式（从 channelManager 获取）
   })
 
   const {
@@ -226,37 +261,6 @@ const AgentChat = () => {
     openUiResource,
   })
 
-  // ==================== 6. Channel Manager Hook ====================
-  const channelManager = useChannelManager({
-    sessionId,
-    isSessionReady,
-    channelKeyword,
-    setChannelKeyword,
-    channels,
-    setChannels,
-    activeChannelId,
-    setActiveChannelId,
-    selectedAgent,
-    setSelectedAgent,
-    isChannelLoading,
-    setChannelLoading,
-    channelError,
-    setChannelError,
-    recordInteraction,
-    openConversationPanel,
-    loadMessagesFromIpfs,
-  })
-
-  const {
-    loadChannelList,
-    refreshChannels,
-    handleChannelKeywordChange,
-    selectChannel,
-    resolveExistingAgentTarget,
-    saveAgentToStorage,
-    deleteChannel,
-  } = channelManager
-
   // ==================== 7. Invite State Hook ====================
   const inviteState = useAgentInvite({
     deleteChannel,
@@ -273,61 +277,12 @@ const AgentChat = () => {
     handleInviteSubmit,
   } = inviteState
 
-  // ==================== 8. Multi-Agent Coordinator ====================
-  // 获取本地 DIAP 身份用于多智能体通信
-  const localIdentity = useMemo(() => {
-    if (selectedAgent?.diapIdentity) {
-      return selectedAgent.diapIdentity
-    }
-    // 尝试从 localStorage 获取
-    if (sessionId && typeof window !== 'undefined') {
-      const stored = localStorage.getItem(`diap_identity_${sessionId}`)
-      if (stored) {
-        try {
-          return JSON.parse(stored)
-        } catch {
-          return null
-        }
-      }
-    }
-    return null
-  }, [selectedAgent, sessionId])
-
-  // 将所有频道中的智能体注册到协调器
-  const registeredAgentsForCoordinator = useMemo(() => {
-    return channels
-      .filter(ch => ch.meta)
-      .map(ch => ({
-        id: ch.id,
-        did: ch.meta.did,
-        ipns: ch.meta.ipns,
-        name: ch.meta.display_name || ch.meta.name,
-        display_name: ch.meta.display_name || ch.meta.name,
-        role_description: ch.meta.role_description,
-        pubsub_topics: ch.meta.pubsub_topics || [],
-      }))
-  }, [channels])
-
-  const multiAgentChat = useMultiAgentChat({
-    localIdentity,
-    registeredAgents: registeredAgentsForCoordinator,
-    onAgentMessage: useCallback((agentId, message) => {
-      console.log('[AgentChat] 收到智能体消息:', agentId, message)
-      // 将智能体间消息添加到对应频道
-      if (message.content) {
-        appendMessage({
-          id: message.id || `agent_${Date.now()}`,
-          type: 'assistant',
-          content: message.content,
-          timestamp: message.timestamp || Date.now(),
-          source: 'agent-coordinator',
-          fromAgent: message.from,
-        }, agentId)
-      }
-    }, [appendMessage]),
-    onGroupMessage: useCallback((groupId, message) => {
-      console.log('[AgentChat] 收到群聊消息:', groupId, message)
-    }, []),
+  // ==================== 9. Multi-Agent Coordinator ====================
+  const multiAgentCoordinator = useMultiAgentCoordinator({
+    selectedAgent,
+    sessionId,
+    channels,
+    appendMessage,
   })
 
   const {
@@ -335,61 +290,16 @@ const AgentChat = () => {
     sendToAgent,
     analyzeIntent,
     isCoordinatorReady,
-  } = multiAgentChat
+  } = multiAgentCoordinator
 
-  // ==================== Stream Events ====================
-  const handleStreamEvent = useCallback(
-    (event) => {
-      if (!event) return
-
-      recordInteraction(
-        'stream_event',
-        { event: event.event, payload: event.payload },
-        event.label,
-      )
-
-      if (event.isFinal && event.timestamp) {
-        if (Array.isArray(event.payload?.tool_calls)) {
-          const uiCall = event.payload.tool_calls.find((call) => {
-            const result = call?.result
-            if (!result) return false
-            if (Array.isArray(result.resources) && result.resources.length > 0) return true
-            return Boolean(result.resource || result.uri)
-          })
-
-          if (uiCall?.result) {
-            const result = uiCall.result
-            if (Array.isArray(result.resources) && result.resources.length > 0) {
-              openUiResource(result.resources[0], { source: 'stream_final', toolCall: uiCall.name })
-            } else if (result.resource) {
-              openUiResource(result.resource, { source: 'stream_final', toolCall: uiCall.name })
-            } else if (result.uri) {
-              openUiResource(result, { source: 'stream_final', toolCall: uiCall.name })
-            }
-          }
-        }
-      }
-    },
-    [openUiResource, recordInteraction],
-  )
-
-  const { status: streamStatus, events: streamEvents } = useAgentStream(sessionId, {
-    enabled: isSessionReady,
-    onEvent: handleStreamEvent,
+  // ==================== 10. Stream Handler ====================
+  const { streamStatus, streamEvents } = useAgentStreamHandler({
+    sessionId,
+    isSessionReady,
+    recordInteraction,
+    openUiResource,
+    setConnectionStatus,
   })
-
-  // 同步 stream 状态到连接状态
-  useEffect(() => {
-    if (streamStatus === 'error') {
-      setConnectionStatus('error')
-    } else if (streamStatus === 'active' || streamStatus === 'completed') {
-      setConnectionStatus('connected')
-    } else if (streamStatus === 'polling') {
-      setConnectionStatus('connecting')
-    } else {
-      setConnectionStatus('disconnected')
-    }
-  }, [streamStatus, setConnectionStatus])
 
   // ==================== Computed Values ====================
   const agentProfile = useMemo(() => computeAgentProfile(selectedAgent), [selectedAgent])
@@ -428,73 +338,31 @@ const AgentChat = () => {
 
   const showConversationPanel = isConversationVisible
 
-  // ==================== Event Handlers ====================
-  const goToLogin = useCallback(() => {
-    recordInteraction('navigate_login')
-    navigate('/login')
-  }, [navigate, recordInteraction])
+  // ==================== 11. Event Handlers ====================
+  const eventHandlers = useAgentEventHandlers({
+    navigate,
+    logout,
+    recordInteraction,
+    setLanguage,
+    currentLanguage,
+    refreshWallet,
+    createSession,
+    setSessionReady,
+    sessionId,
+    walletSnapshot,
+    fetchAndOpenUiResource,
+  })
 
-  const goToWallet = useCallback(() => {
-    recordInteraction('navigate_wallet')
-    navigate('/wallet')
-  }, [navigate, recordInteraction])
-
-  const handleLogout = useCallback(async () => {
-    recordInteraction('logout')
-    await logout()
-  }, [logout, recordInteraction])
-
-  const toggleLanguage = useCallback(() => {
-    const next = currentLanguage === 'zh' ? 'en' : 'zh'
-    setLanguage(next)
-    recordInteraction('toggle_language', { language: next })
-  }, [currentLanguage, recordInteraction, setLanguage])
-
-  const handleWalletChanged = useCallback(
-    async (event) => {
-      const detail = event?.detail
-      recordInteraction('wallet_event', { address: detail?.address })
-      await refreshWallet()
-      await createSession()
-      setSessionReady(true)
-    },
-    [createSession, recordInteraction, refreshWallet, setSessionReady],
-  )
-
-  const handleInspectWallet = useCallback(() => {
-    if (!sessionId) return
-    void fetchAndOpenUiResource(
-      MCP_UI_TARGETS.walletOverview,
-      { session_id: sessionId, chain: walletSnapshot?.chain },
-      { source: 'wallet_card' },
-    )
-  }, [fetchAndOpenUiResource, sessionId, walletSnapshot])
-
-  const handleInspectTransaction = useCallback(
-    (transaction) => {
-      if (!transaction) return
-      const transactionId = transaction.hash || transaction.id
-      if (!transactionId) return
-      void fetchAndOpenUiResource(
-        MCP_UI_TARGETS.transactionDetail,
-        { session_id: sessionId, transaction_id: transactionId, chain: walletSnapshot?.chain },
-        { source: 'transaction_list', transactionId },
-      )
-    },
-    [fetchAndOpenUiResource, sessionId, walletSnapshot],
-  )
-
-  const handleInspectMessage = useCallback(
-    (message) => {
-      if (!message?.id) return
-      void fetchAndOpenUiResource(
-        MCP_UI_TARGETS.conversationDetail,
-        { message_id: message.id, role: message.type, timestamp: message.timestamp },
-        { source: 'conversation', messageId: message.id },
-      )
-    },
-    [fetchAndOpenUiResource],
-  )
+  const {
+    goToLogin,
+    goToWallet,
+    handleLogout,
+    toggleLanguage,
+    handleWalletChanged,
+    handleInspectWallet,
+    handleInspectTransaction,
+    handleInspectMessage,
+  } = eventHandlers
 
   const createChannel = useCallback(() => {
     setCreateAgentModalOpen(true)
@@ -502,171 +370,8 @@ const AgentChat = () => {
   }, [recordInteraction])
 
   const closeCreateAgentModal = useCallback(() => {
-        setCreateAgentModalOpen(false)
+    setCreateAgentModalOpen(false)
   }, [])
-
-  const handleEarlyChannel = useCallback(
-    (earlyMetadata) => {
-      const channel = buildChannelFromAgent(earlyMetadata)
-      if (channel) {
-        // 确保 tempId 保存在 channel.meta 中用于后续匹配
-        const tempId = earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_') 
-          ? earlyMetadata.cid 
-          : null
-        if (tempId) {
-          channel.tempId = tempId
-          if (channel.meta) {
-            channel.meta.tempId = tempId
-          }
-        }
-        
-        setChannels((prev) => {
-          // 如果已有相同 tempId 的频道，更新它；否则添加新频道
-          if (tempId) {
-            const existingIndex = prev.findIndex((item) => 
-              item.tempId === tempId || 
-              item.id === tempId || 
-              item.meta?.tempId === tempId ||
-              item.meta?.cid === tempId
-            )
-            if (existingIndex >= 0) {
-              // 更新现有频道（保留位置）
-              const updated = [...prev]
-              updated[existingIndex] = channel
-              console.log('[AgentChat] 更新早期频道（头像已上传）:', tempId)
-              return updated
-            }
-          }
-          
-          // 移除可能重复的频道（相同 ID）
-          const others = prev.filter((item) => item.id !== channel.id)
-          console.log('[AgentChat] 添加早期频道:', channel.id, 'tempId:', tempId)
-          return [channel, ...others]
-        })
-        setActiveChannelId(channel.id)
-        setSelectedAgent(earlyMetadata)
-        console.log('[AgentChat] 早期频道已显示，tempId:', tempId, '等待完整创建...')
-      }
-    },
-    [setChannels, setActiveChannelId, setSelectedAgent],
-  )
-
-  const handleCreateAgentSubmit = useCallback(
-    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity, tempId }) => {
-      // 如果有 tempId，说明是后台更新，不需要显示 loading
-      const isBackgroundUpdate = !!tempId
-      if (!isBackgroundUpdate) {
-        setChannelLoading(true)
-      }
-      setChannelError(null)
-      recordInteraction('create_claude_agent', { name, isBackgroundUpdate })
-
-      try {
-        const walletAddress =
-          typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-        const chainId =
-          typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
-        const detectedChain = resolveBackendChain({ chainId, chain: preferredChain })
-
-        const result = await agentService.createClaudeAgent({
-          sessionId,
-          walletAddress,
-          chain: detectedChain || preferredChain,
-          name,
-          roleDescription,
-          avatarCid,
-          mcpConfigCid,
-          mcpPorts,
-          diapIdentity,
-        })
-
-        const metadata = result.agent_metadata || {
-          did: result.diap_identity?.did,
-          cid: result.diap_identity?.cid,
-          ipns: result.diap_identity?.ipns,
-          agent_type: 'claude_agent_sdk',
-          display_name: name,
-          role_description: roleDescription,
-          avatar_cid: avatarCid,
-          mcp_config_cid: mcpConfigCid,
-          mcp_ports: mcpPorts,
-          diap_identity: diapIdentity,
-          sessionId,
-        }
-
-        if (diapIdentity) {
-          metadata.diapIdentity = diapIdentity
-          metadata.did = metadata.did || diapIdentity.did
-          metadata.cid = metadata.cid || diapIdentity.cid
-          metadata.ipns = metadata.ipns || diapIdentity.ipns
-        }
-
-        const channel = buildChannelFromAgent(metadata)
-        if (channel) {
-          setChannels((prev) => {
-            // 查找临时频道 - 使用多种方式匹配
-            const tempIndex = prev.findIndex((item) => {
-              // 1. 通过 tempId 属性匹配
-              if (tempId && item.tempId === tempId) return true
-              if (tempId && item.meta?.tempId === tempId) return true
-              // 2. 通过 id 匹配（临时频道的 id 就是 tempId）
-              if (tempId && item.id === tempId) return true
-              // 3. 通过 meta.cid 匹配
-              if (tempId && item.meta?.cid === tempId) return true
-              // 4. 检查是否是任何临时频道（以 temp_ 开头）
-              if (item.id && item.id.startsWith('temp_')) return true
-              if (item.meta?.cid && item.meta.cid.startsWith('temp_')) return true
-              return false
-            })
-
-            if (tempIndex >= 0) {
-              // 更新临时频道为完整频道
-              const updated = [...prev]
-              const oldChannel = updated[tempIndex]
-              console.log('[AgentChat] 找到临时频道:', oldChannel.id, '-> 更新为:', channel.id)
-              updated[tempIndex] = channel
-              return updated
-            }
-
-            // 没有找到临时频道，检查是否已存在相同 ID 的频道
-            const existingIndex = prev.findIndex((item) => item.id === channel.id)
-            if (existingIndex >= 0) {
-              const updated = [...prev]
-              updated[existingIndex] = channel
-              console.log('[AgentChat] 更新已存在的频道:', channel.id)
-              return updated
-            }
-
-            // 添加新频道
-            console.log('[AgentChat] 添加新频道:', channel.id)
-            return [channel, ...prev]
-          })
-          setActiveChannelId(channel.id)
-        }
-
-        setSelectedAgent(metadata)
-
-        // 保存到本地存储
-        saveAgentToStorage(metadata)
-
-        console.log('[AgentChat] 智能体创建/更新完成:', metadata.did || metadata.cid)
-        return result
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        if (!isBackgroundUpdate) {
-          setChannelError(message)
-        }
-        recordInteraction('create_claude_agent_failed', { error: message })
-        console.error('[AgentChat] 创建智能体失败:', message)
-        throw new Error(message)
-      } finally {
-        if (!isBackgroundUpdate) {
-          setChannelLoading(false)
-        }
-      }
-    },
-    [preferredChain, recordInteraction, saveAgentToStorage, sessionId, setChannels, setActiveChannelId, setSelectedAgent],
-  )
 
   // ==================== Send Message with Tool Calls ====================
   // 使用 sendMessageToAgent 实现多智能体独立执行空间
@@ -778,7 +483,7 @@ const AgentChat = () => {
           selectedModelType={selectedModelType}
           onModelTypeChange={setSelectedModelType}
           currentMode={currentMode}
-          onModeChange={setCurrentMode}
+          onModeChange={handleModeChange}
           onShowIdentityPanel={() => setShowDiapPanel(true)}
         />
 

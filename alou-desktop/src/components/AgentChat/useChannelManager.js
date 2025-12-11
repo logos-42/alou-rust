@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import agentService from '@/services/agentService'
 import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
 import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from './agentUtils'
+import { resolveBackendChain } from '@/hooks/useAgentChat'
 
 export const useChannelManager = ({
   sessionId,
@@ -21,6 +22,7 @@ export const useChannelManager = ({
   recordInteraction,
   openConversationPanel,
   loadMessagesFromIpfs, // 新增：加载历史消息的回调
+  preferredChain, // 用于创建智能体时确定链
 }) => {
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
@@ -391,25 +393,256 @@ export const useChannelManager = ({
     }
   }, [addAgentToStore, sessionId])
 
+  // ==================== 模式管理 ====================
+  // 获取当前活动频道的模式（从 channel.meta.mode 读取，默认为 'agent'）
+  const currentMode = useMemo(() => {
+    if (!activeChannelId) return 'agent'
+    const channel = channels.find(c => c.id === activeChannelId)
+    return channel?.meta?.mode || 'agent'
+  }, [activeChannelId, channels])
+
+  // 切换指定频道的模式
+  const handleModeChange = useCallback((channelId, mode) => {
+    setChannels((prev) =>
+      prev.map((channel) =>
+        channel.id === channelId
+          ? {
+              ...channel,
+              meta: {
+                ...channel.meta,
+                mode,
+              },
+            }
+          : channel
+      )
+    )
+    recordInteraction('mode_changed', { channelId, mode })
+  }, [recordInteraction, setChannels])
+
+  // ==================== 智能体创建 ====================
+  // 处理早期频道（头像上传后，但完整创建前）
+  const handleEarlyChannel = useCallback(
+    (earlyMetadata) => {
+      const channel = buildChannelFromAgent(earlyMetadata)
+      if (channel) {
+        // 确保 tempId 保存在 channel.meta 中用于后续匹配
+        const tempId = earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_') 
+          ? earlyMetadata.cid 
+          : null
+        if (tempId) {
+          channel.tempId = tempId
+          if (channel.meta) {
+            channel.meta.tempId = tempId
+          }
+        }
+        
+        setChannels((prev) => {
+          // 如果已有相同 tempId 的频道，更新它；否则添加新频道
+          if (tempId) {
+            const existingIndex = prev.findIndex((item) => 
+              item.tempId === tempId || 
+              item.id === tempId || 
+              item.meta?.tempId === tempId ||
+              item.meta?.cid === tempId
+            )
+            if (existingIndex >= 0) {
+              // 更新现有频道（保留位置）
+              const updated = [...prev]
+              updated[existingIndex] = channel
+              console.log('[useChannelManager] 更新早期频道（头像已上传）:', tempId)
+              return updated
+            }
+          }
+          
+          // 移除可能重复的频道（相同 ID）
+          const others = prev.filter((item) => item.id !== channel.id)
+          console.log('[useChannelManager] 添加早期频道:', channel.id, 'tempId:', tempId)
+          return [channel, ...others]
+        })
+        setActiveChannelId(channel.id)
+        setSelectedAgent(earlyMetadata)
+        console.log('[useChannelManager] 早期频道已显示，tempId:', tempId, '等待完整创建...')
+      }
+    },
+    [setChannels, setActiveChannelId, setSelectedAgent],
+  )
+
+  // 创建智能体
+  const handleCreateAgentSubmit = useCallback(
+    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity, tempId }) => {
+      // 如果有 tempId，说明是后台更新，不需要显示 loading
+      const isBackgroundUpdate = !!tempId
+      if (!isBackgroundUpdate) {
+        setChannelLoading(true)
+      }
+      setChannelError(null)
+      recordInteraction('create_claude_agent', { name, isBackgroundUpdate })
+
+      try {
+        const walletAddress =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+        const chainId =
+          typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+        const detectedChain = resolveBackendChain({ chainId, chain: preferredChain })
+
+        const result = await agentService.createClaudeAgent({
+          sessionId,
+          walletAddress,
+          chain: detectedChain || preferredChain,
+          name,
+          roleDescription,
+          avatarCid,
+          mcpConfigCid,
+          mcpPorts,
+          diapIdentity,
+        })
+
+        const metadata = result.agent_metadata || {
+          did: result.diap_identity?.did,
+          cid: result.diap_identity?.cid,
+          ipns: result.diap_identity?.ipns,
+          agent_type: 'claude_agent_sdk',
+          display_name: name,
+          role_description: roleDescription,
+          avatar_cid: avatarCid,
+          mcp_config_cid: mcpConfigCid,
+          mcp_ports: mcpPorts,
+          diap_identity: diapIdentity,
+          sessionId,
+        }
+
+        if (diapIdentity) {
+          metadata.diapIdentity = diapIdentity
+          metadata.did = metadata.did || diapIdentity.did
+          metadata.cid = metadata.cid || diapIdentity.cid
+          metadata.ipns = metadata.ipns || diapIdentity.ipns
+        }
+
+        const channel = buildChannelFromAgent(metadata)
+        if (channel) {
+          setChannels((prev) => {
+            // 查找临时频道 - 使用多种方式匹配
+            const tempIndex = prev.findIndex((item) => {
+              // 1. 通过 tempId 属性匹配
+              if (tempId && item.tempId === tempId) return true
+              if (tempId && item.meta?.tempId === tempId) return true
+              // 2. 通过 id 匹配（临时频道的 id 就是 tempId）
+              if (tempId && item.id === tempId) return true
+              // 3. 通过 meta.cid 匹配
+              if (tempId && item.meta?.cid === tempId) return true
+              // 4. 检查是否是任何临时频道（以 temp_ 开头）
+              if (item.id && item.id.startsWith('temp_')) return true
+              if (item.meta?.cid && item.meta.cid.startsWith('temp_')) return true
+              return false
+            })
+
+            if (tempIndex >= 0) {
+              // 更新临时频道为完整频道
+              const updated = [...prev]
+              const oldChannel = updated[tempIndex]
+              console.log('[useChannelManager] 找到临时频道:', oldChannel.id, '-> 更新为:', channel.id)
+              updated[tempIndex] = channel
+              return updated
+            }
+
+            // 没有找到临时频道，检查是否已存在相同 ID 的频道
+            const existingIndex = prev.findIndex((item) => item.id === channel.id)
+            if (existingIndex >= 0) {
+              const updated = [...prev]
+              updated[existingIndex] = channel
+              console.log('[useChannelManager] 更新已存在的频道:', channel.id)
+              return updated
+            }
+
+            // 添加新频道
+            console.log('[useChannelManager] 添加新频道:', channel.id)
+            return [channel, ...prev]
+          })
+          setActiveChannelId(channel.id)
+        }
+
+        setSelectedAgent(metadata)
+
+        // 保存到本地存储
+        saveAgentToStorage(metadata)
+
+        console.log('[useChannelManager] 智能体创建/更新完成:', metadata.did || metadata.cid)
+        return result
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (!isBackgroundUpdate) {
+          setChannelError(message)
+        }
+        recordInteraction('create_claude_agent_failed', { error: message })
+        console.error('[useChannelManager] 创建智能体失败:', message)
+        throw new Error(message)
+      } finally {
+        if (!isBackgroundUpdate) {
+          setChannelLoading(false)
+        }
+      }
+    },
+    [preferredChain, recordInteraction, saveAgentToStorage, sessionId, setChannels, setActiveChannelId, setSelectedAgent, setChannelLoading, setChannelError],
+  )
+
   // 删除频道和本地存储的智能体
   const deleteChannel = useCallback(async (channel) => {
     if (!channel) return false
     
-    const agentId = channel.meta?.ipns || channel.meta?.cid || channel.meta?.did || channel.id
+    // 收集所有可能的标识符，用于匹配存储中的智能体
+    const possibleIds = [
+      channel.id,
+      channel.meta?.ipns,
+      channel.meta?.cid,
+      channel.meta?.did,
+      channel.meta?.sessionId,
+    ].filter(Boolean)
+    
     const agentSessionId = channel.meta?.sessionId
+    
+    console.log('[useChannelManager] 开始删除智能体:', {
+      channelId: channel.id,
+      channelName: channel.name,
+      possibleIds,
+      agentSessionId,
+    })
     
     // 1. 从频道列表中删除
     setChannels((prev) => {
       const filtered = prev.filter((c) => c.id !== channel.id)
+      console.log('[useChannelManager] 从频道列表删除，剩余:', filtered.length)
       return filtered
     })
     
-    // 2. 从本地存储中删除
-    try {
-      removeAgentFromStore(agentId)
-      console.log('[useChannelManager] 已从本地存储删除智能体:', channel.name, agentId)
-    } catch (error) {
-      console.error('[useChannelManager] 删除本地智能体失败:', error)
+    // 2. 从本地存储中删除（尝试所有可能的 ID）
+    let deletedFromStore = false
+    const beforeCount = useAgentStore.getState().agents.length
+    
+    for (const id of possibleIds) {
+      try {
+        // 检查是否存在该智能体
+        const existingAgent = useAgentStore.getState().agents.find(
+          a => a.id === id || a.sessionId === id || a.ipns === id || a.cid === id || a.did === id
+        )
+        
+        if (existingAgent) {
+          removeAgentFromStore(id)
+          const afterCount = useAgentStore.getState().agents.length
+          
+          if (afterCount < beforeCount) {
+            deletedFromStore = true
+            console.log('[useChannelManager] 已从本地存储删除智能体 (使用 ID:', id, '):', channel.name, '存储中的 ID:', existingAgent.id)
+            break // 找到并删除后退出循环
+          }
+        }
+      } catch (error) {
+        console.warn('[useChannelManager] 尝试删除 ID', id, '失败:', error)
+      }
+    }
+    
+    if (!deletedFromStore) {
+      console.warn('[useChannelManager] 未能从本地存储找到并删除智能体，可能 ID 不匹配。尝试的 ID:', possibleIds, '存储中的智能体:', useAgentStore.getState().agents.map(a => ({ id: a.id, sessionId: a.sessionId, ipns: a.ipns, cid: a.cid })))
+      // 即使没找到，也继续执行其他清理操作
     }
     
     // 3. 删除 localStorage 中的 DIAP identity 映射
@@ -441,7 +674,7 @@ export const useChannelManager = ({
     
     recordInteraction('delete_channel', { channelId: channel.id, name: channel.name })
     return true
-  }, [activeChannelId, recordInteraction, removeAgentFromStore, setActiveChannelId, setChannels, setSelectedAgent])
+  }, [activeChannelId, recordInteraction, removeAgentFromStore, setActiveChannelId, setChannels, setSelectedAgent, storedAgents.length])
 
   return {
     loadChannelList,
@@ -451,6 +684,13 @@ export const useChannelManager = ({
     resolveExistingAgentTarget,
     saveAgentToStorage,
     deleteChannel,
+    // 模式管理
+    currentMode,
+    handleModeChange,
+    // 智能体创建
+    handleCreateAgentSubmit,
+    handleEarlyChannel,
+    // 其他
     hasHydrated,
     storedAgents,
     channelRequestIdRef,

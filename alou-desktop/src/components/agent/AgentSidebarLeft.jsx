@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import CollapseIcon from '@/assets/侧边栏收缩.png'
 import SearchIcon from '@/assets/搜索.png'
 import CreateIcon from '@/assets/创建.png'
+import InviteIcon from '@/assets/创建.png'
+import DeleteIcon from '@/assets/删除3.png'
 import { useI18n } from '@/hooks/useI18n'
 import './AgentSidebarLeft.css'
 
@@ -25,7 +27,7 @@ const MIN_MENU_WIDTH = 176
 
 const AgentSidebarLeft = ({
   channels = [],
-  activeChannelId,
+  activeChannelId, // 当前活动的频道 ID
   keyword,
   isLoading = false,
   errorMessage,
@@ -39,8 +41,8 @@ const AgentSidebarLeft = ({
   onToggleCollapse,
   selectedModelType,
   onModelTypeChange,
-  currentMode = 'agent', // 当前模式：'agent' 或 'alou'
-  onModeChange, // 切换模式的回调
+  currentMode = 'agent', // 当前模式：'agent' 或 'alou'（已废弃，保留用于向后兼容）
+  onModeChange, // 切换模式的回调：(channelId, mode) => void
   onShowIdentityPanel,
 }) => {
   const { t } = useI18n()
@@ -249,17 +251,18 @@ const AgentSidebarLeft = ({
                     <span className={`status-dot ${channel.status}`} />
                     {/* 模式切换按钮：显示当前模式，点击切换 */}
                     <span
-                      className={`channel-badge badge-claude ${currentMode === 'agent' ? 'badge-agent' : 'badge-alou'}`}
+                      className={`channel-badge badge-claude ${(channel.meta?.mode || 'agent') === 'agent' ? 'badge-agent' : 'badge-alou'}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        // 切换模式：agent <-> alou
-                        const nextMode = currentMode === 'agent' ? 'alou' : 'agent'
-                        onModeChange?.(nextMode)
+                        // 切换模式：agent <-> alou（只切换当前 channel）
+                        const currentChannelMode = channel.meta?.mode || 'agent'
+                        const nextMode = currentChannelMode === 'agent' ? 'alou' : 'agent'
+                        onModeChange?.(channel.id, nextMode)
                       }}
                       style={{ cursor: 'pointer' }}
-                      title={`当前模式：${currentMode === 'agent' ? 'Agent' : 'Alou'}，点击切换`}
+                      title={`当前模式：${(channel.meta?.mode || 'agent') === 'agent' ? 'Agent' : 'Alou'}，点击切换`}
                     >
-                      {currentMode === 'agent' ? 'Agent' : 'Alou'}
+                      {(channel.meta?.mode || 'agent') === 'agent' ? 'Agent' : 'Alou'}
                     </span>
                     {channel.meta?.ipns && (
                       <span
@@ -322,22 +325,7 @@ const AgentSidebarLeft = ({
                     title="邀请其他智能体"
                     aria-label="邀请其他智能体加入群组"
                   >
-                    <svg viewBox="0 0 20 20" fill="none">
-                      <path
-                        d="M10 4v12M4 10h12"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                      <circle
-                        cx="10"
-                        cy="10"
-                        r="8"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        opacity="0.5"
-                      />
-                    </svg>
+                    <img src={InviteIcon} alt="邀请" />
                   </button>
                   <button
                     type="button"
@@ -351,14 +339,7 @@ const AgentSidebarLeft = ({
                     title="删除智能体"
                     aria-label="删除智能体"
                   >
-                    <svg viewBox="0 0 20 20" fill="none">
-                      <path
-                        d="M6 6l8 8M14 6l-8 8"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                    </svg>
+                    <img src={DeleteIcon} alt="删除" />
                   </button>
                 </div>
               </>

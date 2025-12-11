@@ -1,0 +1,122 @@
+/**
+ * IPNS 工具函数
+ */
+
+/**
+ * 从输入中提取 IPNS key
+ * @param {string} input - 可能包含日志消息的输入字符串
+ * @returns {string|null} IPNS key (k51... 或 k2...)
+ */
+export function extractIpnsKey(input) {
+  if (!input || typeof input !== 'string') {
+    return null
+  }
+  
+  // 尝试匹配 IPNS key 格式
+  const match = input.match(/(k51[a-zA-Z0-9]+|k2[a-zA-Z0-9]+)/)
+  return match ? match[1] : null
+}
+
+/**
+ * 规范化 IPNS 名称
+ * @param {string} input - IPNS 名称或包含 IPNS 的字符串
+ * @returns {string|null} 规范化后的 IPNS 名称 (/ipns/k51...)
+ */
+export function normalizeIpns(input) {
+  if (!input || typeof input !== 'string') {
+    return null
+  }
+  
+  // 如果已经是 /ipns/ 格式，先提取 key
+  const key = extractIpnsKey(input.replace(/^\/ipns\//, ''))
+  return key ? `/ipns/${key}` : null
+}
+
+/**
+ * 清理 IPNS 名称，提取纯 key
+ * @param {string} input - IPNS 名称或包含 IPNS 的字符串
+ * @returns {string|null} IPNS key (k51... 或 k2...)
+ */
+export function cleanIpnsKey(input) {
+  if (!input || typeof input !== 'string') {
+    return null
+  }
+  
+  // 移除 /ipns/ 前缀
+  const withoutPrefix = input.replace(/^\/ipns\//, '')
+  
+  // 提取 key
+  return extractIpnsKey(withoutPrefix)
+}
+
+/**
+ * 判断字符串是否为 IPNS 格式
+ * @param {string} input - 输入字符串
+ * @returns {boolean}
+ */
+export function isIpns(input) {
+  if (!input || typeof input !== 'string') {
+    return false
+  }
+  
+  return input.startsWith('/ipns/') || 
+         input.startsWith('k51') || 
+         input.startsWith('k2')
+}
+
+/**
+ * 判断字符串是否为 CID 格式
+ * @param {string} input - 输入字符串
+ * @returns {boolean}
+ */
+export function isCid(input) {
+  if (!input || typeof input !== 'string') {
+    return false
+  }
+  
+  return input.startsWith('Qm') || 
+         input.startsWith('bafy') || 
+         input.startsWith('bafk')
+}
+
+/**
+ * 从输入中提取 CID
+ * @param {string} input - 可能包含日志消息的输入字符串
+ * @returns {string|null} CID
+ */
+export function extractCid(input) {
+  if (!input || typeof input !== 'string') {
+    return null
+  }
+  
+  const match = input.match(/(Qm[a-zA-Z0-9]+|bafy[a-zA-Z0-9]+|bafk[a-zA-Z0-9]+)/)
+  return match ? match[1] : null
+}
+
+/**
+ * 清理目标标识（IPNS 或 CID）
+ * @param {string} target - 目标标识
+ * @returns {{type: 'ipns'|'cid'|'unknown', value: string}}
+ */
+export function cleanTarget(target) {
+  if (!target || typeof target !== 'string') {
+    return { type: 'unknown', value: null }
+  }
+  
+  const trimmed = target.trim()
+  
+  // 尝试提取 IPNS
+  const ipnsKey = extractIpnsKey(trimmed)
+  if (ipnsKey) {
+    return { type: 'ipns', value: `/ipns/${ipnsKey}` }
+  }
+  
+  // 尝试提取 CID
+  const cid = extractCid(trimmed)
+  if (cid) {
+    return { type: 'cid', value: cid }
+  }
+  
+  return { type: 'unknown', value: trimmed }
+}
+

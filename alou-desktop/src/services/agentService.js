@@ -1,7 +1,11 @@
 /**
  * Agent Service - 与 Cloudflare Workers (alou-edge) 通信
+ * 重构后：使用组合模式，将职责分离到不同的服务
  */
 import apiClient from './api'
+import agentResolverService from './agentResolverService'
+import ipfsContentService from './ipfsContentService'
+import { parseDidDocumentToAgent } from './didDocumentParser'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
@@ -58,7 +62,7 @@ export class AgentService {
     
     // 如果包含 did_document，解析它来提取智能体元数据
     if (resolvedAgent.did_document) {
-      const parsedAgent = this._parseDidDocumentToAgent(resolvedAgent.did_document, {
+      const parsedAgent = parseDidDocumentToAgent(resolvedAgent.did_document, {
         cid: resolvedAgent.cid,
         ipns: resolvedAgent.ipns || null,
       })
@@ -220,7 +224,7 @@ export class AgentService {
     const { invoke } = await import('@tauri-apps/api/core')
     const response = await invoke('create_local_diap_identity', {
       params: {
-      session_id: sessionId,
+        session_id: sessionId,
         agent_name: params.agentName,
         agent_description: params.agentDescription,
         ipfs_api_url: params.ipfsApiUrl,
@@ -324,11 +328,7 @@ export class AgentService {
     console.log(`[AgentService] 参数详情 - ipnsName: ${ipnsName}, ipfsApiUrl: ${ipfsApiUrl}, ipfsGatewayUrl: ${ipfsGatewayUrl}`)
     const { invoke } = await import('@tauri-apps/api/core')
     
-    // 使用默认值如果参数未提供（与 diapService.js 保持一致）
-    const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
-    const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
-    
-    // Tauri 期望驼峰格式的参数名（根据错误信息）
+    // Tauri 期望驼峰格式的参数名
     const invokeParams = {
       ipnsName: ipnsName,
       ipfsApiUrl: ipfsApiUrl || DEFAULT_IPFS_API,
@@ -365,40 +365,7 @@ export class AgentService {
    * @returns {Promise<Object>} 智能体元数据
    */
   async loadAgentFromIpfs(cid) {
-    console.log(`[AgentService] 从 IPFS 加载智能体: ${cid}`)
-    
-    try {
-      // 通过 IPFS Gateway 获取 DID 文档
-      const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipfs/${cid}`
-      const response = await fetch(gatewayUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        throw new Error(`IPFS Gateway 返回错误: ${response.status} ${response.statusText}`)
-      }
-      
-      const didDocument = await response.json()
-      console.log(`[AgentService] 获取到 DID 文档:`, didDocument)
-      
-      // 解析 DID 文档，提取智能体元数据
-      const agentMetadata = this._parseDidDocumentToAgent(didDocument, { cid })
-      
-      return {
-        success: true,
-        agent: agentMetadata,
-        didDocument,
-        source: 'ipfs',
-      }
-    } catch (error) {
-      console.error(`[AgentService] 从 IPFS 加载智能体失败:`, error)
-      return {
-        success: false,
-        error: error.message || '加载失败',
-        source: 'ipfs',
-      }
-    }
+    return agentResolverService.loadAgentFromIpfs(cid)
   }
 
   /**
@@ -407,74 +374,7 @@ export class AgentService {
    * @returns {Promise<Object>} 智能体元数据
    */
   async loadAgentFromIpns(ipnsName) {
-    console.log(`[AgentService] 从 IPNS 加载智能体: ${ipnsName}`)
-    
-    try {
-      // 规范化 IPNS 名称
-      const normalizedName = ipnsName.startsWith('/ipns/') 
-        ? ipnsName 
-        : `/ipns/${ipnsName}`
-      
-      // 尝试通过 Tauri 命令解析 IPNS
-      const { invoke } = await import('@tauri-apps/api/core')
-      
-      const identity = await invoke('get_local_diap_identity', {
-        ipnsName: normalizedName,
-        ipfsApiUrl: DEFAULT_IPFS_API,
-        ipfsGatewayUrl: DEFAULT_IPFS_GATEWAY,
-      })
-      
-      console.log(`[AgentService] IPNS 解析结果:`, identity)
-      
-      // 使用解析得到的 CID 获取完整文档
-      const loadResult = await this.loadAgentFromIpfs(identity.cid)
-      
-      if (loadResult.success) {
-        // 合并 IPNS 信息
-        loadResult.agent.ipns = normalizedName
-        loadResult.agent.did = identity.did
-        loadResult.source = 'ipns'
-      }
-      
-      return loadResult
-    } catch (error) {
-      console.error(`[AgentService] 从 IPNS 加载智能体失败:`, error)
-      
-      // 降级：尝试直接通过 Gateway 访问
-      try {
-        console.log(`[AgentService] 尝试通过 Gateway 降级访问 IPNS...`)
-        const normalizedName = ipnsName.replace(/^\/ipns\//, '')
-        const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipns/${normalizedName}`
-        
-        const response = await fetch(gatewayUrl, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Gateway 返回错误: ${response.status}`)
-        }
-        
-        const didDocument = await response.json()
-        const agentMetadata = this._parseDidDocumentToAgent(didDocument, { 
-          ipns: ipnsName.startsWith('/ipns/') ? ipnsName : `/ipns/${ipnsName}`
-        })
-        
-        return {
-          success: true,
-          agent: agentMetadata,
-          didDocument,
-          source: 'ipns-gateway',
-        }
-      } catch (fallbackError) {
-        console.error(`[AgentService] Gateway 降级也失败:`, fallbackError)
-        return {
-          success: false,
-          error: error.message || '加载失败',
-          source: 'ipns',
-        }
-      }
-    }
+    return agentResolverService.loadAgentFromIpns(ipnsName)
   }
 
   /**
@@ -483,165 +383,7 @@ export class AgentService {
    * @returns {Promise<Object>} 智能体元数据
    */
   async loadAgentFromNetwork(target) {
-    if (!target || typeof target !== 'string') {
-      return { success: false, error: '无效的目标标识' }
-    }
-    
-    const trimmed = target.trim()
-    
-    // 判断是 IPNS 还是 CID
-    const isIpns = trimmed.startsWith('/ipns/') || 
-                   trimmed.startsWith('k51') || 
-                   trimmed.startsWith('k2')
-    
-    const isCid = trimmed.startsWith('Qm') || 
-                  trimmed.startsWith('bafy') || 
-                  trimmed.startsWith('bafk')
-    
-    if (isIpns) {
-      return this.loadAgentFromIpns(trimmed)
-    } else if (isCid) {
-      return this.loadAgentFromIpfs(trimmed)
-    } else {
-      // 尝试作为 IPNS 解析
-      console.log(`[AgentService] 未知格式，尝试作为 IPNS 解析: ${trimmed}`)
-      return this.loadAgentFromIpns(trimmed)
-    }
-  }
-
-  /**
-   * 解析 DID 文档，提取智能体元数据
-   * @private
-   */
-  _parseDidDocumentToAgent(didDocument, additionalInfo = {}) {
-    console.log('[AgentService] 解析 DID 文档:', JSON.stringify(didDocument, null, 2))
-    
-    // 从 DID 文档中提取智能体信息
-    const did = didDocument.id || didDocument.did || null
-    
-    // 从 service 数组中提取智能体配置
-    const services = didDocument.service || []
-    console.log('[AgentService] 找到 services:', services.length, services)
-    
-    // 尝试多种方式查找 AgentEndpoint 服务
-    let agentService = services.find(s => 
-      s.type === 'AgentEndpoint' || s.type === 'agent' || s.id?.includes('#agent')
-    )
-    
-    // 如果没有找到，尝试查找第一个包含 serviceEndpoint 的服务
-    if (!agentService) {
-      agentService = services.find(s => s.serviceEndpoint)
-    }
-    
-    // 如果还是没有找到，使用第一个服务
-    if (!agentService && services.length > 0) {
-      agentService = services[0]
-    }
-    
-    console.log('[AgentService] 找到 agentService:', agentService)
-    
-    // 提取 serviceEndpoint，支持多种结构
-    let serviceEndpoint = {}
-    if (agentService) {
-      // 如果 serviceEndpoint 是对象
-      if (typeof agentService.serviceEndpoint === 'object' && agentService.serviceEndpoint !== null) {
-        serviceEndpoint = agentService.serviceEndpoint
-      }
-      // 如果整个 service 对象就是配置
-      else if (agentService.name || agentService.avatar_cid) {
-        serviceEndpoint = agentService
-      }
-    }
-    
-    console.log('[AgentService] 提取的 serviceEndpoint:', serviceEndpoint)
-    
-    // 提取 metadata，支持多种位置
-    const metadata = didDocument['alou:metadata'] || 
-                     didDocument.metadata || 
-                     didDocument['@context']?.metadata ||
-                     {}
-    
-    console.log('[AgentService] 提取的 metadata:', metadata)
-    
-    // 提取 PubSub 主题
-    const pubsubTopics = agentService?.pubsubTopics || 
-                        agentService?.pubsub_topics ||
-                        serviceEndpoint.pubsub_topics ||
-                        []
-    
-    // 提取加密的 PeerID
-    const encryptedPeerIdService = services.find(s => 
-      s.type === 'EncryptedPeerID' || 
-      s.type === 'encryptedPeerId' ||
-      s.id?.includes('#encryptedPeerId')
-    )
-    
-    // 提取名字，支持多种字段名和位置
-    const name = serviceEndpoint.name || 
-                 serviceEndpoint.display_name ||
-                 metadata.agent_name ||
-                 metadata.name ||
-                 didDocument.name ||
-                 '未命名智能体'
-    
-    // 提取头像，支持多种字段名
-    const avatar_cid = serviceEndpoint.avatar_cid || 
-                      serviceEndpoint.avatarCid ||
-                      metadata.avatar_cid ||
-                      metadata.avatarCid ||
-                      null
-    
-    const avatar_url = serviceEndpoint.avatar_url ||
-                      serviceEndpoint.avatarUrl ||
-                      metadata.avatar_url ||
-                      metadata.avatarUrl ||
-                      null
-    
-    console.log('[AgentService] 解析结果 - name:', name, 'avatar_cid:', avatar_cid, 'avatar_url:', avatar_url)
-    
-    return {
-      id: additionalInfo.cid || additionalInfo.ipns || did || `agent_${Date.now()}`,
-      did,
-      cid: additionalInfo.cid || null,
-      ipns: additionalInfo.ipns || null,
-      name,
-      display_name: name,
-      role_description: serviceEndpoint.description || 
-                       serviceEndpoint.role_description ||
-                       metadata.agent_description ||
-                       metadata.description ||
-                       metadata.role_description ||
-                       '',
-      avatar_cid,
-      avatar_url,
-      mcp_config_cid: serviceEndpoint.mcp_config_cid || 
-                      serviceEndpoint.mcpConfigCid ||
-                      metadata.mcp_config_cid ||
-                      null,
-      mcp_ports: serviceEndpoint.mcp_ports || 
-                serviceEndpoint.mcpPorts ||
-                metadata.mcp_ports ||
-                [],
-      agent_type: serviceEndpoint.agent_type || 
-                 serviceEndpoint.agentType ||
-                 metadata.agent_type ||
-                 'claude_agent_sdk',
-      customPrompt: serviceEndpoint.custom_prompt || 
-                   serviceEndpoint.customPrompt ||
-                   metadata.custom_prompt ||
-                   null,
-      pubsub_topics: pubsubTopics,
-      encrypted_peer_id: encryptedPeerIdService?.serviceEndpoint || null,
-      created_at: didDocument.created ? new Date(didDocument.created).getTime() : Date.now(),
-      updated_at: Date.now(),
-      imported_from_network: true,
-      diapIdentity: {
-        did,
-        cid: additionalInfo.cid,
-        ipns: additionalInfo.ipns,
-        public_key: didDocument.verificationMethod?.[0]?.publicKeyMultibase || null,
-      },
-    }
+    return agentResolverService.loadAgentFromNetwork(target)
   }
 
   /**
@@ -659,44 +401,9 @@ export class AgentService {
     }
     
     const jsonData = JSON.stringify(messagesData, null, 2)
+    const filename = `messages_${agentId}_${Date.now()}.json`
     
-    try {
-      // 优先尝试使用 Tauri 命令（避免 CORS 问题）
-      // 不检查环境，直接尝试调用，如果失败再回退到 fetch
-      try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        
-        // 将 JSON 数据转换为 base64（与 agentAssetsService 保持一致）
-        const base64Data = btoa(unescape(encodeURIComponent(jsonData)))
-        
-        const result = await invoke('ipfs_add_base64', {
-          dataBase64: base64Data,
-          fileName: `messages_${agentId}_${Date.now()}.json`,
-          ipfsApiUrl: DEFAULT_IPFS_API,
-        })
-        
-        console.log('[AgentService] 通过 Tauri 上传消息到 IPFS 成功:', result.cid)
-        return result.cid
-      } catch (tauriError) {
-        // Tauri 调用失败（可能不在 Tauri 环境或 API 未加载），回退到直接 fetch（网页版）
-        console.warn('[AgentService] Tauri invoke 失败，回退到 fetch:', tauriError.message || tauriError)
-        
-        const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
-          method: 'POST',
-          body: new Blob([jsonData], { type: 'application/json' }),
-        })
-        
-        if (!response.ok) {
-          throw new Error(`IPFS 上传失败: ${response.status}`)
-        }
-        
-        const result = await response.json()
-        return result.Hash
-      }
-    } catch (error) {
-      console.error('[AgentService] 上传消息到 IPFS 失败:', error)
-      throw error
-    }
+    return ipfsContentService.uploadContent(jsonData, filename)
   }
 
   /**
@@ -705,23 +412,13 @@ export class AgentService {
    * @returns {Promise<Object>} 消息数据
    */
   async loadMessagesFromIpfs(cid) {
-    try {
-      const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipfs/${cid}`
-      const response = await fetch(gatewayUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        throw new Error(`IPFS Gateway 返回错误: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error('[AgentService] 从 IPFS 加载消息失败:', error)
-      throw error
+    const result = await ipfsContentService.getContent(cid)
+    
+    if (!result.success) {
+      throw new Error(result.error)
     }
+    
+    return result.data
   }
 }
 
