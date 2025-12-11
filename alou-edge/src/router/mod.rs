@@ -1,3 +1,5 @@
+use crate::agent::cluster_action::ClusterActionManager;
+use crate::agent::cluster_executor::ClusterExecutor;
 use crate::agent::core::AgentCore;
 use crate::agent::discovery::AgentDiscovery;
 use crate::agent::session::SessionManager;
@@ -15,6 +17,7 @@ use worker::*;
 
 mod agent;
 mod blockchain;
+mod cluster_action;
 mod diap;
 mod mcp;
 mod pubsub;
@@ -31,6 +34,8 @@ pub struct Router {
     transaction_tool: Option<TransactionTool>,
     broadcast_tool: Option<BroadcastTool>,
     pubsub_manager: pubsub::PubSubManager,
+    cluster_action_manager: Option<ClusterActionManager>,
+    cluster_executor: Option<ClusterExecutor>,
     metrics: MetricsCollector,
 }
 
@@ -38,7 +43,8 @@ impl Router {
     pub fn new(kv: KvStore) -> Self {
         let session_store = kv.clone();
         let wallet_store = kv.clone();
-        let pubsub_store = kv;
+        let pubsub_store = kv.clone();
+        let cluster_action_store = kv;
         Self {
             session_manager: SessionManager::new(session_store),
             agent_wallet_tool: AgentWalletTool::new(wallet_store),
@@ -49,6 +55,8 @@ impl Router {
             transaction_tool: None,
             broadcast_tool: None,
             pubsub_manager: pubsub::PubSubManager::new(pubsub_store),
+            cluster_action_manager: Some(ClusterActionManager::new(cluster_action_store)),
+            cluster_executor: None,
             metrics: MetricsCollector::new(),
         }
     }
@@ -62,6 +70,7 @@ impl Router {
         self.agent_core = Some(agent_core);
         self
     }
+
 
     pub fn with_agent_discovery(mut self, agent_discovery: AgentDiscovery) -> Self {
         self.agent_discovery = Some(agent_discovery);
@@ -92,12 +101,29 @@ impl Router {
         self
     }
 
-    pub async fn handle(&self, mut req: Request, env: Env) -> Result<Response> {
+    pub async fn handle(&mut self, mut req: Request, env: Env) -> Result<Response> {
         let start_time = crate::utils::time::now_timestamp_millis();
         let path = req.path();
         let method = req.method();
 
         console_log!("→ {} {}", method.to_string(), path);
+        
+        // 确保集群执行器已初始化（如果需要）
+        if self.cluster_executor.is_none() && self.agent_core.is_some() {
+            if let Ok(kv) = env.kv("KV") {
+                let kv_store = crate::storage::kv::KvStore::new(kv);
+                let session_manager = SessionManager::new(kv_store.clone());
+                let pubsub_manager = pubsub::PubSubManager::new(kv_store);
+                if let Some(ref agent_core) = self.agent_core {
+                    let executor = ClusterExecutor::new(
+                        agent_core.clone(),
+                        session_manager,
+                        pubsub_manager,
+                    );
+                    self.cluster_executor = Some(executor);
+                }
+            }
+        }
 
         let headers = Headers::new();
         headers.set("Access-Control-Allow-Origin", "*")?;
@@ -299,6 +325,51 @@ impl Router {
             }
             (Method::Post, "/api/diap/governance") => {
                 diap::handle_governance_request(env, req).await
+            }
+
+            // 集群行动路由
+            (Method::Post, "/api/cluster-action/create") => {
+                if let Some(ref manager) = self.cluster_action_manager {
+                    cluster_action::handle_create_cluster_action(manager, req).await
+                } else {
+                    Response::error("Cluster action manager not initialized", 500)
+                }
+            }
+            (Method::Post, "/api/cluster-action/execute") => {
+                if let (Some(ref manager), Some(ref executor)) = 
+                    (self.cluster_action_manager.as_ref(), self.cluster_executor.as_ref()) {
+                    cluster_action::handle_execute_cluster_action(manager, executor, req).await
+                } else {
+                    Response::error("Cluster action manager or executor not initialized", 500)
+                }
+            }
+            (Method::Get, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/status") => {
+                if let Some(ref manager) = self.cluster_action_manager {
+                    cluster_action::handle_get_status(manager, req).await
+                } else {
+                    Response::error("Cluster action manager not initialized", 500)
+                }
+            }
+            (Method::Get, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/results") => {
+                if let Some(ref manager) = self.cluster_action_manager {
+                    cluster_action::handle_get_results(manager, req).await
+                } else {
+                    Response::error("Cluster action manager not initialized", 500)
+                }
+            }
+            (Method::Post, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/cancel") => {
+                if let Some(ref manager) = self.cluster_action_manager {
+                    cluster_action::handle_cancel_action(manager, req).await
+                } else {
+                    Response::error("Cluster action manager not initialized", 500)
+                }
+            }
+            (Method::Post, "/api/cluster-action/analyze") => {
+                if let Some(ref manager) = self.cluster_action_manager {
+                    cluster_action::handle_analyze_task(manager, req).await
+                } else {
+                    Response::error("Cluster action manager not initialized", 500)
+                }
             }
             (Method::Post, "/api/diap/timelock") => diap::handle_timelock_request(env, req).await,
             (Method::Post, "/api/diap/account") => diap::handle_account_request(env, req).await,

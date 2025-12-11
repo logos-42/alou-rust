@@ -1,6 +1,6 @@
 {
   "name": "alou-edge",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Alou Edge - Web3 AI Agent on Cloudflare Workers",
   "main": "index.ts",
   "type": "module",

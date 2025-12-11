@@ -1,6 +1,6 @@
 use crate::storage::kv::KvStore;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use worker::*;
 
 use super::{json_response, json_response_with_status, ErrorResponse};
@@ -105,6 +105,99 @@ impl PubSubManager {
         };
         
         Ok(filtered)
+    }
+
+    /// 为集群行动创建群聊主题
+    pub async fn create_group_topic(&self, action_id: &str) -> Result<String> {
+        let topic = format!("diap/cluster_action/{}", action_id);
+        
+        // 创建初始消息
+        let init_message = PubSubMessage {
+            id: format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")),
+            msg_type: "system".to_string(),
+            from: Some("system".to_string()),
+            to: None,
+            content: format!("群聊主题已创建: {}", topic),
+            topic: topic.clone(),
+            timestamp: crate::utils::time::now_timestamp(),
+            metadata: json!({
+                "type": "topic_created",
+                "action_id": action_id,
+            }),
+        };
+
+        self.publish(&topic, init_message).await?;
+        Ok(topic)
+    }
+
+    /// 发布任务请求到群聊
+    pub async fn publish_task_request(
+        &self,
+        topic: &str,
+        task_id: &str,
+        task_description: &str,
+        agent_id: &str,
+    ) -> Result<String> {
+        let message = PubSubMessage {
+            id: format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")),
+            msg_type: "task_request".to_string(),
+            from: Some(agent_id.to_string()),
+            to: None,
+            content: format!("任务请求: {}", task_description),
+            topic: topic.to_string(),
+            timestamp: crate::utils::time::now_timestamp(),
+            metadata: json!({
+                "type": "task_request",
+                "task_id": task_id,
+                "description": task_description,
+            }),
+        };
+
+        self.publish(topic, message).await
+    }
+
+    /// 发布任务结果到群聊
+    pub async fn publish_task_result(
+        &self,
+        topic: &str,
+        task_id: &str,
+        result: &Value,
+        agent_id: &str,
+    ) -> Result<String> {
+        let message = PubSubMessage {
+            id: format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", "")),
+            msg_type: "task_result".to_string(),
+            from: Some(agent_id.to_string()),
+            to: None,
+            content: format!("任务完成: {}", serde_json::to_string(result).unwrap_or_default()),
+            topic: topic.to_string(),
+            timestamp: crate::utils::time::now_timestamp(),
+            metadata: json!({
+                "type": "task_result",
+                "task_id": task_id,
+                "result": result,
+            }),
+        };
+
+        self.publish(topic, message).await
+    }
+
+    /// 订阅群聊消息（返回消息列表，实际订阅由前端处理）
+    pub async fn subscribe_to_group(
+        &self,
+        topic: &str,
+        since: Option<i64>,
+    ) -> Result<Vec<PubSubMessage>> {
+        self.get_messages(topic, since).await
+    }
+
+    /// 获取群聊消息（用于结果聚合）
+    pub async fn get_group_messages(
+        &self,
+        topic: &str,
+        since: Option<i64>,
+    ) -> Result<Vec<PubSubMessage>> {
+        self.get_messages(topic, since).await
     }
 
     fn topic_key(topic: &str) -> String {
