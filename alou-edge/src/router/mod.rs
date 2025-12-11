@@ -392,6 +392,7 @@ impl Router {
         let body: McpUiResourceRequest = match req.json().await {
             Ok(body) => body,
             Err(e) => {
+                console_log!("Invalid MCP UI resource request body: {}", e);
                 let error_response = ErrorResponse {
                     error: format!("Invalid request body: {}", e),
                 };
@@ -399,18 +400,40 @@ impl Router {
             }
         };
 
+        console_log!(
+            "MCP UI resource request - target: {}, params: {:?}",
+            body.target,
+            body.params
+        );
+
         let params = body.params.unwrap_or_else(|| json!({}));
         let builder = UiResourceBuilder::new(&self.session_manager, &self.agent_wallet_tool);
 
         match builder.build_resource(&body.target, params).await {
-            Ok(resource) => json_response(&resource),
+            Ok(resource) => {
+                console_log!("MCP UI resource built successfully for target: {}", body.target);
+                json_response(&resource)
+            }
             Err(AloudError::InvalidInput(msg)) => {
-                let error_response = ErrorResponse { error: msg };
+                console_log!(
+                    "Invalid input for MCP UI resource (target: {}): {}",
+                    body.target,
+                    msg
+                );
+                let error_response = ErrorResponse {
+                    error: format!("Invalid request: {}", msg),
+                };
                 json_response_with_status(&error_response, 400)
             }
             Err(e) => {
+                let error_msg = e.to_string();
+                console_log!(
+                    "MCP UI resource build error (target: {}): {}",
+                    body.target,
+                    error_msg
+                );
                 let error_response = ErrorResponse {
-                    error: e.to_string(),
+                    error: format!("Failed to build resource: {}", error_msg),
                 };
                 json_response_with_status(&error_response, 500)
             }

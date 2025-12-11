@@ -64,6 +64,10 @@ struct ChatRequest {
     chain: Option<String>,
     #[serde(default)]
     context_events: Vec<RawContextEvent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agent_info: Option<Value>, // 包含 name, role_description, custom_prompt, mode 等
 }
 
 #[derive(Serialize)]
@@ -303,6 +307,34 @@ pub(crate) async fn handle_agent_chat(
         wallet_address
     );
 
+    // 如果提供了 agent_info，更新 agent_metadata
+    if let Some(ref agent_info) = body.agent_info {
+        if let Some(ref agent_id) = body.agent_id {
+            // 构建完整的 metadata，包含 mode
+            let mut metadata = agent_info.clone();
+            // 确保 agent_id 也在 metadata 中
+            if let Some(obj) = metadata.as_object_mut() {
+                obj.insert("agent_id".to_string(), json!(agent_id));
+            }
+            if let Err(e) = session_manager
+                .set_agent_metadata(&body.session_id, metadata)
+                .await
+            {
+                console_log!(
+                    "Failed to set agent metadata for session {}: {}",
+                    body.session_id,
+                    e
+                );
+            } else {
+                console_log!(
+                    "Agent metadata updated for session {} with mode: {:?}",
+                    body.session_id,
+                    agent_info.get("mode")
+                );
+            }
+        }
+    }
+
     match agent_core
         .handle_message(
             &body.session_id,
@@ -335,18 +367,24 @@ pub(crate) async fn handle_agent_chat(
             json_response(&chat_response)
         }
         Err(e) => {
+            let error_msg = e.to_string();
+            console_log!(
+                "Agent chat error for session {}: {}",
+                body.session_id,
+                error_msg
+            );
             stream_publisher
                 .publish(
                     StreamEvent::new(&body.session_id, "conversation.error")
                         .with_label("代理执行失败")
                         .with_payload(json!({
-                            "message": e.to_string(),
+                            "message": error_msg.clone(),
                         }))
                         .mark_final(),
                 )
                 .await;
             let error_response = ErrorResponse {
-                error: e.to_string(),
+                error: format!("Agent execution failed: {}", error_msg),
             };
             json_response_with_status(&error_response, 500)
         }

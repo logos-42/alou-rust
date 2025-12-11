@@ -661,11 +661,9 @@ export class AgentService {
     const jsonData = JSON.stringify(messagesData, null, 2)
     
     try {
-      // 检查是否在桌面环境（Tauri）
-      const isDesktop = typeof window !== 'undefined' && window.__TAURI__ !== undefined
-      
-      if (isDesktop) {
-        // 桌面版：使用 Tauri 命令（避免 CORS 问题）
+      // 优先尝试使用 Tauri 命令（避免 CORS 问题）
+      // 不检查环境，直接尝试调用，如果失败再回退到 fetch
+      try {
         const { invoke } = await import('@tauri-apps/api/core')
         
         // 将 JSON 数据转换为 base64（与 agentAssetsService 保持一致）
@@ -679,19 +677,21 @@ export class AgentService {
         
         console.log('[AgentService] 通过 Tauri 上传消息到 IPFS 成功:', result.cid)
         return result.cid
-      } else {
-        // 网页版：使用 IPFS HTTP API（需要配置 CORS）
-      const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
-        method: 'POST',
-        body: new Blob([jsonData], { type: 'application/json' }),
-      })
-      
-      if (!response.ok) {
-        throw new Error(`IPFS 上传失败: ${response.status}`)
-      }
-      
-      const result = await response.json()
-      return result.Hash
+      } catch (tauriError) {
+        // Tauri 调用失败（可能不在 Tauri 环境或 API 未加载），回退到直接 fetch（网页版）
+        console.warn('[AgentService] Tauri invoke 失败，回退到 fetch:', tauriError.message || tauriError)
+        
+        const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/add`, {
+          method: 'POST',
+          body: new Blob([jsonData], { type: 'application/json' }),
+        })
+        
+        if (!response.ok) {
+          throw new Error(`IPFS 上传失败: ${response.status}`)
+        }
+        
+        const result = await response.json()
+        return result.Hash
       }
     } catch (error) {
       console.error('[AgentService] 上传消息到 IPFS 失败:', error)

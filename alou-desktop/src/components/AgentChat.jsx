@@ -77,6 +77,7 @@ const AgentChat = () => {
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
+  const [currentMode, setCurrentMode] = useState('agent') // 当前模式：'agent' 或 'alou'
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
 
   // ==================== 1. UI State Hook ====================
@@ -191,6 +192,7 @@ const AgentChat = () => {
     conversationOverlayRef,
     consoleDockRef,
     contextEventsRef,
+    currentMode, // 传递当前模式
   })
 
   const {
@@ -409,9 +411,14 @@ const AgentChat = () => {
 
     if (selectedModelType) {
       filtered = filtered.filter((channel) => {
-        const agentType = channel.meta?.agent_type || channel.meta?.model_type
-        if (selectedModelType === 'claude') return agentType === 'claude_agent_sdk'
-        if (selectedModelType === 'alou') return agentType === 'alou_agent' || agentType === 'alou'
+        const channelMode = channel.meta?.mode || 'agent' // 默认为 agent 模式
+        // 模式筛选：agent 或 alou
+        if (selectedModelType === 'agent') {
+          return channelMode === 'agent' || !channelMode // 默认也是 agent
+        }
+        if (selectedModelType === 'alou') {
+          return channelMode === 'alou'
+        }
         return true
       })
     }
@@ -770,6 +777,8 @@ const AgentChat = () => {
           onToggleCollapse={toggleLeftSidebar}
           selectedModelType={selectedModelType}
           onModelTypeChange={setSelectedModelType}
+          currentMode={currentMode}
+          onModeChange={setCurrentMode}
           onShowIdentityPanel={() => setShowDiapPanel(true)}
         />
 

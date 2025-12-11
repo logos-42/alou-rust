@@ -22,6 +22,7 @@ export const useAgentMessages = ({
   conversationOverlayRef,
   consoleDockRef,
   contextEventsRef,
+  currentMode = 'agent', // 当前模式：'agent' 或 'alou'
 }) => {
   // 按频道存储消息：Map<channelId, Message[]>
   const [messagesByChannel, setMessagesByChannel] = useState({})
@@ -252,6 +253,7 @@ export const useAgentMessages = ({
             name: agentInfo.display_name || agentInfo.name,
             role_description: agentInfo.role_description,
             custom_prompt: agentInfo.customPrompt,
+            mode: currentMode, // 传递当前模式
           } : undefined,
         }, {
           signal: abortController.signal, // 添加 abort signal 用于终止请求

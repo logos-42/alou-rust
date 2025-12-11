@@ -332,8 +332,11 @@ impl DiapIdentityManager {
 /// Configuration for DIAP identity creation (WASM stub)
 #[cfg(target_arch = "wasm32")]
 pub struct DiapIdentityConfig {
+    #[allow(dead_code)] // Will be used when WASM implementation is complete
     pub ipfs_api_url: String,
+    #[allow(dead_code)] // Will be used when WASM implementation is complete
     pub ipfs_gateway_url: String,
+    #[allow(dead_code)] // Will be used when WASM implementation is complete
     pub ipns_key: Option<String>,
     pub timeout_secs: u64,
 }
@@ -360,38 +363,211 @@ impl DiapIdentityConfig {
     }
 }
 
-/// WASM-compatible stub for DIAP identity manager
+/// WASM-compatible DIAP identity manager
 #[cfg(target_arch = "wasm32")]
-pub struct DiapIdentityManager;
+pub struct DiapIdentityManager {
+    config: DiapIdentityConfig,
+}
 
 #[cfg(target_arch = "wasm32")]
 impl DiapIdentityManager {
-    pub fn new(_config: DiapIdentityConfig) -> Result<Self> {
-        // In WASM, we can't use reqwest, but we can still create the manager
-        // The actual IPFS operations will need to be done via external HTTP calls
-        Ok(Self)
+    pub fn new(config: DiapIdentityConfig) -> Result<Self> {
+        Ok(Self { config })
     }
 
+    #[allow(dead_code)]
     pub async fn create_identity(&self) -> Result<DiapIdentity> {
         Err(AloudError::AgentError(
             "DIAP identity creation is not available in WASM build. Use Desktop app instead.".to_string(),
         ))
     }
 
-    pub async fn get_identity(&self, _cid: &str) -> Result<DiapIdentity> {
-        Err(AloudError::AgentError(
-            "DIAP identity retrieval is not available in WASM build".to_string(),
-        ))
+    /// Get identity information from CID using IPFS gateway
+    pub async fn get_identity(&self, cid: &str) -> Result<DiapIdentity> {
+        use worker::{console_log, Fetch, Method, Request as WorkerRequest, RequestInit};
+
+        console_log!("DIAP WASM: Getting identity from CID: {}", cid);
+
+        // Construct IPFS gateway URL
+        let gateway_url = self.config.ipfs_gateway_url.trim_end_matches('/');
+        let did_doc_url = format!("{}/ipfs/{}", gateway_url, cid);
+
+        console_log!("DIAP WASM: Fetching DID document from: {}", did_doc_url);
+
+        // Create fetch request
+        let mut init = RequestInit::new();
+        init.with_method(Method::Get);
+
+        let request = WorkerRequest::new_with_init(&did_doc_url, &init)
+            .map_err(|e| AloudError::AgentError(format!("Failed to create request: {}", e)))?;
+
+        let mut response = Fetch::Request(request)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to fetch DID document: {}", e)))?;
+
+        if !response.status_code().is_success() {
+            return Err(AloudError::AgentError(format!(
+                "IPFS gateway returned error: {}",
+                response.status_code()
+            )));
+        }
+
+        // Parse DID document JSON
+        let did_doc_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read response: {}", e)))?;
+
+        console_log!("DIAP WASM: DID document length: {} bytes", did_doc_text.len());
+
+        let did_doc: serde_json::Value = serde_json::from_str(&did_doc_text)
+            .map_err(|e| AloudError::AgentError(format!("Failed to parse DID document: {}", e)))?;
+
+        // Extract DID
+        let did = did_doc
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AloudError::AgentError("DID not found in document".to_string()))?
+            .to_string();
+
+        console_log!("DIAP WASM: Extracted DID: {}", did);
+
+        // Extract IPNS from service endpoints
+        let ipns = did_doc
+            .get("service")
+            .and_then(|services| services.as_array())
+            .and_then(|arr| {
+                arr.iter().find(|s| {
+                    s.get("type")
+                        .and_then(|t| t.as_str())
+                        .map(|t| t == "ipns")
+                        .unwrap_or(false)
+                })
+            })
+            .and_then(|service| service.get("serviceEndpoint"))
+            .and_then(|endpoint| endpoint.as_str())
+            .ok_or_else(|| AloudError::AgentError("IPNS not found in DID document".to_string()))?
+            .to_string();
+
+        console_log!("DIAP WASM: Extracted IPNS: {}", ipns);
+
+        // Extract public key
+        let public_key = did_doc
+            .get("verificationMethod")
+            .and_then(|methods| methods.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|method| method.get("publicKeyMultibase"))
+            .and_then(|key| key.as_str())
+            .ok_or_else(|| AloudError::AgentError("Public key not found in DID document".to_string()))?
+            .to_string();
+
+        console_log!("DIAP WASM: Extracted public key");
+
+        // Extract encrypted peer ID if present
+        let encrypted_peer_id = did_doc
+            .get("service")
+            .and_then(|services| services.as_array())
+            .and_then(|arr| {
+                arr.iter().find(|s| {
+                    s.get("type")
+                        .and_then(|t| t.as_str())
+                        .map(|t| t == "encrypted_peer_id")
+                        .unwrap_or(false)
+                })
+            })
+            .and_then(|service| {
+                let ciphertext_b64 = service.get("ciphertext").and_then(|c| c.as_str())?;
+                let nonce_b64 = service.get("nonce").and_then(|n| n.as_str())?;
+                let signature_b64 = service.get("signature").and_then(|s| s.as_str()).unwrap_or("");
+                let method = service.get("method").and_then(|m| m.as_str()).unwrap_or("xchacha20poly1305");
+                Some(EncryptedPeerPayload {
+                    ciphertext_b64: ciphertext_b64.to_string(),
+                    nonce_b64: nonce_b64.to_string(),
+                    signature_b64: signature_b64.to_string(),
+                    method: method.to_string(),
+                })
+            });
+
+        Ok(DiapIdentity {
+            did,
+            ipns,
+            cid: cid.to_string(),
+            public_key,
+            encrypted_peer_id,
+            ipns_key: None,
+            is_registered: false,
+            registered_address: None,
+            created_at: crate::utils::time::now_timestamp(),
+        })
     }
 
-    /// Resolve identity from IPNS name (WASM stub - returns error)
-    pub async fn resolve_identity_from_ipns(&self, _ipns_name: &str) -> Result<DiapIdentity> {
-        Err(AloudError::AgentError(
-            "IPNS resolution is not available in WASM build. Use Desktop app or configure external IPFS gateway.".to_string(),
-        ))
+    /// Resolve identity from IPNS name using IPFS API
+    pub async fn resolve_identity_from_ipns(&self, ipns_name: &str) -> Result<DiapIdentity> {
+        use worker::{console_log, Fetch, Method, Request as WorkerRequest, RequestInit};
+
+        console_log!("DIAP WASM: Resolving IPNS: {}", ipns_name);
+
+        // Normalize IPNS name (remove /ipns/ prefix if present)
+        let ipns_key = ipns_name.trim_start_matches("/ipns/");
+
+        // Construct IPFS API URL for IPNS resolution
+        let api_url = self.config.ipfs_api_url.trim_end_matches('/');
+        let resolve_url = format!("{}/api/v0/name/resolve?arg={}", api_url, ipns_key);
+
+        console_log!("DIAP WASM: Resolving via: {}", resolve_url);
+
+        // Create fetch request
+        let mut init = RequestInit::new();
+        init.with_method(Method::Post);
+
+        let request = WorkerRequest::new_with_init(&resolve_url, &init)
+            .map_err(|e| AloudError::AgentError(format!("Failed to create IPNS resolve request: {}", e)))?;
+
+        let mut response = Fetch::Request(request)
+            .send()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to resolve IPNS: {}", e)))?;
+
+        if !response.status_code().is_success() {
+            let error_text = response.text().await.unwrap_or_default();
+            return Err(AloudError::AgentError(format!(
+                "IPNS resolution failed ({}): {}",
+                response.status_code(),
+                error_text
+            )));
+        }
+
+        // Parse IPNS resolution response
+        let response_text = response
+            .text()
+            .await
+            .map_err(|e| AloudError::AgentError(format!("Failed to read IPNS response: {}", e)))?;
+
+        console_log!("DIAP WASM: IPNS resolve response: {}", response_text);
+
+        #[derive(Deserialize)]
+        struct IpnsResolveResponse {
+            #[serde(rename = "Path")]
+            path: String,
+        }
+
+        let parsed: IpnsResolveResponse = serde_json::from_str(&response_text)
+            .map_err(|e| AloudError::AgentError(format!("Failed to parse IPNS response: {}", e)))?;
+
+        // Extract CID from path (/ipfs/Qm...)
+        let cid = parsed
+            .path
+            .trim_start_matches("/ipfs/")
+            .to_string();
+
+        console_log!("DIAP WASM: Resolved to CID: {}", cid);
+
+        // Get identity from CID
+        self.get_identity(&cid).await
     }
 
-    /// Validate identity information (WASM stub - basic validation only)
+    /// Validate identity information (basic format validation)
     pub fn validate_identity(&self, identity: &DiapIdentity) -> Result<()> {
         // Basic format validation only (no network calls)
         if !identity.ipns.starts_with("/ipns/") && !identity.ipns.starts_with("k51") {
@@ -411,6 +587,18 @@ impl DiapIdentityManager {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+trait StatusCodeExt {
+    fn is_success(&self) -> bool;
+}
+
+#[cfg(target_arch = "wasm32")]
+impl StatusCodeExt for u16 {
+    fn is_success(&self) -> bool {
+        (200..300).contains(self)
     }
 }
 

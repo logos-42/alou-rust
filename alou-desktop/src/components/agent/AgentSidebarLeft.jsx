@@ -14,15 +14,10 @@ const formatDate = (timestamp) => {
   })
 }
 
-const MODEL_TYPES = [
-  { id: 'claude', name: 'Claude', available: true },
-  { id: 'gemini', name: 'Gemini', available: false },
-  { id: 'gpt', name: 'GPT', available: false },
-  { id: 'qwen', name: 'Qwen', available: false },
-  { id: 'kimi', name: 'Kimi', available: false },
-  { id: 'deepseek', name: 'DeepSeek', available: false },
+// 模式类型：Agent 模式（自定义智能体）和 Alou 模式（平台模式）
+const MODE_TYPES = [
+  { id: 'agent', name: 'Agent', available: true },
   { id: 'alou', name: 'Alou', available: true },
-  { id: 'grok', name: 'Grok', available: false },
 ]
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
@@ -44,6 +39,8 @@ const AgentSidebarLeft = ({
   onToggleCollapse,
   selectedModelType,
   onModelTypeChange,
+  currentMode = 'agent', // 当前模式：'agent' 或 'alou'
+  onModeChange, // 切换模式的回调
   onShowIdentityPanel,
 }) => {
   const { t } = useI18n()
@@ -52,13 +49,12 @@ const AgentSidebarLeft = ({
   const menuRef = useRef(null)
   const badgeAnchorRef = useRef(null)
 
-  const availableModels = useMemo(() => MODEL_TYPES.filter((model) => model.available), [])
-  const upcomingModels = useMemo(() => MODEL_TYPES.filter((model) => !model.available), [])
-  const selectedModelLabel = useMemo(() => {
+  const availableModes = useMemo(() => MODE_TYPES.filter((mode) => mode.available), [])
+  const selectedModeLabel = useMemo(() => {
     if (!selectedModelType) {
       return ''
     }
-    const matched = MODEL_TYPES.find((item) => item.id === selectedModelType)
+    const matched = MODE_TYPES.find((item) => item.id === selectedModelType)
     return matched?.name || ''
   }, [selectedModelType])
 
@@ -123,11 +119,11 @@ const AgentSidebarLeft = ({
     })
   }
 
-  const handleModelClick = (model) => {
-    if (!model.available) {
+  const handleModelClick = (mode) => {
+    if (!mode.available) {
       return
     }
-    const nextValue = selectedModelType === model.id ? null : model.id
+    const nextValue = selectedModelType === mode.id ? null : mode.id
     onModelTypeChange?.(nextValue)
     closeModelMenu()
   }
@@ -167,9 +163,9 @@ const AgentSidebarLeft = ({
         </div>
       )}
 
-      {!isCollapsed && selectedModelLabel && (
+      {!isCollapsed && selectedModeLabel && (
         <div className="model-filter-chip">
-          <span>{t('agent.sidebar.filtered')}{selectedModelLabel}</span>
+          <span>{t('agent.sidebar.filtered')}{selectedModeLabel}</span>
           <button
             type="button"
             onClick={() => {
@@ -251,19 +247,20 @@ const AgentSidebarLeft = ({
                   </div>
                   <div className="channel-meta">
                     <span className={`status-dot ${channel.status}`} />
-                    {channel.meta?.agent_type === 'claude_agent_sdk' && (
-                      <span
-                        className={`channel-badge badge-claude ${selectedModelType === 'claude' ? 'selected' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openModelMenu(e)
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        title="点击筛选模型类型"
-                      >
-                        Agent
-                      </span>
-                    )}
+                    {/* 模式切换按钮：显示当前模式，点击切换 */}
+                    <span
+                      className={`channel-badge badge-claude ${currentMode === 'agent' ? 'badge-agent' : 'badge-alou'}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        // 切换模式：agent <-> alou
+                        const nextMode = currentMode === 'agent' ? 'alou' : 'agent'
+                        onModeChange?.(nextMode)
+                      }}
+                      style={{ cursor: 'pointer' }}
+                      title={`当前模式：${currentMode === 'agent' ? 'Agent' : 'Alou'}，点击切换`}
+                    >
+                      {currentMode === 'agent' ? 'Agent' : 'Alou'}
+                    </span>
                     {channel.meta?.ipns && (
                       <span
                         className={`channel-badge status-badge ${
@@ -398,26 +395,16 @@ const AgentSidebarLeft = ({
           </div>
 
           <div className="model-filter-section">
-            <div className="section-label">已接入</div>
-            {availableModels.map((model) => (
+            <div className="section-label">选择模式</div>
+            {availableModes.map((mode) => (
               <div
-                key={model.id}
-                className={`model-filter-item ${selectedModelType === model.id ? 'active' : ''}`}
-                onClick={() => handleModelClick(model)}
+                key={mode.id}
+                className={`model-filter-item ${selectedModelType === mode.id ? 'active' : ''}`}
+                onClick={() => handleModelClick(mode)}
                 role="button"
                 tabIndex={0}
               >
-                <span className="model-name">{model.name}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="model-filter-section">
-            <div className="section-label">即将上线</div>
-            {upcomingModels.map((model) => (
-              <div key={model.id} className="model-filter-item coming-soon">
-                <span className="model-name">{model.name}</span>
-                <span className="coming-soon-label">后续接入</span>
+                <span className="model-name">{mode.name}</span>
               </div>
             ))}
           </div>

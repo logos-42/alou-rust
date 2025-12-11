@@ -5,7 +5,7 @@ use worker::console_log;
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
 use crate::agent::claude_client::{ClaudeClient, ClaudeMessage, ClaudeTool, ToolUse};
 use crate::agent::context::AgentContext;
-use crate::agent::prompts::PromptMode;
+use crate::agent::prompts::{AgentMode, CustomAgentInfo, PromptMode};
 use crate::agent::session::{ContextEvent, Message, SessionManager};
 use crate::agent::stream::{StreamEvent, StreamPublisher};
 use crate::mcp::executor::{McpExecutor, ToolCall};
@@ -153,49 +153,62 @@ impl AgentCore {
             .ok()
             .flatten();
 
-        // 确定系统 prompt：优先使用智能体的 customPrompt 或 role_description
+        // 确定系统 prompt：优先使用 CustomAgentInfo 结构体生成更完整的 Prompt
         let mut system_prompt = if let Some(ref metadata) = agent_metadata {
-            // 优先使用 customPrompt
-            if let Some(custom_prompt) = metadata.get("customPrompt").and_then(|v| v.as_str()) {
-                if !custom_prompt.is_empty() {
-                    let mut prompt = custom_prompt.to_string();
-                    // 添加钱包和链信息
-                    if let Some(w) = wallet.as_deref() {
-                        prompt.push_str(&format!("\n\n当前用户钱包地址: {}", w));
+            // 从 metadata 中读取模式（默认为 Agent 模式）
+            let mode = metadata
+                .get("mode")
+                .and_then(|v| v.as_str())
+                .map(|m| {
+                    if m.eq_ignore_ascii_case("alou") {
+                        AgentMode::Alou
+                    } else {
+                        AgentMode::Agent
                     }
-                    if let Some(c) = chain.as_deref() {
-                        prompt.push_str(&format!("\n当前链: {}", c));
-                    }
-                    prompt
-                } else {
-                    prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
-                }
-            }
-            // 其次使用 role_description 构建 prompt
-            else if let Some(role_desc) = metadata.get("role_description").and_then(|v| v.as_str())
-            {
-                if !role_desc.is_empty() {
-                    let agent_name = metadata
-                        .get("display_name")
-                        .and_then(|v| v.as_str())
-                        .or_else(|| metadata.get("name").and_then(|v| v.as_str()))
-                        .unwrap_or("智能体");
+                })
+                .unwrap_or(AgentMode::Agent);
 
-                    let mut prompt = format!("你是 {}。\n\n{}", agent_name, role_desc);
-                    // 添加钱包和链信息
-                    if let Some(w) = wallet.as_deref() {
-                        prompt.push_str(&format!("\n\n当前用户钱包地址: {}", w));
-                    }
-                    if let Some(c) = chain.as_deref() {
-                        prompt.push_str(&format!("\n当前链: {}", c));
-                    }
-                    prompt
-                } else {
-                    prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
-                }
-            }
-            // 否则使用默认 prompt
-            else {
+            // 构建 CustomAgentInfo 结构体
+            let custom_agent_info = CustomAgentInfo {
+                name: metadata
+                    .get("display_name")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| metadata.get("name").and_then(|v| v.as_str()))
+                    .unwrap_or("智能体")
+                    .to_string(),
+                role_description: metadata
+                    .get("role_description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(if mode == AgentMode::Alou {
+                        "Alou 平台的 Web3 支付助手"
+                    } else {
+                        "一个去中心化的 Web3 智能体"
+                    })
+                    .to_string(),
+                custom_instructions: metadata
+                    .get("customPrompt")
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string()),
+                did: metadata.get("did").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                ipns: metadata.get("ipns").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                mode,
+            };
+
+            // 如果存在自定义指令或角色描述，使用 CustomAgentInfo 生成 Prompt
+            if custom_agent_info.custom_instructions.is_some()
+                || !custom_agent_info.role_description.is_empty()
+                || custom_agent_info.did.is_some()
+                || custom_agent_info.ipns.is_some()
+                || custom_agent_info.mode == AgentMode::Alou
+            {
+                PromptMode::system_prompt_for_custom_agent_with_context(
+                    &custom_agent_info,
+                    wallet.as_deref(),
+                    chain.as_deref(),
+                )
+            } else {
+                // 否则使用默认 prompt
                 prompt_mode.system_prompt_with_context(wallet.as_deref(), chain.as_deref())
             }
         } else {
