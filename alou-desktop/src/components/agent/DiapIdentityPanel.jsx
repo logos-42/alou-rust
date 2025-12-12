@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
+import { invoke } from '@tauri-apps/api/core'
+import { ethers } from 'ethers'
 import './DiapIdentityPanel.css'
 
 const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
@@ -13,8 +15,23 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   const [error, setError] = useState(null)
   const [registerInfo, setRegisterInfo] = useState(null)
   const [toastMessage, setToastMessage] = useState(null)
+  const [txHash, setTxHash] = useState(null)
+  const [hasTestnetKey, setHasTestnetKey] = useState(false)
   
   const updateAgent = useAgentStore((state) => state.updateAgent)
+  
+  // Check if testnet private key is available
+  useEffect(() => {
+    const checkTestnetKey = async () => {
+      try {
+        await invoke('get_testnet_private_key')
+        setHasTestnetKey(true)
+      } catch (err) {
+        setHasTestnetKey(false)
+      }
+    }
+    checkTestnetKey()
+  }, [])
 
   useEffect(() => {
     if (sessionId) {
@@ -177,7 +194,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   const handleRegisterOnChain = async () => {
     if (!identity) return
 
-    const network = window.prompt('请输入网络名称（如：base_sepolia, base_mainnet）', 'base_sepolia')
+    const network = window.prompt('请输入网络名称（如：base_sepolia, sepolia）', 'base_sepolia')
     if (!network) return
 
     const stakeAmount = window.prompt('请输入质押金额（单位：wei，例如 100000000000000000000 表示 100 代币）', '100000000000000000000')
@@ -188,16 +205,102 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     try {
       setRegistering(true)
       setError(null)
+      setTxHash(null)
+      
+      // Get encoded transaction from backend
       const result = await agentService.registerAgentOnChain(
-        sessionId,
+        identity,
         network,
         stakeAmount,
         useAa,
         0, // salt
       )
-      setRegisterInfo(result)
-      // Reload identity to check registration status
-      await loadIdentity()
+      
+      // Check if we should auto-sign and broadcast
+      let shouldAutoSign = false
+      if (hasTestnetKey) {
+        shouldAutoSign = window.confirm(
+          '检测到测试网私钥环境变量（DIAP_TESTNET_PRIVATE_KEY）\n\n' +
+          '是否自动签名并广播交易？\n\n' +
+          '点击"确定"自动签名并广播\n' +
+          '点击"取消"仅生成编码交易（需要手动签名）'
+        )
+      }
+      
+      if (shouldAutoSign && result.encoded_call?.data) {
+        try {
+          // Get private key from environment
+          const privateKey = await invoke('get_testnet_private_key')
+          
+          // Get RPC URL based on network
+          let rpcUrl, chainId
+          if (network === 'base_sepolia') {
+            rpcUrl = 'https://sepolia.base.org'
+            chainId = 84532
+          } else if (network === 'sepolia') {
+            rpcUrl = 'https://ethereum-sepolia-rpc.publicnode.com'
+            chainId = 11155111
+          } else {
+            throw new Error(`不支持的测试网络: ${network}`)
+          }
+          
+          // Get contract address based on network
+          // DIAPAgentNetwork contract addresses
+          let contractAddress
+          if (network === 'base_sepolia') {
+            contractAddress = '0xA960cf9053FA76278e16f9D4BA35225f7634DC54' // Base Sepolia DIAPAgentNetwork
+          } else if (network === 'sepolia') {
+            contractAddress = '0x9eF71FD5be68ebab2ABE20c5Fab826b14BfBc089' // Sepolia DIAPAgentNetwork
+          } else {
+            throw new Error(`不支持的测试网络: ${network}`)
+          }
+          
+          // Create provider and wallet
+          const provider = new ethers.JsonRpcProvider(rpcUrl)
+          const wallet = new ethers.Wallet(privateKey, provider)
+          
+          // Get transaction parameters
+          const nonce = await provider.getTransactionCount(wallet.address, 'latest')
+          const gasPrice = await provider.getFeeData()
+          
+          // Build transaction
+          const tx = {
+            to: contractAddress,
+            data: result.encoded_call.data,
+            value: 0,
+            nonce: nonce,
+            gasLimit: 500000, // You may want to estimate this properly
+            gasPrice: gasPrice.gasPrice,
+            chainId: chainId,
+          }
+          
+          // Sign and send transaction
+          console.log('[DiapIdentityPanel] 签名并广播交易...', tx)
+          const txResponse = await wallet.sendTransaction(tx)
+          console.log('[DiapIdentityPanel] 交易已发送:', txResponse.hash)
+          
+          setTxHash(txResponse.hash)
+          setToastMessage(`交易已广播: ${txResponse.hash}`)
+          
+          // Wait for transaction to be mined
+          const receipt = await txResponse.wait()
+          console.log('[DiapIdentityPanel] 交易已确认:', receipt)
+          
+          setToastMessage(`交易已确认: ${txResponse.hash}`)
+          
+          // Reload identity to check registration status
+          await loadIdentity()
+        } catch (signErr) {
+          console.error('Failed to sign and broadcast transaction:', signErr)
+          setError(`签名/广播失败: ${signErr.message}`)
+          setToastMessage(`签名/广播失败: ${signErr.message}`)
+          // Still show the encoded call so user can manually sign
+          setRegisterInfo(result)
+        }
+      } else {
+        // Just show the encoded call
+        setRegisterInfo(result)
+      }
     } catch (err) {
       console.error('Failed to register agent on-chain:', err)
       const message = err.message || t('agent.diap.registerFailed')
@@ -334,7 +437,29 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
               </div>
             </div>
 
-            {registerInfo && (
+            {txHash && (
+              <div className="diap-field register-info">
+                <label>交易哈希</label>
+                <div className="diap-value">
+                  <p className="info-text success">
+                    ✓ 交易已广播并确认
+                  </p>
+                  <div className="encoded-call">
+                    <code>{txHash}</code>
+                    <button
+                      type="button"
+                      className="copy-btn"
+                      onClick={() => copyToClipboard(txHash)}
+                      title={t('agent.diap.copy')}
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {registerInfo && !txHash && (
               <div className="diap-field register-info">
                 <label>{t('agent.diap.registerTxInfo')}</label>
                 <div className="diap-value">

@@ -116,6 +116,12 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.group-chat-toggle-btn-fixed img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .group-chat-toggle-btn-fixed:hover:not(:disabled) {
   background: rgba(148, 163, 184, 0.28);
   transform: translateY(-2px);

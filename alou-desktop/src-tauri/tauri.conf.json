@@ -1,6 +1,6 @@
 {
   "productName": "Alou",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "com.alou.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",

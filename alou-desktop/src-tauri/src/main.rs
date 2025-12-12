@@ -32,7 +32,7 @@ use crate::diap::{
     get_local_diap_identity,
     update_local_diap_identity,
 };
-use crate::wallet::verify_wallet_signature;
+use crate::wallet::{verify_wallet_signature, get_testnet_private_key};
 use crate::browser::{open_browser, test_ipfs_node_connection};
 use crate::sync::{
     read_wallet_sync_data, start_wallet_sync_server, write_wallet_sync_data,
@@ -67,6 +67,7 @@ fn main() {
             get_local_diap_identity,
             update_local_diap_identity,
             verify_wallet_signature,
+            get_testnet_private_key,
             open_browser,
             test_ipfs_node_connection,
             write_wallet_sync_data,

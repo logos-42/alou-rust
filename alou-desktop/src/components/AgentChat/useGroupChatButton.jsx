@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import GroupIcon from '@/assets/群组.png'
 
 /**
  * useGroupChatButton - 群聊按钮 Hook
@@ -36,13 +37,13 @@ export const useGroupChatButton = ({
             {children}
             {showConversationPanel && (
               <button type="button" {...buttonConfig}>
-                👥
+                <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
               </button>
             )}
           </div>
         )
       },
-    [showConversationPanel, buttonConfig],
+    [showConversationPanel, buttonConfig, showGroupChat, t],
   )
 
   return {

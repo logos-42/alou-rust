@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import GroupChatMessage from './GroupChatMessage'
 import { useI18n } from '@/hooks/useI18n'
+import GroupIcon from '@/assets/群组.png'
+import RefreshIcon from '@/assets/刷新0.2.png'
 import './GroupChatPanel.css'
 
 /**
@@ -56,7 +58,9 @@ const GroupChatPanel = ({
               ✕
             </button>
           )}
-          <div className="group-icon">👥</div>
+          <div className="group-icon">
+            <img src={GroupIcon} alt="群组" />
+          </div>
           <div className="header-info">
             <div className="group-title">{t('agent.groupChat.title')}</div>
             <div className="group-subtitle">
@@ -130,7 +134,7 @@ const GroupChatPanel = ({
           title={t('agent.groupChat.refresh')}
           aria-label={t('agent.groupChat.refresh')}
         >
-          🔄
+          <img src={RefreshIcon} alt={t('agent.groupChat.refresh')} />
         </button>
       )}
 

@@ -1,6 +1,7 @@
 use hex;
-use k256::ecdsa::{Signature as K256Signature, VerifyingKey};
+use k256::ecdsa::{Signature as K256Signature, SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
+use std::env;
 
 /// Verify Ethereum wallet signature
 #[tauri::command]
@@ -92,5 +93,15 @@ fn public_key_to_address(public_key: &VerifyingKey) -> String {
     // Use last 20 bytes as address
     let address_bytes = &hash[12..32];
     format!("0x{}", hex::encode(address_bytes))
+}
+
+/// Get testnet private key from environment variable (if available)
+/// Environment variable name: DIAP_TESTNET_PRIVATE_KEY
+/// Returns the private key if set, otherwise returns an error
+/// WARNING: Only use this for testing purposes!
+#[tauri::command]
+pub async fn get_testnet_private_key() -> Result<String, String> {
+    env::var("DIAP_TESTNET_PRIVATE_KEY")
+        .map_err(|_| "DIAP_TESTNET_PRIVATE_KEY environment variable not set".to_string())
 }
 

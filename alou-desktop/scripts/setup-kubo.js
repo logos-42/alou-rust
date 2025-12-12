@@ -16,24 +16,68 @@ const __dirname = path.dirname(__filename)
 const KUBO_VERSION = 'v0.24.0'
 const KUBO_DIR = path.join(__dirname, '..', 'src-tauri', 'kubo')
 
-// Detect platform
-const platform = os.platform()
+// Parse command line arguments for target platform
+const args = process.argv.slice(2)
+let targetPlatform = null
+if (args.includes('--platform') || args.includes('-p')) {
+  const index = args.includes('--platform') ? args.indexOf('--platform') : args.indexOf('-p')
+  targetPlatform = args[index + 1]
+  if (!targetPlatform || targetPlatform.startsWith('-')) {
+    console.error('Error: --platform requires a value (darwin, win32, or linux)')
+    process.exit(1)
+  }
+}
+
+// Detect platform (use target platform if specified, otherwise use current platform)
+const platform = targetPlatform || os.platform()
 const arch = os.arch()
+
+// Validate platform
+const validPlatforms = ['win32', 'darwin', 'linux']
+if (!validPlatforms.includes(platform)) {
+  console.error(`Error: Invalid platform "${platform}". Valid options: ${validPlatforms.join(', ')}`)
+  process.exit(1)
+}
 
 let kuboFile, kuboUrl, extractCommand
 
 if (platform === 'win32') {
   kuboFile = `kubo_${KUBO_VERSION}_windows-amd64.zip`
   kuboUrl = `https://dist.ipfs.tech/kubo/${KUBO_VERSION}/${kuboFile}`
-  extractCommand = (file) => `powershell -Command "Expand-Archive -Path '${file}' -DestinationPath '${path.dirname(file)}' -Force"`
+  // Use tar or 7z for cross-platform extraction on Windows
+  extractCommand = (file) => {
+    // Try to use tar (available in Windows 10+)
+    try {
+      execSync('tar --version', { stdio: 'ignore' })
+      return `tar -xf "${file}" -C "${path.dirname(file)}"`
+    } catch {
+      // Fallback to PowerShell
+      return `powershell -Command "Expand-Archive -Path '${file}' -DestinationPath '${path.dirname(file)}' -Force"`
+    }
+  }
 } else if (platform === 'darwin') {
-  kuboFile = `kubo_${KUBO_VERSION}_darwin-amd64.tar.gz`
+  // Support both amd64 and arm64 for macOS
+  const macArch = arch === 'arm64' ? 'arm64' : 'amd64'
+  kuboFile = `kubo_${KUBO_VERSION}_darwin-${macArch}.tar.gz`
   kuboUrl = `https://dist.ipfs.tech/kubo/${KUBO_VERSION}/${kuboFile}`
-  extractCommand = (file) => `tar -xzf "${file}" -C "${path.dirname(file)}"`
+  extractCommand = (file) => {
+    // On Windows, use tar (available in Windows 10+)
+    if (os.platform() === 'win32') {
+      return `tar -xzf "${file}" -C "${path.dirname(file)}"`
+    } else {
+      return `tar -xzf "${file}" -C "${path.dirname(file)}"`
+    }
+  }
 } else {
   kuboFile = `kubo_${KUBO_VERSION}_linux-amd64.tar.gz`
   kuboUrl = `https://dist.ipfs.tech/kubo/${KUBO_VERSION}/${kuboFile}`
-  extractCommand = (file) => `tar -xzf "${file}" -C "${path.dirname(file)}"`
+  extractCommand = (file) => {
+    if (os.platform() === 'win32') {
+      return `tar -xzf "${file}" -C "${path.dirname(file)}"`
+    } else {
+      return `tar -xzf "${file}" -C "${path.dirname(file)}"`
+    }
+  }
 }
 
 const binaryName = platform === 'win32' ? 'ipfs.exe' : 'ipfs'

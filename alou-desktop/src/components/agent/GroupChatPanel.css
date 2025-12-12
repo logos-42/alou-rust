@@ -47,6 +47,12 @@
   flex-shrink: 0;
 }
 
+.group-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .header-info {
   flex: 1;
   min-width: 0;
@@ -313,6 +319,12 @@
   transition: all 0.2s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10;
+}
+
+.refresh-btn-fixed img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .refresh-btn-fixed:hover {

@@ -29,13 +29,15 @@
 .conversation-panel.embedded {
   position: relative;
   width: 100%;
-  height: auto;
+  height: 100%;
   min-height: 320px;
   border-radius: 1.25rem;
   padding: 1.25rem 1.5rem;
   background: var(--surface);
   border: 1px solid var(--border-color);
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
 }
 
 .conversation-panel.embedded .conversation-body {
@@ -144,9 +146,11 @@
   flex: 1;
   overflow-y: auto;
   padding-right: 1rem;
+  min-height: 0;
 }
 
-.conversation-panel .close-btn {
+.conversation-panel .close-btn,
+.conversation-panel .group-chat-toggle-btn {
   border: none;
   background: rgba(148, 163, 184, 0.18);
   width: 28px;
@@ -159,8 +163,32 @@
   justify-content: center;
 }
 
-.conversation-panel .close-btn:hover {
+.conversation-panel .close-btn:hover,
+.conversation-panel .group-chat-toggle-btn:hover {
   background: rgba(148, 163, 184, 0.28);
+}
+
+.conversation-panel .group-chat-toggle-btn {
+  margin-right: 8px;
+  transition: all 0.2s ease;
+}
+
+.conversation-panel .group-chat-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.conversation-panel .group-chat-toggle-btn:disabled:hover {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.conversation-panel .group-chat-toggle-btn.active {
+  background: var(--primary-color, #6366f1);
+  color: #ffffff;
+}
+
+.conversation-panel .group-chat-toggle-btn.active:hover {
+  background: var(--primary-hover, #5855eb);
 }
 
 .stream-panel-wrapper {
