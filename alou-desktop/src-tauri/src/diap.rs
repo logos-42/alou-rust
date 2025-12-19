@@ -97,12 +97,13 @@ async fn trigger_public_gateway_query_with_retry(ipns_path: &str, retry_count: u
 /// 这相当于强制触发了 DHT 的查询过程，可以大大缩短全球生效时间
 /// 公共网关通常拥有极高的带宽和海量的 Peer 连接，一旦找到记录会协助缓存并进一步扩散
 async fn trigger_public_gateway_query(ipns_path: &str) {
-    let public_gateways = vec![
-        "https://gateway.ipfs.io",
-        "https://ipfs.io",
-        "https://dweb.link",
-        "https://cloudflare-ipfs.com",
+    let public_gateways: Vec<String> = vec![
+        "https://gateway.ipfs.io".to_string(),
+        "https://ipfs.io".to_string(),
+        "https://dweb.link".to_string(),
+        "https://cloudflare-ipfs.com".to_string(),
     ];
+    let gateway_count = public_gateways.len();
     
     let client = match Client::builder()
         .timeout(std::time::Duration::from_secs(10))
@@ -117,10 +118,11 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
     
     // 并发向所有公共网关发起 HEAD 请求（触发 DHT 查询）
     let trigger_futures: Vec<_> = public_gateways
-        .iter()
+        .into_iter()
         .map(|gateway| {
             let gateway_url = format!("{}{}", gateway, ipns_path);
             let client_clone = client.clone();
+            let gateway_clone = gateway.clone();
             
             async move {
                 // 使用 HEAD 请求触发网关查询（不下载内容，只触发 DHT 查询）
@@ -133,20 +135,20 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         if status == 200 {
-                            info!(target: "diap", "✅ {} 已找到 IPNS 记录", gateway);
+                            info!(target: "diap", "✅ {} 已找到 IPNS 记录", gateway_clone);
                         } else if status == 504 || status == 502 || status == 503 {
-                            info!(target: "diap", "⏳ {} 正在查询 IPNS 记录（已触发 DHT 查询）", gateway);
+                            info!(target: "diap", "⏳ {} 正在查询 IPNS 记录（已触发 DHT 查询）", gateway_clone);
                         } else {
-                            info!(target: "diap", "🔍 {} 已触发查询，状态: {}", gateway, status);
+                            info!(target: "diap", "🔍 {} 已触发查询，状态: {}", gateway_clone, status);
                         }
                     }
                     Err(e) => {
                         // 即使失败也视为成功触发（因为网关可能已经开始查询）
                         let error_str = e.to_string();
                         if error_str.contains("timeout") {
-                            info!(target: "diap", "⏳ {} 查询超时（但已触发 DHT 查询）", gateway);
+                            info!(target: "diap", "⏳ {} 查询超时（但已触发 DHT 查询）", gateway_clone);
                         } else {
-                            debug!(target: "diap", "🔍 {} 触发查询时出错（可能已开始查询）: {}", gateway, e);
+                            debug!(target: "diap", "🔍 {} 触发查询时出错（可能已开始查询）: {}", gateway_clone, e);
                         }
                     }
                 }
@@ -166,7 +168,7 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
         }
     });
     
-    info!(target: "diap", "✅ 已向 {} 个公共网关发起查询请求，将加速 IPNS 记录传播", public_gateways.len());
+    info!(target: "diap", "✅ 已向 {} 个公共网关发起查询请求，将加速 IPNS 记录传播", gateway_count);
 }
 
 /// 检查并启用 IPNS PubSub 以加速 IPNS 记录的传播
@@ -482,12 +484,13 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
     };
     
     // 公共网关列表
-    let public_gateways = vec![
-        "https://gateway.ipfs.io",
-        "https://ipfs.io",
-        "https://dweb.link",
-        "https://cloudflare-ipfs.com",
+    let public_gateways: Vec<String> = vec![
+        "https://gateway.ipfs.io".to_string(),
+        "https://ipfs.io".to_string(),
+        "https://dweb.link".to_string(),
+        "https://cloudflare-ipfs.com".to_string(),
     ];
+    let gateway_count = public_gateways.len();
     
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(30))
@@ -496,13 +499,14 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
     
     // 创建并发测试任务
     let test_futures: Vec<_> = public_gateways
-        .iter()
+        .into_iter()
         .map(|gateway| {
             let gateway_url = format!("{}{}", gateway, ipns_path);
             let client_clone = client.clone();
+            let gateway_clone = gateway.clone();
             
             async move {
-                let gateway = *gateway;
+                let gateway = gateway_clone;
                 let client = client_clone;
                 let mut gateway_result = serde_json::json!({
                     "gateway": gateway,
@@ -623,12 +627,12 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
     // 生成友好的提示消息
     let (message, user_friendly_message) = if accessible_count > 0 {
         (
-            format!("IPNS 记录可在 {}/{} 个公共网关上访问", accessible_count, public_gateways.len()),
+            format!("IPNS 记录可在 {}/{} 个公共网关上访问", accessible_count, gateway_count),
             None
         )
     } else if syncing_count > 0 {
         (
-            format!("IPNS 记录正在同步中（{}/{} 个网关）", syncing_count, public_gateways.len()),
+            format!("IPNS 记录正在同步中（{}/{} 个网关）", syncing_count, gateway_count),
             Some("🌍 正在全球同步节点信息... 您的身份已在本地创建，全球生效可能需要 1-3 分钟。".to_string())
         )
     } else {
@@ -639,10 +643,10 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
     };
     
     let mut summary = serde_json::json!({
-        "total_gateways": public_gateways.len(),
+        "total_gateways": gateway_count,
         "accessible_count": accessible_count,
         "syncing_count": syncing_count,
-        "all_accessible": accessible_count == public_gateways.len(),
+        "all_accessible": accessible_count == gateway_count,
         "message": message
     });
     
@@ -796,21 +800,22 @@ pub async fn get_local_diap_identity(
     
     // 如果解析的身份有 PubSub 主题，尝试订阅 IPNS PubSub 以获取实时更新
     // 这对于两个 Agent 实时对话很重要，可以实时接收对方的 IPNS 记录更新
-    if !pubsub_topics.is_empty() {
-        info!(target: "diap", "检测到 PubSub 主题，尝试订阅 IPNS PubSub 以增强实时性...");
-        let ipns_name_clean = ipns_name.trim();
-        let ipns_key = ipns_name_clean.trim_start_matches("/ipns/");
-        let ipfs_api_clone = ipfs_api.clone();
-        
-        // 在后台订阅 IPNS PubSub（不阻塞主流程）
-        tokio::spawn(async move {
-            if let Err(e) = subscribe_ipns_pubsub(&ipfs_api_clone, ipns_key).await {
-                warn!(target: "diap", "订阅 IPNS PubSub 失败（不影响功能）: {}", e);
-            } else {
-                info!(target: "diap", "✅ 已订阅 IPNS PubSub，将实时接收更新");
-            }
-        });
-    }
+    // 注意：IPNS PubSub 订阅功能暂未实现，这里先注释掉
+    // if !pubsub_topics.is_empty() {
+    //     info!(target: "diap", "检测到 PubSub 主题，尝试订阅 IPNS PubSub 以增强实时性...");
+    //     let ipns_name_clean = ipns_name.trim();
+    //     let ipns_key = ipns_name_clean.trim_start_matches("/ipns/");
+    //     let ipfs_api_clone = ipfs_api.clone();
+    //     
+    //     // 在后台订阅 IPNS PubSub（不阻塞主流程）
+    //     tokio::spawn(async move {
+    //         if let Err(e) = subscribe_ipns_pubsub(&ipfs_api_clone, ipns_key).await {
+    //             warn!(target: "diap", "订阅 IPNS PubSub 失败（不影响功能）: {}", e);
+    //         } else {
+    //             info!(target: "diap", "✅ 已订阅 IPNS PubSub，将实时接收更新");
+    //         }
+    //     });
+    // }
 
     // 提取加密节点标识
     let encrypted_node_id = did_document
@@ -844,7 +849,7 @@ pub async fn get_local_diap_identity(
         gateway_url,
         ipns_key,
         encrypted_node_id,
-        pubsub_topics,
+        pubsub_topics: Some(pubsub_topics),
     })
 }
 

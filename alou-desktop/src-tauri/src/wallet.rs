@@ -1,5 +1,5 @@
 use hex;
-use k256::ecdsa::{Signature as K256Signature, SigningKey, VerifyingKey};
+use k256::ecdsa::{Signature as K256Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 use std::env;
 
