@@ -1,6 +1,6 @@
 [package]
 name = "alou-desktop"
-version = "0.1.5"
+version = "0.1.6"
 description = "Alou Desktop - Web3 AI Agent Desktop Application"
 authors = ["Alou Team"]
 license = "MIT OR Apache-2.0"

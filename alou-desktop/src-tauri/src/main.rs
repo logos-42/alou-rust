@@ -31,6 +31,7 @@ use crate::diap::{
     create_local_diap_identity,
     get_local_diap_identity,
     update_local_diap_identity,
+    test_ipns_on_public_gateway,
 };
 use crate::wallet::{verify_wallet_signature, get_testnet_private_key};
 use crate::browser::{open_browser, test_ipfs_node_connection};
@@ -66,6 +67,7 @@ fn main() {
             create_local_diap_identity,
             get_local_diap_identity,
             update_local_diap_identity,
+            test_ipns_on_public_gateway,
             verify_wallet_signature,
             get_testnet_private_key,
             open_browser,

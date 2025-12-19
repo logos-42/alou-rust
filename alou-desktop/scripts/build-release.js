@@ -32,16 +32,20 @@ if (platform === 'win32') {
 console.log(`Using bundles: ${bundles}`)
 
 try {
-  // Run setup:kubo
-  console.log('\n1. Setting up Kubo binary...')
+  // Run setup:kubo for current platform
+  console.log('\n1. Setting up Kubo binary for current platform...')
   execSync('npm run setup:kubo', { stdio: 'inherit', cwd: path.join(__dirname, '..') })
   
+  // Prepare platform-specific binary for build
+  console.log('\n2. Preparing Kubo binary for build...')
+  execSync('node scripts/prepare-kubo-for-build.js', { stdio: 'inherit', cwd: path.join(__dirname, '..') })
+  
   // Build frontend
-  console.log('\n2. Building frontend...')
+  console.log('\n3. Building frontend...')
   execSync('npm run build', { stdio: 'inherit', cwd: path.join(__dirname, '..') })
   
   // Build Tauri with appropriate bundles
-  console.log(`\n3. Building Tauri bundles (${bundles})...`)
+  console.log(`\n4. Building Tauri bundles (${bundles})...`)
   console.log('   ⏳ This step may take 5-15 minutes depending on your system...')
   console.log('   ⏳ Rust is compiling dependencies - please be patient...\n')
   

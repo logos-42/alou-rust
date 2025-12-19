@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const KUBO_VERSION = 'v0.24.0'
+const KUBO_VERSION = 'v0.39.0'
 const KUBO_DIR = path.join(__dirname, '..', 'src-tauri', 'kubo')
 
 // Parse command line arguments for target platform
@@ -80,8 +80,19 @@ if (platform === 'win32') {
   }
 }
 
-const binaryName = platform === 'win32' ? 'ipfs.exe' : 'ipfs'
-const targetPath = path.join(KUBO_DIR, binaryName)
+// 为了支持多平台打包，使用平台特定的文件名
+// macOS: ipfs.darwin, Linux: ipfs.linux, Windows: ipfs.exe
+let binaryName, targetPath
+if (platform === 'win32') {
+  binaryName = 'ipfs.exe'
+  targetPath = path.join(KUBO_DIR, binaryName)
+} else if (platform === 'darwin') {
+  binaryName = 'ipfs.darwin'
+  targetPath = path.join(KUBO_DIR, binaryName)
+} else {
+  binaryName = 'ipfs.linux'
+  targetPath = path.join(KUBO_DIR, binaryName)
+}
 
 // Check if binary already exists
 if (fs.existsSync(targetPath)) {
@@ -173,10 +184,12 @@ const downloadFile = (url, dest) => {
     execSync(extractCommand(tempFile), { stdio: 'inherit' })
     
     // Copy binary - try multiple possible paths
+    // 注意：解压后的文件名是 'ipfs' 或 'ipfs.exe'（不是平台特定的名称）
+    const extractedBinaryName = platform === 'win32' ? 'ipfs.exe' : 'ipfs'
     const possiblePaths = [
-      path.join(path.dirname(tempFile), 'kubo', 'kubo', binaryName),
-      path.join(path.dirname(tempFile), 'kubo', binaryName),
-      path.join(path.dirname(tempFile), binaryName),
+      path.join(path.dirname(tempFile), 'kubo', 'kubo', extractedBinaryName),
+      path.join(path.dirname(tempFile), 'kubo', extractedBinaryName),
+      path.join(path.dirname(tempFile), extractedBinaryName),
     ]
     
     let binaryFound = false
@@ -184,7 +197,7 @@ const downloadFile = (url, dest) => {
       if (fs.existsSync(extractedPath)) {
         fs.copyFileSync(extractedPath, targetPath)
         binaryFound = true
-        console.log(`Binary copied from: ${extractedPath}`)
+        console.log(`Binary copied from: ${extractedPath} to ${targetPath}`)
         break
       }
     }
@@ -198,6 +211,14 @@ const downloadFile = (url, dest) => {
     // Set executable permission (Unix)
     if (platform !== 'win32') {
       fs.chmodSync(targetPath, '755')
+      // 为了兼容性，如果是 macOS 或 Linux，同时创建一个通用的 'ipfs' 文件（如果不存在）
+      // 这样旧代码或打包时可以使用通用文件名
+      const genericPath = path.join(KUBO_DIR, 'ipfs')
+      if (!fs.existsSync(genericPath)) {
+        fs.copyFileSync(targetPath, genericPath)
+        fs.chmodSync(genericPath, '755')
+        console.log(`Also created generic 'ipfs' file for compatibility: ${genericPath}`)
+      }
     }
     
     // Verify installation

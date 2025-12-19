@@ -3,7 +3,7 @@
 
 set -e
 
-KUBO_VERSION="v0.24.0"
+KUBO_VERSION="v0.39.0"
 KUBO_DIR="src-tauri/kubo"
 OS=""
 ARCH="amd64"

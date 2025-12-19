@@ -1,4 +1,5 @@
 // Kubo binary management module
+use log;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -7,7 +8,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::utils::app_data_dir;
 
-pub const KUBO_VERSION: &str = "v0.24.0";
+pub const KUBO_VERSION: &str = "v0.39.0";
 const KUBO_VERSION_FILE: &str = "version.json";
 
 #[derive(Serialize, Deserialize)]
@@ -80,17 +81,17 @@ pub async fn download_kubo_binary(app: AppHandle) -> Result<String, String> {
     // Determine download URL based on platform
     let (url, filename) = if cfg!(target_os = "windows") {
         (
-            "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_windows-amd64.zip",
+            "https://dist.ipfs.tech/kubo/v0.39.0/kubo_v0.39.0_windows-amd64.zip",
             "kubo.zip",
         )
     } else if cfg!(target_os = "macos") {
         (
-            "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_darwin-amd64.tar.gz",
+            "https://dist.ipfs.tech/kubo/v0.39.0/kubo_v0.39.0_darwin-amd64.tar.gz",
             "kubo.tar.gz",
         )
     } else {
         (
-            "https://dist.ipfs.tech/kubo/v0.24.0/kubo_v0.24.0_linux-amd64.tar.gz",
+            "https://dist.ipfs.tech/kubo/v0.39.0/kubo_v0.39.0_linux-amd64.tar.gz",
             "kubo.tar.gz",
         )
     };
@@ -238,10 +239,20 @@ pub async fn ensure_kubo_binary(app: &AppHandle) -> Result<(), String> {
 
     let target_bin = kubo_dir.join(binary_name());
 
+    // 检查现有版本，如果版本不匹配则删除旧版本并下载新版本
     if target_bin.exists() {
         if let Some(info) = read_kubo_version(&kubo_dir) {
             if info.version == KUBO_VERSION {
+                // 版本匹配，直接返回
                 return Ok(());
+            } else {
+                // 版本不匹配，删除旧版本
+                log::info!("检测到 Kubo 版本不匹配: {} -> {}，将更新", info.version, KUBO_VERSION);
+                std::fs::remove_file(&target_bin)
+                    .map_err(|e| format!("Failed to remove old Kubo binary: {}", e))?;
+                // 也删除版本信息文件，确保重新下载
+                let version_file = kubo_dir.join(KUBO_VERSION_FILE);
+                std::fs::remove_file(&version_file).ok(); // 忽略错误，文件可能不存在
             }
         }
     }

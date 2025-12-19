@@ -1,6 +1,6 @@
 # PowerShell script to download and setup Kubo (IPFS) binary for Windows
 
-$KUBO_VERSION = "v0.24.0"
+$KUBO_VERSION = "v0.39.0"
 $KUBO_DIR = "src-tauri\kubo"
 $KUBO_FILE = "kubo_${KUBO_VERSION}_windows-amd64.zip"
 $KUBO_URL = "https://dist.ipfs.tech/kubo/${KUBO_VERSION}/${KUBO_FILE}"
