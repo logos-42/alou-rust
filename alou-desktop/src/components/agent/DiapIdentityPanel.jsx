@@ -48,7 +48,16 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       if (selectedAgent?.diapIdentity) {
         console.log('[DiapIdentityPanel] 从智能体元数据加载 DIAP 身份:', selectedAgent.diapIdentity.ipns || selectedAgent.diapIdentity.did)
         console.log('[DiapIdentityPanel] 完整身份信息:', selectedAgent.diapIdentity)
-        setIdentity(selectedAgent.diapIdentity)
+        
+        // 确保 IPNS 字段存在（如果 diapIdentity 中没有，从 selectedAgent 中补充）
+        const identity = {
+          ...selectedAgent.diapIdentity,
+          ipns: selectedAgent.diapIdentity.ipns || selectedAgent.ipns || null,
+          cid: selectedAgent.diapIdentity.cid || selectedAgent.cid || null,
+          did: selectedAgent.diapIdentity.did || selectedAgent.did || null,
+        }
+        console.log('[DiapIdentityPanel] 补充后的身份信息:', identity)
+        setIdentity(identity)
         setLoading(false)
         return
       } else {
@@ -63,23 +72,42 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       }
       
       // 优先级2: 从 IPNS/CID/DID 查找（如果智能体有这些标识）
-      const agentTarget = selectedAgent?.ipns || selectedAgent?.cid || selectedAgent?.did
-      if (agentTarget) {
+      // 注意：跳过临时ID（temp_xxx），因为它们没有对应的DIAP身份
+      const isTempId = (id) => id && typeof id === 'string' && id.startsWith('temp_')
+      const agentTarget = selectedAgent?.ipns || 
+                         (selectedAgent?.cid && !isTempId(selectedAgent.cid) ? selectedAgent.cid : null) ||
+                         selectedAgent?.did
+      
+      if (agentTarget && !isTempId(agentTarget)) {
         try {
+          console.log('[DiapIdentityPanel] 尝试从 IPNS/CID/DID 加载 DIAP 身份:', agentTarget)
           const response = await agentService.getDiapIdentity(agentTarget)
           if (response.identity) {
-            console.log('[DiapIdentityPanel] 从 IPNS/CID/DID 加载 DIAP 身份:', agentTarget)
-            setIdentity(response.identity)
-            // 更新智能体元数据
+            console.log('[DiapIdentityPanel] ✅ 从 IPNS/CID/DID 加载 DIAP 身份成功:', agentTarget)
+            
+            // 确保 IPNS 字段存在（如果响应中没有，从 selectedAgent 中补充）
+            const identity = {
+              ...response.identity,
+              ipns: response.identity.ipns || selectedAgent?.ipns || null,
+              cid: response.identity.cid || selectedAgent?.cid || null,
+              did: response.identity.did || selectedAgent?.did || null,
+            }
+            console.log('[DiapIdentityPanel] 补充后的身份信息:', identity)
+            
+            setIdentity(identity)
+            // 更新智能体元数据（使用补充后的完整身份）
             if (selectedAgent?.id) {
-              updateAgent(selectedAgent.id, { diapIdentity: response.identity })
+              updateAgent(selectedAgent.id, { diapIdentity: identity })
             }
             setLoading(false)
             return
           }
         } catch (targetErr) {
           console.log('[DiapIdentityPanel] 从 IPNS/CID/DID 加载失败:', targetErr.message)
+          // 继续尝试其他方式加载
         }
+      } else if (selectedAgent?.cid && isTempId(selectedAgent.cid)) {
+        console.log('[DiapIdentityPanel] 跳过临时ID，尝试从 localStorage 或网络加载')
       }
       
       // 优先级3: 从 localStorage 加载（使用 sessionId）
@@ -145,6 +173,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       setError(null)
       const response = await agentService.createDiapIdentity(sessionId)
       if (response.identity) {
+        console.log('[DiapIdentityPanel] DIAP 身份创建成功:', response.identity)
         setIdentity(response.identity)
         
         // 保存到 localStorage（使用 sessionId）
@@ -157,27 +186,27 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
         }
         
         // 保存到智能体元数据（使用 IPNS/CID/DID 作为 key）
-        if (selectedAgent?.id) {
-          updateAgent(selectedAgent.id, { 
+        // 注意：优先使用 sessionId 关联的智能体ID，如果没有则使用身份标识符
+        const agentIdToUpdate = selectedAgent?.id || 
+                                (response.identity.ipns ? response.identity.ipns.replace(/^\/?ipns\//, '') : null) ||
+                                response.identity.cid || 
+                                response.identity.did
+        
+        if (agentIdToUpdate) {
+          updateAgent(agentIdToUpdate, { 
             diapIdentity: response.identity,
             ipns: response.identity.ipns,
             cid: response.identity.cid,
             did: response.identity.did,
+            sessionId: sessionId, // 确保 sessionId 被保存
           })
-          console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据:', selectedAgent.id)
-        } else if (response.identity.ipns || response.identity.cid || response.identity.did) {
-          // 如果没有 selectedAgent，使用 IPNS/CID/DID 作为 key 保存
-          const agentId = response.identity.ipns || response.identity.cid || response.identity.did
-          updateAgent(agentId, {
-            id: agentId,
-            sessionId,
-            diapIdentity: response.identity,
-            ipns: response.identity.ipns,
-            cid: response.identity.cid,
-            did: response.identity.did,
-          })
-          console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据（新）:', agentId)
+          console.log('[DiapIdentityPanel] DIAP 身份已保存到智能体元数据:', agentIdToUpdate)
         }
+        
+        // 重新加载身份以刷新显示（确保IPNS正确显示）
+        setTimeout(() => {
+          loadIdentity()
+        }, 100)
         
         setToastMessage(t('agent.diap.createSuccess'))
       }
@@ -197,10 +226,10 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     const network = window.prompt('请输入网络名称（如：base_sepolia, sepolia）', 'base_sepolia')
     if (!network) return
 
-    const stakeAmount = window.prompt('请输入质押金额（单位：wei，例如 100000000000000000000 表示 100 代币）', '100000000000000000000')
+    const stakeAmount = window.prompt('请输入质押金额（单位：wei，例如 100 表示 100 代币）', '100000000000000000000')
     if (!stakeAmount) return
 
-    const useAa = window.confirm('是否使用 ERC-4337 AA 账户？\n\n点击"确定"使用 AA 账户\n点击"取消"使用传统 EOA')
+    const useAa = window.confirm('是否使用 ERC-4337智能体 AA 账户？\n\n点击"确定"使用 AA 账户\n点击"取消"使用传统 EOA')
 
     try {
       setRegistering(true)
@@ -382,15 +411,17 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             <div className="diap-field">
               <label>{t('agent.diap.ipns')}</label>
               <div className="diap-value">
-                <code>{identity.ipns}</code>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => copyToClipboard(identity.ipns)}
-                  title={t('agent.diap.copy')}
-                >
-                  📋
-                </button>
+                <code>{identity.ipns || selectedAgent?.ipns || 'N/A'}</code>
+                {(identity.ipns || selectedAgent?.ipns) && (
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => copyToClipboard(identity.ipns || selectedAgent?.ipns || '')}
+                    title={t('agent.diap.copy')}
+                  >
+                    📋
+                  </button>
+                )}
               </div>
             </div>
 

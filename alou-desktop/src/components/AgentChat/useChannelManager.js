@@ -164,7 +164,12 @@ export const useChannelManager = ({
     if (!isSessionReady) {
       return
     }
-    loadChannelListRef.current(channelKeyword)
+    // 延迟加载，确保本地存储的频道先加载完成
+    // 这样可以避免本地存储的频道被覆盖
+    const timer = setTimeout(() => {
+      loadChannelListRef.current(channelKeyword)
+    }, 100) // 给本地存储加载一点时间
+    return () => clearTimeout(timer)
   }, [channelKeyword, isSessionReady])
 
   const refreshChannels = useCallback(() => {
@@ -324,13 +329,15 @@ export const useChannelManager = ({
         setSelectedAgent(agent)
         
         // 保存到本地存储
+        // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
         try {
-          const agentId = agent.ipns || agent.cid || agent.did || parsedTarget
-          console.log('[useChannelManager] 准备保存到本地存储，agentId:', agentId)
+          // 使用与频道相同的ID逻辑（去掉IPNS前缀以便统一）
+          const agentIdForStore = channel.id
+          console.log('[useChannelManager] 准备保存到本地存储，使用频道ID:', agentIdForStore)
           const result = importAgentToStore({
             ...agent,
             sessionId,
-            id: agentId,
+            id: agentIdForStore, // 使用频道ID，确保一致性
           })
           if (result.isNew) {
             console.log('[useChannelManager] ✅ 从网络导入新智能体到本地存储:', result.agent.id)
@@ -366,6 +373,7 @@ export const useChannelManager = ({
   )
 
   // 从本地存储加载智能体到 channels（在 hydration 完成后，只执行一次）
+  // 注意：这个逻辑应该在 loadChannelList 之前执行，确保本地存储的频道优先加载
   useEffect(() => {
     // 防止重复加载
     if (hasLoadedFromStorageRef.current) {
@@ -381,11 +389,19 @@ export const useChannelManager = ({
 
     // 如果本地存储有智能体，加载到 channels
     if (storedAgents && storedAgents.length > 0) {
-      console.log(`[useChannelManager] 从本地存储加载 ${storedAgents.length} 个智能体（一次性）`)
-      
       const localChannels = storedAgents
-        .map(agent => buildChannelFromAgent(agent))
+        .map((agent) => {
+          const channel = buildChannelFromAgent(agent)
+          if (!channel) {
+            console.error(`[useChannelManager] 无法构建频道，agent:`, agent)
+          }
+          return channel
+        })
         .filter(Boolean)
+      
+      if (storedAgents.length !== localChannels.length) {
+        console.warn(`[useChannelManager] 警告: ${storedAgents.length - localChannels.length} 个智能体无法构建频道`)
+      }
       
       if (localChannels.length > 0) {
         setChannels(prev => {
@@ -394,8 +410,11 @@ export const useChannelManager = ({
           const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
           
           if (newChannels.length > 0) {
-            console.log(`[useChannelManager] 合并 ${newChannels.length} 个本地智能体到频道列表`)
             return [...newChannels, ...prev]
+          }
+          
+          if (localChannels.length !== prev.length) {
+            console.warn(`[useChannelManager] 警告: 本地存储有 ${localChannels.length} 个智能体，但频道列表只有 ${prev.length} 个`)
           }
           return prev
         })
@@ -408,22 +427,30 @@ export const useChannelManager = ({
           }
           return prev
         })
+      } else {
+        console.warn(`[useChannelManager] 本地存储有 ${storedAgents.length} 个智能体，但无法构建任何频道`)
       }
     }
   }, [hasHydrated, isSessionReady, storedAgents, setChannels, setActiveChannelId, setSelectedAgent])
 
   // 保存新创建的智能体到本地存储
+  // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保保存和加载时的ID一致
   const saveAgentToStorage = useCallback((agentMetadata) => {
     try {
+      // 先构建频道以获取一致的ID
+      const channel = buildChannelFromAgent(agentMetadata)
+      const agentId = channel ? channel.id : (agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}`)
+      
+      console.log('[useChannelManager] 保存智能体到本地存储，使用ID:', agentId)
       addAgentToStore({
         ...agentMetadata,
         sessionId,
-        id: agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}`,
+        id: agentId, // 使用与频道相同的ID，确保一致性
       })
-      console.log('[useChannelManager] 智能体已保存到本地存储:', agentMetadata.display_name || agentMetadata.name)
+      console.log('[useChannelManager] ✅ 智能体已保存到本地存储:', agentMetadata.display_name || agentMetadata.name, 'ID:', agentId)
       return true
     } catch (error) {
-      console.error('[useChannelManager] 保存智能体到本地存储失败:', error)
+      console.error('[useChannelManager] ❌ 保存智能体到本地存储失败:', error)
       return false
     }
   }, [addAgentToStore, sessionId])
@@ -762,13 +789,15 @@ export const useChannelManager = ({
         setSelectedAgent(agent)
         
         // 保存到本地存储
+        // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
         try {
-          const agentId = agent.ipns || agent.cid || agent.did || agent.id
-          console.log('[useChannelManager] 准备保存到本地存储，agentId:', agentId)
+          // 使用与频道相同的ID逻辑
+          const agentIdForStore = channel.id
+          console.log('[useChannelManager] 准备保存到本地存储，使用频道ID:', agentIdForStore)
           const result = importAgentToStore({
             ...agent,
             sessionId,
-            id: agentId,
+            id: agentIdForStore, // 使用频道ID，确保一致性
           })
           if (result.isNew) {
             console.log('[useChannelManager] ✅ 从网络导入新智能体到本地存储:', result.agent.id)

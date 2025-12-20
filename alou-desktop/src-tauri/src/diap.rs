@@ -103,7 +103,6 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
         "https://dweb.link".to_string(),
         "https://cloudflare-ipfs.com".to_string(),
     ];
-    let gateway_count = public_gateways.len();
     
     let client = match Client::builder()
         .timeout(std::time::Duration::from_secs(10))
@@ -116,13 +115,15 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
         }
     };
     
+    // 保存网关数量用于日志
+    let gateway_count = public_gateways.len();
+    
     // 并发向所有公共网关发起 HEAD 请求（触发 DHT 查询）
     let trigger_futures: Vec<_> = public_gateways
         .into_iter()
         .map(|gateway| {
             let gateway_url = format!("{}{}", gateway, ipns_path);
             let client_clone = client.clone();
-            let gateway_clone = gateway.clone();
             
             async move {
                 // 使用 HEAD 请求触发网关查询（不下载内容，只触发 DHT 查询）
@@ -135,20 +136,20 @@ async fn trigger_public_gateway_query(ipns_path: &str) {
                     Ok(response) => {
                         let status = response.status().as_u16();
                         if status == 200 {
-                            info!(target: "diap", "✅ {} 已找到 IPNS 记录", gateway_clone);
+                            info!(target: "diap", "✅ {} 已找到 IPNS 记录", gateway_url);
                         } else if status == 504 || status == 502 || status == 503 {
-                            info!(target: "diap", "⏳ {} 正在查询 IPNS 记录（已触发 DHT 查询）", gateway_clone);
+                            info!(target: "diap", "⏳ {} 正在查询 IPNS 记录（已触发 DHT 查询）", gateway_url);
                         } else {
-                            info!(target: "diap", "🔍 {} 已触发查询，状态: {}", gateway_clone, status);
+                            info!(target: "diap", "🔍 {} 已触发查询，状态: {}", gateway_url, status);
                         }
                     }
                     Err(e) => {
                         // 即使失败也视为成功触发（因为网关可能已经开始查询）
                         let error_str = e.to_string();
                         if error_str.contains("timeout") {
-                            info!(target: "diap", "⏳ {} 查询超时（但已触发 DHT 查询）", gateway_clone);
+                            info!(target: "diap", "⏳ {} 查询超时（但已触发 DHT 查询）", gateway_url);
                         } else {
-                            debug!(target: "diap", "🔍 {} 触发查询时出错（可能已开始查询）: {}", gateway_clone, e);
+                            debug!(target: "diap", "🔍 {} 触发查询时出错（可能已开始查询）: {}", gateway_url, e);
                         }
                     }
                 }
@@ -206,6 +207,40 @@ async fn enable_ipns_pubsub(api_url: &str) -> Result<(), String> {
             // 这是正常的，DHT 传播仍然有效，只是速度较慢（几分钟到几十分钟）
             Err("节点不支持 IPNS PubSub，将使用 DHT 传播（正常，但速度较慢）".to_string())
         }
+    }
+}
+
+/// 订阅 IPNS PubSub 主题以实时接收 IPNS 记录更新
+/// 这对于两个 Agent 实时对话很重要，可以实时接收对方的 IPNS 记录更新
+async fn subscribe_ipns_pubsub(api_url: &str, ipns_key: &str) -> Result<(), String> {
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
+
+    // IPNS PubSub 主题格式是 /ipns/<key>
+    let topic = format!("/ipns/{}", ipns_key);
+    let url = format!(
+        "{}/api/v0/pubsub/sub?arg={}",
+        normalize_base_url(api_url),
+        urlencoding::encode(&topic)
+    );
+
+    let response = client
+        .post(&url)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("IPNS PubSub 订阅请求失败: {}", e))?;
+
+    if response.status().is_success() {
+        info!(target: "diap", "成功订阅 IPNS PubSub 主题: {}", topic);
+        Ok(())
+    } else {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        Err(format!("IPNS PubSub 订阅失败: {} - {}", status, text))
     }
 }
 
@@ -490,6 +525,8 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
         "https://dweb.link".to_string(),
         "https://cloudflare-ipfs.com".to_string(),
     ];
+    
+    // 保存网关数量用于后续日志
     let gateway_count = public_gateways.len();
     
     let client = Client::builder()
@@ -506,7 +543,7 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
             let gateway_clone = gateway.clone();
             
             async move {
-                let gateway = gateway_clone;
+                let gateway = gateway_clone.as_str();
                 let client = client_clone;
                 let mut gateway_result = serde_json::json!({
                     "gateway": gateway,
@@ -800,22 +837,21 @@ pub async fn get_local_diap_identity(
     
     // 如果解析的身份有 PubSub 主题，尝试订阅 IPNS PubSub 以获取实时更新
     // 这对于两个 Agent 实时对话很重要，可以实时接收对方的 IPNS 记录更新
-    // 注意：IPNS PubSub 订阅功能暂未实现，这里先注释掉
-    // if !pubsub_topics.is_empty() {
-    //     info!(target: "diap", "检测到 PubSub 主题，尝试订阅 IPNS PubSub 以增强实时性...");
-    //     let ipns_name_clean = ipns_name.trim();
-    //     let ipns_key = ipns_name_clean.trim_start_matches("/ipns/");
-    //     let ipfs_api_clone = ipfs_api.clone();
-    //     
-    //     // 在后台订阅 IPNS PubSub（不阻塞主流程）
-    //     tokio::spawn(async move {
-    //         if let Err(e) = subscribe_ipns_pubsub(&ipfs_api_clone, ipns_key).await {
-    //             warn!(target: "diap", "订阅 IPNS PubSub 失败（不影响功能）: {}", e);
-    //         } else {
-    //             info!(target: "diap", "✅ 已订阅 IPNS PubSub，将实时接收更新");
-    //         }
-    //     });
-    // }
+    if !pubsub_topics.is_empty() {
+        info!(target: "diap", "检测到 PubSub 主题，尝试订阅 IPNS PubSub 以增强实时性...");
+        let ipns_name_clean = ipns_name.trim();
+        let ipns_key = ipns_name_clean.trim_start_matches("/ipns/").to_string();
+        let ipfs_api_clone = ipfs_api.clone();
+        
+        // 在后台订阅 IPNS PubSub（不阻塞主流程）
+        tokio::spawn(async move {
+            if let Err(e) = subscribe_ipns_pubsub(&ipfs_api_clone, &ipns_key).await {
+                warn!(target: "diap", "订阅 IPNS PubSub 失败（不影响功能）: {}", e);
+            } else {
+                info!(target: "diap", "✅ 已订阅 IPNS PubSub，将实时接收更新");
+            }
+        });
+    }
 
     // 提取加密节点标识
     let encrypted_node_id = did_document

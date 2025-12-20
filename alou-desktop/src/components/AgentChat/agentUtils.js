@@ -62,17 +62,8 @@ export const resolveAgentAvatar = (agent) => {
 
 export const buildChannelFromAgent = (agent) => {
   if (!agent) {
-    console.warn('[buildChannelFromAgent] agent 为 null 或 undefined')
     return null
   }
-  
-  console.log('[buildChannelFromAgent] 开始构建频道，agent:', {
-    ipns: agent.ipns,
-    did: agent.did,
-    cid: agent.cid,
-    name: agent.name,
-    display_name: agent.display_name,
-  })
   
   // 过滤掉 mock IPNS 值
   const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
@@ -86,7 +77,6 @@ export const buildChannelFromAgent = (agent) => {
   // 创建清理后的 agent 对象
   const cleanedAgent = { ...agent }
   if (isMockIpns) {
-    console.log('[buildChannelFromAgent] 检测到 mock IPNS，已移除')
     delete cleanedAgent.ipns
   }
   
@@ -99,20 +89,12 @@ export const buildChannelFromAgent = (agent) => {
   const displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid || fallbackName
   
   if (!id) {
-    console.error('[buildChannelFromAgent] ⚠️ 生成的 ID 为空！', {
+    console.error('[buildChannelFromAgent] 生成的 ID 为空！', {
       ipns: cleanedAgent.ipns,
       did: cleanedAgent.did,
       cid: cleanedAgent.cid,
     })
   }
-  
-  console.log('[buildChannelFromAgent] 生成的频道信息:', {
-    id,
-    displayName,
-    hasIpns: !!cleanedAgent.ipns,
-    hasDid: !!cleanedAgent.did,
-    hasCid: !!cleanedAgent.cid,
-  })
   
   // 判断是否是临时频道（正在创建中）
   const isCreating = cleanedAgent.status === 'creating' || 

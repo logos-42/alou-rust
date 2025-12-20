@@ -44,8 +44,30 @@ const useAgentStore = create(
         const agents = get().agents
         const now = Date.now()
         
+        // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
+        // 1. 如果传入的 id 已经存在，优先使用它（通常是 channel.id）
+        // 2. 否则，按照 buildChannelFromAgent 的逻辑生成：ipns || did || cid || timestamp
+        // 注意：需要过滤 mock IPNS（与 buildChannelFromAgent 保持一致）
+        const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
+        let ipnsValue = agentData.ipns || agentData.diapIdentity?.ipns || null
+        const isMockIpns = ipnsValue && (
+          ipnsValue.includes(mockIpns) ||
+          ipnsValue === mockIpns ||
+          ipnsValue === `/ipns/${mockIpns}`
+        )
+        if (isMockIpns) {
+          ipnsValue = null // 过滤掉 mock IPNS
+        }
+        
+        // 使用与 buildChannelFromAgent 相同的ID生成逻辑
+        const generatedId = agentData.id || 
+                            ipnsValue || 
+                            agentData.did || 
+                            agentData.cid || 
+                            `agent_${Date.now()}`
+        
         const newAgent = {
-          id: agentData.id || agentData.ipns || agentData.cid || `agent_${Date.now()}`,
+          id: generatedId, // 使用一致的ID生成逻辑
           sessionId: agentData.sessionId,
           name: agentData.name || agentData.display_name || '未命名智能体',
           display_name: agentData.display_name || agentData.name || '未命名智能体',
@@ -55,7 +77,7 @@ const useAgentStore = create(
           mcp_config_cid: agentData.mcp_config_cid || null,
           mcp_ports: agentData.mcp_ports || [],
           agent_type: agentData.agent_type || 'claude_agent_sdk',
-          ipns: agentData.ipns || agentData.diapIdentity?.ipns || null,
+          ipns: ipnsValue, // 使用过滤后的 IPNS
           cid: agentData.cid || agentData.diapIdentity?.cid || null,
           did: agentData.did || agentData.diapIdentity?.did || null,
           diapIdentity: agentData.diapIdentity || null,
@@ -79,11 +101,9 @@ const useAgentStore = create(
             ...newAgent,
             created_at: updatedAgents[existingIndex].created_at, // 保留原始创建时间
           }
-          console.log(`[AgentStore] 更新智能体: ${newAgent.id}`)
         } else {
           // 添加新智能体
           updatedAgents = [newAgent, ...agents]
-          console.log(`[AgentStore] 添加新智能体: ${newAgent.id}`)
         }
         
         set({ agents: updatedAgents })
@@ -152,15 +172,36 @@ const useAgentStore = create(
       importAgent: (agentData) => {
         const agents = get().agents
         
-        // 检查是否已存在
-        const target = agentData.ipns || agentData.cid || agentData.did
-        const existing = agents.find(
-          a => a.ipns === target || a.cid === target || a.did === target
-        )
+        // 重要：如果 agentData.id 已存在，优先使用它（通常是 channel.id，已经与 buildChannelFromAgent 一致）
+        // 否则，使用 addAgent 的逻辑（它也会使用与 buildChannelFromAgent 一致的ID生成）
+        const targetId = agentData.id
+        
+        // 检查是否已存在（优先使用ID匹配，因为ID是最准确的）
+        let existing = null
+        if (targetId) {
+          existing = agents.find(a => a.id === targetId)
+        }
+        
+        // 如果通过ID没找到，尝试通过 IPNS/CID/DID 匹配
+        if (!existing) {
+          const target = agentData.ipns || agentData.cid || agentData.did
+          if (target) {
+            existing = agents.find(
+              a => a.ipns === target || a.cid === target || a.did === target || a.id === target
+            )
+          }
+        }
         
         if (existing) {
-          console.log(`[AgentStore] 智能体已存在: ${target}`)
-          return { agent: existing, isNew: false }
+          // 更新现有智能体（合并新数据）
+          const updated = get().addAgent({
+            ...existing,
+            ...agentData,
+            id: existing.id, // 保持原有ID不变
+            imported_at: Date.now(),
+            source: 'network',
+          })
+          return { agent: updated, isNew: false }
         }
         
         const newAgent = get().addAgent({
@@ -169,7 +210,6 @@ const useAgentStore = create(
           source: 'network',
         })
         
-        console.log(`[AgentStore] 从网络导入智能体: ${target}`)
         return { agent: newAgent, isNew: true }
       },
     }),
@@ -181,7 +221,6 @@ const useAgentStore = create(
         if (error) {
           console.error('[AgentStore] Hydration 失败:', error)
         } else if (state) {
-          console.log(`[AgentStore] Hydration 完成，已加载 ${state.agents?.length || 0} 个智能体`)
           state.setHasHydrated(true)
         }
       },
