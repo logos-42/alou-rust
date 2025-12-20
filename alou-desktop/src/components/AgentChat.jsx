@@ -228,6 +228,7 @@ const AgentChat = () => {
     handleChannelKeywordChange,
     selectChannel,
     resolveExistingAgentTarget,
+    handleImportAgent,
     saveAgentToStorage,
     deleteChannel,
     currentMode,
@@ -657,6 +658,7 @@ const AgentChat = () => {
         onClose={closeCreateAgentModal}
         onSubmit={handleCreateAgentSubmit}
         onResolve={resolveExistingAgentTarget}
+        onImportAgent={handleImportAgent}
         onEarlyChannel={handleEarlyChannel}
         sessionId={sessionId}
       />

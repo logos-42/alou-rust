@@ -278,39 +278,74 @@ export const useChannelManager = ({
       if (!parsedTarget) {
         throw new Error('请输入 IPNS / CID / DID 标识')
       }
+      console.log('[useChannelManager] 开始解析节点:', parsedTarget)
       setChannelLoading(true)
       setChannelError(null)
       recordInteraction('create_channel', { target: parsedTarget })
       try {
+        console.log('[useChannelManager] 调用 agentService.resolveAgent...')
         const agent = await agentService.resolveAgent(parsedTarget, sessionId)
-        const channel = buildChannelFromAgent(agent)
-        if (!channel) {
-          throw new Error('解析结果为空')
-        }
-        setChannels((prev) => {
-          const others = prev.filter((item) => item.id !== channel.id)
-          return [channel, ...others]
+        console.log('[useChannelManager] 解析成功，agent 数据:', {
+          did: agent?.did,
+          cid: agent?.cid,
+          ipns: agent?.ipns,
+          name: agent?.name || agent?.display_name,
+          hasDidDocument: !!agent?.did_document,
         })
+        
+        const channel = buildChannelFromAgent(agent)
+        console.log('[useChannelManager] 构建的 channel:', {
+          id: channel?.id,
+          name: channel?.name,
+          hasMeta: !!channel?.meta,
+        })
+        
+        if (!channel) {
+          console.error('[useChannelManager] buildChannelFromAgent 返回 null，agent:', agent)
+          throw new Error('解析结果为空：无法构建频道对象')
+        }
+        
+        if (!channel.id) {
+          console.error('[useChannelManager] channel.id 为空，channel:', channel)
+          throw new Error('频道 ID 为空：无法添加到列表')
+        }
+        
+        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id)
+        setChannels((prev) => {
+          console.log('[useChannelManager] 当前频道列表长度:', prev.length)
+          const others = prev.filter((item) => item.id !== channel.id)
+          const newChannels = [channel, ...others]
+          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name)
+          return newChannels
+        })
+        
+        console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
         setActiveChannelId(channel.id)
         setSelectedAgent(agent)
         
         // 保存到本地存储
         try {
+          const agentId = agent.ipns || agent.cid || agent.did || parsedTarget
+          console.log('[useChannelManager] 准备保存到本地存储，agentId:', agentId)
           const result = importAgentToStore({
             ...agent,
             sessionId,
-            id: agent.ipns || agent.cid || agent.did || parsedTarget,
+            id: agentId,
           })
           if (result.isNew) {
-            console.log('[useChannelManager] 从网络导入新智能体到本地存储:', result.agent.id)
+            console.log('[useChannelManager] ✅ 从网络导入新智能体到本地存储:', result.agent.id)
+          } else {
+            console.log('[useChannelManager] ℹ️ 智能体已存在于本地存储:', result.agent.id)
           }
         } catch (storeError) {
-          console.error('[useChannelManager] 导入智能体到本地存储失败:', storeError)
+          console.error('[useChannelManager] ❌ 导入智能体到本地存储失败:', storeError)
         }
         
+        console.log('[useChannelManager] ✅ 节点解析并加载完成:', channel.name, 'ID:', channel.id)
         return channel
       } catch (error) {
         const message = extractErrorMessage(error)
+        console.error('[useChannelManager] ❌ 解析节点失败:', message, error)
         setChannelError(message)
         recordInteraction('create_channel_failed', { target: parsedTarget, error: message })
         throw new Error(message)
@@ -676,12 +711,103 @@ export const useChannelManager = ({
     return true
   }, [activeChannelId, recordInteraction, removeAgentFromStore, setActiveChannelId, setChannels, setSelectedAgent, storedAgents.length])
 
+  // 导入已解析的智能体（从 CreateAgentModal 导入）
+  const handleImportAgent = useCallback(
+    async (agent) => {
+      if (!agent) {
+        console.error('[useChannelManager] handleImportAgent 接收到 null/undefined agent')
+        throw new Error('无效的智能体数据')
+      }
+      
+      console.log('[useChannelManager] 开始导入已解析的智能体:', {
+        id: agent.id,
+        ipns: agent.ipns,
+        did: agent.did,
+        cid: agent.cid,
+        name: agent.name || agent.display_name,
+      })
+      
+      setChannelLoading(true)
+      setChannelError(null)
+      
+      try {
+        const channel = buildChannelFromAgent(agent)
+        console.log('[useChannelManager] 构建的 channel:', {
+          id: channel?.id,
+          name: channel?.name,
+          hasMeta: !!channel?.meta,
+        })
+        
+        if (!channel) {
+          console.error('[useChannelManager] buildChannelFromAgent 返回 null，agent:', agent)
+          throw new Error('无法构建频道对象')
+        }
+        
+        if (!channel.id) {
+          console.error('[useChannelManager] channel.id 为空，channel:', channel)
+          throw new Error('频道 ID 为空：无法添加到列表')
+        }
+        
+        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id)
+        setChannels((prev) => {
+          console.log('[useChannelManager] 当前频道列表长度:', prev.length)
+          const others = prev.filter((item) => item.id !== channel.id)
+          const newChannels = [channel, ...others]
+          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name)
+          return newChannels
+        })
+        
+        console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
+        setActiveChannelId(channel.id)
+        setSelectedAgent(agent)
+        
+        // 保存到本地存储
+        try {
+          const agentId = agent.ipns || agent.cid || agent.did || agent.id
+          console.log('[useChannelManager] 准备保存到本地存储，agentId:', agentId)
+          const result = importAgentToStore({
+            ...agent,
+            sessionId,
+            id: agentId,
+          })
+          if (result.isNew) {
+            console.log('[useChannelManager] ✅ 从网络导入新智能体到本地存储:', result.agent.id)
+          } else {
+            console.log('[useChannelManager] ℹ️ 智能体已存在于本地存储:', result.agent.id)
+          }
+        } catch (storeError) {
+          console.error('[useChannelManager] ❌ 导入智能体到本地存储失败:', storeError)
+        }
+        
+        console.log('[useChannelManager] ✅ 智能体导入完成:', channel.name, 'ID:', channel.id)
+        return channel
+      } catch (error) {
+        const message = extractErrorMessage(error)
+        console.error('[useChannelManager] ❌ 导入智能体失败:', message, error)
+        setChannelError(message)
+        throw new Error(message)
+      } finally {
+        setChannelLoading(false)
+      }
+    },
+    [
+      importAgentToStore,
+      sessionId,
+      setActiveChannelId,
+      setChannelError,
+      setChannelLoading,
+      setChannels,
+      setSelectedAgent,
+    ],
+  )
+
   return {
     loadChannelList,
     refreshChannels,
     handleChannelKeywordChange,
     selectChannel,
     resolveExistingAgentTarget,
+    handleImportAgent,
     saveAgentToStorage,
     deleteChannel,
     // 模式管理
