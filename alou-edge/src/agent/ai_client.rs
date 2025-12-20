@@ -108,6 +108,10 @@ impl AiClient {
                 api_key,
                 model.unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string()),
             )),
+            "kimi" => Box::new(providers::KimiProvider::new(
+                api_key,
+                model.unwrap_or_else(|| "moonshot-v1-8k".to_string()),
+            )),
             _ => {
                 return Err(crate::utils::error::AloudError::InvalidInput(format!(
                     "Unknown provider: {}",
