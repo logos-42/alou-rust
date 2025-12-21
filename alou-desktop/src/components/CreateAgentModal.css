@@ -113,42 +113,81 @@
   cursor: pointer;
 }
 
-.agent-modal__field-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+.agent-modal__code-editor {
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  padding: 14px;
+  background: rgba(15, 23, 42, 0.8);
+  color: #e2e8f0;
+  resize: vertical;
+  min-height: 200px;
 }
 
-.agent-modal__field-header button {
-  border: none;
-  background: rgba(99, 102, 241, 0.2);
-  color: #c7d2fe;
-  padding: 6px 12px;
+.agent-modal__code-editor:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.agent-modal__mcp-error {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
   border-radius: 8px;
-  cursor: pointer;
+  color: #fecaca;
+  font-size: 12px;
 }
 
-.agent-modal__port-list {
+.agent-modal__mcp-tools {
+  margin-top: 12px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.agent-modal__mcp-tools-header {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #c7d2fe;
+  font-weight: 500;
+}
+
+.agent-modal__mcp-tools-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.agent-modal__port-item {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) 80px;
   gap: 8px;
-  align-items: center;
 }
 
-.agent-modal__port-item button {
-  border: none;
-  background: rgba(248, 113, 113, 0.15);
-  color: #fecaca;
+.agent-modal__mcp-tool-item {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 8px;
-  padding: 8px;
-  cursor: pointer;
+  padding: 10px 12px;
+}
+
+.agent-modal__mcp-tool-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #c7d2fe;
+  margin-bottom: 4px;
+}
+
+.agent-modal__mcp-tool-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.agent-modal__mcp-tool-endpoint {
+  font-size: 11px;
+  color: #64748b;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  margin-top: 4px;
 }
 
 .agent-modal__field--resolve .agent-modal__resolve-row {

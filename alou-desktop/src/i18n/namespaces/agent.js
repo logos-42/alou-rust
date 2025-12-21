@@ -24,7 +24,8 @@ export const agent = {
     'agent.create.role.default': 'Web3 多代理协调智能体',
 
     // MCP 端口配置
-    'agent.create.mcp.label': 'MCP 端口配置',
+    'agent.create.mcp.label': 'MCP 配置',
+    'agent.create.mcp.tools': 'MCP 工具',
     'agent.create.mcp.add': '+ 新增端口',
     'agent.create.mcp.portName': '端口名称',
     'agent.create.mcp.endpoint': 'Endpoint URL (wss:// 或 http://)',
@@ -184,7 +185,8 @@ export const agent = {
     'agent.create.role.default': 'Web3 Multi-Agent Coordinator',
 
     // MCP Port Configuration
-    'agent.create.mcp.label': 'MCP Port Configuration',
+    'agent.create.mcp.label': 'MCP Configuration',
+    'agent.create.mcp.tools': 'MCP Tools',
     'agent.create.mcp.add': '+ Add Port',
     'agent.create.mcp.portName': 'Port Name',
     'agent.create.mcp.endpoint': 'Endpoint URL (wss:// or http://)',

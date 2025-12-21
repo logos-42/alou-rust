@@ -31,6 +31,7 @@ src-tauri/kubo
 .env
 .env.local
 .env.*.local
+.dev.vars
 
 docs/
 

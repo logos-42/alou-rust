@@ -99,6 +99,7 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 .aider*
 .env
+.dev.vars
 node_modules
 
 # 根目录特定忽略

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
 import diapService from '@/services/diapService'
@@ -6,15 +6,16 @@ import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
 import './CreateAgentModal.css'
 
-const emptyPort = () => ({
-  label: '',
-  endpoint: '',
-  port: '',
-  description: '',
-  protocol: 'http',
-})
-
-const MAX_PORTS = 6
+const DEFAULT_MCP_CODE = `{
+  ports: [
+    {
+      label: '',
+      endpoint: '',
+      port: 0,
+      description: ''
+    }
+  ]
+}`
 
 function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent, sessionId, onEarlyChannel }) {
   const { t } = useI18n()
@@ -22,7 +23,9 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
   const [roleDescription, setRoleDescription] = useState(t('agent.create.role.default'))
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
-  const [mcpPorts, setMcpPorts] = useState([emptyPort()])
+  const [mcpCode, setMcpCode] = useState(DEFAULT_MCP_CODE)
+  const [mcpTools, setMcpTools] = useState([])
+  const [mcpParseError, setMcpParseError] = useState(null)
   const [existingAgentTarget, setExistingAgentTarget] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -30,7 +33,55 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
   const [resolvedAgent, setResolvedAgent] = useState(null)
   const [showImportConfirm, setShowImportConfirm] = useState(false)
 
-  const canAddMorePorts = useMemo(() => mcpPorts.length < MAX_PORTS, [mcpPorts])
+  // 解析 MCP 代码并提取工具名称
+  const parseMcpCode = useCallback((code) => {
+    try {
+      setMcpParseError(null)
+      
+      // 移除注释
+      const cleanedCode = code.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+      
+      // 尝试解析为 JavaScript 对象
+      // 使用 Function 构造器来安全执行代码
+      const config = new Function('return ' + cleanedCode)()
+      
+      if (!config || typeof config !== 'object') {
+        throw new Error('配置必须是一个对象')
+      }
+      
+      const ports = config.ports || []
+      if (!Array.isArray(ports)) {
+        throw new Error('ports 必须是一个数组')
+      }
+      
+      // 提取工具名称（从 label 字段）
+      const tools = ports
+        .filter(port => port && port.label)
+        .map(port => ({
+          name: port.label,
+          endpoint: port.endpoint || '',
+          port: port.port || '',
+          description: port.description || ''
+        }))
+      
+      setMcpTools(tools)
+      return { ports, tools }
+    } catch (err) {
+      setMcpParseError(err.message || '解析失败')
+      setMcpTools([])
+      return { ports: [], tools: [] }
+    }
+  }, [])
+
+  // 当 MCP 代码改变时自动解析
+  useEffect(() => {
+    if (mcpCode.trim()) {
+      parseMcpCode(mcpCode)
+    } else {
+      setMcpTools([])
+      setMcpParseError(null)
+    }
+  }, [mcpCode, parseMcpCode])
 
   if (!isOpen) {
     return null
@@ -53,30 +104,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
     reader.readAsDataURL(file)
   }
 
-  const handlePortChange = (index, field, value) => {
-    setMcpPorts((prev) =>
-      prev.map((port, idx) => {
-        if (idx !== index) return port
-        return {
-          ...port,
-          [field]: value,
-        }
-      }),
-    )
-  }
-
-  const handleAddPort = () => {
-    if (!canAddMorePorts) return
-    setMcpPorts((prev) => [...prev, emptyPort()])
-  }
-
-  const handleRemovePort = (index) => {
-    if (mcpPorts.length === 1) {
-      setMcpPorts([emptyPort()])
-      return
-    }
-    setMcpPorts((prev) => prev.filter((_, idx) => idx !== index))
-  }
 
   const handleInternalSubmit = async (event) => {
     event.preventDefault()
@@ -165,12 +192,16 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             }
           }
 
-          // 上传 MCP 配置
-          const filteredPorts = mcpPorts
-            .filter((port) => port.label.trim() || port.endpoint.trim())
+          // 解析并上传 MCP 配置
+          const { ports: parsedPorts } = parseMcpCode(mcpCode)
+          const filteredPorts = parsedPorts
+            .filter((port) => port && (port.label?.trim() || port.endpoint?.trim()))
             .map((port) => ({
-              ...port,
+              label: port.label || '',
+              endpoint: port.endpoint || '',
               port: port.port ? Number(port.port) : undefined,
+              description: port.description || '',
+              protocol: port.protocol || 'http',
             }))
 
           let mcpConfigCid = null
@@ -363,47 +394,38 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
           </label>
 
           <div className="agent-modal__field">
-            <div className="agent-modal__field-header">
-              <span>{t('agent.create.mcp.label')}</span>
-              {canAddMorePorts && (
-                <button type="button" onClick={handleAddPort}>
-                  {t('agent.create.mcp.add')}
-                </button>
-              )}
-            </div>
-            <div className="agent-modal__port-list">
-              {mcpPorts.map((port, index) => (
-                <div key={`port-${index}`} className="agent-modal__port-item">
-                  <input
-                    type="text"
-                    placeholder={t('agent.create.mcp.portName')}
-                    value={port.label}
-                    onChange={(event) => handlePortChange(index, 'label', event.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t('agent.create.mcp.endpoint')}
-                    value={port.endpoint}
-                    onChange={(event) => handlePortChange(index, 'endpoint', event.target.value)}
-                  />
-                  <input
-                    type="number"
-                    placeholder={t('agent.create.mcp.port')}
-                    value={port.port}
-                    onChange={(event) => handlePortChange(index, 'port', event.target.value)}
-                  />
-                  <input
-                    type="text"
-                    placeholder={t('agent.create.mcp.description')}
-                    value={port.description}
-                    onChange={(event) => handlePortChange(index, 'description', event.target.value)}
-                  />
-                  <button type="button" onClick={() => handleRemovePort(index)}>
-                    {t('agent.create.mcp.remove')}
-                  </button>
+            <span>{t('agent.create.mcp.label')}</span>
+            <textarea
+              className="agent-modal__code-editor"
+              value={mcpCode}
+              onChange={(event) => setMcpCode(event.target.value)}
+              placeholder={DEFAULT_MCP_CODE}
+              rows={12}
+              spellCheck={false}
+            />
+            {mcpParseError && (
+              <div className="agent-modal__mcp-error">{mcpParseError}</div>
+            )}
+            {mcpTools.length > 0 && (
+              <div className="agent-modal__mcp-tools">
+                <div className="agent-modal__mcp-tools-header">
+                  <span>{t('agent.create.mcp.tools')} ({mcpTools.length})</span>
                 </div>
-              ))}
-            </div>
+                <div className="agent-modal__mcp-tools-list">
+                  {mcpTools.map((tool, index) => (
+                    <div key={index} className="agent-modal__mcp-tool-item">
+                      <div className="agent-modal__mcp-tool-name">{tool.name}</div>
+                      {tool.description && (
+                        <div className="agent-modal__mcp-tool-desc">{tool.description}</div>
+                      )}
+                      {tool.endpoint && (
+                        <div className="agent-modal__mcp-tool-endpoint">{tool.endpoint}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="agent-modal__field agent-modal__field--resolve">
