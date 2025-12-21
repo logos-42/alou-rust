@@ -7,12 +7,14 @@ use crate::agent::stream::get_events;
 use crate::agent::tools::{BroadcastTool, QueryTool, TransactionTool};
 use crate::mcp::tools::AgentWalletTool;
 use crate::mcp::UiResourceBuilder;
+use crate::middleware::SubscriptionGuard;
 use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::utils::metrics::MetricsCollector;
 use crate::web3::auth::WalletAuth;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 use worker::*;
 
 mod agent;
@@ -20,15 +22,16 @@ mod blockchain;
 mod cluster_action;
 mod diap;
 mod mcp;
-mod pubsub;
+pub mod pubsub;
 mod session;
+mod subscription;
 mod wallet;
 
 pub struct Router {
     session_manager: SessionManager,
     agent_wallet_tool: AgentWalletTool,
     wallet_auth: Option<WalletAuth>,
-    agent_core: Option<AgentCore>,
+    agent_core: Option<Arc<AgentCore>>,
     agent_discovery: Option<AgentDiscovery>,
     query_tool: Option<QueryTool>,
     transaction_tool: Option<TransactionTool>,
@@ -36,6 +39,7 @@ pub struct Router {
     pubsub_manager: pubsub::PubSubManager,
     cluster_action_manager: Option<ClusterActionManager>,
     cluster_executor: Option<ClusterExecutor>,
+    subscription_guard: Option<SubscriptionGuard>,
     metrics: MetricsCollector,
 }
 
@@ -57,6 +61,7 @@ impl Router {
             pubsub_manager: pubsub::PubSubManager::new(pubsub_store),
             cluster_action_manager: Some(ClusterActionManager::new(cluster_action_store)),
             cluster_executor: None,
+            subscription_guard: None,
             metrics: MetricsCollector::new(),
         }
     }
@@ -67,7 +72,18 @@ impl Router {
     }
 
     pub fn with_agent_core(mut self, agent_core: AgentCore) -> Self {
-        self.agent_core = Some(agent_core);
+        let agent_core_arc = Arc::new(agent_core);
+        let session_manager = self.session_manager.clone();
+        let pubsub_manager = self.pubsub_manager.clone();
+        
+        // 初始化 ClusterExecutor
+        self.cluster_executor = Some(ClusterExecutor::new(
+            agent_core_arc.clone(),
+            session_manager,
+            pubsub_manager,
+        ));
+        
+        self.agent_core = Some(agent_core_arc);
         self
     }
 
@@ -101,6 +117,11 @@ impl Router {
         self
     }
 
+    pub fn with_subscription_guard(mut self, subscription_guard: SubscriptionGuard) -> Self {
+        self.subscription_guard = Some(subscription_guard);
+        self
+    }
+
     pub async fn handle(&mut self, mut req: Request, env: Env) -> Result<Response> {
         let start_time = crate::utils::time::now_timestamp_millis();
         let path = req.path();
@@ -109,21 +130,8 @@ impl Router {
         console_log!("→ {} {}", method.to_string(), path);
         
         // 确保集群执行器已初始化（如果需要）
-        if self.cluster_executor.is_none() && self.agent_core.is_some() {
-            if let Ok(kv) = env.kv("KV") {
-                let kv_store = crate::storage::kv::KvStore::new(kv);
-                let session_manager = SessionManager::new(kv_store.clone());
-                let pubsub_manager = pubsub::PubSubManager::new(kv_store);
-                if let Some(ref agent_core) = self.agent_core {
-                    let executor = ClusterExecutor::new(
-                        agent_core.clone(),
-                        session_manager,
-                        pubsub_manager,
-                    );
-                    self.cluster_executor = Some(executor);
-                }
-            }
-        }
+        // Note: AgentCore doesn't implement Clone, so we skip executor initialization here
+        // The executor should be initialized elsewhere if needed
 
         let headers = Headers::new();
         headers.set("Access-Control-Allow-Origin", "*")?;
@@ -243,8 +251,9 @@ impl Router {
             (Method::Post, "/api/agent/chat") => {
                 session::handle_agent_chat(
                     &self.session_manager,
-                    self.agent_core.as_ref(),
+                    self.agent_core.as_ref().map(|arc| arc.as_ref()),
                     self.wallet_auth.as_ref(),
+                    self.subscription_guard.as_ref(),
                     req,
                 )
                 .await
@@ -277,14 +286,14 @@ impl Router {
             (Method::Post, "/api/mcp/ui-resource") => self.handle_mcp_ui_resource(req).await,
             (Method::Post, "/api/mcp/execute-tool") => {
                 if let Some(agent_core) = self.agent_core.as_ref() {
-                    mcp::handle_execute_tool(agent_core.get_executor(), req).await
+                    mcp::handle_execute_tool(agent_core.as_ref().get_executor(), req).await
                 } else {
                     Response::error("Agent core not initialized", 500)
                 }
             }
             (Method::Get, "/api/mcp/tools") => {
                 if let Some(agent_core) = self.agent_core.as_ref() {
-                    mcp::handle_list_tools(agent_core.get_executor()).await
+                    mcp::handle_list_tools(agent_core.as_ref().get_executor()).await
                 } else {
                     Response::error("Agent core not initialized", 500)
                 }
@@ -331,6 +340,7 @@ impl Router {
             (Method::Post, "/api/cluster-action/create") => {
                 if let Some(ref manager) = self.cluster_action_manager {
                     cluster_action::handle_create_cluster_action(manager, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager not initialized", 500)
                 }
@@ -339,6 +349,7 @@ impl Router {
                 if let (Some(ref manager), Some(ref executor)) = 
                     (self.cluster_action_manager.as_ref(), self.cluster_executor.as_ref()) {
                     cluster_action::handle_execute_cluster_action(manager, executor, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager or executor not initialized", 500)
                 }
@@ -346,6 +357,7 @@ impl Router {
             (Method::Get, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/status") => {
                 if let Some(ref manager) = self.cluster_action_manager {
                     cluster_action::handle_get_status(manager, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager not initialized", 500)
                 }
@@ -353,6 +365,7 @@ impl Router {
             (Method::Get, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/results") => {
                 if let Some(ref manager) = self.cluster_action_manager {
                     cluster_action::handle_get_results(manager, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager not initialized", 500)
                 }
@@ -360,6 +373,7 @@ impl Router {
             (Method::Post, path) if path.starts_with("/api/cluster-action/") && path.ends_with("/cancel") => {
                 if let Some(ref manager) = self.cluster_action_manager {
                     cluster_action::handle_cancel_action(manager, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager not initialized", 500)
                 }
@@ -367,6 +381,7 @@ impl Router {
             (Method::Post, "/api/cluster-action/analyze") => {
                 if let Some(ref manager) = self.cluster_action_manager {
                     cluster_action::handle_analyze_task(manager, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string()))
                 } else {
                     Response::error("Cluster action manager not initialized", 500)
                 }
@@ -380,6 +395,64 @@ impl Router {
             }
             (Method::Get, "/api/pubsub/messages") => {
                 pubsub::handle_get_messages(&self.pubsub_manager, req).await
+            }
+
+            // Subscription endpoints
+            (Method::Post, "/api/subscription/check-trial") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_check_trial(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Post, "/api/subscription/get-trial") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_get_or_create_trial(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Get, "/api/subscription/plans") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_get_plans(&storage).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Get, "/api/subscription/status") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_get_status(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Post, "/api/subscription/create") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_create_subscription(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Post, "/api/subscription/renew") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_renew_subscription(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Post, "/api/subscription/verify-payment") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_verify_payment(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
+            }
+            (Method::Get, "/api/subscription/notifications") => {
+                match crate::storage::subscription::SubscriptionStorage::new(&env) {
+                    Ok(storage) => subscription::handle_get_notifications(&storage, req).await
+                        .map_err(|e| worker::Error::RustError(e.to_string())),
+                    Err(e) => Err(worker::Error::RustError(format!("Failed to initialize subscription storage: {}", e))),
+                }
             }
 
             _ => {

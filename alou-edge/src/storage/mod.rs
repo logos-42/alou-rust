@@ -1,5 +1,10 @@
 pub mod d1;
 pub mod kv;
+pub mod subscription;
 
-// pub use d1::D1Database; // Commented out until D1 is available
-// pub use kv::KvStore; // Exported but not used in lib.rs yet
+#[allow(unused_imports)]
+pub use d1::D1Database;
+#[allow(unused_imports)]
+pub use kv::KvStore;
+#[allow(unused_imports)]
+pub use subscription::{SubscriptionStorage, Subscription, SubscriptionPlan, TrialPeriod, SubscriptionPayment};

@@ -200,7 +200,15 @@
 .register-section {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  width: 100%;
+}
+
+.register-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .register-btn {
@@ -223,6 +231,27 @@
 .register-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.subscribe-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #f8fafc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.25);
+}
+
+.subscribe-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.35);
+}
+
+.subscribe-btn:active {
+  transform: translateY(0);
 }
 
 .register-info {
@@ -289,5 +318,35 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.diap-subscribe-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.diap-subscribe-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #f8fafc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.diap-subscribe-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
+}
+
+.diap-subscribe-btn:active {
+  transform: translateY(0);
 }
 

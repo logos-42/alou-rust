@@ -211,13 +211,12 @@ export default {
         return await rustFetch(request, env, ctx);
         
       } catch (error: any) {
-        console.error('[Worker] 处理请求时出错:', error);
-        return new Response(JSON.stringify({ 
-          error: error.message || 'Internal server error' 
-        }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        // 如果处理过程中出错，记录详细错误信息并传递给 Rust 后端处理
+        console.error('[Worker] TypeScript 层处理请求时出错:', error);
+        console.error('[Worker] 错误堆栈:', error.stack);
+        // 继续传递给 Rust 后端，让 Rust 后端处理错误
+        // 这样可以确保错误信息正确传递，而不是在这里吞掉
+        return await rustFetch(request, env, ctx);
       }
     }
     

@@ -4,7 +4,9 @@ use worker::*;
 
 mod agent;
 mod mcp;
+mod middleware;
 mod router;
+mod services;
 mod storage;
 mod utils;
 mod web3;
@@ -18,6 +20,7 @@ use mcp::tools::{
     WalletManagerTool, WorkflowTool,
 };
 use mcp::{McpBridge, McpConnectionPool, McpExecutor, McpRegistry};
+use middleware::SubscriptionGuard;
 use router::Router;
 use storage::kv::KvStore;
 
@@ -120,7 +123,7 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
 
     // Create KV store wrappers
     let sessions_store = KvStore::new(sessions_kv.clone());
-    let _cache_store = KvStore::new(cache_kv); // Reserved for future use
+    let cache_store = KvStore::new(cache_kv);
     let nonces_store = KvStore::new(nonces_kv);
 
     // ========================================
@@ -161,10 +164,26 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
             env.secret("CLAUDE_API_KEY").map(|s| s.to_string())
         })
         .unwrap_or_else(|_| {
-            console_warn!("  ⚠ No API key found, using default (NOT SECURE FOR PRODUCTION)");
-            "default_api_key_change_in_production".to_string()
+            console_error!("  ✗ AI_API_KEY not found! Please set it with: wrangler secret put AI_API_KEY");
+            console_error!("  ✗ For local development, add AI_API_KEY to .dev.vars file");
+            // 使用空字符串而不是默认值，这样会在 API 调用时立即失败并给出明确的错误
+            String::new()
         });
-    console_log!("  ✓ API key loaded");
+    
+    if api_key.is_empty() {
+        console_error!("  ✗ Cannot proceed without AI_API_KEY");
+        return Err(worker::Error::RustError(
+            "AI_API_KEY not configured. Please set it with: wrangler secret put AI_API_KEY".to_string()
+        ));
+    }
+    
+    // 记录 API key 预览（前8个字符）用于调试
+    let api_key_preview = if api_key.len() > 8 {
+        format!("{}...", &api_key[..8])
+    } else {
+        "***".to_string()
+    };
+    console_log!("  ✓ API key loaded (preview: {})", api_key_preview);
 
     // Load RPC URLs (optional, with fallbacks)
     let eth_rpc_url = env
@@ -365,7 +384,23 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     console_log!("  ✓ Agent core initialized with {} provider", ai_provider);
 
     // ========================================
-    // 8. Initialize Router
+    // 8. Initialize Subscription Guard
+    // ========================================
+    console_log!("→ Initializing subscription guard...");
+    
+    let subscription_guard = match SubscriptionGuard::new(&env, cache_store.clone()) {
+        Ok(guard) => {
+            console_log!("  ✓ Subscription guard initialized");
+            Some(guard)
+        }
+        Err(e) => {
+            console_warn!("  ⚠ Failed to initialize subscription guard: {} (rate limiting disabled)", e);
+            None
+        }
+    };
+
+    // ========================================
+    // 9. Initialize Router
     // ========================================
     console_log!("→ Initializing router...");
 
@@ -386,12 +421,18 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
         console_log!("  ℹ Blockchain tools not configured (RPC URLs not set)");
     }
 
+    // Add subscription guard if initialized
+    if let Some(guard) = subscription_guard {
+        router = router.with_subscription_guard(guard);
+        console_log!("  ✓ Subscription guard attached to router");
+    }
+
     console_log!("  ✓ Router initialized");
 
     console_log!("=== All services initialized successfully ===");
 
     // ========================================
-    // 9. Handle Request
+    // 10. Handle Request
     // ========================================
     router.handle(req, env).await
 }

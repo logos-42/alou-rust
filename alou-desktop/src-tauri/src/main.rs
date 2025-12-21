@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod browser;
+mod claude_agent;
 mod diap;
 mod ipfs_api;
 mod ipfs_commands;
@@ -27,6 +28,7 @@ use crate::ipfs_commands::{
     ipfs_pubsub_ls,
 };
 use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, stop_ipfs_node};
+use crate::claude_agent::query_claude_agent;
 use crate::diap::{
     create_local_diap_identity,
     get_local_diap_identity,
@@ -68,6 +70,8 @@ fn main() {
             get_local_diap_identity,
             update_local_diap_identity,
             test_ipns_on_public_gateway,
+            // Claude Agent SDK command
+            query_claude_agent,
             verify_wallet_signature,
             get_testnet_private_key,
             open_browser,

@@ -218,6 +218,78 @@ export class AgentService {
   }
 
   /**
+   * Query Claude Agent SDK directly (using local Tauri command)
+   * 使用 Claude Agent SDK 直接查询（通过 Tauri 命令）
+   * 
+   * @param {Object} options - 查询选项
+   * @param {string} options.apiKey - Claude API key
+   * @param {string} options.prompt - 用户提示
+   * @param {string} [options.systemPrompt] - 系统提示（可选）
+   * @param {Array} [options.history] - 消息历史（可选）
+   * @param {Object} [options.agentInfo] - 智能体信息（可选）
+   * @param {Array} [options.tools] - 工具定义（可选）
+   * @param {string} [options.model] - 模型名称（默认: claude-3-5-sonnet-20241022）
+   * @param {number} [options.maxTokens] - 最大 token 数（默认: 4096）
+   * @param {number} [options.temperature] - 温度参数（默认: 0.7）
+   * @returns {Promise<Object>} 查询结果
+   */
+  async queryClaudeAgentDirect({
+    apiKey,
+    prompt,
+    systemPrompt,
+    history = [],
+    agentInfo,
+    tools = [],
+    model = 'claude-3-5-sonnet-20241022',
+    maxTokens = 4096,
+    temperature = 0.7,
+  }) {
+    // 验证必需参数
+    if (!apiKey) {
+      throw new Error('API key 不能为空')
+    }
+    if (!prompt) {
+      throw new Error('Prompt 不能为空')
+    }
+
+    const { invoke } = await import('@tauri-apps/api/core')
+
+    // 构建请求对象（使用 snake_case 以匹配 Rust 结构体）
+    const request = {
+      api_key: apiKey,
+      prompt,
+      ...(systemPrompt && { system_prompt: systemPrompt }),
+      ...(history.length > 0 && { history }),
+      ...(agentInfo && { agent_info: agentInfo }),
+      ...(tools.length > 0 && { tools }),
+      model,
+      max_tokens: maxTokens,
+      temperature,
+    }
+
+    try {
+      const response = await invoke('query_claude_agent', { request })
+      
+      // 检查响应是否成功
+      if (!response.success) {
+        throw new Error(response.error || '查询失败')
+      }
+
+      return {
+        response: response.response || '',
+        toolCalls: response.tool_calls || [],
+        usage: response.usage || {
+          input_tokens: 0,
+          output_tokens: 0,
+        },
+      }
+    } catch (error) {
+      console.error('[AgentService] queryClaudeAgentDirect 错误:', error)
+      throw new Error(error.message || '调用 Claude Agent SDK 失败')
+    }
+  }
+
+  /**
    * Create DIAP identity for a session (using local Tauri command)
    */
   async createDiapIdentity(sessionId, params = {}) {

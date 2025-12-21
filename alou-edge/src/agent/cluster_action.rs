@@ -1,5 +1,7 @@
 use crate::storage::kv::KvStore;
-use crate::utils::error::{AloudError, Result};
+#[allow(unused_imports)]
+use crate::utils::error::AloudError;
+use crate::utils::error::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -126,6 +128,7 @@ fn default_max_retries() -> u32 {
     3
 }
 
+#[allow(dead_code)]
 impl Task {
     pub fn new(
         task_type: String,
@@ -221,6 +224,7 @@ pub struct ExecutionPlan {
     pub created_at: i64,
 }
 
+#[allow(dead_code)]
 impl ExecutionPlan {
     pub fn new() -> Self {
         Self {
@@ -250,7 +254,8 @@ impl ExecutionPlan {
 
             for task_id in &remaining {
                 if let Some(task) = self.tasks.iter().find(|t| &t.task_id == task_id) {
-                    if task.can_execute(&completed.iter().map(|s| s.as_str()).collect::<Vec<_>>()) {
+                    let completed_strs: Vec<&str> = completed.iter().map(|s: &String| s.as_str()).collect();
+                    if task.can_execute(&completed_strs) {
                         ready_tasks.push(task_id.clone());
                         progress = true;
                     }
@@ -311,6 +316,7 @@ pub struct ClusterAction {
     pub metadata: Value,
 }
 
+#[allow(dead_code)]
 impl ClusterAction {
     pub fn new(description: String, created_by: String) -> Self {
         let action_id = format!("action_{}", Uuid::new_v4().to_string().replace("-", ""));
@@ -358,6 +364,7 @@ impl ClusterAction {
     }
 
     /// 获取所有已完成的任务
+    #[allow(dead_code)]
     pub fn get_completed_tasks(&self) -> Vec<&Task> {
         self.execution_plan
             .tasks
@@ -415,7 +422,7 @@ impl ClusterActionManager {
         description: String,
         created_by: String,
     ) -> Result<ClusterAction> {
-        let mut action = ClusterAction::new(description, created_by);
+        let action = ClusterAction::new(description, created_by);
         self.save_action(&action).await?;
         Ok(action)
     }
@@ -452,6 +459,7 @@ impl ClusterActionManager {
     }
 
     /// 将复杂任务分解为子任务
+    #[allow(dead_code)]
     pub async fn decompose_task(
         &self,
         task_description: &str,
@@ -493,6 +501,7 @@ impl ClusterActionManager {
     }
 
     /// 创建执行计划
+    #[allow(dead_code)]
     pub async fn create_execution_plan(
         &self,
         tasks: Vec<Task>,
@@ -510,6 +519,7 @@ impl ClusterActionManager {
     }
 
     /// 获取集群行动状态
+    #[allow(dead_code)]
     pub async fn get_action_status(
         &self,
         action_id: &str,

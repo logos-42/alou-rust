@@ -1,0 +1,170 @@
+.subscription-view {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.subscription-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.subscription-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.premium-badge,
+.trial-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: bold;
+  margin-top: 1rem;
+}
+
+.premium-badge {
+  background-color: #10a37f;
+  color: white;
+}
+
+.trial-badge {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.subscription-plans {
+  margin-bottom: 3rem;
+}
+
+.subscription-plans h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.plan-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.plan-card:hover {
+  border-color: #10a37f;
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.plan-card.selected {
+  border-color: #10a37f;
+  background-color: #f0fdf4;
+}
+
+.plan-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.plan-price {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #10a37f;
+  margin-bottom: 1.5rem;
+}
+
+.plan-period {
+  font-size: 1rem;
+  color: #6b7280;
+  font-weight: normal;
+}
+
+.plan-features {
+  text-align: left;
+  margin-bottom: 2rem;
+}
+
+.plan-features .feature {
+  padding: 0.5rem 0;
+  color: #374151;
+}
+
+.subscribe-button {
+  width: 100%;
+  padding: 1rem;
+  background-color: #10a37f;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.subscribe-button:hover:not(:disabled) {
+  background-color: #0d8c6d;
+}
+
+.subscribe-button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.subscription-comparison {
+  margin-top: 3rem;
+}
+
+.subscription-comparison h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.comparison-table thead {
+  background-color: #10a37f;
+  color: white;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.comparison-table th {
+  font-weight: bold;
+}
+
+.comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.comparison-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.2rem;
+  color: #6b7280;
+}
+

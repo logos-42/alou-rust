@@ -1,10 +1,7 @@
-use crate::agent::agent_coordinator::AgentCoordinator;
 use crate::agent::cluster_action::{
-    ClusterAction, ClusterActionManager, ClusterActionStatus, TaskAnalysis,
+    ClusterAction, ClusterActionManager, TaskAnalysis,
 };
 use crate::agent::cluster_executor::ClusterExecutor;
-use crate::agent::session::SessionManager;
-use crate::router::pubsub::PubSubManager;
 use crate::utils::error::{AloudError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -18,6 +15,7 @@ pub struct CreateClusterActionRequest {
     pub description: String,
     pub created_by: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[allow(dead_code)]
     pub metadata: Option<Value>,
 }
 
@@ -84,7 +82,8 @@ pub async fn handle_create_cluster_action(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return json_response_with_status(&error_response, 400)
+                .map_err(|e| AloudError::AgentError(e.to_string()));
         }
     };
 
@@ -99,12 +98,14 @@ pub async fn handle_create_cluster_action(
                 error: None,
             };
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         Err(e) => {
             let error_response = ErrorResponse {
                 error: format!("Failed to create cluster action: {}", e),
             };
             json_response_with_status(&error_response, 500)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }
@@ -121,7 +122,8 @@ pub async fn handle_execute_cluster_action(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return json_response_with_status(&error_response, 400)
+                .map_err(|e| AloudError::AgentError(e.to_string()));
         }
     };
 
@@ -132,7 +134,8 @@ pub async fn handle_execute_cluster_action(
             let error_response = ErrorResponse {
                 error: format!("Cluster action {} not found", body.action_id),
             };
-            return json_response_with_status(&error_response, 404);
+            return json_response_with_status(&error_response, 404)
+                .map_err(|e| AloudError::AgentError(e.to_string()));
         }
     };
 
@@ -151,12 +154,14 @@ pub async fn handle_execute_cluster_action(
                 error: None,
             };
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         Err(e) => {
             let error_response = ErrorResponse {
                 error: format!("Failed to execute cluster action: {}", e),
             };
             json_response_with_status(&error_response, 500)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }
@@ -183,12 +188,14 @@ pub async fn handle_get_status(
                 error: action.error.clone(),
             };
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         None => {
             let error_response = ErrorResponse {
                 error: format!("Cluster action {} not found", action_id),
             };
             json_response_with_status(&error_response, 404)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }
@@ -216,12 +223,14 @@ pub async fn handle_get_results(
                 error: action.error.clone(),
             };
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         None => {
             let error_response = ErrorResponse {
                 error: format!("Cluster action {} not found", action_id),
             };
             json_response_with_status(&error_response, 404)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }
@@ -248,12 +257,14 @@ pub async fn handle_cancel_action(
                 "message": "Action cancelled",
             });
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         Err(e) => {
             let error_response = ErrorResponse {
                 error: format!("Failed to cancel action: {}", e),
             };
             json_response_with_status(&error_response, 500)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }
@@ -269,7 +280,8 @@ pub async fn handle_analyze_task(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return json_response_with_status(&error_response, 400)
+                .map_err(|e| AloudError::AgentError(e.to_string()));
         }
     };
 
@@ -280,12 +292,14 @@ pub async fn handle_analyze_task(
         Ok(analysis) => {
             let response = AnalyzeResponse { analysis };
             json_response(&response)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
         Err(e) => {
             let error_response = ErrorResponse {
                 error: format!("Failed to analyze task: {}", e),
             };
             json_response_with_status(&error_response, 500)
+                .map_err(|e| AloudError::AgentError(e.to_string()))
         }
     }
 }

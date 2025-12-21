@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
@@ -8,6 +9,7 @@ import './DiapIdentityPanel.css'
 
 const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const [identity, setIdentity] = useState(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -19,6 +21,10 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   const [hasTestnetKey, setHasTestnetKey] = useState(false)
   
   const updateAgent = useAgentStore((state) => state.updateAgent)
+  
+  const handleSubscribe = () => {
+    navigate('/subscription')
+  }
   
   // Check if testnet private key is available
   useEffect(() => {
@@ -455,14 +461,23 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                 ) : (
                   <div className="register-section">
                     <span className="status-unregistered">{t('agent.diap.notRegistered')}</span>
-                    <button
-                      type="button"
-                      className="register-btn"
-                      onClick={handleRegisterOnChain}
-                      disabled={registering}
-                    >
-                      {registering ? t('agent.diap.registering') : t('agent.diap.register')}
-                    </button>
+                    <div className="register-buttons">
+                      <button
+                        type="button"
+                        className="register-btn"
+                        onClick={handleRegisterOnChain}
+                        disabled={registering}
+                      >
+                        {registering ? t('agent.diap.registering') : t('agent.diap.register')}
+                      </button>
+                      <button
+                        type="button"
+                        className="subscribe-btn"
+                        onClick={handleSubscribe}
+                      >
+                        {t('agent.diap.subscribe')}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -533,6 +548,20 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
           </div>
         )}
       </div>
+      
+      {/* 右下角注册付费按钮 */}
+      {identity && (
+        <div className="diap-subscribe-footer">
+          <button
+            type="button"
+            className="diap-subscribe-btn"
+            onClick={handleSubscribe}
+          >
+            {t('agent.diap.subscribe')}
+          </button>
+        </div>
+      )}
+      
       {toastMessage && (
         <div className="diap-toast" role="status" aria-live="polite">
           {toastMessage}

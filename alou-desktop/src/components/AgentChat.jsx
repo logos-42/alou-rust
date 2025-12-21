@@ -17,6 +17,7 @@ import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
 import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
+import RateLimitModal from '@/components/RateLimitModal'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
 // Hooks
@@ -32,6 +33,7 @@ import { useAgentStreamHandler } from './AgentChat/useAgentStreamHandler'
 import { useAgentEventHandlers } from './AgentChat/useAgentEventHandlers'
 import { useGroupChatManager } from './AgentChat/useGroupChatManager'
 import { useGroupChatButton } from './AgentChat/useGroupChatButton'
+import { useRateLimitModal } from './AgentChat/useRateLimitModal'
 
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
@@ -81,6 +83,9 @@ const AgentChat = () => {
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
+
+  // ==================== Rate Limit Modal Hook ====================
+  const { rateLimitModal, openRateLimitModal, closeRateLimitModal, handleSubscribe } = useRateLimitModal()
 
   // ==================== 1. UI State Hook ====================
   const uiState = useAgentUI({
@@ -262,6 +267,7 @@ const AgentChat = () => {
     consoleDockRef,
     contextEventsRef,
     currentMode, // 传递当前模式（从 channelManager 获取）
+    onRateLimitExceeded: openRateLimitModal,
   })
 
   const {
@@ -635,6 +641,15 @@ const AgentChat = () => {
           )}
         />
       </div>
+
+      {/* 限额弹窗 - 显示在输入框上方 */}
+      <RateLimitModal
+        isOpen={rateLimitModal.isOpen}
+        onClose={closeRateLimitModal}
+        remainingRequests={rateLimitModal.remainingRequests}
+        resetTime={rateLimitModal.resetTime}
+        onSubscribe={handleSubscribe}
+      />
 
       <AgentConsoleDock
         ref={consoleDockRef}

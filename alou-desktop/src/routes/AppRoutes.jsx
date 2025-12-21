@@ -8,6 +8,7 @@ import AuthCallbackView from '@/views/AuthCallbackView'
 import WalletSyncCallbackView from '@/views/WalletSyncCallbackView'
 import WalletView from '@/views/WalletView'
 import AboutView from '@/views/AboutView'
+import SubscriptionView from '@/views/SubscriptionView'
 
 // 钱包同步监听组件
 const WalletSyncListener = () => {
@@ -219,6 +220,14 @@ const AppRoutes = () => (
       }
     />
     <Route path="/about" element={<AboutView />} />
+    <Route
+      path="/subscription"
+      element={
+        <ProtectedRoute>
+          <SubscriptionView />
+        </ProtectedRoute>
+      }
+    />
     <Route
       path="/login"
       element={

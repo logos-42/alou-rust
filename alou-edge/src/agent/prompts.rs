@@ -41,6 +41,7 @@ pub enum PromptMode {
     Payment,
     Developer,
     /// 自定义智能体模式
+    #[allow(dead_code)]
     CustomAgent,
 }
 

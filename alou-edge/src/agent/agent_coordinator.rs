@@ -1,11 +1,16 @@
 use crate::agent::cluster_action::{AgentAssignment, Task};
 use crate::agent::session::SessionManager;
 use crate::router::pubsub::PubSubManager;
-use crate::utils::error::{AloudError, Result};
-use serde_json::{json, Value};
+#[allow(unused_imports)]
+use crate::utils::error::AloudError;
+use crate::utils::error::Result;
+use serde_json::json;
+#[allow(unused_imports)]
+use serde_json::Value;
 
 /// 智能体信息
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AgentInfo {
     pub agent_id: String,
     pub agent_name: Option<String>,
@@ -15,11 +20,13 @@ pub struct AgentInfo {
 }
 
 /// 智能体协调器
+#[allow(dead_code)]
 pub struct AgentCoordinator {
     session_manager: SessionManager,
     pubsub_manager: PubSubManager,
 }
 
+#[allow(dead_code)]
 impl AgentCoordinator {
     pub fn new(session_manager: SessionManager, pubsub_manager: PubSubManager) -> Self {
         Self {

@@ -60,7 +60,7 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
       const poll = async () => {
         try {
           // 获取新消息
-          const response = await apiClient.get(`/api/pubsub/messages`, {
+          const response = await apiClient.get(`/pubsub/messages`, {
             params: {
               topic,
               since: lastTimestamp,
@@ -145,7 +145,7 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
 
       try {
         const topic = `diap/cluster_action/${actionId}`
-        const response = await apiClient.get(`/api/pubsub/messages`, {
+        const response = await apiClient.get(`/pubsub/messages`, {
           params: {
             topic,
           },

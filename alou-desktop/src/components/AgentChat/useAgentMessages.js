@@ -1,9 +1,7 @@
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import apiClient from '@/services/api'
 import agentService from '@/services/agentService'
-import clusterActionService from '@/services/clusterActionService'
 import useAgentStore from '@/stores/agentStore'
-import useClusterActionStore from '@/stores/clusterActionStore'
 
 /**
  * Hook for managing messages and conversation
@@ -25,6 +23,7 @@ export const useAgentMessages = ({
   consoleDockRef,
   contextEventsRef,
   currentMode = 'agent', // 当前模式：'agent' 或 'alou'
+  onRateLimitExceeded, // 回调函数：当遇到 429 错误时调用
 }) => {
   // 按频道存储消息：Map<channelId, Message[]>
   const [messagesByChannel, setMessagesByChannel] = useState({})
@@ -205,73 +204,8 @@ export const useAgentMessages = ({
 
     const contextSnapshot = contextEventsRef.current.splice(0, contextEventsRef.current.length)
 
-    // 尝试自动创建集群行动（如果任务需要多智能体协作）
-    try {
-      const { addAction, setActiveAction } = useClusterActionStore.getState()
-      const { getAgents } = useAgentStore.getState()
-      const availableAgents = getAgents().map((a) => a.sessionId || a.id).filter(Boolean)
-
-      if (availableAgents.length > 1) {
-        // 分析任务是否需要集群行动
-        const analysis = await clusterActionService.analyzeTask(text.trim(), availableAgents)
-
-        if (analysis?.analysis?.needs_cluster_action) {
-          console.log('[useAgentMessages] 检测到需要集群行动，创建中...', analysis)
-
-          // 创建集群行动
-          const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') || 'user' : 'user'
-          const createResult = await clusterActionService.createClusterAction(
-            text.trim(),
-            userId,
-            { auto_created: true, original_message: text.trim() },
-          )
-
-          if (createResult?.action) {
-            const action = createResult.action
-            addAction(action)
-
-            // 执行集群行动
-            const walletAddress =
-              typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-            await clusterActionService.executeClusterAction(
-              action.action_id,
-              walletAddress,
-              activeChain || undefined,
-            )
-
-            // 设置为活跃行动并打开群聊
-            setActiveAction(action.action_id)
-            // 注意：showGroupChat 状态需要在父组件中管理，这里通过事件通知
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(
-                new CustomEvent('cluster-action-created', {
-                  detail: { actionId: action.action_id },
-                }),
-              )
-            }
-
-            // 添加系统消息提示
-            appendMessage(
-              {
-                id: `system_${Date.now()}`,
-                type: 'assistant',
-                content: `🤖 检测到需要多智能体协作，已创建集群行动 #${action.action_id.slice(-8)}。正在执行中...`,
-                timestamp: Date.now(),
-                source: 'system',
-              },
-              targetAgentId,
-            )
-
-            setAgentLoading(targetAgentId, false)
-            return // 集群行动已创建，不再执行单智能体逻辑
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[useAgentMessages] 自动创建集群行动失败，继续单智能体处理:', error)
-      // 失败时继续执行单智能体逻辑
-    }
-
+    // 直接调用后端 API 进行单智能体聊天
+    // 注意：多智能体协作（集群行动）只在用户主动创建邀请时创建（见 useAgentInvite.js）
     try {
       const walletAddress =
         typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
@@ -311,6 +245,7 @@ export const useAgentMessages = ({
       abortControllersByAgent.current[targetAgentId] = abortController
 
       const agentInfo = targetAgent || selectedAgent
+      
       const data = await apiClient
         .post('/agent/chat', {
           session_id: agentSessionId,
@@ -367,12 +302,48 @@ export const useAgentMessages = ({
       const errorMessage = error instanceof Error ? error.message : '未知错误'
       const statusCode = error?.response?.status
       
-      let friendlyMessage = `❌ 抱歉，发生了错误：${errorMessage}`
+      // 尝试从响应中提取详细错误信息
+      let detailedError = errorMessage
+      if (error?.response?.data) {
+        const errorData = error.response.data
+        if (errorData.error) {
+          detailedError = errorData.error
+        } else if (typeof errorData === 'string') {
+          detailedError = errorData
+        }
+      }
+      
+      console.error('[useAgentMessages] 后端 API 错误:', {
+        status: statusCode,
+        message: errorMessage,
+        detailedError,
+        response: error?.response?.data,
+      })
+      
+      // 处理 429 错误（限额超限）
+      if (statusCode === 429) {
+        const errorData = error?.response?.data
+        const remainingRequests = errorData?.remaining_requests ?? 0
+        const resetTime = errorData?.reset_time ?? null
+        
+        // 调用回调函数显示弹窗
+        if (onRateLimitExceeded) {
+          onRateLimitExceeded({
+            remainingRequests,
+            resetTime,
+          })
+        }
+        
+        // 不添加错误消息到对话中，因为已经有弹窗了
+        return
+      }
+      
+      let friendlyMessage = `❌ 抱歉，发生了错误：${detailedError}`
       if (statusCode === 404) {
         friendlyMessage = '❌ 会话已过期，请刷新页面重试。'
         setSessionReady(false)
       } else if (statusCode === 500) {
-        friendlyMessage = '❌ 服务器内部错误，请稍后重试。'
+        friendlyMessage = `❌ 服务器内部错误：${detailedError}\n\n请检查后端服务是否正常运行，或查看控制台获取更多信息。`
       } else if (!error?.response) {
         friendlyMessage = '❌ 无法连接到服务器，请检查网络连接。'
       }
@@ -400,6 +371,7 @@ export const useAgentMessages = ({
     createSession,
     handleToolCalls,
     loadingByAgent,
+    onRateLimitExceeded,
     recordInteraction,
     scrollToBottom,
     selectedAgent,

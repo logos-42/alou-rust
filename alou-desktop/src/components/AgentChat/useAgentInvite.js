@@ -119,6 +119,24 @@ export const useAgentInvite = ({
           addAction(action)
           setActiveAction(actionId)
           
+          // 创建集群行动后立即执行，以创建 pubsub topic
+          try {
+            const walletAddress =
+              typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+            const chain =
+              typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
+            
+            // 执行集群行动（这会创建 pubsub topic）
+            await clusterActionService.executeClusterAction(
+              actionId,
+              walletAddress,
+              chain || undefined,
+            )
+          } catch (executeError) {
+            // 执行失败时静默处理，不影响群聊创建
+            console.warn('[useAgentInvite] 执行集群行动失败（不影响群聊创建）:', executeError)
+          }
+          
           // 触发群聊显示事件
           window.dispatchEvent(
             new CustomEvent('cluster-action-created', {

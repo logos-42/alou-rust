@@ -5,6 +5,7 @@ use std::collections::HashMap;
 
 /// 工作流类型
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum WorkflowType {
     /// 顺序执行
     Sequential,
@@ -17,8 +18,10 @@ pub enum WorkflowType {
 }
 
 /// 任务编排引擎
+#[allow(dead_code)]
 pub struct TaskOrchestrator;
 
+#[allow(dead_code)]
 impl TaskOrchestrator {
     pub fn new() -> Self {
         Self
@@ -40,7 +43,7 @@ impl TaskOrchestrator {
             // 找出所有可以执行的任务（依赖已满足）
             for task_id in &remaining {
                 if let Some(task) = tasks.iter().find(|t| &t.task_id == task_id) {
-                    let completed_ids: Vec<&str> = completed.iter().map(|s| s.as_str()).collect();
+                    let completed_ids: Vec<&str> = completed.iter().map(|s: &String| s.as_str()).collect();
                     if task.can_execute(&completed_ids) {
                         ready_tasks.push(task_id.clone());
                     }
@@ -147,25 +150,27 @@ impl TaskOrchestrator {
         condition_task.mark_completed(condition_result.clone());
 
         // 根据条件结果选择分支
-        let branch_to_execute = if condition_evaluator(&condition_result) {
-            true_branch
-        } else {
-            false_branch
-        };
-
+        let should_execute_true = condition_evaluator(&condition_result);
+        
         // 标记未执行的分支为跳过
-        let branch_to_skip = if condition_evaluator(&condition_result) {
-            false_branch
+        if should_execute_true {
+            for task in false_branch.iter_mut() {
+                task.status = TaskStatus::Skipped;
+            }
         } else {
-            true_branch
-        };
-
-        for task in branch_to_skip.iter_mut() {
-            task.status = TaskStatus::Skipped;
+            for task in true_branch.iter_mut() {
+                task.status = TaskStatus::Skipped;
+            }
         }
 
         // 执行选定的分支
         let mut results = vec![condition_result];
+        let branch_to_execute = if should_execute_true {
+            true_branch
+        } else {
+            false_branch
+        };
+        
         for task in branch_to_execute.iter_mut() {
             task.mark_started();
             match executor(task) {

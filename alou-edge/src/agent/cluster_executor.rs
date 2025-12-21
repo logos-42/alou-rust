@@ -5,17 +5,18 @@ use crate::router::pubsub::PubSubManager;
 use crate::utils::error::{AloudError, Result};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// 集群执行器
 pub struct ClusterExecutor {
-    agent_core: AgentCore,
+    agent_core: Arc<AgentCore>,
     session_manager: SessionManager,
     pubsub_manager: PubSubManager,
 }
 
 impl ClusterExecutor {
     pub fn new(
-        agent_core: AgentCore,
+        agent_core: Arc<AgentCore>,
         session_manager: SessionManager,
         pubsub_manager: PubSubManager,
     ) -> Self {
@@ -103,6 +104,7 @@ impl ClusterExecutor {
     }
 
     /// 处理执行失败情况
+    #[allow(dead_code)]
     pub async fn handle_failure(
         &self,
         task: &mut Task,
@@ -130,6 +132,13 @@ impl ClusterExecutor {
     ) -> Result<ClusterAction> {
         action.mark_started();
 
+        // 创建 PubSub 群聊主题
+        let topic = self.pubsub_manager
+            .create_group_topic(&action.action_id)
+            .await
+            .map_err(|e| AloudError::InternalError(format!("Failed to create group topic: {}", e)))?;
+        action.group_topic = Some(topic.clone());
+
         let mut completed_tasks = Vec::new();
         let mut task_results = HashMap::new();
 
@@ -142,13 +151,14 @@ impl ClusterExecutor {
                 .find(|t| &t.task_id == task_id)
             {
                 // 检查依赖是否满足
-                if !task.can_execute(&completed_tasks.iter().map(|s| s.as_str()).collect::<Vec<_>>()) {
+                let completed_strs: Vec<&str> = completed_tasks.iter().map(|s: &String| s.as_str()).collect();
+                if !task.can_execute(&completed_strs) {
                     continue;
                 }
 
                 // 获取分配的智能体
                 let agent_id = if let Some(ref assignment) = task.assigned_agent {
-                    &assignment.agent_id
+                    assignment.agent_id.clone()
                 } else {
                     return Err(AloudError::InternalError(format!(
                         "Task {} has no assigned agent",
@@ -156,20 +166,30 @@ impl ClusterExecutor {
                     )));
                 };
 
+                // 发布任务请求到 PubSub
+                let _ = self.pubsub_manager
+                    .publish_task_request(
+                        &topic,
+                        &task.task_id,
+                        &task.description,
+                        &agent_id,
+                    )
+                    .await;
+
                 // 执行任务（带重试）
                 let mut retry_count = 0;
-                loop {
+                let task_result = loop {
                     task.mark_started();
 
                     match self
-                        .execute_task_for_agent(task, agent_id, wallet_address.clone(), chain.clone())
+                        .execute_task_for_agent(task, &agent_id, wallet_address.clone(), chain.clone())
                         .await
                     {
                         Ok(result) => {
                             self.handle_agent_response(task, result.clone()).await?;
-                            task_results.insert(agent_id.clone(), result);
+                            task_results.insert(agent_id.clone(), result.clone());
                             completed_tasks.push(task.task_id.clone());
-                            break;
+                            break Ok(result);
                         }
                         Err(e) => {
                             if task.can_retry() && retry_count < task.max_retries {
@@ -179,14 +199,46 @@ impl ClusterExecutor {
                                 // 继续重试
                             } else {
                                 task.mark_failed(e.to_string());
-                                return Err(AloudError::InternalError(format!(
+                                break Err(AloudError::InternalError(format!(
                                     "Task {} failed after {} retries",
                                     task.task_id, retry_count
                                 )));
                             }
                         }
                     }
+                };
+
+                // 发布任务结果到 PubSub
+                match &task_result {
+                    Ok(result) => {
+                        let _ = self.pubsub_manager
+                            .publish_task_result(
+                                &topic,
+                                &task.task_id,
+                                result,
+                                &agent_id,
+                            )
+                            .await;
+                    }
+                    Err(_) => {
+                        // 任务失败时也发布结果（包含错误信息）
+                        let error_result = json!({
+                            "error": task.error.as_ref().unwrap_or(&"Unknown error".to_string()),
+                            "status": "failed",
+                        });
+                        let _ = self.pubsub_manager
+                            .publish_task_result(
+                                &topic,
+                                &task.task_id,
+                                &error_result,
+                                &agent_id,
+                            )
+                            .await;
+                    }
                 }
+
+                // 如果任务失败，返回错误
+                task_result?;
             }
         }
 

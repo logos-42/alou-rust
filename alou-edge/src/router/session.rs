@@ -1,6 +1,7 @@
 use crate::agent::core::AgentCore;
 use crate::agent::session::{ContextEvent, SessionManager};
 use crate::agent::stream::{cleanup_session, StreamEvent, StreamPublisher};
+use crate::middleware::SubscriptionGuard;
 use crate::utils::error::AloudError;
 use crate::web3::auth::WalletAuth;
 use serde::{Deserialize, Serialize};
@@ -76,6 +77,14 @@ struct ChatResponse {
     session_id: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tool_calls: Vec<crate::agent::core::ToolCallInfo>,
+}
+
+#[derive(Serialize)]
+struct RateLimitErrorResponse {
+    error: String,
+    remaining_requests: u64,
+    limit_exceeded: bool,
+    reset_time: i64, // UTC midnight timestamp
 }
 
 pub(crate) async fn handle_create_session(
@@ -157,6 +166,7 @@ pub(crate) async fn handle_agent_chat(
     session_manager: &SessionManager,
     agent_core: Option<&AgentCore>,
     wallet_auth: Option<&WalletAuth>,
+    subscription_guard: Option<&SubscriptionGuard>,
     req: &mut Request,
 ) -> Result<Response> {
     let agent_core = match agent_core {
@@ -178,6 +188,72 @@ pub(crate) async fn handle_agent_chat(
             return json_response_with_status(&error_response, 400);
         }
     };
+
+    // Rate limit check
+    if let Some(guard) = subscription_guard {
+        // Determine user identifier: prefer wallet_address, fallback to session_id
+        let user_identifier = body.wallet_address.as_ref()
+            .map(|w| w.as_str())
+            .unwrap_or(&body.session_id);
+        
+        let wallet_address_str = body.wallet_address.as_deref().unwrap_or("");
+        
+        match guard.check_request_access(user_identifier, wallet_address_str).await {
+            Ok((allowed, remaining, _is_premium)) => {
+                if !allowed {
+                    // Calculate reset time (UTC midnight of next day)
+                    let now = crate::utils::time::now_timestamp();
+                    let today = now / 86400;
+                    let next_day = (today + 1) * 86400;
+                    
+                    let error_response = RateLimitErrorResponse {
+                        error: format!(
+                            "每日请求限额已用完。您今天已经使用了所有可用请求。\n\nDaily request limit exceeded. You have used all available requests for today.\n\n剩余请求 / Remaining requests: {}\n重置时间 / Reset time: {} (UTC)",
+                            remaining,
+                            crate::utils::time::timestamp_to_rfc3339(next_day)
+                        ),
+                        remaining_requests: remaining,
+                        limit_exceeded: true,
+                        reset_time: next_day,
+                    };
+                    
+                    let json = serde_json::to_string(&error_response)
+                        .unwrap_or_else(|_| r#"{"error":"Rate limit exceeded"}"#.to_string());
+                    
+                    console_log!(
+                        "Rate limit exceeded for user: {} (remaining: {})",
+                        user_identifier,
+                        remaining
+                    );
+                    
+                    let headers = {
+                        let mut h = Headers::new();
+                        let _ = h.set("Content-Type", "application/json; charset=utf-8");
+                        let _ = h.set("Retry-After", &next_day.to_string());
+                        h
+                    };
+                    
+                    return Ok(Response::ok(json)
+                        .map_err(|_| worker::Error::RustError("Failed to create error response".to_string()))?
+                        .with_status(429)
+                        .with_headers(headers));
+                }
+                
+                // Log remaining requests for monitoring
+                if remaining < 5 {
+                    console_log!(
+                        "Rate limit warning for user: {} (remaining: {})",
+                        user_identifier,
+                        remaining
+                    );
+                }
+            }
+            Err(e) => {
+                // Log error but don't block request (fail open)
+                console_error!("Rate limit check failed: {}", e);
+            }
+        }
+    }
 
     let stream_publisher = StreamPublisher::new(&body.session_id);
     stream_publisher

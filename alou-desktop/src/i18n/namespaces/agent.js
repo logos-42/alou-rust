@@ -91,6 +91,11 @@ export const agent = {
     'agent.chat.error.serverError': '❌ 服务器内部错误，请稍后重试。',
     'agent.chat.error.networkError': '❌ 无法连接到服务器，请检查网络连接。',
     'agent.chat.error.backendUnavailable': '❌ 无法连接到后端服务，请检查网络连接或稍后重试。',
+    'agent.chat.error.rateLimitExceeded': '每日请求限额已用完',
+    'agent.chat.error.rateLimitMessage': '您今天已经使用了所有可用请求。',
+    'agent.chat.error.rateLimitRemaining': '剩余请求',
+    'agent.chat.error.rateLimitReset': '重置时间',
+    'agent.chat.error.subscribeNow': '立即注册付费',
 
     // ==================== 邀请智能体 ====================
     'agent.invite.title': '邀请智能体到群组',
@@ -126,6 +131,8 @@ export const agent = {
     'agent.diap.register': '注册到链上',
     'agent.diap.registering': '注册中...',
     'agent.diap.registered': '已注册',
+    'agent.diap.subscribe': '注册付费',
+    'agent.diap.subscribing': '注册中...',
     'agent.diap.notRegistered': '未注册',
     'agent.diap.createSuccess': 'DIAP 身份创建成功！',
     'agent.diap.createFailed': '创建身份失败',
@@ -252,6 +259,11 @@ export const agent = {
     'agent.chat.error.serverError': '❌ Server error, please try again later.',
     'agent.chat.error.networkError': '❌ Cannot connect to server, please check your network.',
     'agent.chat.error.backendUnavailable': '❌ Cannot connect to backend service, please check network or try again later.',
+    'agent.chat.error.rateLimitExceeded': 'Daily Request Limit Exceeded',
+    'agent.chat.error.rateLimitMessage': 'You have used all available requests for today.',
+    'agent.chat.error.rateLimitRemaining': 'Remaining requests',
+    'agent.chat.error.rateLimitReset': 'Reset time',
+    'agent.chat.error.subscribeNow': 'Subscribe Now',
 
     // ==================== Invite Agent ====================
     'agent.invite.title': 'Invite Agent to Group',
@@ -287,6 +299,7 @@ export const agent = {
     'agent.diap.register': 'Register On-Chain',
     'agent.diap.registering': 'Registering...',
     'agent.diap.registered': 'Registered',
+    'agent.diap.subscribe': 'Subscribe',
     'agent.diap.notRegistered': 'Not Registered',
     'agent.diap.createSuccess': 'DIAP identity created successfully!',
     'agent.diap.createFailed': 'Failed to create identity',

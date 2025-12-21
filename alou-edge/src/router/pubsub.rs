@@ -42,6 +42,7 @@ pub struct MessagesResponse {
 }
 
 /// PubSub 管理器
+#[derive(Clone)]
 pub struct PubSubManager {
     kv: KvStore,
 }

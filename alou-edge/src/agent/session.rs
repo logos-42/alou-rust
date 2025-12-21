@@ -105,6 +105,7 @@ impl Session {
 }
 
 /// Session manager for handling conversation sessions
+#[derive(Clone)]
 pub struct SessionManager {
     kv: KvStore,
 }

@@ -149,6 +149,11 @@ impl AiProvider for DeepSeekProvider {
                 .collect()
         });
 
+        // 记录请求详情用于调试（在移动之前）
+        let messages_count = deepseek_messages.len();
+        console_log!("DeepSeek: Model: {}, Messages count: {}", self.model, messages_count);
+        console_log!("DeepSeek: Request URL: {}", DEEPSEEK_API_URL);
+        
         let request = DeepSeekRequest {
             model: self.model.clone(),
             messages: deepseek_messages,
@@ -160,6 +165,25 @@ impl AiProvider for DeepSeekProvider {
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
 
+        // 记录请求预览
+        let request_preview = body.chars().take(200).collect::<String>();
+        console_log!("DeepSeek: Request preview: {}", request_preview);
+
+        // 验证 API key 不为空
+        if self.api_key.is_empty() {
+            return Err(AloudError::AgentError(
+                "DeepSeek API key is empty. Please configure AI_API_KEY secret.".to_string()
+            ));
+        }
+        
+        // 记录 API key 的前几个字符用于调试（不记录完整 key）
+        let api_key_preview = if self.api_key.len() > 8 {
+            format!("{}...", &self.api_key[..8])
+        } else {
+            "***".to_string()
+        };
+        console_log!("DeepSeek: Using API key: {}", api_key_preview);
+        
         let headers = {
             let h = Headers::new();
             h.set("Content-Type", "application/json")
@@ -176,7 +200,7 @@ impl AiProvider for DeepSeekProvider {
                 .with_body(Some(body.into()));
             i
         };
-
+        
         let mut response = Fetch::Request(
             worker::Request::new_with_init(DEEPSEEK_API_URL, &init)
                 .map_err(|e| AloudError::AgentError(e.to_string()))?,
@@ -185,13 +209,60 @@ impl AiProvider for DeepSeekProvider {
         .await
         .map_err(|e| AloudError::AgentError(e.to_string()))?;
 
-        if !response.status_code().is_success() {
+        let status_code = response.status_code();
+        console_log!("DeepSeek: Response status: {}", status_code);
+        
+        if !status_code.is_success() {
             let error_text = response.text().await.unwrap_or_default();
-            return Err(AloudError::AgentError(format!(
-                "DeepSeek API error {}: {}",
-                response.status_code(),
-                error_text
-            )));
+            console_log!("DeepSeek API error {}: {}", status_code, error_text);
+            console_log!("DeepSeek: API key preview: {}", api_key_preview);
+            
+            // 尝试解析错误响应 JSON 以获取更详细的错误信息
+            let error_message = if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&error_text) {
+                if let Some(error_obj) = error_json.get("error") {
+                    let message = error_obj.get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error");
+                    let error_type = error_obj.get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown_error");
+                    let error_code = error_obj.get("code")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown");
+                    
+                    // 特殊处理常见错误
+                    if message.contains("Insufficient Balance") || message.contains("余额不足") {
+                        format!("DeepSeek API 账户余额不足。请前往 DeepSeek 平台充值后再试。\n\n错误详情: {} (type: {}, code: {})",
+                            message, error_type, error_code
+                        )
+                    } else if message.contains("governor") || message.contains("Governor") || 
+                             message.contains("rate limit") || message.contains("限流") {
+                        format!("DeepSeek API 限流或临时限制：{}\n\n可能原因：\n1. 请求频率过高，触发了限流保护\n2. API key 可能被临时限制\n3. 账户可能存在异常行为\n\n建议：\n1. 等待几分钟后重试\n2. 检查 DeepSeek 平台的账户状态\n3. 如果持续出现，可能需要联系 DeepSeek 支持\n\n错误详情: {} (type: {}, code: {})",
+                            message, message, error_type, error_code
+                        )
+                    } else if error_type == "authentication_error" || error_type == "invalid_api_key" || 
+                             message.contains("Invalid API key") || message.contains("API key") ||
+                             message.contains("authentication") || message.contains("认证") ||
+                             message.contains("Authentication Fails") {
+                        format!("DeepSeek API 认证失败：{}\n\n请检查：\n1. AI_API_KEY 是否正确配置（运行: wrangler secret put AI_API_KEY）\n2. API key 是否有效且未过期\n3. API key 格式是否正确\n4. 如果错误包含 'governor'，可能是限流问题，请等待后重试\n\n错误详情: {} (type: {}, code: {})",
+                            message, message, error_type, error_code
+                        )
+                    } else {
+                        format!("DeepSeek API error {}: {} (type: {}, code: {})",
+                            response.status_code(),
+                            message,
+                            error_type,
+                            error_code
+                        )
+                    }
+                } else {
+                    format!("DeepSeek API error {}: {}", response.status_code(), error_text)
+                }
+            } else {
+                format!("DeepSeek API error {}: {}", response.status_code(), error_text)
+            };
+            
+            return Err(AloudError::AgentError(error_message));
         }
 
         let response_text = response

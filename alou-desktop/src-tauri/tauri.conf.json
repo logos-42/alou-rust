@@ -39,7 +39,8 @@
     "shortDescription": "Web3 AI Agent Desktop Application",
     "longDescription": "Alou Desktop - A desktop application for Web3 AI agents with DIAP integration",
     "resources": [
-      "kubo"
+      "kubo/ipfs.exe",
+      "kubo/README.md"
     ],
     "externalBin": [],
     "windows": {
