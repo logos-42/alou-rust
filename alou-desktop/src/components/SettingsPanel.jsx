@@ -1,18 +1,35 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import CloseIcon from '@/assets/关闭0.3.png'
+import { blurImage } from '@/utils/imageBlur'
 import './SettingsPanel.css'
 
-const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false }) => {
+const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null }) => {
   const { t } = useI18n()
   const panelRef = useRef(null)
   const fileInputRef = useRef(null)
+  
+  // 根据 activeChannelId 获取存储键名
+  const getStorageKey = (channelId) => {
+    if (!channelId) return 'alou-chat-background'
+    return `alou-chat-background-${channelId}`
+  }
+  
   const [backgroundImage, setBackgroundImage] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('alou-chat-background') || ''
+    if (typeof localStorage !== 'undefined' && activeChannelId) {
+      return localStorage.getItem(getStorageKey(activeChannelId)) || ''
     }
     return ''
   })
+  
+  // 当 activeChannelId 变化时，重新加载对应的背景
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      const storageKey = getStorageKey(activeChannelId)
+      const stored = localStorage.getItem(storageKey) || ''
+      setBackgroundImage(stored)
+    }
+  }, [activeChannelId])
 
   // 点击外部关闭面板
   useEffect(() => {
@@ -38,17 +55,31 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
   }, [onClose])
 
   // 处理背景图片选择
-  const handleBackgroundSelect = (event) => {
+  const handleBackgroundSelect = async (event) => {
     const file = event.target.files?.[0]
     if (file) {
       const reader = new FileReader()
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const imageUrl = e.target?.result
-        setBackgroundImage(imageUrl)
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('alou-chat-background', imageUrl)
+        try {
+          // 使用模糊处理工具处理图片
+          const blurredImageUrl = await blurImage(imageUrl, 10)
+          setBackgroundImage(blurredImageUrl)
+          const storageKey = getStorageKey(activeChannelId)
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(storageKey, blurredImageUrl)
+          }
+          onBackgroundChange?.(blurredImageUrl)
+        } catch (error) {
+          console.error('图片模糊处理失败:', error)
+          // 如果处理失败，使用原图
+          setBackgroundImage(imageUrl)
+          const storageKey = getStorageKey(activeChannelId)
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(storageKey, imageUrl)
+          }
+          onBackgroundChange?.(imageUrl)
         }
-        onBackgroundChange?.(imageUrl)
       }
       reader.readAsDataURL(file)
     }
@@ -57,8 +88,9 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
   // 移除背景图片
   const handleRemoveBackground = () => {
     setBackgroundImage('')
+    const storageKey = getStorageKey(activeChannelId)
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('alou-chat-background')
+      localStorage.removeItem(storageKey)
     }
     onBackgroundChange?.('')
   }

@@ -22,6 +22,7 @@ const ChatHeader = ({
   onGoToWallet,
   onLogout,
   onBackgroundChange,
+  activeChannelId = null,
 }) => {
   const { t } = useI18n()
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -104,6 +105,7 @@ const ChatHeader = ({
           onToggleTheme={onToggleTheme}
           onClose={() => setShowSettingsPanel(false)}
           onBackgroundChange={onBackgroundChange}
+          activeChannelId={activeChannelId}
         />
       )}
     </nav>

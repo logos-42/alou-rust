@@ -61,7 +61,7 @@ function DiapPanelToggle({
         style={{
           position: 'fixed',
           top: '64px',
-          right: isSidebarCollapsed ? '20px' : '320px',
+          right: '20px', // 完全固定位置，不受侧边栏状态和偏移影响
           zIndex: 1000,
         }}
         aria-label={showPanel ? '隐藏 DIAP 面板' : '打开 DIAP 面板'}
@@ -87,7 +87,7 @@ function DiapPanelToggle({
           style={{
             position: 'fixed',
             top: '100px',
-            right: isSidebarCollapsed ? '20px' : '320px',
+            right: '20px', // 完全固定位置，不受侧边栏状态和偏移影响
             zIndex: 999,
             maxWidth: '360px',
           }}

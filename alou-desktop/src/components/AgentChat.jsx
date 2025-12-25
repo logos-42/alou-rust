@@ -615,6 +615,7 @@ const AgentChat = () => {
                         avatar={agentProfile?.avatar}
                         title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
                         subtitle={null}
+                        backgroundImage={chatBackground}
                       />
                     </ConversationPanelWrapper>
                   }
@@ -654,6 +655,7 @@ const AgentChat = () => {
                     avatar={agentProfile?.avatar}
                     title={selectedAgent ? (selectedAgent.display_name || selectedAgent.name || '智能体') : '会话'}
                     subtitle={null}
+                    backgroundImage={chatBackground}
                   />
                 </ConversationPanelWrapper>
               )}

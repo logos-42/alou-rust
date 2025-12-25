@@ -1,25 +1,31 @@
 .sidebar-right {
   --sidebar-width: 340px;
   --sidebar-peek: 64px;
+  --sidebar-offset: 45px; /* 向右偏移的距离 */
   position: absolute;
   top: 0;
-  right: 0;
+  right: calc(0px - var(--sidebar-offset));
   bottom: 0;
   width: var(--sidebar-width);
-  background: var(--surface);
-  border-left: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
   overflow: visible;
   transform: translateX(0);
   transition:
     transform 0.32s ease,
     box-shadow 0.32s ease,
     background 0.3s ease;
-  box-shadow: var(--shadow);
+  box-shadow: none;
 }
 
-/* 暗夜模式 - 纯黑色右侧边栏 */
+/* 暗夜模式 - 透明右侧边栏 */
 .app-shell.dark-mode .sidebar-right {
-  background: #000000; /* 纯黑色背景 */
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-right.collapsed {
@@ -35,9 +41,11 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -69,10 +77,12 @@
 }
 
 .app-shell.dark-mode .sidebar-right .collapse-toggle {
-  background: #000000; /* 纯黑色背景 */
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 14px 26px rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-right .sidebar-content {
@@ -108,19 +118,24 @@
 .sidebar-right section.wallet-card,
 .sidebar-right section.history-card,
 .sidebar-right section.context-card {
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border-radius: 1.1rem;
   padding: 1rem;
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* 暗夜模式 - 纯黑色右侧边栏卡片 */
+/* 暗夜模式 - 透明右侧边栏卡片 */
 .app-shell.dark-mode .sidebar-right section.wallet-card,
 .app-shell.dark-mode .sidebar-right section.history-card,
 .app-shell.dark-mode .sidebar-right section.context-card {
-  background: #000000; /* 纯黑色背景 */
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-right section header {
@@ -204,7 +219,13 @@
   gap: 0.3rem;
   padding: 0.6rem;
   border-radius: 0.9rem;
-  background: rgba(148, 163, 184, 0.08);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.app-shell.dark-mode .sidebar-right .history-card li {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-right .history-card li.confirmed {
@@ -258,7 +279,9 @@
 }
 
 .sidebar-right .context-body li {
-  background: rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-radius: 0.9rem;
   padding: 0.6rem 0.75rem;
   display: flex;
@@ -266,6 +289,10 @@
   gap: 0.25rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
+}
+
+.app-shell.dark-mode .sidebar-right .context-body li {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .sidebar-right .log-main {

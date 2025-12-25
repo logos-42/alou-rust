@@ -23,6 +23,30 @@
   transition:
     background 0.3s ease,
     border-color 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 当有背景图片时，添加半透明遮罩以确保内容可读性 */
+.conversation-panel.has-background {
+  background-color: rgba(255, 255, 255, 0.85);
+}
+
+.conversation-panel.has-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.conversation-panel.has-background > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Embedded panel */
@@ -38,6 +62,29 @@
   box-shadow: none;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+/* 当 embedded 面板有背景图片时 */
+.conversation-panel.embedded.has-background {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.conversation-panel.embedded.has-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.conversation-panel.embedded.has-background > * {
+  position: relative;
+  z-index: 1;
 }
 
 .conversation-panel.embedded .conversation-body {
@@ -57,6 +104,23 @@
 .app-shell.dark-mode .conversation-panel {
   background: #000000; /* 纯黑色背景 */
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* 暗夜模式下有背景图片时的遮罩 */
+.app-shell.dark-mode .conversation-panel.has-background {
+  background-color: rgba(0, 0, 0, 0.85);
+}
+
+.app-shell.dark-mode .conversation-panel.has-background::before {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.app-shell.dark-mode .conversation-panel.embedded.has-background {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+.app-shell.dark-mode .conversation-panel.embedded.has-background::before {
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .conversation-panel header {

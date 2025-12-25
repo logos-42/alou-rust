@@ -24,6 +24,7 @@ const AgentConversationOverlay = forwardRef(
       actions,
       emptyState,
       avatar,
+      backgroundImage,
     },
     ref,
   ) => {
@@ -82,9 +83,21 @@ const AgentConversationOverlay = forwardRef(
       </div>
     )
 
+    const panelClassName = `conversation-panel${embedded ? ' embedded' : ''}${backgroundImage ? ' has-background' : ''}`
+    
+    const panelStyle = backgroundImage
+      ? {
+          ...style,
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }
+      : style
+
     if (embedded) {
       return (
-        <section className="conversation-panel embedded" style={style}>
+        <section className={panelClassName} style={panelStyle}>
           {header}
           {body}
         </section>
@@ -93,7 +106,7 @@ const AgentConversationOverlay = forwardRef(
 
     return (
       <div className="conversation-overlay" style={style}>
-        <section className="conversation-panel">
+        <section className={panelClassName} style={panelStyle}>
           {header}
           {body}
         </section>
