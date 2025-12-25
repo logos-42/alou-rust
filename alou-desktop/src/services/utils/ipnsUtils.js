@@ -59,9 +59,14 @@ export function isIpns(input) {
     return false
   }
   
-  return input.startsWith('/ipns/') || 
-         input.startsWith('k51') || 
-         input.startsWith('k2')
+  const trimmed = input.trim()
+  // 检查是否以 /ipns/ 开头，或者包含 IPNS key 模式（k51 或 k2 开头）
+  return trimmed.startsWith('/ipns/') || 
+         trimmed.startsWith('ipns://') ||
+         /^k51[a-zA-Z0-9]+/.test(trimmed) || 
+         /^k2[a-zA-Z0-9]+/.test(trimmed) ||
+         /\/ipns\/k51/.test(trimmed) ||
+         /\/ipns\/k2/.test(trimmed)
 }
 
 /**

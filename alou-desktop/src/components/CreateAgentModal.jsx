@@ -356,7 +356,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
             )}
           </div>
 
-
           {error && <div className="agent-modal__error">{error}</div>}
 
           <div className="agent-modal__actions">

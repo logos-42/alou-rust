@@ -58,6 +58,26 @@ export const agent = {
     'agent.create.error.ipfsNotRunning': 'IPFS 节点未运行。请先启动 IPFS 节点后再创建智能体。',
     'agent.create.error.importFailed': '导入失败',
 
+    // ==================== 导入智能体 ====================
+    'agent.import.title': '导入其他节点的智能体',
+    'agent.import.subtitle': '通过 IPNS / CID / DID 标识导入其他节点的智能体',
+    'agent.import.label': '智能体标识 (IPNS/CID/DID)',
+    'agent.import.placeholder': '输入 IPNS / CID / DID 标识',
+    'agent.import.button': '解析',
+    'agent.import.resolving': '解析中...',
+    'agent.import.success': '解析成功！确认导入以下智能体？',
+    'agent.import.name': '名称',
+    'agent.import.description': '描述',
+    'agent.import.did': 'DID',
+    'agent.import.ipns': 'IPNS',
+    'agent.import.cid': 'CID',
+    'agent.import.unnamed': '未命名',
+    'agent.import.confirm': '确认导入',
+    'agent.import.importing': '导入中...',
+    'agent.import.error.enterIdentifier': '请输入 IPNS / CID / DID 标识',
+    'agent.import.error.resolveFailed': '解析失败，请检查标识是否正确',
+    'agent.import.error.importFailed': '导入失败',
+
     // ==================== 智能体列表 ====================
     'agent.list.title': '智能体列表',
     'agent.list.empty': '暂无智能体',
@@ -226,6 +246,26 @@ export const agent = {
     // Error Messages
     'agent.create.error.ipfsNotRunning': 'IPFS node is not running. Please start the IPFS node before creating an agent.',
     'agent.create.error.importFailed': 'Import failed',
+
+    // ==================== Import Agent ====================
+    'agent.import.title': 'Import Agent from Other Node',
+    'agent.import.subtitle': 'Import agent from other node via IPNS / CID / DID identifier',
+    'agent.import.label': 'Agent Identifier (IPNS/CID/DID)',
+    'agent.import.placeholder': 'Enter IPNS / CID / DID identifier',
+    'agent.import.button': 'Resolve',
+    'agent.import.resolving': 'Resolving...',
+    'agent.import.success': 'Resolved successfully! Confirm importing the following agent?',
+    'agent.import.name': 'Name',
+    'agent.import.description': 'Description',
+    'agent.import.did': 'DID',
+    'agent.import.ipns': 'IPNS',
+    'agent.import.cid': 'CID',
+    'agent.import.unnamed': 'Unnamed',
+    'agent.import.confirm': 'Confirm Import',
+    'agent.import.importing': 'Importing...',
+    'agent.import.error.enterIdentifier': 'Please enter IPNS / CID / DID identifier',
+    'agent.import.error.resolveFailed': 'Resolve failed, please check if the identifier is correct',
+    'agent.import.error.importFailed': 'Import failed',
 
     // ==================== Agent List ====================
     'agent.list.title': 'Agent List',

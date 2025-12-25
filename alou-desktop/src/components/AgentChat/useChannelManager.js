@@ -93,15 +93,46 @@ export const useChannelManager = ({
             console.log('[useChannelManager] 检测到 IPNS/CID 格式，开始解析:', query)
             // 调用独立的解析函数，会自动添加到频道列表
             if (resolveExistingAgentTargetRef.current) {
-              await resolveExistingAgentTargetRef.current(query)
+              const resolvedResult = await resolveExistingAgentTargetRef.current(query)
+              // resolveExistingAgentTarget 现在返回 agent 对象，需要构建 channel
+              if (resolvedResult) {
+                // 判断返回的是 agent 还是 channel（通过是否有 meta 属性）
+                const resolvedAgent = resolvedResult.meta ? resolvedResult.meta : resolvedResult
+                const resolvedChannel = resolvedResult.meta ? resolvedResult : buildChannelFromAgent(resolvedResult)
+                
+                console.log('[useChannelManager] IPNS/CID 解析成功，频道:', {
+                  id: resolvedChannel.id,
+                  name: resolvedChannel.name,
+                  hasMeta: !!resolvedChannel.meta,
+                })
+                applyLatest(() => {
+                  // 清空搜索关键词，避免过滤掉新解析的频道
+                  console.log('[useChannelManager] 清空搜索关键词，确保频道显示')
+                  setChannelKeyword('')
+                  // 确保频道在列表中（resolveExistingAgentTarget 已经添加，这里只是确保状态一致）
+                  setChannels((prev) => {
+                    const existingIds = new Set(prev.map(c => c.id))
+                    if (existingIds.has(resolvedChannel.id)) {
+                      console.log('[useChannelManager] 频道已存在于列表中，跳过添加')
+                      return prev
+                    }
+                    console.log('[useChannelManager] 添加解析后的频道到列表:', resolvedChannel.name)
+                    return [resolvedChannel, ...prev]
+                  })
+                  // 确保设置为活动频道
+                  setActiveChannelId(resolvedChannel.id)
+                })
+                return [resolvedChannel]
+              } else {
+                console.error('[useChannelManager] 解析返回的结果为空')
+                return []
+              }
             } else {
               throw new Error('解析功能未初始化')
             }
-            // 解析成功后，返回空数组（因为已经通过 resolveExistingAgentTarget 添加到列表）
-            return []
           } catch (error) {
             const message = extractErrorMessage(error)
-            console.error('[useChannelManager] IPNS/CID 解析失败:', message)
+            console.error('[useChannelManager] IPNS/CID 解析失败:', message, error)
             applyLatest(() => {
               setChannelError(message || '解析失败，请检查 IPNS/CID 是否正确')
             })
@@ -377,7 +408,8 @@ export const useChannelManager = ({
         throw new Error('请输入 IPNS / CID / DID 标识')
       }
       console.log('[useChannelManager] 开始解析节点:', parsedTarget)
-      setChannelLoading(true)
+      // 注意：不在这里设置 loading，因为 loadChannelList 已经设置了
+      // setChannelLoading(true)
       setChannelError(null)
       recordInteraction('create_channel', { target: parsedTarget })
       try {
@@ -408,18 +440,23 @@ export const useChannelManager = ({
           throw new Error('频道 ID 为空：无法添加到列表')
         }
         
-        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id)
+        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id, 'channel.name:', channel.name)
+        // 使用函数式更新确保状态正确
         setChannels((prev) => {
-          console.log('[useChannelManager] 当前频道列表长度:', prev.length)
+          console.log('[useChannelManager] 当前频道列表长度:', prev.length, '当前频道IDs:', prev.map(c => c.id))
           const others = prev.filter((item) => item.id !== channel.id)
           const newChannels = [channel, ...others]
-          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name)
+          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name, '新频道IDs:', newChannels.map(c => c.id))
           return newChannels
         })
         
         console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
         setActiveChannelId(channel.id)
         setSelectedAgent(agent)
+        
+        // 清空搜索关键词，避免过滤掉新解析的频道
+        console.log('[useChannelManager] 清空搜索关键词')
+        setChannelKeyword('')
         
         // 保存到本地存储
         // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
@@ -442,7 +479,8 @@ export const useChannelManager = ({
         }
         
         console.log('[useChannelManager] ✅ 节点解析并加载完成:', channel.name, 'ID:', channel.id)
-        return channel
+        // 返回 agent 对象，以便 CreateAgentModal 可以使用
+        return agent
       } catch (error) {
         const message = extractErrorMessage(error)
         console.error('[useChannelManager] ❌ 解析节点失败:', message, error)
@@ -450,7 +488,8 @@ export const useChannelManager = ({
         recordInteraction('create_channel_failed', { target: parsedTarget, error: message })
         throw new Error(message)
       } finally {
-        setChannelLoading(false)
+        // 注意：不在这里设置 loading，因为 loadChannelList 会处理
+        // setChannelLoading(false)
       }
     },
     [
@@ -462,6 +501,7 @@ export const useChannelManager = ({
       setChannelLoading,
       setChannels,
       setSelectedAgent,
+      setChannelKeyword,
     ],
   )
 
@@ -849,18 +889,44 @@ export const useChannelManager = ({
         ipns: agent.ipns,
         did: agent.did,
         cid: agent.cid,
-        name: agent.name || agent.display_name,
+        name: agent.name,
+        display_name: agent.display_name,
+        avatar_cid: agent.avatar_cid,
+        avatar_url: agent.avatar_url,
+        role_description: agent.role_description,
+        hasDidDocument: !!agent.did_document,
       })
       
       setChannelLoading(true)
       setChannelError(null)
       
       try {
-        const channel = buildChannelFromAgent(agent)
+        // 确保 agent 对象包含完整的元数据
+        const enrichedAgent = {
+          ...agent,
+          // 确保名称字段存在
+          name: agent.name || agent.display_name || null,
+          display_name: agent.display_name || agent.name || null,
+          // 确保头像字段存在
+          avatar_cid: agent.avatar_cid || null,
+          avatar_url: agent.avatar_url || null,
+        }
+        
+        console.log('[useChannelManager] 增强后的 agent:', {
+          name: enrichedAgent.name,
+          display_name: enrichedAgent.display_name,
+          avatar_cid: enrichedAgent.avatar_cid,
+          avatar_url: enrichedAgent.avatar_url,
+        })
+        
+        const channel = buildChannelFromAgent(enrichedAgent)
         console.log('[useChannelManager] 构建的 channel:', {
           id: channel?.id,
           name: channel?.name,
+          avatar: channel?.avatar,
           hasMeta: !!channel?.meta,
+          metaName: channel?.meta?.name,
+          metaDisplayName: channel?.meta?.display_name,
         })
         
         if (!channel) {
@@ -873,18 +939,19 @@ export const useChannelManager = ({
           throw new Error('频道 ID 为空：无法添加到列表')
         }
         
-        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id)
+        console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id, 'channel.name:', channel.name)
         setChannels((prev) => {
           console.log('[useChannelManager] 当前频道列表长度:', prev.length)
           const others = prev.filter((item) => item.id !== channel.id)
           const newChannels = [channel, ...others]
-          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name)
+          console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name, '频道头像:', channel.avatar)
           return newChannels
         })
         
         console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
         setActiveChannelId(channel.id)
-        setSelectedAgent(agent)
+        // 使用增强后的 agent 对象
+        setSelectedAgent(enrichedAgent)
         
         // 保存到本地存储
         // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
@@ -893,7 +960,7 @@ export const useChannelManager = ({
           const agentIdForStore = channel.id
           console.log('[useChannelManager] 准备保存到本地存储，使用频道ID:', agentIdForStore)
           const result = importAgentToStore({
-            ...agent,
+            ...enrichedAgent,
             sessionId,
             id: agentIdForStore, // 使用频道ID，确保一致性
           })

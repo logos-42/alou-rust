@@ -15,8 +15,10 @@ import SplitView from '@/components/common/SplitView'
 import DiapPanelToggle from '@/components/agent/DiapPanelToggle'
 import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
+import ImportAgentModal from '@/components/ImportAgentModal'
 import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
+import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
@@ -34,6 +36,8 @@ import { useAgentEventHandlers } from './AgentChat/useAgentEventHandlers'
 import { useGroupChatManager } from './AgentChat/useGroupChatManager'
 import { useGroupChatButton } from './AgentChat/useGroupChatButton'
 import { useRateLimitModal } from './AgentChat/useRateLimitModal'
+import { useAgentBackground } from './AgentChat/useAgentBackground'
+import { useAgentModals } from './AgentChat/useAgentModals'
 
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
@@ -82,16 +86,12 @@ const AgentChat = () => {
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
-  const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
-  const [chatBackground, setChatBackground] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('alou-chat-background') || ''
-    }
-    return ''
-  })
 
   // ==================== Rate Limit Modal Hook ====================
   const { rateLimitModal, openRateLimitModal, closeRateLimitModal, handleSubscribe } = useRateLimitModal()
+
+  // ==================== Background Hook ====================
+  const { chatBackground, updateBackground } = useAgentBackground(activeChannelId)
 
   // ==================== 1. UI State Hook ====================
   const uiState = useAgentUI({
@@ -127,6 +127,21 @@ const AgentChat = () => {
     handleResize,
     consoleDockStyle,
   } = uiState
+
+  // ==================== Modals Hook ====================
+  // 需要在 useAgentUI 之后定义，因为需要 recordInteraction
+  // 需要在 useAgentDrag 之前定义，因为 useAgentDrag 需要 openDetailPanel
+  const {
+    isCreateAgentModalOpen,
+    isImportAgentModalOpen,
+    showDetailPanel,
+    createChannel,
+    importChannel,
+    closeCreateAgentModal,
+    closeImportAgentModal,
+    openDetailPanel,
+    closeDetailPanel,
+  } = useAgentModals({ recordInteraction })
 
   // ==================== Group Chat Manager Hook ====================
   // 需要在 useAgentUI 之后调用，因为需要 openConversationPanel
@@ -174,6 +189,11 @@ const AgentChat = () => {
     canvasRef,
     recordInteraction,
     openConversationPanel,
+    onAvatarClick: useCallback(() => {
+      if (selectedAgent) {
+        openDetailPanel()
+      }
+    }, [selectedAgent, openDetailPanel]),
   })
 
   const {
@@ -424,15 +444,6 @@ const AgentChat = () => {
     handleInspectMessage,
   } = eventHandlers
 
-  const createChannel = useCallback(() => {
-    setCreateAgentModalOpen(true)
-    recordInteraction('open_create_agent_modal')
-  }, [recordInteraction])
-
-  const closeCreateAgentModal = useCallback(() => {
-    setCreateAgentModalOpen(false)
-  }, [])
-
   // ==================== Send Message with Tool Calls ====================
   // 使用 sendMessageToAgent 实现多智能体独立执行空间
   const sendMessage = useCallback(async () => {
@@ -524,10 +535,9 @@ const AgentChat = () => {
         onGoToLogin={goToLogin}
         onGoToWallet={goToWallet}
         onLogout={handleLogout}
-        onBackgroundChange={(backgroundUrl) => {
-          setChatBackground(backgroundUrl || '')
-        }}
+        onBackgroundChange={updateBackground}
         isSidebarCollapsed={isSidebarCollapsed}
+        activeChannelId={activeChannelId}
       />
 
       <div className="workspace">
@@ -541,6 +551,7 @@ const AgentChat = () => {
           onRefresh={refreshChannels}
           onSelectChannel={selectChannel}
           onCreateChannel={createChannel}
+          onImportChannel={importChannel}
           onDeleteChannel={handleDeleteChannel}
           onInviteToChannel={handleInviteToChannel}
           isCollapsed={isLeftSidebarCollapsed}
@@ -575,6 +586,15 @@ const AgentChat = () => {
               />
               {selectedAgent && <AgentProfilePanel agent={selectedAgent} />}
             </div>
+
+            {showDetailPanel && selectedAgent && (
+              <AgentDetailPanel
+                agent={selectedAgent}
+                sessionId={sessionId}
+                onClose={closeDetailPanel}
+                isDarkMode={isDarkMode}
+              />
+            )}
 
             <div className="conversation-shell">
               {showGroupChat && activeActionId ? (
@@ -692,6 +712,13 @@ const AgentChat = () => {
         onSubmit={handleCreateAgentSubmit}
         onEarlyChannel={handleEarlyChannel}
         sessionId={sessionId}
+      />
+
+      <ImportAgentModal
+        isOpen={isImportAgentModalOpen}
+        onClose={closeImportAgentModal}
+        onResolve={resolveExistingAgentTarget}
+        onImportAgent={handleImportAgent}
       />
 
       <InviteAgentModal

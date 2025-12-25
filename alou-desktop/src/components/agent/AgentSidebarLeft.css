@@ -84,9 +84,44 @@
   opacity: 0.75;
 }
 
-.app-shell.dark-mode .sidebar-left .new-channel-btn img {
+.app-shell.dark-mode .sidebar-left .new-channel-btn img,
+.app-shell.dark-mode .sidebar-left .import-channel-btn img {
   filter: brightness(0) invert(1);
   opacity: 0.95;
+}
+
+.sidebar-left .import-channel-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.sidebar-left .import-channel-btn:hover {
+  transform: translateY(-1px);
+  filter: drop-shadow(0 6px 14px rgba(99, 102, 241, 0.35));
+}
+
+.sidebar-left .import-channel-btn img {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) saturate(0);
+  opacity: 0.55;
+  object-fit: contain;
+}
+
+.sidebar-left .import-channel-btn:hover img {
+  opacity: 0.75;
 }
 
 .sidebar-left .channel-search {
@@ -215,6 +250,15 @@
 
 .sidebar-left .channel-placeholder.channel-error {
   color: #dc2626;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sidebar-left .channel-placeholder.channel-error .error-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .sidebar-left .channel-placeholder button {
@@ -765,7 +809,9 @@
   padding: 0.8rem 0.8rem 0.4rem;
 }
 
-.sidebar-left.collapsed .new-channel-btn {
+.sidebar-left.collapsed .new-channel-btn,
+.sidebar-left.collapsed .import-channel-btn,
+.sidebar-left.collapsed .import-channel-btn {
   display: none;
 }
 

@@ -37,6 +37,7 @@ const AgentSidebarLeft = ({
   onKeywordChange,
   onSelectChannel,
   onCreateChannel,
+  onImportChannel,
   onDeleteChannel,
   onInviteToChannel,
   onRefresh,
@@ -145,9 +146,16 @@ const AgentSidebarLeft = ({
           <img src={CollapseIcon} alt="折叠" className="brand-icon" />
         </button>
         {!isCollapsed && (
-          <button type="button" className="new-channel-btn" onClick={onCreateChannel}>
-            <img src={CreateIcon} alt="创建频道" />
-          </button>
+          <>
+            <button type="button" className="new-channel-btn" onClick={onCreateChannel} title="创建智能体">
+              <img src={CreateIcon} alt="创建频道" />
+            </button>
+            {onImportChannel && (
+              <button type="button" className="import-channel-btn" onClick={onImportChannel} title="导入智能体">
+                <img src={LinkIcon} alt="导入频道" />
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -201,6 +209,7 @@ const AgentSidebarLeft = ({
         {isLoading && <div className="channel-placeholder">{t('agent.sidebar.loading')}</div>}
         {!isLoading && errorMessage && (
           <div className="channel-placeholder channel-error">
+            <div className="error-icon">⚠️</div>
             <div>{errorMessage}</div>
             {onRefresh && (
               <button type="button" onClick={onRefresh}>

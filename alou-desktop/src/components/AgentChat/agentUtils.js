@@ -86,14 +86,26 @@ export const buildChannelFromAgent = (agent) => {
   const nameFromDid = cleanedAgent.did ? cleanedAgent.did.split(':').filter(Boolean).slice(-1)[0] : null
   const fallbackName = cleanedAgent.cid || id
   // 显示名称也优先使用 IPNS，但如果所有名称都为空，使用 DID 的最后部分作为 fallback
-  let displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid
-  // 如果仍然为空，尝试从 DID 提取可读名称
-  if (!displayName && cleanedAgent.did) {
-    const didParts = cleanedAgent.did.split(':')
-    if (didParts.length > 2) {
-      const lastPart = didParts[didParts.length - 1]
-      // 如果 DID 最后部分是哈希值，只显示前8个字符
-      displayName = lastPart.length > 16 ? lastPart.substring(0, 8) : lastPart
+  // 如果名称是 "未命名智能体"，也尝试从 DID 提取名称
+  const providedName = cleanedAgent.display_name || cleanedAgent.name
+  const isUnnamed = providedName === '未命名智能体' || providedName === 'Unnamed Agent' || !providedName
+  
+  let displayName = null
+  if (!isUnnamed) {
+    displayName = providedName
+  } else {
+    // 如果名称为空或是默认值，尝试从 DID 提取可读名称
+    if (cleanedAgent.did) {
+      const didParts = cleanedAgent.did.split(':')
+      if (didParts.length > 2) {
+        const lastPart = didParts[didParts.length - 1]
+        // 如果 DID 最后部分是哈希值，只显示前8个字符
+        displayName = lastPart.length > 16 ? lastPart.substring(0, 8) : lastPart
+      }
+    }
+    // 如果 DID 提取失败，尝试使用 IPNS 或 CID
+    if (!displayName) {
+      displayName = nameFromIpns || nameFromDid
     }
   }
   // 最后的 fallback
