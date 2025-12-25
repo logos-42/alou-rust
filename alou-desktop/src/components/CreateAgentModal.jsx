@@ -4,6 +4,7 @@ import agentService from '@/services/agentService'
 import diapService from '@/services/diapService'
 import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './CreateAgentModal.css'
 
 const DEFAULT_MCP_CODE = `{
@@ -17,7 +18,7 @@ const DEFAULT_MCP_CODE = `{
   ]
 }`
 
-function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent, sessionId, onEarlyChannel }) {
+function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel }) {
   const { t } = useI18n()
   const [name, setName] = useState('')
   const [roleDescription, setRoleDescription] = useState(t('agent.create.role.default'))
@@ -26,12 +27,8 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
   const [mcpCode, setMcpCode] = useState(DEFAULT_MCP_CODE)
   const [mcpTools, setMcpTools] = useState([])
   const [mcpParseError, setMcpParseError] = useState(null)
-  const [existingAgentTarget, setExistingAgentTarget] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  // 解析预览状态
-  const [resolvedAgent, setResolvedAgent] = useState(null)
-  const [showImportConfirm, setShowImportConfirm] = useState(false)
 
   // 解析 MCP 代码并提取工具名称
   const parseMcpCode = useCallback((code) => {
@@ -274,75 +271,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
     }
   }
 
-  const handleResolveExisting = async () => {
-    const target = existingAgentTarget.trim()
-    if (!target) {
-      setError('请输入 IPNS / CID / DID 标识')
-      return
-    }
-    setError(null)
-    setResolvedAgent(null)
-    setShowImportConfirm(false)
-    setIsLoading(true)
-    
-    try {
-      // 使用 agentService 从网络加载智能体
-      console.log('[CreateAgentModal] 开始解析智能体:', target)
-      const result = await agentService.loadAgentFromNetwork(target)
-      
-      if (result.success && result.agent) {
-        console.log('[CreateAgentModal] 解析成功:', result.agent)
-        setResolvedAgent(result.agent)
-        setShowImportConfirm(true)
-        setIsLoading(false)
-      } else {
-        // 降级到原有的 onResolve 方法
-        if (onResolve) {
-          await onResolve(target)
-        }
-        setIsLoading(false)
-        if (!result.success) {
-          setError(result.error || '解析失败，请检查标识是否正确')
-        }
-      }
-    } catch (err) {
-      console.error('[CreateAgentModal] 解析失败:', err)
-      setIsLoading(false)
-      setError(err?.message || '解析失败，请检查标识是否正确')
-    }
-  }
-
-  const handleConfirmImport = async () => {
-    if (!resolvedAgent) return
-    
-    setIsLoading(true)
-    setError(null)
-    
-    try {
-      console.log('[CreateAgentModal] 确认导入智能体:', resolvedAgent)
-      
-      // 调用父组件的导入方法
-      if (onImportAgent) {
-        await onImportAgent(resolvedAgent)
-      }
-      
-      // 清理状态并关闭
-      setResolvedAgent(null)
-      setShowImportConfirm(false)
-      setExistingAgentTarget('')
-      setIsLoading(false)
-      onClose()
-    } catch (err) {
-      console.error('[CreateAgentModal] 导入失败:', err)
-      setError(err?.message || t('agent.create.error.importFailed'))
-      setIsLoading(false)
-    }
-  }
-
-  const handleCancelImport = () => {
-    setResolvedAgent(null)
-    setShowImportConfirm(false)
-  }
 
   return (
     <div className="agent-modal-backdrop">
@@ -353,7 +281,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             <p>{t('agent.create.subtitle')}</p>
           </div>
           <button type="button" onClick={onClose} className="agent-modal__close">
-            ✕
+            <img src={CloseIcon} alt="关闭" />
           </button>
         </div>
 
@@ -428,74 +356,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, onResolve, onImportAgent,
             )}
           </div>
 
-          <div className="agent-modal__field agent-modal__field--resolve">
-            <span>{t('agent.create.resolve.label')}</span>
-            <div className="agent-modal__resolve-row">
-              <input
-                type="text"
-                placeholder={t('agent.create.resolve.placeholder')}
-                value={existingAgentTarget}
-                onChange={(event) => setExistingAgentTarget(event.target.value)}
-                disabled={showImportConfirm}
-              />
-              <button type="button" onClick={handleResolveExisting} disabled={showImportConfirm || isLoading}>
-                {isLoading && !showImportConfirm ? t('agent.create.resolve.resolving') : t('agent.create.resolve.button')}
-              </button>
-            </div>
-          </div>
-
-          {/* 导入确认预览 */}
-          {showImportConfirm && resolvedAgent && (
-            <div className="agent-modal__import-preview">
-              <div className="agent-modal__import-preview-header">
-                <span>{t('agent.create.resolve.success')}</span>
-              </div>
-              <div className="agent-modal__import-preview-content">
-                <div className="agent-modal__import-preview-row">
-                  <strong>{t('agent.create.import.name')}</strong>
-                  <span>{resolvedAgent.name || resolvedAgent.display_name || t('agent.create.name.unnamed')}</span>
-                </div>
-                {resolvedAgent.role_description && (
-                  <div className="agent-modal__import-preview-row">
-                    <strong>{t('agent.create.import.description')}</strong>
-                    <span>{resolvedAgent.role_description}</span>
-                  </div>
-                )}
-                {resolvedAgent.did && (
-                  <div className="agent-modal__import-preview-row">
-                    <strong>{t('agent.create.import.did')}</strong>
-                    <span className="agent-modal__import-preview-mono">{resolvedAgent.did}</span>
-                  </div>
-                )}
-                {resolvedAgent.ipns && (
-                  <div className="agent-modal__import-preview-row">
-                    <strong>{t('agent.create.import.ipns')}</strong>
-                    <span className="agent-modal__import-preview-mono">{resolvedAgent.ipns}</span>
-                  </div>
-                )}
-                {resolvedAgent.cid && (
-                  <div className="agent-modal__import-preview-row">
-                    <strong>{t('agent.create.import.cid')}</strong>
-                    <span className="agent-modal__import-preview-mono">{resolvedAgent.cid}</span>
-                  </div>
-                )}
-                {resolvedAgent.pubsub_topics && resolvedAgent.pubsub_topics.length > 0 && (
-                  <div className="agent-modal__import-preview-row">
-                    <strong>{t('agent.create.import.pubsub')}</strong>
-                    <span>{resolvedAgent.pubsub_topics.join(', ')}</span>
-                  </div>
-                )}
-              </div>
-              <div className="agent-modal__import-preview-actions">
-                <button type="button" className="ghost" onClick={handleCancelImport} disabled={isLoading}>
-                  {t('common.cancel')}
-                </button>
-                <button type="button" onClick={handleConfirmImport} disabled={isLoading}>
-                  {isLoading ? t('agent.create.import.importing') : t('agent.create.import.confirm')}
-                </button>
-              </div>
-            </div>
-          )}
 
           {error && <div className="agent-modal__error">{error}</div>}
 

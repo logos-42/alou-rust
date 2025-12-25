@@ -142,7 +142,7 @@ const InviteAgentModal = ({
             {t('agent.invite.channel')}: {targetChannel?.name || t('agent.invite.channel.unknown')}
           </span>
           <button type="button" className="close-btn" onClick={handleClose}>
-            ✕
+            <img src={CloseIcon} alt="关闭" />
           </button>
         </header>
 

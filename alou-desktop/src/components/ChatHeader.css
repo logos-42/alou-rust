@@ -58,39 +58,36 @@
   gap: 1rem;
 }
 
-.top-nav .status-badge {
+.top-nav .api-icon-btn {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 2rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.top-nav .api-icon-btn:hover {
   background: var(--secondary-color);
-  color: var(--text-secondary);
 }
 
-.top-nav .status-badge.connected {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
+.top-nav .api-icon-btn .api-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) invert(0.4);
+  transition: filter 0.3s ease;
 }
 
-.top-nav .status-badge.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error-color);
+.app-shell.dark-mode .top-nav .api-icon-btn .api-icon {
+  filter: brightness(0) invert(1);
 }
 
-.top-nav .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-secondary);
-}
-
-.top-nav .status-badge.connected .status-dot {
-  background: var(--success-color);
-  animation: header-pulse 2s infinite;
-}
 
 .top-nav .theme-toggle,
 .top-nav .login-btn,
@@ -99,7 +96,8 @@
   transition: all 0.3s ease;
 }
 
-.top-nav .theme-toggle {
+.top-nav .theme-toggle,
+.top-nav .settings-toggle {
   background: var(--secondary-color);
   border: none;
   border-radius: 50%;
@@ -108,7 +106,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.15rem;
+  padding: 0;
+}
+
+.top-nav .settings-toggle img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.app-shell.dark-mode .top-nav .settings-toggle img {
+  filter: brightness(0) invert(1);
 }
 
 .top-nav .login-btn {

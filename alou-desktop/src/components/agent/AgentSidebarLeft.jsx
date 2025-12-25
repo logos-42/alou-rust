@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
-import CollapseIcon from '@/assets/侧边栏收缩.png'
+import CollapseIcon from '@/assets/收缩6.png'
 import SearchIcon from '@/assets/搜索.png'
+import LoadingIcon from '@/assets/加载0.2.png'
+import LinkIcon from '@/assets/链接0.2.png'
 import CreateIcon from '@/assets/创建.png'
 import InviteIcon from '@/assets/创建.png'
 import DeleteIcon from '@/assets/删除3.png'
+import CloseIcon from '@/assets/关闭0.3.png'
 import { useI18n } from '@/hooks/useI18n'
 import './AgentSidebarLeft.css'
 
@@ -153,7 +156,7 @@ const AgentSidebarLeft = ({
           <input
             type="text"
             value={keyword}
-            placeholder={t('agent.list.search.placeholder')}
+            placeholder={t('agent.list.search.placeholder') || '搜索智能体或输入 IPNS/CID'}
             onChange={(event) => onKeywordChange?.(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -161,7 +164,19 @@ const AgentSidebarLeft = ({
               }
             }}
           />
-          <img src={SearchIcon} alt="搜索" className="search-icon" />
+          {isLoading ? (
+            <img src={LoadingIcon} alt="加载中" className="search-icon search-loading" />
+          ) : (
+            <button
+              type="button"
+              className="search-icon-btn"
+              onClick={() => onRefresh?.()}
+              aria-label="搜索"
+              title="点击搜索"
+            >
+              <img src={SearchIcon} alt="搜索" className="search-icon" />
+            </button>
+          )}
         </div>
       )}
 
@@ -177,7 +192,7 @@ const AgentSidebarLeft = ({
             }}
             aria-label={t('agent.sidebar.clearFilter')}
           >
-            ×
+            <img src={CloseIcon} alt="清除" style={{ width: '14px', height: '14px' }} />
           </button>
         </div>
       )}
@@ -265,52 +280,35 @@ const AgentSidebarLeft = ({
                       {(channel.meta?.mode || 'agent') === 'agent' ? 'Agent' : 'Alou'}
                     </span>
                     {channel.meta?.ipns && (
-                      <span
-                        className={`channel-badge status-badge ${
-                          channel.meta?.diap_identity?.is_registered ? 'badge-success' : 'badge-warning'
+                      <button
+                        type="button"
+                        className={`link-icon-btn ${
+                          channel.meta?.diap_identity?.is_registered ? 'registered' : 'unregistered'
                         }`}
                         aria-label={
                           channel.meta?.diap_identity?.is_registered ? 'DIAP 已注册' : 'DIAP 未注册'
                         }
-                        role="button"
-                        tabIndex={0}
                         onClick={(event) => {
                           event.stopPropagation()
                           onShowIdentityPanel?.()
                         }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault()
-                            onShowIdentityPanel?.()
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
+                        title={channel.meta?.diap_identity?.is_registered ? 'DIAP 已注册' : 'DIAP 未注册，点击查看'}
                       >
-                        <span className="status-icon">
-                          {channel.meta?.diap_identity?.is_registered ? (
-                            <svg viewBox="0 0 16 16">
-                              <path
-                                d="M3 8.5l3 3 7-7.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 16 16">
-                              <path
-                                d="M4 4l8 8M12 4l-8 8"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                          )}
-                        </span>
-                      </span>
+                        {channel.meta?.diap_identity?.is_registered ? (
+                          <svg viewBox="0 0 16 16" className="status-icon">
+                            <path
+                              d="M3 8.5l3 3 7-7.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        ) : (
+                          <img src={LinkIcon} alt="未注册" className="status-icon" />
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>

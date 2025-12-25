@@ -73,6 +73,12 @@
   border-radius: 999px;
 }
 
+.invite-modal-header .close-btn img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .invite-modal-header .close-btn {
   width: 32px;
   height: 32px;

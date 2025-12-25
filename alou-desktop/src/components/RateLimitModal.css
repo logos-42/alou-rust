@@ -67,28 +67,38 @@
 .rate-limit-modal-close {
   background: transparent;
   border: none;
-  font-size: 24px;
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
-  color: var(--text-secondary, #666);
-  padding: 0;
+  color: transparent;
+  padding: 4px;
   width: 32px;
   height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s;
+}
+
+.rate-limit-modal-close img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) invert(0.4);
+  transition: filter 0.3s ease;
+}
+
+.dark-mode .rate-limit-modal-close img {
+  filter: brightness(0) invert(1);
 }
 
 .rate-limit-modal-close:hover {
   background: rgba(0, 0, 0, 0.05);
-  color: var(--text-primary, #1a1a1f);
 }
 
 .dark-mode .rate-limit-modal-close:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary, #f4f4f7);
 }
 
 .rate-limit-modal-content {

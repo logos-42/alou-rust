@@ -39,10 +39,16 @@
   z-index: 10;
 }
 
-.close-btn svg {
-  width: 28px;
-  height: 28px;
-  fill: currentColor;
+.close-btn img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+}
+
+.close-btn:hover img {
+  opacity: 1;
 }
 
 .close-btn:hover {

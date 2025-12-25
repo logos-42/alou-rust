@@ -51,6 +51,21 @@
 .sidebar-right .collapse-toggle .toggle-icon {
   width: 16px;
   height: 16px;
+  object-fit: contain;
+}
+
+.app-shell.dark-mode .sidebar-right .collapse-toggle .toggle-icon {
+  filter: brightness(0) invert(1);
+}
+
+.sidebar-right .collapse-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.app-shell.dark-mode .sidebar-right .collapse-icon {
+  filter: brightness(0) invert(1);
 }
 
 .app-shell.dark-mode .sidebar-right .collapse-toggle {

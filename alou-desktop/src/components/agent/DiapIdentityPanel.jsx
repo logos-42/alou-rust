@@ -5,6 +5,8 @@ import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
 import { invoke } from '@tauri-apps/api/core'
 import { ethers } from 'ethers'
+import CloseIcon from '@/assets/关闭0.3.png'
+import CopyIcon from '@/assets/复制.png'
 import './DiapIdentityPanel.css'
 
 const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
@@ -365,7 +367,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
           <h3>{t('agent.diap.title')}</h3>
           {onClose && (
             <button type="button" className="close-btn" onClick={onClose}>
-              ×
+              <img src={CloseIcon} alt="关闭" />
             </button>
           )}
         </div>
@@ -380,7 +382,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
         <h3>{t('agent.diap.title')}</h3>
         {onClose && (
           <button type="button" className="close-btn" onClick={onClose}>
-            ×
+            <img src={CloseIcon} alt="关闭" />
           </button>
         )}
       </div>
@@ -400,21 +402,6 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
         ) : (
           <div className="diap-identity-info">
             <div className="diap-field">
-              <label>{t('agent.diap.did')}</label>
-              <div className="diap-value">
-                <code>{identity.did}</code>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => copyToClipboard(identity.did)}
-                  title={t('agent.diap.copy')}
-                >
-                  📋
-                </button>
-              </div>
-            </div>
-
-            <div className="diap-field">
               <label>{t('agent.diap.ipns')}</label>
               <div className="diap-value">
                 <code>{identity.ipns || selectedAgent?.ipns || 'N/A'}</code>
@@ -425,7 +412,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                     onClick={() => copyToClipboard(identity.ipns || selectedAgent?.ipns || '')}
                     title={t('agent.diap.copy')}
                   >
-                    📋
+                    <img src={CopyIcon} alt="复制" />
                   </button>
                 )}
               </div>
@@ -441,7 +428,22 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                   onClick={() => copyToClipboard(identity.cid)}
                   title={t('agent.diap.copy')}
                 >
-                  📋
+                  <img src={CopyIcon} alt="复制" />
+                </button>
+              </div>
+            </div>
+
+            <div className="diap-field">
+              <label>{t('agent.diap.did')}</label>
+              <div className="diap-value">
+                <code>{identity.did}</code>
+                <button
+                  type="button"
+                  className="copy-btn"
+                  onClick={() => copyToClipboard(identity.did)}
+                  title={t('agent.diap.copy')}
+                >
+                  <img src={CopyIcon} alt="复制" />
                 </button>
               </div>
             </div>
@@ -470,13 +472,6 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                       >
                         {registering ? t('agent.diap.registering') : t('agent.diap.register')}
                       </button>
-                      <button
-                        type="button"
-                        className="subscribe-btn"
-                        onClick={handleSubscribe}
-                      >
-                        {t('agent.diap.subscribe')}
-                      </button>
                     </div>
                   </div>
                 )}
@@ -498,7 +493,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                       onClick={() => copyToClipboard(txHash)}
                       title={t('agent.diap.copy')}
                     >
-                      📋
+                      <img src={CopyIcon} alt="复制" />
                     </button>
                   </div>
                 </div>
@@ -520,7 +515,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
                       onClick={() => copyToClipboard(registerInfo.encoded_call?.data || '')}
                       title={t('agent.diap.copy')}
                     >
-                      📋
+                      <img src={CopyIcon} alt="复制" />
                     </button>
                   </div>
                   {registerInfo.registration_fee && (
@@ -557,7 +552,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             className="diap-subscribe-btn"
             onClick={handleSubscribe}
           >
-            {t('agent.diap.subscribe')}
+            {t('agent.diap.upgradePro')}
           </button>
         </div>
       )}

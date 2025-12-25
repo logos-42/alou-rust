@@ -3,6 +3,7 @@ import agentService from '@/services/agentService'
 import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
 import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from './agentUtils'
 import { resolveBackendChain } from '@/hooks/useAgentChat'
+import { isIpns, isCid } from '@/services/utils/ipnsUtils'
 
 export const useChannelManager = ({
   sessionId,
@@ -27,6 +28,7 @@ export const useChannelManager = ({
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
   const hasLoadedFromStorageRef = useRef(false) // 防止重复从本地加载
+  const resolveExistingAgentTargetRef = useRef(null) // 用于在 loadChannelList 中访问 resolveExistingAgentTarget
 
   // 本地持久化
   const hasHydrated = useAgentStoreHydration()
@@ -81,17 +83,107 @@ export const useChannelManager = ({
           return channel ? [channel] : []
         }
 
-        // 有搜索关键词时，显示搜索结果
-        const response = await agentService.searchAgents(query)
-        const agents = Array.isArray(response?.agents) ? response.agents : []
-        const mapped = agents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
+        // 有搜索关键词时，首先检测是否为 IPNS/CID 格式
+        const isIpnsFormat = isIpns(query)
+        const isCidFormat = isCid(query)
+
+        // 如果是 IPNS/CID，独立解析并添加到频道列表
+        if (isIpnsFormat || isCidFormat) {
+          try {
+            console.log('[useChannelManager] 检测到 IPNS/CID 格式，开始解析:', query)
+            // 调用独立的解析函数，会自动添加到频道列表
+            if (resolveExistingAgentTargetRef.current) {
+              await resolveExistingAgentTargetRef.current(query)
+            } else {
+              throw new Error('解析功能未初始化')
+            }
+            // 解析成功后，返回空数组（因为已经通过 resolveExistingAgentTarget 添加到列表）
+            return []
+          } catch (error) {
+            const message = extractErrorMessage(error)
+            console.error('[useChannelManager] IPNS/CID 解析失败:', message)
+            applyLatest(() => {
+              setChannelError(message || '解析失败，请检查 IPNS/CID 是否正确')
+            })
+            return []
+          }
+        }
+
+        // 如果不是 IPNS/CID，进行关键词搜索
+        // 先搜索本地已有的频道
+        const lowerQuery = query.toLowerCase().trim()
+        
+        // 改进匹配逻辑：单字符时使用前缀匹配，多字符时使用包含匹配
+        // 只匹配名称和描述，不匹配 DID/IPNS/CID 等标识符
+        const isSingleChar = lowerQuery.length === 1
+        const localMatches = channels.filter((channel) => {
+          const channelName = (channel.name || '').toLowerCase()
+          const agentName = (channel.meta?.display_name || channel.meta?.name || '').toLowerCase()
+          const agentDescription = (channel.meta?.role_description || '').toLowerCase()
+          
+          // 跳过没有有效名称的频道（只有 DID/IPNS/CID 标识符）
+          if (!channelName && !agentName) {
+            return false
+          }
+          
+          let matches = false
+          if (isSingleChar) {
+            // 单字符：只匹配以该字符开头的名称（不匹配标识符）
+            matches = (channelName && channelName.startsWith(lowerQuery)) || 
+                     (agentName && agentName.startsWith(lowerQuery))
+          } else {
+            // 多字符：使用包含匹配（只匹配名称和描述）
+            matches = (channelName && channelName.includes(lowerQuery)) || 
+                     (agentName && agentName.includes(lowerQuery)) || 
+                     (agentDescription && agentDescription.includes(lowerQuery))
+          }
+          return matches
+        })
+
+        // 调用后端 API 搜索
+        let remoteAgents = []
+        try {
+          const response = await agentService.searchAgents(query)
+          remoteAgents = Array.isArray(response?.agents) ? response.agents : []
+          
+          // 过滤掉没有名称的 agent（只有 DID/IPNS/CID 标识符，没有实际名称）
+          const validAgents = remoteAgents.filter(agent => {
+            if (!agent) return false
+            // 必须有有效的名称（不是空字符串）
+            const hasValidName = !!(agent.name && agent.name.trim()) || 
+                                !!(agent.display_name && agent.display_name.trim())
+            // 如果从 did_document 中可以解析出名称，也算有效
+            const hasNameInDidDocument = agent.did_document && 
+              typeof agent.did_document === 'object' &&
+              (agent.did_document.name || 
+               (agent.did_document.service && Array.isArray(agent.did_document.service) && 
+                agent.did_document.service.some(s => s.serviceEndpoint?.name)))
+            const isValid = hasValidName || hasNameInDidDocument
+            return isValid
+          })
+          remoteAgents = validAgents
+        } catch (error) {
+          console.warn('[useChannelManager] 后端搜索失败，仅使用本地结果:', error)
+        }
+
+        // 将远程搜索结果转换为频道格式
+        const remoteChannels = remoteAgents.map((agent) => buildChannelFromAgent(agent)).filter(Boolean)
+
+        // 合并本地和远程结果，本地结果优先，去重
+        const localIds = new Set(localMatches.map(c => c.id))
+        const uniqueRemoteChannels = remoteChannels.filter(c => !localIds.has(c.id))
+        const mergedChannels = [...localMatches, ...uniqueRemoteChannels]
+        
+        const mapped = mergedChannels
 
         applyLatest(() => {
           if (mapped.length > 0) {
             setChannels(mapped)
+            // 优先选择本地匹配的频道，如果没有则选择第一个
+            const preferredChannel = localMatches.length > 0 ? localMatches[0] : mapped[0]
             if (!mapped.some((channel) => channel.id === activeChannelId)) {
-              setActiveChannelId(mapped[0].id)
-              setSelectedAgent(mapped[0].meta)
+              setActiveChannelId(preferredChannel.id)
+              setSelectedAgent(preferredChannel.meta)
             }
           } else {
             // 搜索无结果时显示提示，但不清空列表（用户可以清除搜索词看到所有频道）
@@ -138,6 +230,7 @@ export const useChannelManager = ({
     [
       activeChannelId,
       channelKeyword,
+      channels,
       sessionId,
       setActiveChannelId,
       setChannelError,
@@ -371,6 +464,11 @@ export const useChannelManager = ({
       setSelectedAgent,
     ],
   )
+
+  // 更新 ref，使 loadChannelList 可以访问 resolveExistingAgentTarget
+  useEffect(() => {
+    resolveExistingAgentTargetRef.current = resolveExistingAgentTarget
+  }, [resolveExistingAgentTarget])
 
   // 从本地存储加载智能体到 channels（在 hydration 完成后，只执行一次）
   // 注意：这个逻辑应该在 loadChannelList 之前执行，确保本地存储的频道优先加载

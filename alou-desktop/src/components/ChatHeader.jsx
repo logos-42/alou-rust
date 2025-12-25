@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import AlouLogo from '@/../src-tauri/icons/Square30x30Logo.png'
+import ApiDocIcon from '@/assets/API文档.png'
+import SettingsIcon from '@/assets/设置 0.7.png'
+import SettingsPanel from './SettingsPanel'
 import './ChatHeader.css'
 
 const statusTextMap = {
@@ -18,9 +21,11 @@ const ChatHeader = ({
   onGoToLogin,
   onGoToWallet,
   onLogout,
+  onBackgroundChange,
 }) => {
   const { t } = useI18n()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false)
 
   const statusText = useMemo(() => {
     const key = statusTextMap[connectionStatus] || 'connecting'
@@ -50,13 +55,20 @@ const ChatHeader = ({
         </div>
 
         <div className="nav-controls">
-          <div className={`status-badge ${connectionStatus}`}>
-            <div className="status-dot" />
-            <span>{statusText}</span>
-          </div>
+          <button 
+            type="button" 
+            onClick={() => {
+              // 打开API配置页面
+              window.open('https://docs.alou.ai/api', '_blank')
+            }} 
+            className="api-icon-btn" 
+            title={statusText}
+          >
+            <img src={ApiDocIcon} alt="API" className="api-icon" />
+          </button>
 
-          <button type="button" onClick={onToggleTheme} className="theme-toggle" title={t('theme')}>
-            {isDarkMode ? '🌞' : '🌙'}
+          <button type="button" onClick={() => setShowSettingsPanel(true)} className="theme-toggle settings-toggle" title="设置">
+            <img src={SettingsIcon} alt="设置" />
           </button>
 
           {!isAuthenticated ? (
@@ -86,6 +98,14 @@ const ChatHeader = ({
           )}
         </div>
       </div>
+      {showSettingsPanel && (
+        <SettingsPanel
+          isDarkMode={isDarkMode}
+          onToggleTheme={onToggleTheme}
+          onClose={() => setShowSettingsPanel(false)}
+          onBackgroundChange={onBackgroundChange}
+        />
+      )}
     </nav>
   )
 }

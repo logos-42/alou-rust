@@ -85,8 +85,21 @@ export const buildChannelFromAgent = (agent) => {
   const nameFromIpns = cleanedAgent.ipns ? cleanedAgent.ipns.replace(/^\/?ipns\//, '') : null
   const nameFromDid = cleanedAgent.did ? cleanedAgent.did.split(':').filter(Boolean).slice(-1)[0] : null
   const fallbackName = cleanedAgent.cid || id
-  // 显示名称也优先使用 IPNS
-  const displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid || fallbackName
+  // 显示名称也优先使用 IPNS，但如果所有名称都为空，使用 DID 的最后部分作为 fallback
+  let displayName = cleanedAgent.display_name || cleanedAgent.name || nameFromIpns || nameFromDid
+  // 如果仍然为空，尝试从 DID 提取可读名称
+  if (!displayName && cleanedAgent.did) {
+    const didParts = cleanedAgent.did.split(':')
+    if (didParts.length > 2) {
+      const lastPart = didParts[didParts.length - 1]
+      // 如果 DID 最后部分是哈希值，只显示前8个字符
+      displayName = lastPart.length > 16 ? lastPart.substring(0, 8) : lastPart
+    }
+  }
+  // 最后的 fallback
+  if (!displayName) {
+    displayName = fallbackName
+  }
   
   if (!id) {
     console.error('[buildChannelFromAgent] 生成的 ID 为空！', {

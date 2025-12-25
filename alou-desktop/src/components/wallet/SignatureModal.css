@@ -36,6 +36,12 @@
   color: var(--text-primary);
 }
 
+.close-btn img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .close-btn {
   background: transparent;
   border: none;

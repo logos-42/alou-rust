@@ -1,6 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react'
 import MessageList from '@/components/MessageList'
 import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './AgentConversationOverlay.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -55,7 +56,7 @@ const AgentConversationOverlay = forwardRef(
         <div className="header-actions">
           {actions}
           <button type="button" className="close-btn" onClick={onClose} title="关闭对话">
-            ✕
+            <img src={CloseIcon} alt="关闭" />
           </button>
         </div>
       </header>

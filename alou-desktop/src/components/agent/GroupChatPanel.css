@@ -114,6 +114,7 @@
   color: var(--text-secondary, #475569);
   transition: all 0.2s ease;
   flex-shrink: 0;
+  padding: 0;
 }
 
 .refresh-btn:hover,
@@ -124,6 +125,16 @@
 
 .close-btn {
   margin-right: 8px;
+}
+
+.close-btn img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.app-shell.dark-mode .close-btn img {
+  filter: brightness(0) invert(1);
 }
 
 /* 参与智能体列表 */

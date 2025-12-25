@@ -47,7 +47,8 @@
 .mcp-modal-close {
   border: none;
   background: rgba(148, 163, 184, 0.18);
-  color: var(--text-secondary);
+  color: transparent;
+  font-size: 0;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -56,6 +57,19 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  padding: 0;
+}
+
+.mcp-modal-close img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) invert(0.4);
+  transition: filter 0.3s ease;
+}
+
+.app-shell.dark-mode .mcp-modal-close img {
+  filter: brightness(0) invert(1);
 }
 
 .mcp-modal-close:hover {

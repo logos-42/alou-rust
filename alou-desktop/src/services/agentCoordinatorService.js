@@ -50,11 +50,24 @@ class AgentCoordinatorService {
     }
 
     const agentId = agent.id || agent.did || agent.ipns
+    // 确保名称不为 undefined，使用 DID 的最后部分作为 fallback
+    let agentName = agent.display_name || agent.name
+    if (!agentName && agent.did) {
+      const didParts = agent.did.split(':')
+      if (didParts.length > 2) {
+        const lastPart = didParts[didParts.length - 1]
+        agentName = lastPart.length > 16 ? lastPart.substring(0, 8) : lastPart
+      }
+    }
+    if (!agentName) {
+      agentName = agentId || 'Unknown Agent'
+    }
+    
     const agentInfo = {
       id: agentId,
       did: agent.did,
       ipns: agent.ipns,
-      name: agent.display_name || agent.name,
+      name: agentName,
       description: agent.role_description || '',
       capabilities: this._extractCapabilities(agent),
       pubsubTopics: agent.pubsub_topics || [],

@@ -1,5 +1,6 @@
 import React from 'react'
 import { UIResourceRenderer } from '@mcp-ui/client'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './McpModal.css'
 
 const McpModal = ({ resource, onClose, onUIAction }) => {
@@ -18,7 +19,7 @@ const McpModal = ({ resource, onClose, onUIAction }) => {
             <span>MCP UI 内容</span>
           </div>
           <button type="button" className="mcp-modal-close" onClick={onClose}>
-            ✕
+            <img src={CloseIcon} alt="关闭" />
           </button>
         </div>
         <div className="mcp-modal-body">

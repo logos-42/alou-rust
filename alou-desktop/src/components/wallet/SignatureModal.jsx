@@ -1,5 +1,6 @@
 import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './SignatureModal.css'
 
 const formatAddress = (address) => {
@@ -20,7 +21,7 @@ const SignatureModal = ({ show, request, isSigning, onConfirm, onCancel }) => {
         <div className="modal-header">
           <h3>{t('signatureRequest')}</h3>
           <button type="button" onClick={onCancel} className="close-btn">
-            ✕
+            <img src={CloseIcon} alt="关闭" />
           </button>
         </div>
         <div className="modal-body">

@@ -1,6 +1,7 @@
 import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import { useNavigate } from 'react-router-dom'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './RateLimitModal.css'
 
 const RateLimitModal = ({ 
@@ -39,7 +40,9 @@ const RateLimitModal = ({
       <div className="rate-limit-modal" onClick={(e) => e.stopPropagation()}>
         <div className="rate-limit-modal-header">
           <h3>{t('agent.chat.error.rateLimitExceeded')}</h3>
-          <button className="rate-limit-modal-close" onClick={onClose}>×</button>
+          <button className="rate-limit-modal-close" onClick={onClose}>
+            <img src={CloseIcon} alt="关闭" />
+          </button>
         </div>
         <div className="rate-limit-modal-content">
           <p className="rate-limit-message">{t('agent.chat.error.rateLimitMessage')}</p>

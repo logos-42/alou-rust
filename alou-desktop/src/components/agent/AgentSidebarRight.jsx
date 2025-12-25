@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import CollapseIcon from '@/assets/收缩.png'
-import DotsIcon from '@/assets/三点.png'
+import WalletIcon from '@/assets/钱包0.3.png'
 import './AgentSidebarRight.css'
 
 const formatDate = (timestamp) =>
@@ -75,7 +75,7 @@ const AgentSidebarRight = ({
         aria-label={t('interactionLogs')}
       >
         <img
-          src={isCollapsed ? DotsIcon : CollapseIcon}
+          src={isCollapsed ? WalletIcon : CollapseIcon}
           alt={isCollapsed ? '展开' : '折叠'}
           className="toggle-icon"
         />
@@ -191,7 +191,7 @@ const AgentSidebarRight = ({
               </div>
               <button type="button" className="collapse-btn" onClick={onToggleInteraction}>
                 <img
-                  src={isInteractionCollapsed ? DotsIcon : CollapseIcon}
+                  src={isInteractionCollapsed ? WalletIcon : CollapseIcon}
                   alt={isInteractionCollapsed ? '展开' : '折叠'}
                   className="collapse-icon"
                 />

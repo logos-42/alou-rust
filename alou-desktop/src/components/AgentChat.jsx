@@ -83,6 +83,12 @@ const AgentChat = () => {
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
+  const [chatBackground, setChatBackground] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('alou-chat-background') || ''
+    }
+    return ''
+  })
 
   // ==================== Rate Limit Modal Hook ====================
   const { rateLimitModal, openRateLimitModal, closeRateLimitModal, handleSubscribe } = useRateLimitModal()
@@ -518,6 +524,10 @@ const AgentChat = () => {
         onGoToLogin={goToLogin}
         onGoToWallet={goToWallet}
         onLogout={handleLogout}
+        onBackgroundChange={(backgroundUrl) => {
+          setChatBackground(backgroundUrl || '')
+        }}
+        isSidebarCollapsed={isSidebarCollapsed}
       />
 
       <div className="workspace">
@@ -542,7 +552,15 @@ const AgentChat = () => {
           onShowIdentityPanel={() => setShowDiapPanel(true)}
         />
 
-        <div className="agent-center">
+        <div 
+          className="agent-center"
+          style={chatBackground ? {
+            backgroundImage: `url(${chatBackground})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+          } : {}}
+        >
           <div className={`conversation-stack ${showConversationPanel ? 'open' : ''}`}>
             <div className="agent-visual">
               <AgentCanvas
@@ -672,8 +690,6 @@ const AgentChat = () => {
         isOpen={isCreateAgentModalOpen}
         onClose={closeCreateAgentModal}
         onSubmit={handleCreateAgentSubmit}
-        onResolve={resolveExistingAgentTarget}
-        onImportAgent={handleImportAgent}
         onEarlyChannel={handleEarlyChannel}
         sessionId={sessionId}
       />

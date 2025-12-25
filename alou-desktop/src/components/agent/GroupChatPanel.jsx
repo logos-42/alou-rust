@@ -3,6 +3,7 @@ import GroupChatMessage from './GroupChatMessage'
 import { useI18n } from '@/hooks/useI18n'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './GroupChatPanel.css'
 
 /**
@@ -55,7 +56,7 @@ const GroupChatPanel = ({
         <div className="header-left">
           {onClose && (
             <button type="button" className="close-btn" onClick={onClose} title={t('agent.groupChat.close')}>
-              ✕
+              <img src={CloseIcon} alt="关闭" />
             </button>
           )}
           <div className="group-icon">

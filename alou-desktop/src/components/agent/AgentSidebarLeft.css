@@ -111,10 +111,57 @@
   width: 18px;
   height: 18px;
   filter: brightness(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .app-shell.dark-mode .sidebar-left .channel-search .search-icon {
   filter: brightness(0) invert(1);
+}
+
+.sidebar-left .channel-search .search-icon-btn {
+  position: absolute;
+  top: 50%;
+  right: 1.6rem;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-left .channel-search .search-icon-btn:hover {
+  opacity: 0.8;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.sidebar-left .channel-search .search-icon-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.sidebar-left .channel-search .search-icon-btn .search-icon {
+  position: static;
+  transform: none;
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar-left .channel-search .search-loading {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: translateY(-50%) rotate(0deg);
+  }
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
 }
 
 .sidebar-left .channel-search input::placeholder {
@@ -411,12 +458,27 @@
 .model-filter-chip button {
   border: none;
   background: rgba(247, 127, 0, 0.12);
-  color: inherit;
+  color: transparent;
+  font-size: 0;
   border-radius: 999px;
-  padding: 0 0.3rem;
+  padding: 0.2rem;
   cursor: pointer;
-  font-size: 0.85rem;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.model-filter-chip button img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: brightness(0) invert(0.4);
+  transition: filter 0.3s ease;
+}
+
+.app-shell.dark-mode .model-filter-chip button img {
+  filter: brightness(0) invert(1);
 }
 
 .app-shell.dark-mode .model-filter-chip button {
@@ -435,15 +497,85 @@
   background: rgba(234, 179, 8, 0.2);
 }
 
-.sidebar-left .channel-badge.status-badge .status-icon {
+.sidebar-left .link-icon-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.sidebar-left .link-icon-btn .status-icon {
   width: 14px;
   height: 14px;
   display: inline-flex;
+  object-fit: contain;
+  transition: all 0.2s ease;
 }
 
-.sidebar-left .channel-badge.status-badge svg {
+.sidebar-left .link-icon-btn .status-icon img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
+}
+
+/* 未注册状态的链接图标 - 橙色 */
+.sidebar-left .link-icon-btn.unregistered .status-icon,
+.sidebar-left .link-icon-btn.unregistered .status-icon img {
+  filter: brightness(0) saturate(100%) invert(67%) sepia(95%) saturate(1218%) hue-rotate(350deg) brightness(102%) contrast(96%) !important;
+  opacity: 1;
+}
+
+.sidebar-left .link-icon-btn.unregistered img {
+  filter: brightness(0) saturate(100%) invert(67%) sepia(95%) saturate(1218%) hue-rotate(350deg) brightness(102%) contrast(96%) !important;
+}
+
+.app-shell.dark-mode .sidebar-left .link-icon-btn.unregistered .status-icon,
+.app-shell.dark-mode .sidebar-left .link-icon-btn.unregistered .status-icon img,
+.app-shell.dark-mode .sidebar-left .link-icon-btn.unregistered img {
+  filter: brightness(0) saturate(100%) invert(67%) sepia(95%) saturate(1218%) hue-rotate(350deg) brightness(102%) contrast(96%) !important;
+  opacity: 1;
+}
+
+.sidebar-left .link-icon-btn svg {
+  width: 100%;
+  height: 100%;
+  color: #1d4ed8;
+}
+
+.sidebar-left .link-icon-btn:hover {
+  background: rgba(99, 102, 241, 0.15);
+  transform: scale(1.15);
+}
+
+.sidebar-left .link-icon-btn:hover .status-icon {
+  transform: scale(1.1);
+}
+
+.sidebar-left .link-icon-btn:active {
+  transform: scale(0.9);
+  background: rgba(99, 102, 241, 0.25);
+}
+
+.sidebar-left .link-icon-btn:active .status-icon {
+  transform: scale(0.95);
+}
+
+.app-shell.dark-mode .sidebar-left .link-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.app-shell.dark-mode .sidebar-left .link-icon-btn:active {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .sidebar-left .channel-hint {
