@@ -152,10 +152,12 @@
 }
 
 .sidebar-left .channel-search .search-loading {
-  animation: spin 1s linear infinite;
+  width: 10px;
+  height: 10px;
+  animation: search-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes search-spin {
   from {
     transform: translateY(-50%) rotate(0deg);
   }
@@ -171,7 +173,36 @@
 .sidebar-left .channel-list {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0 0.65rem 0.8rem;
+}
+
+/* 滚动条样式 - 隐形化设计 */
+.sidebar-left .channel-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-left .channel-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-left .channel-list::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.sidebar-left .channel-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* 暗黑模式下的滚动条样式 */
+.app-shell.dark-mode .sidebar-left .channel-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.app-shell.dark-mode .sidebar-left .channel-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .sidebar-left .channel-placeholder {
@@ -263,11 +294,15 @@
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  min-width: 0;
 }
 
 .sidebar-left .channel-name {
   font-weight: 600;
   color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-left .channel-meta {
