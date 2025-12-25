@@ -101,6 +101,8 @@ export const agent = {
 
     // ==================== 对话相关 ====================
     'agent.chat.inputPlaceholder': '输入您的问题...（Enter发送，Shift+Enter换行）',
+    'agent.chat.inputPlaceholder.remote': '输入指令控制智能体...（Enter发送，Shift+Enter换行）',
+    'agent.chat.inputPlaceholder.groupChat': '输入消息发送到群聊...（Enter发送，Shift+Enter换行）',
     'agent.chat.send': '发送',
     'agent.chat.thinking': 'AI正在思考中...',
     'agent.chat.welcome': '欢迎使用Alou智能助手',
@@ -191,6 +193,9 @@ export const agent = {
     'agent.groupChat.taskRequest': '任务请求',
     'agent.groupChat.taskComplete': '任务完成',
     'agent.groupChat.yesterday': '昨天',
+    'agent.groupChat.archive': '群聊记录',
+    'agent.groupChat.collapse': '折叠',
+    'agent.groupChat.expand': '展开',
   },
   en: {
     // ==================== Create Agent ====================
@@ -290,6 +295,8 @@ export const agent = {
 
     // ==================== Chat Related ====================
     'agent.chat.inputPlaceholder': 'Type your question... (Enter to send, Shift+Enter for new line)',
+    'agent.chat.inputPlaceholder.remote': 'Type command to control agent... (Enter to send, Shift+Enter for new line)',
+    'agent.chat.inputPlaceholder.groupChat': 'Type message to send to group chat... (Enter to send, Shift+Enter for new line)',
     'agent.chat.send': 'Send',
     'agent.chat.thinking': 'AI is thinking...',
     'agent.chat.welcome': 'Welcome to Alou AI Assistant',
@@ -379,6 +386,9 @@ export const agent = {
     'agent.groupChat.taskRequest': 'Task Request',
     'agent.groupChat.taskComplete': 'Task Complete',
     'agent.groupChat.yesterday': 'Yesterday',
+    'agent.groupChat.archive': 'Group Chat Archive',
+    'agent.groupChat.collapse': 'Collapse',
+    'agent.groupChat.expand': 'Expand',
   },
 }
 

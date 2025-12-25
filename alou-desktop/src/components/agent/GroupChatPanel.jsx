@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import GroupChatMessage from './GroupChatMessage'
+import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
@@ -19,6 +20,10 @@ const GroupChatPanel = ({
   onClose,
   onRefresh,
   isLoading = false,
+  groupChatList = [],
+  activeChannelId,
+  onSwitchGroupChat,
+  onPanelClick,
 }) => {
   const { t } = useI18n()
   const messagesEndRef = useRef(null)
@@ -47,10 +52,19 @@ const GroupChatPanel = ({
     setIsScrolledToBottom(isAtBottom)
   }
 
+  // 处理面板点击事件，切换输入目标到群聊
+  const handlePanelClick = (e) => {
+    // 避免点击按钮或其他交互元素时触发
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+      return
+    }
+    onPanelClick?.()
+  }
+
   // 状态显示已移除
 
   return (
-    <section className="group-chat-panel">
+    <section className="group-chat-panel" onClick={handlePanelClick}>
       {/* 头部 */}
       <header className="group-chat-header">
         <div className="header-left">
@@ -96,33 +110,46 @@ const GroupChatPanel = ({
         </div>
       )}
 
-      {/* 消息列表 */}
-      <div className="group-chat-messages" ref={containerRef} onScroll={handleScroll}>
-        {messages.length === 0 && !isLoading ? (
-          <div className="empty-state">
-            <div className="empty-icon">💬</div>
-            <div className="empty-text">{t('agent.groupChat.empty')}</div>
-            <div className="empty-hint">{t('agent.groupChat.emptyHint')}</div>
-          </div>
-        ) : (
-          <>
-            {messages.map((message) => (
-              <GroupChatMessage key={message.id} message={message} />
-            ))}
-            {isLoading && (
-              <div className="loading-message">
-                <div className="typing-animation">
-                  <div className="typing-dots">
-                    <span />
-                    <span />
-                    <span />
+      {/* 内容区域：消息列表 + 存档列表 */}
+      <div className="group-chat-content">
+        {/* 消息列表 */}
+        <div className="group-chat-messages" ref={containerRef} onScroll={handleScroll}>
+          {messages.length === 0 && !isLoading ? (
+            <div className="empty-state">
+              <div className="empty-icon">💬</div>
+              <div className="empty-text">{t('agent.groupChat.empty')}</div>
+              <div className="empty-hint">{t('agent.groupChat.emptyHint')}</div>
+            </div>
+          ) : (
+            <>
+              {messages.map((message) => (
+                <GroupChatMessage key={message.id} message={message} />
+              ))}
+              {isLoading && (
+                <div className="loading-message">
+                  <div className="typing-animation">
+                    <div className="typing-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                    <span className="typing-text">{t('agent.groupChat.typing')}</span>
                   </div>
-                  <span className="typing-text">{t('agent.groupChat.typing')}</span>
                 </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </>
+              )}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
+
+        {/* 存档列表 */}
+        {groupChatList && groupChatList.length > 0 && (
+          <GroupChatArchiveList
+            groupChatList={groupChatList}
+            activeActionId={actionId}
+            activeChannelId={activeChannelId}
+            onSwitchGroupChat={onSwitchGroupChat}
+          />
         )}
       </div>
 

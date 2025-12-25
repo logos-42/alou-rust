@@ -38,6 +38,7 @@ import { useGroupChatButton } from './AgentChat/useGroupChatButton'
 import { useRateLimitModal } from './AgentChat/useRateLimitModal'
 import { useAgentBackground } from './AgentChat/useAgentBackground'
 import { useAgentModals } from './AgentChat/useAgentModals'
+import { useGroupChatRemoteControl } from './AgentChat/useGroupChatRemoteControl'
 
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
@@ -147,6 +148,7 @@ const AgentChat = () => {
   // 需要在 useAgentUI 之后调用，因为需要 openConversationPanel
   const groupChatManager = useGroupChatManager({
     openConversationPanel,
+    activeChannelId,
   })
 
   const {
@@ -156,14 +158,17 @@ const AgentChat = () => {
     groupChatMessages,
     actionStatus,
     splitPosition,
+    groupChatList,
     openGroupChat,
     closeGroupChat,
     closeGroupChatCompletely,
     toggleGroupChat,
     setSplitPosition,
+    switchGroupChat,
     hasActiveAction,
     canOpenGroupChat,
   } = groupChatManager
+
 
   // ==================== 2. Connection State Hook ====================
   const connectionState = useAgentConnection({
@@ -444,39 +449,24 @@ const AgentChat = () => {
     handleInspectMessage,
   } = eventHandlers
 
-  // ==================== Send Message with Tool Calls ====================
-  // 使用 sendMessageToAgent 实现多智能体独立执行空间
-  const sendMessage = useCallback(async () => {
-    const text = currentMessage.trim()
-    if (!text || !activeChannelId) {
-      return
-    }
-
-    // 检查当前智能体是否正在执行
-    if (isAgentLoading(activeChannelId)) {
-      console.log('[AgentChat] 智能体正在执行中，跳过:', activeChannelId)
-      return
-    }
-
-    if (!isSessionReady) {
-      await createSession()
-      setSessionReady(true)
-    }
-
-    // 使用 sendMessageToAgent 发送消息（支持多智能体并发）
-    setCurrentMessage('')
-    await sendMessageToAgent(activeChannelId, text, selectedAgent)
-  }, [
+  // ==================== Group Chat Remote Control Hook ====================
+  // 群聊遥控功能：管理输入目标模式和消息发送逻辑
+  const remoteControl = useGroupChatRemoteControl({
+    showGroupChat,
+    activeActionId,
     activeChannelId,
-    createSession,
     currentMessage,
+    setCurrentMessage,
+    sendMessageToAgent,
+    selectedAgent,
     isAgentLoading,
     isSessionReady,
-    selectedAgent,
-    sendMessageToAgent,
-    setCurrentMessage,
+    createSession,
     setSessionReady,
-  ])
+    userName,
+  })
+
+  const { inputTargetMode, sendMessage, handleGroupChatPanelClick } = remoteControl
 
 
   // ==================== Bootstrap Effect ====================
@@ -631,6 +621,10 @@ const AgentChat = () => {
                         // 刷新群聊消息的逻辑已在 useGroupChat 中处理
                       }}
                       isLoading={actionStatus === 'Running'}
+                      groupChatList={groupChatList}
+                      activeChannelId={activeChannelId}
+                      onSwitchGroupChat={switchGroupChat}
+                      onPanelClick={handleGroupChatPanelClick}
                     />
                   }
                   defaultPosition={splitPosition}
@@ -674,6 +668,7 @@ const AgentChat = () => {
           onToggleCollapse={toggleSidebar}
           onInspectWallet={handleInspectWallet}
           onInspectTransaction={handleInspectTransaction}
+          selectedAgent={selectedAgent}
           connectActionSlot={() => (
             <button type="button" onClick={goToWallet}>
               {t('agent.sidebar.connectNow')}
@@ -706,6 +701,8 @@ const AgentChat = () => {
         }}
         onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}
         onOpenConversation={openConversationPanel}
+        inputTargetMode={showGroupChat ? inputTargetMode : null}
+        showGroupChat={showGroupChat}
       />
 
       <CreateAgentModal

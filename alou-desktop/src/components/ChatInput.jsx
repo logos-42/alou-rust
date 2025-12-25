@@ -5,8 +5,9 @@ import cancelIcon from '@/assets/终止0.2.png'
 import './ChatInput.css'
 
 const ChatInput = forwardRef(
-  ({ value, onChange, onSend, onNewLine, onCancel, isLoading = false, autoFocus = false }, ref) => {
+  ({ value, onChange, onSend, onNewLine, onCancel, isLoading = false, autoFocus = false, placeholder }, ref) => {
     const { t } = useI18n()
+    const displayPlaceholder = placeholder || t('inputPlaceholder')
     const textareaRef = useRef(null)
 
     const adjustHeight = () => {
@@ -64,7 +65,7 @@ const ChatInput = forwardRef(
               value={value}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
-              placeholder={t('inputPlaceholder')}
+              placeholder={displayPlaceholder}
             />
             <div className="button-group">
               {showCancel ? (
