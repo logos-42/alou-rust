@@ -9,8 +9,12 @@ export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?
 export const resolveAgentAvatar = (agent) => {
   if (!agent) return fallbackAvatar
   
-  // 1. 直接 URL（已经是完整的 http/https URL）
-  if (agent.avatar && agent.avatar.startsWith('http')) return agent.avatar
+  // 1. 直接 URL（已经是完整的 http/https URL）或 data URL
+  if (agent.avatar) {
+    if (agent.avatar.startsWith('http') || agent.avatar.startsWith('data:')) {
+      return agent.avatar
+    }
+  }
   if (agent.avatar_url && agent.avatar_url.startsWith('http')) return agent.avatar_url
   
   // 2. IPFS CID（支持多种格式）

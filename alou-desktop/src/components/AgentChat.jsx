@@ -43,6 +43,7 @@ import { useGroupChatRemoteControl } from './AgentChat/useGroupChatRemoteControl
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
 import { computeAgentProfile } from './AgentChat/agentUtils'
+import avatarManager from './AgentChat/avatarManager'
 import './AgentChat/index.css'
 
 /**
@@ -143,6 +144,35 @@ const AgentChat = () => {
     openDetailPanel,
     closeDetailPanel,
   } = useAgentModals({ recordInteraction })
+
+  // 处理编辑智能体
+  const handleEditAgent = useCallback(() => {
+    if (selectedAgent) {
+      openDetailPanel()
+      recordInteraction('edit_agent_clicked', { agentId: selectedAgent.id })
+    }
+  }, [selectedAgent, openDetailPanel, recordInteraction])
+
+  // 处理智能体更新
+  const handleAgentUpdated = useCallback((updatedAgent) => {
+    console.log('[AgentChat] 智能体已更新:', {
+      id: updatedAgent.id,
+      avatar: updatedAgent.avatar,
+      display_name: updatedAgent.display_name,
+      name: updatedAgent.name,
+      hasAvatarField: 'avatar' in updatedAgent
+    })
+    
+    // 更新selectedAgent状态
+    setSelectedAgent(updatedAgent)
+    
+    // 使用头像管理模块更新频道列表
+    setChannels(prevChannels => 
+      avatarManager.updateChannelsAvatar(prevChannels, updatedAgent)
+    )
+    
+    console.log('[AgentChat] 频道列表已更新')
+  }, [])
 
   // ==================== Group Chat Manager Hook ====================
   // 需要在 useAgentUI 之后调用，因为需要 openConversationPanel
@@ -299,6 +329,7 @@ const AgentChat = () => {
     contextEventsRef,
     currentMode, // 传递当前模式（从 channelManager 获取）
     onRateLimitExceeded: openRateLimitModal,
+    onCreateAgent: createChannel, // 新增：传递创建智能体的回调函数
   })
 
   const {
@@ -487,11 +518,23 @@ const AgentChat = () => {
     }
     bootstrap()
 
+    // 处理头像更新事件
+    const handleAvatarUpdated = (event) => {
+      const { agentId, agent } = event.detail
+      if (selectedAgent?.id === agentId) {
+        setSelectedAgent(agent)
+        setChannels(prevChannels => 
+          avatarManager.updateChannelsAvatar(prevChannels, agent)
+        )
+      }
+    }
+
     // Event listeners
     if (typeof window !== 'undefined') {
       window.addEventListener('wallet-changed', handleWalletChanged)
       window.addEventListener('resize', handleResize)
       window.addEventListener('pointerup', handleGlobalPointerUp)
+      window.addEventListener('agent-avatar-updated', handleAvatarUpdated)
     }
 
     return () => {
@@ -499,10 +542,11 @@ const AgentChat = () => {
         window.removeEventListener('wallet-changed', handleWalletChanged)
         window.removeEventListener('resize', handleResize)
         window.removeEventListener('pointerup', handleGlobalPointerUp)
+        window.removeEventListener('agent-avatar-updated', handleAvatarUpdated)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [selectedAgent])
 
   // ==================== Shell Class Name ====================
   const shellClassName = [
@@ -583,6 +627,7 @@ const AgentChat = () => {
                 sessionId={sessionId}
                 onClose={closeDetailPanel}
                 isDarkMode={isDarkMode}
+                onAgentUpdated={handleAgentUpdated}
               />
             )}
 
@@ -599,6 +644,7 @@ const AgentChat = () => {
                         isLoading={isAgentLoading(activeChannelId)}
                         onClose={closeConversationPanel}
                         onInspectMessage={handleInspectMessage}
+                        onEdit={handleEditAgent}
                         streamEvents={streamEvents}
                         streamStatus={streamStatus}
                         embedded
@@ -643,6 +689,7 @@ const AgentChat = () => {
                     isLoading={isAgentLoading(activeChannelId)}
                     onClose={closeConversationPanel}
                     onInspectMessage={handleInspectMessage}
+                    onEdit={handleEditAgent}
                     streamEvents={streamEvents}
                     streamStatus={streamStatus}
                     embedded
