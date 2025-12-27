@@ -82,7 +82,7 @@ export const useAgentInvite = ({
         }
         
         addAction(localAction)
-        setActiveAction(actionId)
+        setActiveAction(actionId, channel.id)
         
         // 触发群聊显示事件
         window.dispatchEvent(
@@ -116,8 +116,22 @@ export const useAgentInvite = ({
         if (createResult?.action) {
           const action = createResult.action
           actionId = action.action_id
+          // 确保后端返回的 action 有正确的 metadata
+          if (!action.metadata) {
+            action.metadata = {}
+          }
+          if (!action.metadata.type) {
+            action.metadata.type = 'group_chat'
+          }
+          // 确保有 channel_id
+          if (!action.metadata.channel_id) {
+            action.metadata.channel_id = channel.id
+          }
+          if (!action.metadata.channel_name) {
+            action.metadata.channel_name = channel.name
+          }
           addAction(action)
-          setActiveAction(actionId)
+          setActiveAction(actionId, channel.id)
           
           // 创建集群行动后立即执行，以创建 pubsub topic
           try {

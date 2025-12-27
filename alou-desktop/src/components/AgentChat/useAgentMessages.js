@@ -24,6 +24,8 @@ export const useAgentMessages = ({
   contextEventsRef,
   currentMode = 'agent', // 当前模式：'agent' 或 'alou'
   onRateLimitExceeded, // 回调函数：当遇到 429 错误时调用
+  onCreateAgent, // 新增：创建智能体的回调函数
+  onAutoCreateAgent, // 新增：自动创建智能体的回调函数
 }) => {
   // 按频道存储消息：Map<channelId, Message[]>
   const [messagesByChannel, setMessagesByChannel] = useState({})
@@ -382,6 +384,71 @@ export const useAgentMessages = ({
     setSessionReady,
   ])
 
+  // 解析用户指令并生成智能体信息
+  const parseAgentCreationCommand = useCallback((text) => {
+    const lowerText = text.toLowerCase().trim()
+    
+    // 移除创建命令关键词
+    const createKeywords = ['创建智能体', '新建智能体', 'create agent', 'new agent', '/create', '/new']
+    let cleanedText = lowerText
+    for (const keyword of createKeywords) {
+      cleanedText = cleanedText.replace(keyword.toLowerCase(), '').trim()
+    }
+    
+    // 如果指令为空，使用默认值
+    if (!cleanedText) {
+      return {
+        name: `智能体_${Date.now().toString().slice(-6)}`,
+        roleDescription: '这是一个自动创建的智能体，可以帮助您处理各种任务。',
+        isDefault: true
+      }
+    }
+    
+    // 尝试从指令中提取信息
+    // 简单规则：如果包含"为"或"叫做"，提取名字
+    let name = null
+    let roleDescription = cleanedText
+    
+    // 中文模式：提取名字
+    if (cleanedText.includes('为') || cleanedText.includes('叫做') || cleanedText.includes('名为')) {
+      const nameMatch = cleanedText.match(/(?:为|叫做|名为)[：:]\s*([^，,。.]+)/)
+      if (nameMatch && nameMatch[1]) {
+        name = nameMatch[1].trim()
+        roleDescription = cleanedText.replace(nameMatch[0], '').replace(name, '').trim()
+      }
+    }
+    
+    // 英文模式：提取名字
+    if (cleanedText.includes('named') || cleanedText.includes('called') || cleanedText.includes('as')) {
+      const nameMatch = cleanedText.match(/(?:named|called|as)[：:]\s*([^，,.]+)/)
+      if (nameMatch && nameMatch[1]) {
+        name = nameMatch[1].trim()
+        roleDescription = cleanedText.replace(nameMatch[0], '').replace(name, '').trim()
+      }
+    }
+    
+    // 如果没有提取到名字，使用指令作为角色描述，生成默认名字
+    if (!name) {
+      name = `智能体_${Date.now().toString().slice(-6)}`
+      // 如果指令较短，直接作为名字
+      if (cleanedText.length <= 20 && !cleanedText.includes(' ')) {
+        name = cleanedText
+        roleDescription = '这是一个自动创建的智能体，可以帮助您处理各种任务。'
+      }
+    }
+    
+    // 清理角色描述
+    if (!roleDescription || roleDescription.length < 5) {
+      roleDescription = '这是一个自动创建的智能体，可以帮助您处理各种任务。'
+    }
+    
+    return {
+      name: name.charAt(0).toUpperCase() + name.slice(1), // 首字母大写
+      roleDescription,
+      isDefault: false
+    }
+  }, [])
+
   // 向后兼容的 sendMessage（发送到当前活动智能体）
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
@@ -389,7 +456,59 @@ export const useAgentMessages = ({
       return
     }
 
+    // 如果没有活动频道，检查是否为创建智能体的命令
     if (!activeChannelId) {
+      const createCommands = ['创建智能体', '新建智能体', 'create agent', 'new agent', '/create', '/new']
+      const isCreateCommand = createCommands.some(cmd => 
+        text.toLowerCase().includes(cmd.toLowerCase())
+      )
+      
+      if (isCreateCommand) {
+        console.log('[useAgentMessages] 检测到创建智能体命令:', text)
+        setCurrentMessage('')
+        
+        // 显示创建中的消息
+        appendMessage({
+          id: `system_${Date.now()}`,
+          type: 'assistant',
+          content: '🔄 正在创建默认系统智能体...',
+          timestamp: Date.now(),
+          source: 'system',
+        }, 'system')
+        
+        // 调用创建智能体的逻辑
+        if (onCreateAgent) {
+          try {
+            // 调用创建智能体回调
+            await onCreateAgent()
+            console.log('[useAgentMessages] 智能体创建命令已处理')
+          } catch (error) {
+            console.error('[useAgentMessages] 创建智能体失败:', error)
+            // 显示错误消息
+            appendMessage({
+              id: `system_${Date.now()}_error`,
+              type: 'assistant',
+              content: `❌ 创建智能体失败: ${error.message || '未知错误'}`,
+              timestamp: Date.now(),
+              source: 'system',
+            }, 'system')
+          }
+        } else {
+          // 如果没有提供创建回调，显示提示
+          setTimeout(() => {
+            appendMessage({
+              id: `system_${Date.now()}_2`,
+              type: 'assistant',
+              content: '⚠️ 智能体创建功能需要从左侧"+"按钮启动。请点击左侧的"+"按钮创建智能体。',
+              timestamp: Date.now(),
+              source: 'system',
+            }, 'system')
+          }, 1000)
+        }
+        
+        return
+      }
+      
       console.warn('[useAgentMessages] 无法发送消息：没有活动频道')
       return
     }
@@ -402,6 +521,8 @@ export const useAgentMessages = ({
     isLoading,
     selectedAgent,
     sendMessageToAgent,
+    appendMessage,
+    onCreateAgent,
   ])
 
   const openConversationPanel = useCallback(() => {

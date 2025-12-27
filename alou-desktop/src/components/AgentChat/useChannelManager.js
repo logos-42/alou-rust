@@ -910,6 +910,8 @@ export const useChannelManager = ({
           // 确保头像字段存在
           avatar_cid: agent.avatar_cid || null,
           avatar_url: agent.avatar_url || null,
+          // 确保 did_document 存在，以便 resolveAgentAvatar 可以正确解析头像
+          did_document: agent.did_document || null,
         }
         
         console.log('[useChannelManager] 增强后的 agent:', {

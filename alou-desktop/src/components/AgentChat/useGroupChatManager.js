@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useGroupChat } from './useGroupChat'
 import useClusterActionStore from '@/stores/clusterActionStore'
 
@@ -6,17 +6,57 @@ import useClusterActionStore from '@/stores/clusterActionStore'
  * useGroupChatManager - 群聊管理 Hook
  * 统一管理群聊相关的状态、事件监听和UI控制
  */
-export const useGroupChatManager = ({ openConversationPanel }) => {
+export const useGroupChatManager = ({ openConversationPanel, activeChannelId }) => {
   // 从 store 获取集群行动相关状态
   const {
-    activeActionId,
+    getActions,
+    getActiveActionId,
     setActiveAction,
     getActiveAction,
     getGroupChatMessages,
     getActionStatus,
+    loadChannelGroupChats,
   } = useClusterActionStore()
 
-  // 本地 UI 状态
+  // 使用 ref 跟踪已加载的频道，避免重复加载
+  const loadedChannelRef = useRef(null)
+  const openConversationPanelRef = useRef(openConversationPanel)
+  
+  // 更新 ref
+  useEffect(() => {
+    openConversationPanelRef.current = openConversationPanel
+  }, [openConversationPanel])
+
+  // 加载当前频道的群聊
+  useEffect(() => {
+    if (activeChannelId && loadedChannelRef.current !== activeChannelId) {
+      loadedChannelRef.current = activeChannelId
+      // 使用 setTimeout 延迟执行，避免在渲染过程中更新状态
+      setTimeout(() => {
+        const result = loadChannelGroupChats(activeChannelId)
+        
+        // 如果加载了群聊且有保存的显示状态，恢复显示
+        if (result.activeActionId) {
+          const saved = localStorage.getItem(`agent-chat-show-group-chat-${activeChannelId}`)
+          if (saved === 'true') {
+            setShowGroupChat(true)
+            openConversationPanelRef.current?.()
+          }
+        }
+      }, 0)
+    } else if (!activeChannelId) {
+      loadedChannelRef.current = null
+      setShowGroupChat(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannelId]) // 只依赖 activeChannelId，避免循环
+
+  // 获取当前频道的 activeActionId（使用 Zustand selector 订阅状态变化）
+  const activeActionId = useClusterActionStore((state) => {
+    return activeChannelId ? state.activeActionIdByChannel[activeChannelId] || null : null
+  })
+
+  // 本地 UI 状态（按频道存储）
   const [showGroupChat, setShowGroupChat] = useState(false)
   const [splitPosition, setSplitPosition] = useState(() => {
     // 从 localStorage 读取保存的分割位置
@@ -39,8 +79,17 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
     }
   }, [splitPosition])
 
+  // 保存群聊显示状态到 localStorage（按频道）
+  useEffect(() => {
+    if (typeof window !== 'undefined' && activeChannelId) {
+      localStorage.setItem(`agent-chat-show-group-chat-${activeChannelId}`, showGroupChat.toString())
+    }
+  }, [showGroupChat, activeChannelId])
+
   // 群聊相关数据
-  const activeAction = useMemo(() => getActiveAction(), [activeActionId, getActiveAction])
+  const activeAction = useMemo(() => {
+    return activeChannelId ? getActiveAction(activeChannelId) : null
+  }, [activeChannelId, activeActionId, getActiveAction])
   const groupChatMessages = useMemo(
     () => (activeActionId ? getGroupChatMessages(activeActionId) : []),
     [activeActionId, getGroupChatMessages],
@@ -70,11 +119,15 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
     // 注意：不自动清除 activeActionId，以便用户可以重新打开
   }, [])
 
-  // 完全关闭群聊（清除行动）
+  // 完全关闭群聊（只关闭显示，保留记录以便下次打开）
   const closeGroupChatCompletely = useCallback(() => {
     setShowGroupChat(false)
-    setActiveAction(null)
-  }, [setActiveAction])
+    // 不清除 activeActionId，保留记录以便下次可以重新打开
+    // 只清除持久化的显示状态
+    if (typeof window !== 'undefined' && activeChannelId) {
+      localStorage.removeItem(`agent-chat-show-group-chat-${activeChannelId}`)
+    }
+  }, [activeChannelId])
 
   // 切换群聊显示状态
   const toggleGroupChat = useCallback(() => {
@@ -89,8 +142,8 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
   useEffect(() => {
     const handleClusterActionCreated = (event) => {
       const { actionId } = event.detail
-      if (actionId) {
-        setActiveAction(actionId)
+      if (actionId && activeChannelId) {
+        setActiveAction(actionId, activeChannelId)
         setShowGroupChat(true)
         openConversationPanel?.()
       }
@@ -100,15 +153,33 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
     return () => {
       window.removeEventListener('cluster-action-created', handleClusterActionCreated)
     }
-  }, [setActiveAction, openConversationPanel])
+  }, [setActiveAction, openConversationPanel, activeChannelId])
 
-  // 当 activeActionId 变化时，如果之前有群聊打开，保持打开状态
+
+  // 当 activeActionId 被清除时，自动关闭群聊显示
   useEffect(() => {
-    if (activeActionId && !showGroupChat) {
-      // 如果有新的行动但群聊未打开，可以选择自动打开
-      // 这里不自动打开，让用户手动控制
+    if (!activeActionId && showGroupChat && activeChannelId) {
+      setShowGroupChat(false)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`agent-chat-show-group-chat-${activeChannelId}`)
+      }
     }
-  }, [activeActionId, showGroupChat])
+  }, [activeActionId, showGroupChat, activeChannelId])
+
+  // 获取当前频道的群聊列表（直接使用 getActions，不订阅 store，避免循环）
+  const groupChatList = useMemo(() => {
+    if (!activeChannelId) return []
+    return getActions(activeChannelId) || []
+    // 只依赖 activeChannelId，getActions 是稳定的函数引用
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannelId])
+
+  // 切换群聊
+  const switchGroupChat = useCallback((actionId) => {
+    if (activeChannelId) {
+      setActiveAction(actionId, activeChannelId)
+    }
+  }, [activeChannelId, setActiveAction])
 
   return {
     // 状态
@@ -118,6 +189,7 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
     groupChatMessages: groupChatMessagesFromHook.length > 0 ? groupChatMessagesFromHook : groupChatMessages,
     actionStatus: actionStatus || 'Pending',
     splitPosition,
+    groupChatList,
 
     // 操作方法
     openGroupChat,
@@ -125,6 +197,7 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
     closeGroupChatCompletely,
     toggleGroupChat,
     setSplitPosition,
+    switchGroupChat,
 
     // 计算属性
     hasActiveAction: !!activeActionId,
@@ -133,4 +206,5 @@ export const useGroupChatManager = ({ openConversationPanel }) => {
 }
 
 export default useGroupChatManager
+
 
