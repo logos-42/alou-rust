@@ -421,30 +421,34 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             <div className="diap-field">
               <label>{t('agent.diap.cid')}</label>
               <div className="diap-value">
-                <code>{identity.cid}</code>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => copyToClipboard(identity.cid)}
-                  title={t('agent.diap.copy')}
-                >
-                  <img src={CopyIcon} alt="复制" />
-                </button>
+                <code>{identity.cid || selectedAgent?.cid || 'N/A'}</code>
+                {(identity.cid || selectedAgent?.cid) && (
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => copyToClipboard(identity.cid || selectedAgent?.cid || '')}
+                    title={t('agent.diap.copy')}
+                  >
+                    <img src={CopyIcon} alt="复制" />
+                  </button>
+                )}
               </div>
             </div>
 
             <div className="diap-field">
               <label>{t('agent.diap.did')}</label>
               <div className="diap-value">
-                <code>{identity.did}</code>
-                <button
-                  type="button"
-                  className="copy-btn"
-                  onClick={() => copyToClipboard(identity.did)}
-                  title={t('agent.diap.copy')}
-                >
-                  <img src={CopyIcon} alt="复制" />
-                </button>
+                <code>{identity.did || selectedAgent?.did || 'N/A'}</code>
+                {(identity.did || selectedAgent?.did) && (
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => copyToClipboard(identity.did || selectedAgent?.did || '')}
+                    title={t('agent.diap.copy')}
+                  >
+                    <img src={CopyIcon} alt="复制" />
+                  </button>
+                )}
               </div>
             </div>
 

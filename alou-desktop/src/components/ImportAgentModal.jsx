@@ -27,7 +27,7 @@ function ImportAgentModal({ isOpen, onClose, onResolve, onImportAgent }) {
     isCancelledRef.current = false // 重置取消标志
     
     try {
-      // 使用 agentService 从网络加载智能体
+      // 使用 agentService 从网络加载智能体（照搬三天前版本的解析逻辑）
       console.log('[ImportAgentModal] 开始解析智能体:', target)
       const result = await agentService.loadAgentFromNetwork(target)
       
@@ -39,49 +39,32 @@ function ImportAgentModal({ isOpen, onClose, onResolve, onImportAgent }) {
       
       if (result.success && result.agent) {
         console.log('[ImportAgentModal] 解析成功:', result.agent)
+        // 确保 agent 对象包含 did_document，以便 resolveAgentAvatar 可以正确解析头像
+        const agentWithDidDocument = {
+          ...result.agent,
+          did_document: result.didDocument || result.agent.did_document,
+        }
+        console.log('[ImportAgentModal] agent 对象（包含 did_document）:', {
+          name: agentWithDidDocument.name,
+          avatar_cid: agentWithDidDocument.avatar_cid,
+          avatar_url: agentWithDidDocument.avatar_url,
+          hasDidDocument: !!agentWithDidDocument.did_document,
+        })
         // 只有在组件仍然挂载且未被取消时才更新状态
         if (!isCancelledRef.current && isMountedRef.current) {
-          setResolvedAgent(result.agent)
+          setResolvedAgent(agentWithDidDocument)
           setShowImportConfirm(true)
-        }
-        if (isMountedRef.current) {
           setIsLoading(false)
         }
       } else {
-        // 降级到原有的 onResolve 方法
+        // 降级到原有的 onResolve 方法（照搬三天前版本的逻辑）
         if (onResolve) {
-          try {
-            const resolvedAgent = await onResolve(target)
-            
-            // 检查是否已被取消或组件已卸载
-            if (isCancelledRef.current || !isMountedRef.current) {
-              console.log('[ImportAgentModal] 解析已被取消或组件已卸载')
-              return
-            }
-            
-            if (resolvedAgent) {
-              console.log('[ImportAgentModal] onResolve 解析成功:', resolvedAgent)
-              // 只有在组件仍然挂载且未被取消时才更新状态
-              if (!isCancelledRef.current && isMountedRef.current) {
-                setResolvedAgent(resolvedAgent)
-                setShowImportConfirm(true)
-              }
-            }
-            if (isMountedRef.current) {
-              setIsLoading(false)
-            }
-          } catch (err) {
-            // 只有在组件仍然挂载且未被取消时才显示错误
-            if (!isCancelledRef.current && isMountedRef.current) {
-              console.error('[ImportAgentModal] onResolve 失败:', err)
-              setIsLoading(false)
-              setError(err?.message || t('agent.import.error.resolveFailed') || '解析失败，请检查标识是否正确')
-            }
-          }
-        } else {
-          // 只有在组件仍然挂载且未被取消时才显示错误
-          if (!isCancelledRef.current && isMountedRef.current) {
-            setIsLoading(false)
+          await onResolve(target)
+        }
+        // 只有在组件仍然挂载且未被取消时才更新状态
+        if (!isCancelledRef.current && isMountedRef.current) {
+          setIsLoading(false)
+          if (!result.success) {
             setError(result.error || t('agent.import.error.resolveFailed') || '解析失败，请检查标识是否正确')
           }
         }

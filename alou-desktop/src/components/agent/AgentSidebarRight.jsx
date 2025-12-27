@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import CollapseIcon from '@/assets/收缩.png'
 import WalletIcon from '@/assets/钱包0.3.png'
+import { resolveAgentAvatar } from '@/components/AgentChat/agentUtils'
 import './AgentSidebarRight.css'
 
 const formatDate = (timestamp) =>
@@ -56,8 +57,12 @@ const AgentSidebarRight = ({
   onInspectWallet,
   onInspectTransaction,
   connectActionSlot,
+  selectedAgent = null,
 }) => {
   const { t } = useI18n()
+  
+  // 获取智能体头像
+  const agentAvatar = selectedAgent ? resolveAgentAvatar(selectedAgent) : null
 
   const handleCopy = useCallback((address) => {
     if (!address || typeof navigator === 'undefined') return
@@ -86,19 +91,28 @@ const AgentSidebarRight = ({
           <section className="wallet-card">
             <header>
               <div className="title">
+                {agentAvatar ? (
+                  <img 
+                    src={agentAvatar} 
+                    alt={selectedAgent?.display_name || selectedAgent?.name || '智能体'}
+                    className="agent-avatar"
+                    onError={(e) => {
+                      // 头像加载失败时，隐藏图片，显示默认图标
+                      e.target.style.display = 'none'
+                      const parent = e.target.parentElement
+                      if (parent && !parent.querySelector('.emoji-fallback')) {
+                        const fallback = document.createElement('span')
+                        fallback.className = 'emoji emoji-fallback'
+                        fallback.textContent = '💰'
+                        parent.insertBefore(fallback, e.target)
+                      }
+                    }}
+                  />
+                ) : (
                 <span className="emoji">💰</span>
+                )}
                 <span>{t('agentAssets')}</span>
               </div>
-              <button
-                type="button"
-                className="refresh-btn"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onRefreshWallet?.()
-                }}
-              >
-                {t('refresh')}
-              </button>
             </header>
             {walletSnapshot ? (
               <div

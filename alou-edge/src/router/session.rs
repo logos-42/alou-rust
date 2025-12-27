@@ -227,7 +227,7 @@ pub(crate) async fn handle_agent_chat(
                     );
                     
                     let headers = {
-                        let mut h = Headers::new();
+                        let h = Headers::new();
                         let _ = h.set("Content-Type", "application/json; charset=utf-8");
                         let _ = h.set("Retry-After", &next_day.to_string());
                         h

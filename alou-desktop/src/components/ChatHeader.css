@@ -96,27 +96,9 @@
   transition: all 0.3s ease;
 }
 
-.top-nav .theme-toggle,
-.top-nav .settings-toggle {
-  background: var(--secondary-color);
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-.top-nav .settings-toggle img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
-.app-shell.dark-mode .top-nav .settings-toggle img {
-  filter: brightness(0) invert(1);
+/* 设置按钮使用和 API 按钮相同的样式 */
+.top-nav .settings-icon-btn {
+  /* 继承 api-icon-btn 的所有样式 */
 }
 
 .top-nav .login-btn {
@@ -133,11 +115,23 @@
   transition: all 0.3s ease;
 }
 
+.top-nav .login-btn .login-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) invert(0.4);
+  transition: filter 0.3s ease;
+}
+
 /* 暗夜模式下登录按钮变暗色 */
 .app-shell.dark-mode .top-nav .login-btn {
   background: rgba(255, 255, 255, 0.1); /* 暗夜模式暗色背景 */
   color: #ffffff; /* 暗夜模式白色文字 */
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.app-shell.dark-mode .top-nav .login-btn .login-icon {
+  filter: brightness(0) invert(1);
 }
 
 .app-shell.dark-mode .top-nav .login-btn:hover {

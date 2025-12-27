@@ -156,16 +156,53 @@
   gap: 0.5rem;
   font-weight: 600;
   color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.sidebar-right .title > span:not(.emoji):not(.emoji-fallback) {
+  font-size: 0.875rem;
+}
+
+.sidebar-right .title .agent-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.sidebar-right .title .emoji {
+  font-size: 1.2rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .sidebar-right .refresh-btn {
   border: none;
   background: rgba(99, 102, 241, 0.12);
   color: var(--primary-color);
-  border-radius: 999px;
-  padding: 0.3rem 0.7rem;
-  font-size: 0.72rem;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.sidebar-right .refresh-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+.sidebar-right .refresh-btn .refresh-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-right .wallet-body {

@@ -202,6 +202,15 @@
   line-height: 1;
 }
 
+/* 内容区域：消息列表 + 存档列表 */
+.group-chat-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
 /* 消息列表 */
 .group-chat-messages {
   flex: 1;
@@ -209,6 +218,8 @@
   overflow-x: hidden;
   padding: 16px 0;
   scroll-behavior: smooth;
+  min-width: 0;
+  position: relative;
 }
 
 .group-chat-messages::-webkit-scrollbar {
@@ -311,7 +322,7 @@
   color: var(--text-secondary, #475569);
 }
 
-/* 刷新按钮 - 固定在右下角 */
+/* 刷新按钮 - 固定在右下角（相对于消息区域） */
 .refresh-btn-fixed {
   position: absolute;
   bottom: 1.25rem;
@@ -330,6 +341,11 @@
   transition: all 0.2s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 10;
+}
+
+/* 当有存档列表时，按钮相对于消息区域定位 */
+.group-chat-content:has(.group-chat-archive-list) .refresh-btn-fixed {
+  right: 1.25rem;
 }
 
 .refresh-btn-fixed img {

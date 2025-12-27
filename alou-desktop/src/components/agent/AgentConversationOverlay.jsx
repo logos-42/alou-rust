@@ -2,6 +2,7 @@ import React, { forwardRef, useImperativeHandle, useRef } from 'react'
 import MessageList from '@/components/MessageList'
 import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
 import CloseIcon from '@/assets/关闭0.3.png'
+import EditIcon from '@/assets/修改.png'
 import './AgentConversationOverlay.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -16,6 +17,7 @@ const AgentConversationOverlay = forwardRef(
       isLoading,
       onClose,
       onInspectMessage,
+      onEdit,
       streamEvents = [],
       streamStatus = 'idle',
       embedded = false,
@@ -46,9 +48,21 @@ const AgentConversationOverlay = forwardRef(
     const header = (
       <header>
         <div className="title">
-          <span className="agent-avatar">
-            <img src={avatarSrc} alt={avatarAlt} />
-          </span>
+          <div className="avatar-container">
+            <span className="agent-avatar">
+              <img src={avatarSrc} alt={avatarAlt} />
+            </span>
+            {onEdit && (
+              <button 
+                type="button" 
+                className="edit-btn" 
+                onClick={onEdit} 
+                title="编辑智能体"
+              >
+                <img src={EditIcon} alt="编辑" />
+              </button>
+            )}
+          </div>
           <div className="title-text">
             <span>{title}</span>
             {subtitle && <small>{subtitle}</small>}

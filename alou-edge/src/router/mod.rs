@@ -17,7 +17,7 @@ use serde_json::json;
 use std::sync::Arc;
 use worker::*;
 
-mod agent;
+pub mod agent;
 mod blockchain;
 mod cluster_action;
 mod diap;
@@ -25,6 +25,7 @@ mod mcp;
 pub mod pubsub;
 mod session;
 mod subscription;
+mod user_config;
 mod wallet;
 
 pub struct Router {
@@ -248,6 +249,42 @@ impl Router {
                     .await
             }
 
+            // User config endpoints
+            (Method::Get, "/api/user/config") => {
+                match env.kv("CACHE") {
+                    Ok(kv_binding) => {
+                        let kv = KvStore::new(kv_binding);
+                        user_config::handle_get_user_config(self.wallet_auth.as_ref(), &kv, req).await
+                            .map_err(|e| worker::Error::RustError(e.to_string()))
+                    }
+                    Err(e) => {
+                        let error_response = ErrorResponse {
+                            error: format!("Failed to access KV store: {}", e),
+                        };
+                        json_response_with_status(&error_response, 500)
+                    }
+                }
+            }
+            (Method::Post, "/api/user/config") => {
+                match env.kv("CACHE") {
+                    Ok(kv_binding) => {
+                        let kv = KvStore::new(kv_binding);
+                        user_config::handle_save_user_config(self.wallet_auth.as_ref(), &kv, req).await
+                            .map_err(|e| worker::Error::RustError(e.to_string()))
+                    }
+                    Err(e) => {
+                        let error_response = ErrorResponse {
+                            error: format!("Failed to access KV store: {}", e),
+                        };
+                        json_response_with_status(&error_response, 500)
+                    }
+                }
+            }
+            (Method::Post, "/api/user/config/verify") => {
+                user_config::handle_verify_api_key(self.wallet_auth.as_ref(), req).await
+                    .map_err(|e| worker::Error::RustError(e.to_string()))
+            }
+
             (Method::Post, "/api/agent/chat") => {
                 session::handle_agent_chat(
                     &self.session_manager,
@@ -277,6 +314,15 @@ impl Router {
             }
             (Method::Post, "/api/agent/create-claude") => {
                 agent::handle_create_claude_agent(&self.session_manager, req).await
+            }
+            (Method::Post, "/api/agent/batch-create") => {
+                agent::handle_batch_create_agent(&self.session_manager, req, &env).await
+            }
+            (Method::Get, path) if path.starts_with("/api/agent/batch-create/") => {
+                agent::handle_get_batch_create_task(&self.session_manager, req, &env).await
+            }
+            (Method::Get, path) if path.starts_with("/api/agent/batch-create/sessions/") => {
+                agent::handle_get_batch_agent_sessions(&self.session_manager, req, &env).await
             }
             (Method::Post, "/api/agent/diap/register-onchain") => {
                 agent::handle_register_agent_onchain(&self.session_manager, &env, req).await

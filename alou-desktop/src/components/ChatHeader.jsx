@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import AlouLogo from '@/../src-tauri/icons/Square30x30Logo.png'
-import ApiDocIcon from '@/assets/API文档.png'
 import SettingsIcon from '@/assets/设置 0.7.png'
+import LoginIcon from '@/assets/登录.png'
 import SettingsPanel from './SettingsPanel'
+import ApiConfigModal from './ApiConfigModal'
 import './ChatHeader.css'
 
 const statusTextMap = {
@@ -27,6 +28,7 @@ const ChatHeader = ({
   const { t } = useI18n()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
+  const [showApiConfigModal, setShowApiConfigModal] = useState(false)
 
   const statusText = useMemo(() => {
     const key = statusTextMap[connectionStatus] || 'connecting'
@@ -58,23 +60,16 @@ const ChatHeader = ({
         <div className="nav-controls">
           <button 
             type="button" 
-            onClick={() => {
-              // 打开API配置页面
-              window.open('https://docs.alou.ai/api', '_blank')
-            }} 
-            className="api-icon-btn" 
-            title={statusText}
+            onClick={() => setShowSettingsPanel(true)} 
+            className="api-icon-btn settings-icon-btn" 
+            title="设置"
           >
-            <img src={ApiDocIcon} alt="API" className="api-icon" />
-          </button>
-
-          <button type="button" onClick={() => setShowSettingsPanel(true)} className="theme-toggle settings-toggle" title="设置">
-            <img src={SettingsIcon} alt="设置" />
+            <img src={SettingsIcon} alt="设置" className="api-icon" />
           </button>
 
           {!isAuthenticated ? (
             <button type="button" onClick={onGoToLogin} className="login-btn">
-              <span>🔐</span>
+              <img src={LoginIcon} alt="登录" className="login-icon" />
               <span>{t('login')}</span>
             </button>
           ) : (
@@ -106,6 +101,17 @@ const ChatHeader = ({
           onClose={() => setShowSettingsPanel(false)}
           onBackgroundChange={onBackgroundChange}
           activeChannelId={activeChannelId}
+          onOpenApiConfig={() => {
+            setShowSettingsPanel(false)
+            setShowApiConfigModal(true)
+          }}
+        />
+      )}
+      {showApiConfigModal && (
+        <ApiConfigModal
+          isOpen={showApiConfigModal}
+          onClose={() => setShowApiConfigModal(false)}
+          isDarkMode={isDarkMode}
         />
       )}
     </nav>

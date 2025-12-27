@@ -177,6 +177,14 @@ pub fn generate_nonce() -> String {
     hex::encode(bytes)
 }
 
+/// Compute SHA256 hash of a string
+pub fn sha256(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let hash = hasher.finalize();
+    hex::encode(hash)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

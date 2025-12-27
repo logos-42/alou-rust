@@ -4,7 +4,7 @@ import CloseIcon from '@/assets/关闭0.3.png'
 import { blurImage } from '@/utils/imageBlur'
 import './SettingsPanel.css'
 
-const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null }) => {
+const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null, onOpenApiConfig }) => {
   const { t } = useI18n()
   const panelRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -102,37 +102,54 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
       <div ref={panelRef} className={`settings-panel ${isDarkMode ? 'dark' : 'light'}`}>
         <div className="settings-panel-header">
           <button type="button" className="close-btn" onClick={onClose}>
-            <img src={CloseIcon} alt="关闭" />
+            <img src={CloseIcon} alt={t('common.close')} />
           </button>
-          <h3>设置</h3>
+          <h3>{t('common.settings.title')}</h3>
           <div className="header-spacer"></div>
         </div>
 
         <div className="settings-panel-content">
           {/* 主题切换 */}
           <div className="settings-section">
-            <div className="settings-section-title">主题</div>
+            <div className="settings-section-title">{t('common.theme.title')}</div>
             <div className="settings-option">
-              <span className="option-label">白天/黑夜模式</span>
+              <span className="option-label">{t('common.theme.dayNight')}</span>
               <button
                 type="button"
                 className="theme-toggle-btn"
                 onClick={onToggleTheme}
-                aria-label={isDarkMode ? '切换到白天模式' : '切换到黑夜模式'}
+                aria-label={isDarkMode ? t('common.theme.switchToDay') : t('common.theme.switchToNight')}
               >
                 <span className={`toggle-switch ${isDarkMode ? 'dark' : 'light'}`}>
                   <span className="toggle-slider" />
                 </span>
-                <span className="toggle-label">{isDarkMode ? '黑夜' : '白天'}</span>
+                <span className="toggle-label">{isDarkMode ? t('common.theme.night') : t('common.theme.day')}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* API 配置 */}
+          <div className="settings-section">
+            <div className="settings-section-title">{t('common.settings.apiConfig.title')}</div>
+            <div className="settings-option">
+              <span className="option-label">{t('common.settings.apiConfig.label')}</span>
+              <button
+                type="button"
+                className="btn-select-image"
+                onClick={() => {
+                  onOpenApiConfig?.()
+                }}
+              >
+                {t('common.settings.apiConfig.open')}
               </button>
             </div>
           </div>
 
           {/* 背景设置 */}
           <div className="settings-section">
-            <div className="settings-section-title">聊天背景</div>
+            <div className="settings-section-title">{t('common.settings.background.title')}</div>
             <div className="settings-option">
-              <span className="option-label">背景图片</span>
+              <span className="option-label">{t('common.settings.background.label')}</span>
               <div className="background-controls">
                 <input
                   ref={fileInputRef}
@@ -146,7 +163,7 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
                   className="btn-select-image"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  选择图片
+                  {t('common.settings.background.select')}
                 </button>
                 {backgroundImage && (
                   <button
@@ -154,14 +171,14 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
                     className="btn-remove-background"
                     onClick={handleRemoveBackground}
                   >
-                    移除背景
+                    {t('common.settings.background.remove')}
                   </button>
                 )}
               </div>
             </div>
             {backgroundImage && (
               <div className="background-preview">
-                <img src={backgroundImage} alt="背景预览" />
+                <img src={backgroundImage} alt={t('common.settings.background.preview')} />
               </div>
             )}
           </div>

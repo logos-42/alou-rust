@@ -70,12 +70,19 @@ export const useAgentStream = (sessionId, options = {}) => {
       const controller = new AbortController()
       abortRef.current = controller
 
+      // 设置超时（10秒）
+      const timeoutId = setTimeout(() => {
+        controller.abort()
+      }, 10000)
+
       try {
         const response = await fetch(url, {
           method: 'GET',
           headers: { Accept: 'application/json' },
           signal: controller.signal,
         })
+
+        clearTimeout(timeoutId)
 
         if (!response.ok) {
           throw new Error(`Progress fetch failed: ${response.status}`)
@@ -109,10 +116,23 @@ export const useAgentStream = (sessionId, options = {}) => {
           scheduleNext(idleIntervalMs)
         }
       } catch (error) {
+        clearTimeout(timeoutId)
+        
         if (!stopped) {
-          console.error('agent progress polling failed:', error)
+          // 如果是超时或网络错误，静默处理，不输出错误日志
+          const isTimeout = error.name === 'AbortError' && controller.signal.aborted
+          const isNetworkError = error.message?.includes('Failed to fetch') || 
+                                error.message?.includes('ERR_TIMED_OUT') ||
+                                error.message?.includes('NetworkError')
+          
+          if (!isTimeout && !isNetworkError) {
+            console.error('agent progress polling failed:', error)
+          }
+          
+          // 对于超时和网络错误，使用更长的重试间隔
+          const retryDelay = (isTimeout || isNetworkError) ? idleIntervalMs * 2 : idleIntervalMs
           setState('error')
-          scheduleNext(idleIntervalMs)
+          scheduleNext(retryDelay)
         }
       } finally {
         abortRef.current = null

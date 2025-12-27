@@ -12,6 +12,10 @@ mod utils;
 mod web3;
 
 use agent::{
+    ai_client::AiClient,
+    batch_create::BatchCreateTask,
+    batch_processor::BatchProcessor,
+    content_generator::ContentGenerator,
     discovery::{AgentDiscovery, AgentDiscoveryConfig},
     AgentCore, SessionManager,
 };
@@ -497,5 +501,84 @@ async fn initialize_mcp_servers(env: &Env, bridge: Arc<McpBridge>) -> Result<()>
         console_log!("  ℹ No MCP servers configured (MCP_SERVERS not set)");
     }
 
+    Ok(())
+}
+
+/// Queue handler for batch agent creation
+/// 
+/// This handler processes messages from the agent creation queue.
+/// It runs in a separate worker context and does not block HTTP requests.
+#[event(queue)]
+async fn queue_handler(batch: MessageBatch<BatchCreateTask>, env: Env, _ctx: Context) -> Result<()> {
+    console_log!("=== Processing batch agent creation queue ===");
+
+    // Initialize services
+    let sessions_kv = match env.kv("SESSIONS") {
+        Ok(kv) => kv,
+        Err(e) => {
+            console_error!("Failed to access SESSIONS KV: {}", e);
+            return Err(worker::Error::RustError(format!(
+                "Failed to access SESSIONS KV: {}",
+                e
+            )));
+        }
+    };
+    let kv_store = KvStore::new(sessions_kv.clone());
+    let session_manager = SessionManager::new(kv_store.clone());
+
+    // Create AI client (needed for ContentGenerator)
+    let ai_provider = env
+        .var("AI_PROVIDER")
+        .map(|v| v.to_string())
+        .unwrap_or_else(|_| {
+            console_log!("AI_PROVIDER not set, defaulting to 'deepseek'");
+            "deepseek".to_string()
+        });
+
+    let api_key = match env.secret("AI_API_KEY") {
+        Ok(key) => key.to_string(),
+        Err(_) => {
+            console_error!("AI_API_KEY not found in environment");
+            return Err(worker::Error::RustError(
+                "AI_API_KEY not configured".to_string(),
+            ));
+        }
+    };
+
+    let ai_model = env.var("AI_MODEL").map(|v| v.to_string()).ok();
+    let ai_client = match AiClient::new(&ai_provider, api_key, ai_model) {
+        Ok(client) => client,
+        Err(e) => {
+            console_error!("Failed to create AI client: {}", e);
+            return Err(worker::Error::RustError(format!(
+                "Failed to create AI client: {}",
+                e
+            )));
+        }
+    };
+
+    let content_generator = ContentGenerator::new(ai_client);
+    let processor = BatchProcessor::new(session_manager, content_generator, kv_store);
+
+    // Process each message in the batch
+    let messages = batch.messages()?;
+    console_log!("Batch size: {}", messages.len());
+    
+    for message in messages {
+        let task = message.body();
+        console_log!("Processing task: {}", task.task_id);
+        match processor.process_batch(task.clone(), &env).await {
+            Ok(()) => {
+                console_log!("Task {} processed successfully", message.id());
+                message.ack();
+            }
+            Err(e) => {
+                console_error!("Failed to process task {}: {}", message.id(), e);
+                message.retry();
+            }
+        }
+    }
+
+    console_log!("=== Batch processing completed ===");
     Ok(())
 }

@@ -36,6 +36,16 @@ id = "41a7073e13e84444a37f044f8467a50c"
 binding = "NONCES"
 id = "e0f682098b73485b940f1176417f417a"
 
+# Queue configuration for batch agent creation (requires Workers Paid plan)
+# [[queues.producers]]
+# queue = "agent-creation-queue"
+# binding = "AGENT_CREATION_QUEUE"
+
+# [[queues.consumers]]
+# queue = "agent-creation-queue"
+# max_batch_size = 10
+# max_batch_timeout = 30
+
 # Secrets (set with: wrangler secret put <NAME>)
 # AI_API_KEY - API key for the selected AI provider (DeepSeek/Qwen/OpenAI/Claude)
 # JWT_SECRET - Secret for JWT token signing

@@ -1,9 +1,12 @@
 pub mod ai_client;
 pub mod agent_coordinator;
+pub mod batch_create;
+pub mod batch_processor;
 pub mod blockchain_agent;
 pub mod claude_client;
 pub mod cluster_action;
 pub mod cluster_executor;
+pub mod content_generator;
 pub mod context;
 pub mod core;
 pub mod diap_identity;

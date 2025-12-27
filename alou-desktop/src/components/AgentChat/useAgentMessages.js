@@ -467,23 +467,36 @@ export const useAgentMessages = ({
         console.log('[useAgentMessages] 检测到创建智能体命令:', text)
         setCurrentMessage('')
         
+        // 解析指令并生成智能体信息
+        const agentInfo = parseAgentCreationCommand(text)
+        console.log('[useAgentMessages] 解析的智能体信息:', agentInfo)
+        
         // 显示创建中的消息
         appendMessage({
           id: `system_${Date.now()}`,
           type: 'assistant',
-          content: '🔄 正在创建默认系统智能体...',
+          content: `🔄 正在创建智能体 "${agentInfo.name}"...`,
           timestamp: Date.now(),
           source: 'system',
         }, 'system')
         
-        // 调用创建智能体的逻辑
-        if (onCreateAgent) {
+        // 调用自动创建智能体的逻辑
+        if (onAutoCreateAgent) {
           try {
-            // 调用创建智能体回调
-            await onCreateAgent()
-            console.log('[useAgentMessages] 智能体创建命令已处理')
+            // 调用自动创建智能体回调
+            await onAutoCreateAgent(agentInfo)
+            console.log('[useAgentMessages] 智能体自动创建命令已处理')
+            
+            // 显示创建成功消息
+            appendMessage({
+              id: `system_${Date.now()}_success`,
+              type: 'assistant',
+              content: `✅ 智能体 "${agentInfo.name}" 创建成功！已添加到频道栏。`,
+              timestamp: Date.now(),
+              source: 'system',
+            }, 'system')
           } catch (error) {
-            console.error('[useAgentMessages] 创建智能体失败:', error)
+            console.error('[useAgentMessages] 自动创建智能体失败:', error)
             // 显示错误消息
             appendMessage({
               id: `system_${Date.now()}_error`,
@@ -493,8 +506,16 @@ export const useAgentMessages = ({
               source: 'system',
             }, 'system')
           }
+        } else if (onCreateAgent) {
+          // 如果没有自动创建回调，但有创建回调，则打开模态框
+          try {
+            await onCreateAgent()
+            console.log('[useAgentMessages] 智能体创建命令已处理（打开模态框）')
+          } catch (error) {
+            console.error('[useAgentMessages] 打开创建模态框失败:', error)
+          }
         } else {
-          // 如果没有提供创建回调，显示提示
+          // 如果没有提供任何创建回调，显示提示
           setTimeout(() => {
             appendMessage({
               id: `system_${Date.now()}_2`,
@@ -523,6 +544,8 @@ export const useAgentMessages = ({
     sendMessageToAgent,
     appendMessage,
     onCreateAgent,
+    onAutoCreateAgent,
+    parseAgentCreationCommand,
   ])
 
   const openConversationPanel = useCallback(() => {

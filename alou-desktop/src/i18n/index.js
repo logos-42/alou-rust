@@ -30,11 +30,12 @@ import { agent } from './namespaces/agent'
 import { login } from './namespaces/login'
 import { wallet } from './namespaces/wallet'
 import { subscription } from './namespaces/subscription'
+import { apiConfig } from './namespaces/apiConfig'
 import { legacy } from './namespaces/legacy'
 
 // 所有命名空间列表 - 添加新命名空间时在这里注册
 // legacy 放在最后，确保新的命名空间 key 优先
-const namespaces = [common, agent, login, wallet, subscription, legacy]
+const namespaces = [common, agent, login, wallet, subscription, apiConfig, legacy]
 
 // 支持的语言列表
 export const SUPPORTED_LANGUAGES = ['zh', 'en']

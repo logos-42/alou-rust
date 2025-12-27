@@ -114,4 +114,101 @@ apiClient.interceptors.response.use(
   },
 )
 
+// API test functions
+export const apiService = {
+  // Test API connection
+  async testApiConnection(apiKey, provider, model) {
+    try {
+      const response = await apiClient.post('/user/config/verify', {
+        api_key: apiKey,
+        provider,
+        model,
+      })
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      console.error('[API Service] Test connection failed:', error)
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        return {
+          success: false,
+          error: '验证端点未实现，请确保后端服务正在运行',
+          details: error.message,
+        }
+      }
+      
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+        return {
+          success: false,
+          error: '无法连接到后端服务器，请检查网络连接',
+          details: error.message,
+        }
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || '未知错误',
+        details: error.response?.data,
+      }
+    }
+  },
+
+  // Save API configuration
+  async saveApiConfig(apiKey, provider, model) {
+    try {
+      const response = await apiClient.post('/user/config', {
+        api_key: apiKey,
+        provider,
+        model,
+      })
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      console.error('[API Service] Save config failed:', error)
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || '保存配置失败',
+        details: error.response?.data,
+      }
+    }
+  },
+
+  // Get API configuration
+  async getApiConfig() {
+    try {
+      const response = await apiClient.get('/user/config')
+      return {
+        success: true,
+        data: response.data,
+      }
+    } catch (error) {
+      // 如果是 401 错误，用户未认证，返回默认配置
+      if (error.response?.status === 401) {
+        console.log('[API Service] User not authenticated, returning default config')
+        return {
+          success: true,
+          data: {
+            provider: 'deepseek',
+            model: 'deepseek-chat',
+            has_api_key: false,
+            updated_at: 0,
+          },
+        }
+      }
+      
+      console.error('[API Service] Get config failed:', error)
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || '获取配置失败',
+        details: error.response?.data,
+      }
+    }
+  },
+}
+
 export default apiClient

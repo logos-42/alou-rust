@@ -307,6 +307,31 @@ const AgentChat = () => {
   // 注意：这里先创建一个占位函数，实际的 handleToolCalls 会在 messageState 之后更新
   const handleToolCallsRef = useRef(null)
   
+  // ==================== 自动创建智能体函数 ====================
+  const handleAutoCreateAgent = useCallback(async (agentInfo) => {
+    console.log('[AgentChat] 开始自动创建智能体:', agentInfo)
+    
+    try {
+      // 使用 handleCreateAgentSubmit 函数创建智能体
+      // 这里使用默认值：没有头像、使用默认 MCP 配置
+      await handleCreateAgentSubmit({
+        name: agentInfo.name,
+        roleDescription: agentInfo.roleDescription,
+        avatarCid: null, // 没有头像
+        mcpConfigCid: null, // 使用默认配置
+        mcpPorts: [], // 空端口列表
+        diapIdentity: null, // 自动创建 DIAP identity
+        tempId: null, // 没有临时 ID
+      })
+      
+      console.log('[AgentChat] 智能体自动创建成功:', agentInfo.name)
+      return true
+    } catch (error) {
+      console.error('[AgentChat] 智能体自动创建失败:', error)
+      throw error
+    }
+  }, [handleCreateAgentSubmit])
+
   // ==================== 6. Message State Hook ====================
   const messageState = useAgentMessages({
     sessionId,
@@ -329,7 +354,8 @@ const AgentChat = () => {
     contextEventsRef,
     currentMode, // 传递当前模式（从 channelManager 获取）
     onRateLimitExceeded: openRateLimitModal,
-    onCreateAgent: createChannel, // 新增：传递创建智能体的回调函数
+    onCreateAgent: createChannel, // 传递创建智能体的回调函数（打开模态框）
+    onAutoCreateAgent: handleAutoCreateAgent, // 新增：传递自动创建智能体的回调函数
   })
 
   const {

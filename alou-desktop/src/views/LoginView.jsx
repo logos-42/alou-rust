@@ -7,6 +7,7 @@ import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
 import { useI18n } from '@/hooks/useI18n'
 import CloseIcon from '@/assets/关闭0.3.png'
+import WalletIcon from '@/assets/钱包0.3.png'
 import './LoginView.css'
 
 const getWalletButtons = (isDesktop, t) => {
@@ -401,7 +402,7 @@ const LoginView = () => {
         </button>
 
         <div className="logo">
-          <div className="logo-icon">💰</div>
+          <img src={WalletIcon} alt="钱包" className="logo-icon" />
         </div>
 
         <h1 className="title">{t('login.title')}</h1>

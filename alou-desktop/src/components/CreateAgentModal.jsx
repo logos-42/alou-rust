@@ -10,10 +10,22 @@ import './CreateAgentModal.css'
 const DEFAULT_MCP_CODE = `{
   ports: [
     {
-      label: '',
-      endpoint: '',
-      port: 0,
-      description: ''
+      label: 'web_search',
+      endpoint: 'wss://mcp-server.example.com/web-search',
+      port: 443,
+      description: 'Web搜索工具，可以搜索最新信息'
+    },
+    {
+      label: 'blockchain',
+      endpoint: 'wss://mcp-server.example.com/blockchain',
+      port: 443,
+      description: '区块链工具，可以查询余额、发送交易等'
+    },
+    {
+      label: 'file_system',
+      endpoint: 'ws://localhost:8765',
+      port: 8765,
+      description: '本地文件系统工具'
     }
   ]
 }`
@@ -323,6 +335,10 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
 
           <div className="agent-modal__field">
             <span>{t('agent.create.mcp.label')}</span>
+            <div className="agent-modal__mcp-hint">
+              💡 <strong>重要提示：</strong>MCP工具是智能体的"能力"，没有工具配置的智能体将无法执行任何操作。
+              请至少配置一个MCP工具端点，或使用默认配置。
+            </div>
             <textarea
               className="agent-modal__code-editor"
               value={mcpCode}

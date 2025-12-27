@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
+import CloseIcon from '@/assets/关闭0.3.png'
 import './InviteAgentModal.css'
 
 /**

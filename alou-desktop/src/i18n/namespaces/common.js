@@ -75,6 +75,23 @@ export const common = {
     'common.theme.dark': '深色模式',
     'common.theme.light': '浅色模式',
     'common.theme.auto': '跟随系统',
+    'common.theme.title': '主题',
+    'common.theme.dayNight': '白天/黑夜模式',
+    'common.theme.day': '白天',
+    'common.theme.night': '黑夜',
+    'common.theme.switchToDay': '切换到白天模式',
+    'common.theme.switchToNight': '切换到黑夜模式',
+
+    // 设置面板
+    'common.settings.title': '设置',
+    'common.settings.apiConfig.title': '大模型 API 配置',
+    'common.settings.apiConfig.label': '配置 API 密钥和模型',
+    'common.settings.apiConfig.open': '打开 API 配置',
+    'common.settings.background.title': '聊天背景',
+    'common.settings.background.label': '背景图片',
+    'common.settings.background.select': '选择图片',
+    'common.settings.background.remove': '移除背景',
+    'common.settings.background.preview': '背景预览',
 
     // 语言
     'common.language': '语言',
@@ -153,6 +170,23 @@ export const common = {
     'common.theme.dark': 'Dark Mode',
     'common.theme.light': 'Light Mode',
     'common.theme.auto': 'System',
+    'common.theme.title': 'Theme',
+    'common.theme.dayNight': 'Day/Night Mode',
+    'common.theme.day': 'Day',
+    'common.theme.night': 'Night',
+    'common.theme.switchToDay': 'Switch to Day Mode',
+    'common.theme.switchToNight': 'Switch to Night Mode',
+
+    // Settings Panel
+    'common.settings.title': 'Settings',
+    'common.settings.apiConfig.title': 'LLM API Configuration',
+    'common.settings.apiConfig.label': 'Configure API Key and Model',
+    'common.settings.apiConfig.open': 'Open API Configuration',
+    'common.settings.background.title': 'Chat Background',
+    'common.settings.background.label': 'Background Image',
+    'common.settings.background.select': 'Select Image',
+    'common.settings.background.remove': 'Remove Background',
+    'common.settings.background.preview': 'Background Preview',
 
     // Language
     'common.language': 'Language',
