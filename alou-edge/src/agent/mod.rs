@@ -10,12 +10,8 @@ pub mod content_generator;
 pub mod context;
 pub mod context_compressor;
 pub mod core;
-pub mod creation;
-pub mod creation_parser;
 pub mod diap_identity;
 pub mod discovery;
-pub mod error_analyzer;
-pub mod error_response;
 pub mod prompts;
 pub mod providers;
 pub mod retry_policy;
@@ -32,17 +28,19 @@ pub use agent_coordinator::AgentCoordinator;
 pub use cluster_action::{ClusterAction, ClusterActionManager, ClusterActionStatus};
 #[allow(unused_imports)]
 pub use cluster_executor::ClusterExecutor;
+#[allow(unused_imports)]
 pub use core::AgentCore;
-pub use error_analyzer::{ErrorAnalyzer, SessionContext};
-pub use error_response::{ErrorType, ToolErrorResponse, CorrectedArgs};
-pub use retry_policy::{RetryPolicy, RetryState, RetryDecision, BackoffStrategy};
+#[allow(unused_imports)]
 pub use session::SessionManager;
+#[allow(unused_imports)]
 pub use spec::{
     TaskSpec, StepSpec, StepType, Precondition, ExpectedOutcome,
     ValidationRule, ValidationRuleType, ValidationSeverity, ExecutionPlan,
-    ExecutionPhase, SpecMetadata, RetryConfig
+    SpecMetadata, RetryConfig
 };
+#[allow(unused_imports)]
 pub use spec_validator::SpecValidator;
+#[allow(unused_imports)]
 pub use spec_validator::ValidationResult;
 #[allow(unused_imports)]
 pub use task_orchestrator::TaskOrchestrator;
