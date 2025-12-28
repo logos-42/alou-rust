@@ -8,6 +8,8 @@ mod ipfs_api;
 mod ipfs_commands;
 mod ipfs_node;
 mod kubo;
+mod lsp;
+mod spec;
 mod sync;
 mod utils;
 mod wallet;
@@ -40,6 +42,8 @@ use crate::browser::{open_browser, test_ipfs_node_connection};
 use crate::sync::{
     read_wallet_sync_data, start_wallet_sync_server, write_wallet_sync_data,
 };
+use crate::lsp::{execute_lsp, get_supported_languages};
+use crate::spec::{execute_spec, get_spec_templates, load_template_content};
 
 fn main() {
     tauri::Builder::default()
@@ -72,6 +76,13 @@ fn main() {
             test_ipns_on_public_gateway,
             // Claude Agent SDK command
             query_claude_agent,
+            // LSP SDK commands
+            execute_lsp,
+            get_supported_languages,
+            // Spec SDK commands
+            execute_spec,
+            get_spec_templates,
+            load_template_content,
             verify_wallet_signature,
             get_testnet_private_key,
             open_browser,

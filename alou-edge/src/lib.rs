@@ -19,8 +19,8 @@ use agent::{
     discovery::{AgentDiscovery, AgentDiscoveryConfig},
     AgentCore, SessionManager,
 };
-use mcp::tools::{
-    AgentWalletTool, BroadcastTool, EchoTool, QueryTool, TransactionTool, WalletAuthTool,
+ use mcp::tools::{
+    AgentWalletTool, BroadcastTool, EchoTool, QueryTool, SpecEnhancedTool, TransactionTool, WalletAuthTool,
     WalletManagerTool, WorkflowTool,
 };
 use mcp::{McpBridge, McpConnectionPool, McpExecutor, McpRegistry};
@@ -282,7 +282,11 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     // Register workflow tool
     registry.register(Arc::new(WorkflowTool::new()));
     console_log!("  ✓ Registered WorkflowTool");
-
+    
+    // Register spec enhanced tool
+    registry.register(Arc::new(SpecEnhancedTool::new(sessions_store.clone())));
+    console_log!("  ✓ Registered SpecEnhancedTool");
+    
     // Register blockchain tools
     registry.register(Arc::new(WalletAuthTool::new(
         nonces_store.clone(),

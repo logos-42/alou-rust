@@ -315,6 +315,12 @@ impl Router {
             (Method::Post, "/api/agent/create-claude") => {
                 agent::handle_create_claude_agent(&self.session_manager, req).await
             }
+            (Method::Post, "/api/agent/parse-creation-command") => {
+                agent::handle_parse_creation_command(&self.session_manager, req).await
+            }
+            (Method::Post, "/api/agent/create-from-command") => {
+                agent::handle_create_agent_from_command(&self.session_manager, req, &env).await
+            }
             (Method::Post, "/api/agent/batch-create") => {
                 agent::handle_batch_create_agent(&self.session_manager, req, &env).await
             }

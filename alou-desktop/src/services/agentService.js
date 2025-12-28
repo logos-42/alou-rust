@@ -218,6 +218,46 @@ export class AgentService {
   }
 
   /**
+   * Parse agent creation command using backend API
+   * 使用后端API解析智能体创建指令
+   * 
+   * @param {string} command - 创建指令
+   * @returns {Promise<Object>} 解析结果 {name, roleDescription}
+   */
+  async parseAgentCreationCommand(command) {
+    const response = await apiClient.post('/agent/parse-creation-command', {
+      command,
+    })
+    return response.data
+  }
+
+  /**
+   * Create agent using backend API (automatic creation)
+   * 使用后端API自动创建智能体
+   * 
+   * @param {Object} options - 创建选项
+   * @param {string} options.command - 创建指令
+   * @param {string} [options.sessionId] - 会话ID（可选）
+   * @param {string} [options.walletAddress] - 钱包地址（可选）
+   * @param {string} [options.chain] - 链名称（可选）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createAgentFromCommand({
+    command,
+    sessionId,
+    walletAddress,
+    chain,
+  }) {
+    const response = await apiClient.post('/agent/create-from-command', {
+      command,
+      session_id: sessionId,
+      wallet_address: walletAddress,
+      chain,
+    })
+    return response.data
+  }
+
+  /**
    * Query Claude Agent SDK directly (using local Tauri command)
    * 使用 Claude Agent SDK 直接查询（通过 Tauri 命令）
    * 

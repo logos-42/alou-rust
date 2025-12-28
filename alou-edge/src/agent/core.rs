@@ -5,7 +5,11 @@ use worker::console_log;
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
 use crate::agent::claude_client::{ClaudeClient, ClaudeMessage, ClaudeTool, ToolUse};
 use crate::agent::context::AgentContext;
+use crate::agent::context_compressor::{ContextCompressor, CompressionStrategy, CompressionInfo};
+use crate::agent::error_analyzer::ErrorAnalyzer;
+use crate::agent::error_response::ToolErrorResponse;
 use crate::agent::prompts::{AgentMode, CustomAgentInfo, PromptMode};
+use crate::agent::retry_policy::{RetryPolicy, RetryState, RetryDecision, BackoffStrategy};
 use crate::agent::session::{ContextEvent, Message, SessionManager};
 use crate::agent::stream::{StreamEvent, StreamPublisher};
 use crate::mcp::executor::{McpExecutor, ToolCall};
@@ -129,15 +133,58 @@ impl AgentCore {
 
         // Load conversation history
         let history = self.session_manager.get_history(session_id).await?;
-
+        
+        // Check if context compression is needed
+        let compressor = ContextCompressor::new(
+            CompressionStrategy::SummarizeAndKeepKey,
+            8000,
+            0.7,
+        );
+        
+        let final_history = if compressor.should_compress(&history) {
+            worker::console_log!("Compressing context for session {}", session_id);
+            
+            match compressor.compress_history(&history, session_id, self.ai_client.as_ref()).await {
+                Ok(compressed) => {
+                    worker::console_log!(
+                        "Context compressed: {} -> {} messages ({:.1}% reduction)",
+                        compressed.compression_info.original_count,
+                        compressed.compression_info.compressed_count,
+                        compressed.compression_info.reduction_percent
+                    );
+                    
+                    Self::emit_stream(
+                        &stream,
+                        StreamEvent::new(session_id, "context.compressed")
+                            .with_label("上下文已压缩")
+                            .with_payload(json!({
+                                "original_count": compressed.compression_info.original_count,
+                                "compressed_count": compressed.compression_info.compressed_count,
+                                "reduction_percent": compressed.compression_info.reduction_percent,
+                                "strategy": format!("{:?}", compressed.compression_info.strategy),
+                                "summary": compressed.compression_info.summary,
+                            }))
+                    ).await;
+                    
+                    compressed.messages
+                },
+                Err(e) => {
+                    worker::console_log!("Compression failed: {}, using original history", e);
+                    history
+                }
+            }
+        } else {
+            history
+        };
+        
         // Get session to extract chain info
         let session = self.session_manager.get_session(session_id).await?;
-
+        
         // Get wallet address from parameter or session
         let wallet = wallet_address.or(session.wallet_address.clone());
-
+        
         let chain = chain.or(session.chain.clone());
-
+        
         // Create agent context
         let mut context = AgentContext::new(session_id.to_string());
         context.wallet_address = wallet.clone();
@@ -225,7 +272,7 @@ impl AgentCore {
         }
 
         // Convert history to Claude messages
-        let mut messages = self.history_to_claude_messages(&history);
+        let mut messages = self.history_to_claude_messages(&final_history);
 
         // Prepend system message if this is the first message in the conversation
         if messages.is_empty() || !messages.iter().any(|m| m.role == "system") {
@@ -517,7 +564,85 @@ impl AgentCore {
             })
             .collect();
 
-        self.mcp_executor.execute_batch(tool_calls, context).await
+        let results = self.mcp_executor.execute_batch(tool_calls, context).await;
+
+        let error_analyzer = ErrorAnalyzer::new();
+        let mut enhanced_results = Vec::new();
+
+        for (tool_use, result) in tool_uses.iter().zip(results.iter()) {
+            if let Some(ref error) = result.error {
+                console_log!("Tool {} failed: {}", tool_use.name, error);
+
+                let history = match self.session_manager.get_history(&context.session_id).await {
+                    Ok(h) => h,
+                    Err(_) => vec![],
+                };
+
+                let session_context = ErrorAnalyzer::create_session_context(&history);
+
+                let analysis = error_analyzer.analyze_error(
+                    error,
+                    &tool_use.name,
+                    &tool_use.input,
+                    &session_context,
+                );
+
+                let error_response = ToolErrorResponse::from_aloud_error(error);
+
+                if analysis.can_auto_correct {
+                    if let Some(corrected) = &analysis.corrected_args {
+                        console_log!("Auto-correcting args for tool {}: {:?}", tool_use.name, corrected.explanation);
+
+                        let corrected_tool_call = ToolCall {
+                            id: tool_use.id.clone(),
+                            name: tool_use.name.clone(),
+                            args: corrected.args.clone(),
+                        };
+
+                        let retry_result = self
+                            .mcp_executor
+                            .execute(&tool_use.name, corrected.args.clone(), context)
+                            .await;
+
+                        match retry_result {
+                            Ok(value) => {
+                                console_log!("Auto-correction succeeded for tool {}", tool_use.name);
+                                enhanced_results.push(crate::mcp::executor::ToolResult {
+                                    id: tool_use.id.clone(),
+                                    name: tool_use.name.clone(),
+                                    result: value,
+                                    error: None,
+                                });
+                                continue;
+                            },
+                            Err(e2) => {
+                                console_log!("Auto-correction failed: {}", e2);
+                                enhanced_results.push(crate::mcp::executor::ToolResult {
+                                    id: tool_use.id.clone(),
+                                    name: tool_use.name.clone(),
+                                    result: Value::Null,
+                                    error: Some(serde_json::to_string(&error_response)
+                                        .unwrap_or_else(|_| error.clone())),
+                                });
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+                enhanced_results.push(crate::mcp::executor::ToolResult {
+                    id: tool_use.id.clone(),
+                    name: tool_use.name.clone(),
+                    result: result.result.clone(),
+                    error: Some(serde_json::to_string(&error_response)
+                        .unwrap_or_else(|_| error.clone())),
+                });
+            } else {
+                enhanced_results.push(result.clone());
+            }
+        }
+
+        enhanced_results
     }
 
     /// Convert session history to Claude messages

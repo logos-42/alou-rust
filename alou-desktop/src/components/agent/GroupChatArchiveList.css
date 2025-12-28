@@ -1,0 +1,196 @@
+.group-chat-archive-list {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+  height: 100%;
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  border-left: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  flex-shrink: 0;
+  transition: width 0.3s ease, min-width 0.3s ease, max-width 0.3s ease;
+}
+
+.group-chat-archive-list.collapsed {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+}
+
+.archive-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  flex-shrink: 0;
+}
+
+.group-chat-archive-list.collapsed .archive-list-header {
+  justify-content: center;
+  padding: 12px;
+}
+
+.archive-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+.archive-list-count {
+  font-size: 12px;
+  color: var(--text-secondary, #475569);
+}
+
+.archive-collapse-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.archive-collapse-btn:hover {
+  background: var(--background, rgba(99, 102, 241, 0.1));
+}
+
+.archive-collapse-btn img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.group-chat-archive-list.collapsed .archive-collapse-btn img {
+  transform: rotate(180deg);
+}
+
+.archive-list-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+  transition: opacity 0.3s ease;
+}
+
+.group-chat-archive-list.collapsed .archive-list-content {
+  display: none;
+}
+
+.archive-list-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.archive-list-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.archive-list-content::-webkit-scrollbar-thumb {
+  background: var(--border-color, rgba(15, 23, 42, 0.2));
+  border-radius: 2px;
+}
+
+.archive-list-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary, #475569);
+}
+
+.archive-list-item {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.archive-list-item:hover {
+  background: var(--background, rgba(99, 102, 241, 0.05));
+}
+
+.archive-list-item.active {
+  background: var(--secondary-color, rgba(99, 102, 241, 0.12));
+  border-left-color: var(--primary-color, #6366f1);
+}
+
+.archive-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.archive-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.archive-list-item.active .archive-item-name {
+  color: var(--primary-color, #6366f1);
+  font-weight: 600;
+}
+
+.archive-item-subtitle {
+  font-size: 11px;
+  color: var(--text-secondary, #475569);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .group-chat-archive-list {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .archive-list-header {
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .archive-list-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.app-shell.dark-mode .archive-list-item.active {
+  background: rgba(99, 102, 241, 0.2);
+  border-left-color: #6366f1;
+}
+
+.app-shell.dark-mode .archive-item-name {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.app-shell.dark-mode .archive-list-item.active .archive-item-name {
+  color: #818cf8;
+}
+
+.app-shell.dark-mode .archive-item-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.dark-mode .archive-collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .archive-collapse-btn img {
+  filter: brightness(0) invert(1);
+}
+

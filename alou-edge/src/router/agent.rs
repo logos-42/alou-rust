@@ -427,6 +427,24 @@ pub(crate) async fn handle_create_claude_agent(
         }
     };
 
+    let result = handle_create_claude_agent_internal(session_manager, body).await?;
+    
+    json_response(&json!({
+        "session_id": result.session_id,
+        "agent_id": result.session_id, // 使用session_id作为agent_id
+        "agent_type": "claude_agent_sdk",
+        "name": result.name,
+        "diap_identity": result.identity,
+        "agent_metadata": result.agent_metadata,
+    }))
+}
+
+/// Internal function to handle Claude agent creation logic
+/// 内部函数处理Claude智能体创建逻辑
+pub(crate) async fn handle_create_claude_agent_internal(
+    session_manager: &SessionManager,
+    body: CreateClaudeAgentRequest,
+) -> Result<CreateClaudeAgentResult> {
     // Create or use existing session
     let session_id = if let Some(sid) = body.session_id {
         // Verify session exists
@@ -475,7 +493,7 @@ pub(crate) async fn handle_create_claude_agent(
             let error_response = ErrorResponse {
                 error: format!("Failed to store DIAP identity: {}", e),
             };
-            return json_response_with_status(&error_response, 500);
+            return Err(worker::Error::RustError(error_response.error));
         }
         stored_identity = Some(identity);
     }
@@ -532,16 +550,22 @@ pub(crate) async fn handle_create_claude_agent(
         );
     }
 
-    // Build response with error handling
-    let response_json = json!({
-        "session_id": session_id,
-        "agent_type": "claude_agent_sdk",
-        "name": body.name.unwrap_or_else(|| "Claude Agent SDK".to_string()),
-        "diap_identity": identity,
-        "agent_metadata": agent_metadata,
-    });
+    Ok(CreateClaudeAgentResult {
+        session_id,
+        name: body.name.unwrap_or_else(|| "Claude Agent SDK".to_string()),
+        identity,
+        agent_metadata,
+    })
+}
 
-    json_response(&response_json)
+/// Result of Claude agent creation
+/// Claude智能体创建结果
+#[derive(Debug)]
+pub(crate) struct CreateClaudeAgentResult {
+    pub session_id: String,
+    pub name: String,
+    pub identity: Option<DiapIdentity>,
+    pub agent_metadata: serde_json::Value,
 }
 
 /// Get DIAP identity for a session
@@ -955,5 +979,152 @@ pub(crate) async fn handle_get_batch_agent_sessions(
             },
             500,
         ),
+    }
+}
+
+/// Parse agent creation command using AI
+/// 使用AI解析智能体创建指令
+pub(crate) async fn handle_parse_creation_command(
+    session_manager: &SessionManager,
+    req: &mut Request,
+) -> Result<Response> {
+    #[derive(Deserialize)]
+    struct ParseCommandRequest {
+        command: String,
+    }
+
+    let body: ParseCommandRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return json_response_with_status(&error_response, 400);
+        }
+    };
+
+    // 使用内置的智能体来解析创建指令
+    match crate::agent::creation_parser::parse_creation_command(&body.command).await {
+        Ok(result) => {
+            let success_response = serde_json::json!({
+                "name": result.name,
+                "roleDescription": result.role_description,
+                "success": true
+            });
+            json_response_with_status(&success_response, 200)
+        }
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Failed to parse creation command: {}", e),
+            };
+            json_response_with_status(&error_response, 400)
+        }
+    }
+}
+
+/// Create agent from command using backend creation flow
+/// 使用后端创建流程从命令创建智能体
+pub(crate) async fn handle_create_agent_from_command(
+    session_manager: &SessionManager,
+    env: &Env,
+    req: &mut Request,
+) -> Result<Response> {
+    #[derive(Deserialize)]
+    struct CreateFromCommandRequest {
+        command: String,
+        #[serde(default)]
+        session_id: Option<String>,
+        #[serde(default)]
+        wallet_address: Option<String>,
+        #[serde(default)]
+        chain: Option<String>,
+    }
+
+    let body: CreateFromCommandRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return json_response_with_status(&error_response, 400);
+        }
+    };
+
+    // 解析创建命令
+    let parsed_info = match crate::agent::creation_parser::parse_creation_command(&body.command).await {
+        Ok(info) => info,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Failed to parse creation command: {}", e),
+            };
+            return json_response_with_status(&error_response, 400);
+        }
+    };
+
+    // 创建或使用现有会话
+    let session_id = if let Some(sid) = body.session_id {
+        // 验证会话存在
+        session_manager
+            .get_session(&sid)
+            .await
+            .map_err(|e| {
+                let error_response = ErrorResponse {
+                    error: format!("Session not found: {}", e),
+                };
+                worker::Error::RustError(error_response.error.clone())
+            })?;
+        sid
+    } else {
+        // 创建新会话
+        let wallet_address = body.wallet_address.unwrap_or_else(|| "default_user".to_string());
+        let session = session_manager
+            .create_session(wallet_address)
+            .await
+            .map_err(|e| {
+                let error_response = ErrorResponse {
+                    error: format!("Failed to create session: {}", e),
+                };
+                worker::Error::RustError(error_response.error.clone())
+            })?;
+        session.id
+    };
+
+    // 使用现有的 create_claude_agent 逻辑，但传入解析的信息
+    let create_request = serde_json::json!({
+        "session_id": session_id,
+        "wallet_address": body.wallet_address,
+        "chain": body.chain,
+        "name": parsed_info.name,
+        "role_description": parsed_info.role_description,
+        // 使用默认值，因为这些是从命令解析来的
+        "avatar_cid": null,
+        "mcp_config_cid": null,
+        "mcp_ports": [],
+        "diap_identity": null
+    });
+
+    // 调用现有的创建逻辑
+    match crate::agent::creation::create_claude_agent_from_parsed(
+        session_manager,
+        env,
+        create_request,
+    ).await {
+        Ok(result) => {
+            let success_response = serde_json::json!({
+                "agent_id": result.agent_id,
+                "session_id": session_id,
+                "name": parsed_info.name,
+                "roleDescription": parsed_info.role_description,
+                "success": true,
+                "message": "智能体创建成功"
+            });
+            json_response_with_status(&success_response, 200)
+        }
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Failed to create agent: {}", e),
+            };
+            json_response_with_status(&error_response, 500)
+        }
     }
 }
