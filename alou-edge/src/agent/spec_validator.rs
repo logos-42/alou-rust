@@ -65,8 +65,24 @@ impl SpecValidator {
         for (i, step) in steps.iter().enumerate() {
             // Validate step ID
             if step.step_id.is_empty() {
-                result = result.with_error(format!("步骤 {} (索引 {}) 的 step_id 为空", i, i));
+                let new_result = result.with_error(format!("步骤 {} (索引 {}) 的 step_id 为空", i, i));
+                *result = new_result;
             }
+            
+            // Check for duplicate step IDs
+            if step_ids.contains(&step.step_id) {
+                let new_result = result.with_error(format!("重复的 step_id: {}", step.step_id));
+                *result = new_result;
+            } else {
+                step_ids.insert(step.step_id.clone());
+            }
+            
+            // Validate description
+            if step.description.trim().is_empty() {
+                let new_result = result.with_warning(format!("步骤 {} 没有描述", step.step_id));
+                *result = new_result;
+            }
+        }
             
             // Check for duplicate step IDs
             if step_ids.contains(&step.step_id) {

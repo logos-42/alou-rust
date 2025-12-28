@@ -152,22 +152,30 @@ pub struct ValidationRule {
 }
 
 /// Validation rule type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationRuleType {
+    #[default]
     OutputFormat,
+    #[default]
     OutputRange,
+    #[default]
     OutputPattern,
+    #[default]
     CustomCheck,
 }
 
 /// Validation severity
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationSeverity {
+    #[default]
     Info,
+    #[default]
     Warning,
+    #[default]
     Error,
+    #[default]
     Critical,
 }
 
@@ -220,10 +228,13 @@ pub struct ExecutionPhase {
 }
 
 /// Validation result
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ValidationResult {
+    #[default]
     pub is_valid: bool,
+    #[default]
     pub errors: Vec<String>,
+    #[default]
     pub warnings: Vec<String>,
 }
 
@@ -239,12 +250,10 @@ impl ValidationResult {
     pub fn with_error(mut self, error: String) -> Self {
         self.errors.push(error);
         self.is_valid = false;
-        self
     }
     
     pub fn with_warning(mut self, warning: String) -> Self {
         self.warnings.push(warning);
-        self
     }
 }
 
