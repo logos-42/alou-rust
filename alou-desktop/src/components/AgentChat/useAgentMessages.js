@@ -195,7 +195,7 @@ export const useAgentMessages = ({
     const userMessage = {
       id: `user_${Date.now()}_${targetAgentId}`,
       type: 'user',
-      content: text.trim(),
+      content: String(text).trim(),
       timestamp: Date.now(),
     }
 
@@ -274,7 +274,7 @@ export const useAgentMessages = ({
       const assistantMessage = {
         id: `assistant_${Date.now()}_${targetAgentId}`,
         type: 'assistant',
-        content: data.content || data.response || '收到响应',
+        content: String(data.content || data.response || '收到响应'),
         timestamp: data.timestamp || Date.now(),
         source: data.source || 'alou-edge',
         agentId: targetAgentId,
@@ -353,7 +353,7 @@ export const useAgentMessages = ({
       appendMessage({
         id: `error_${Date.now()}`,
         type: 'assistant',
-        content: friendlyMessage,
+        content: String(friendlyMessage),
         timestamp: Date.now(),
         source: 'error',
       }, targetAgentId)
@@ -605,6 +605,9 @@ export const useAgentMessages = ({
       throw error
     }
   }, [])
+  
+  // 基于规则的智能体创建指令解析
+  const parseAgentCreationCommandWithRules = useCallback((text) => {
     const lowerText = text.toLowerCase().trim()
     
     // 移除创建命令关键词
@@ -713,7 +716,7 @@ export const useAgentMessages = ({
       roleDescription,
       isDefault: false
     }
-  }
+  }, [])
 
   // 向后兼容的 sendMessage（发送到当前活动智能体）
   const sendMessage = useCallback(async () => {
@@ -898,4 +901,4 @@ export const useAgentMessages = ({
     saveMessagesToIpfs,
     loadMessagesFromIpfs,
   }
-
+}

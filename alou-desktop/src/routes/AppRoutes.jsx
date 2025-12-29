@@ -9,6 +9,7 @@ import WalletSyncCallbackView from '@/views/WalletSyncCallbackView'
 import WalletView from '@/views/WalletView'
 import AboutView from '@/views/AboutView'
 import SubscriptionView from '@/views/SubscriptionView'
+import SdkExampleView from '@/routes/SdkExample.jsx'
 
 // 钱包同步监听组件
 const WalletSyncListener = () => {
@@ -238,6 +239,14 @@ const AppRoutes = () => (
     />
     <Route path="/auth/callback" element={<AuthCallbackView />} />
     <Route path="/wallet-sync" element={<WalletSyncCallbackView />} />
+    <Route
+      path="/sdk"
+      element={
+        <ProtectedRoute>
+          <SdkExampleView />
+        </ProtectedRoute>
+      }
+    />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </>

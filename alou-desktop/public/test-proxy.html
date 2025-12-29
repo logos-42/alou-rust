@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代理测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        code {
+            background-color: #f1f1f1;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vite代理测试页面</h1>
+    <p>当前页面URL: <span id="current-url"></span></p>
+    
+    <div class="test-section">
+        <h2>测试1: 直接调用后端API（应该失败）</h2>
+        <p>直接调用 <code>https://alou-edge.yuanjieliu65.workers.dev/api/health</code></p>
+        <button onclick="testDirectApi()">测试直接API调用</button>
+        <div id="result1" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试2: 通过Vite代理调用（应该成功）</h2>
+        <p>通过Vite代理调用 <code>/api/health</code></p>
+        <button onclick="testProxyApi()">测试代理API调用</button>
+        <div id="result2" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试3: 检查控制台日志</h2>
+        <p>打开浏览器开发者工具控制台，查看API配置信息</p>
+        <button onclick="checkConsole()">检查控制台</button>
+        <div id="result3" class="result"></div>
+    </div>
+    
+    <script>
+        document.getElementById('current-url').textContent = window.location.href;
+        
+        function testDirectApi() {
+            const resultDiv = document.getElementById('result1');
+            resultDiv.innerHTML = '测试中...';
+            resultDiv.className = 'result';
+            
+            fetch('https://alou-edge.yuanjieliu65.workers.dev/api/health')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            })
+            .then(data => {
+                resultDiv.innerHTML = `<span class="success">✓ 成功！</span>\n响应: ${JSON.stringify(data, null, 2)}`;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<span class="error">✗ 失败：${error.message}</span>`;
+            });
+        }
+        
+        function testProxyApi() {
+            const resultDiv = document.getElementById('result2');
+            resultDiv.innerHTML = '测试中...';
+            resultDiv.className = 'result';
+            
+            fetch('/api/health')
+            .then(response => {
+                if (response.ok) {
+                    return response.json();
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            })
+            .then(data => {
+                resultDiv.innerHTML = `<span class="success">✓ 成功！</span>\n响应: ${JSON.stringify(data, null, 2)}`;
+            })
+            .catch(error => {
+                resultDiv.innerHTML = `<span class="error">✗ 失败：${error.message}</span>`;
+            });
+        }
+        
+        function checkConsole() {
+            const resultDiv = document.getElementById('result3');
+            resultDiv.innerHTML = '请查看浏览器控制台中的日志信息...';
+            resultDiv.className = 'result';
+            
+            // 触发API模块的日志
+            console.log('[测试] 手动触发API配置检查');
+            
+            // 尝试导入API模块来触发日志
+            import('/src/services/api.js').then(module => {
+                console.log('[测试] API模块已加载');
+            }).catch(err => {
+                console.error('[测试] 无法加载API模块:', err);
+            });
+        }
+    </script>
+</body>
+</html>

@@ -260,6 +260,136 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* 工作流切换按钮 */
+.workflow-switch {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 5rem; /* 在语言切换按钮上方 */
+  z-index: 40;
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem;
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  cursor: pointer;
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.15);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.workflow-switch:hover {
+  background: rgba(99, 102, 241, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 40px rgba(99, 102, 241, 0.25);
+}
+
+.workflow-switch.active {
+  background: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3);
+}
+
+.workflow-switch .workflow-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  object-fit: contain;
+}
+
+/* 浅色模式下工作流按钮样式 */
+.app-shell:not(.dark-mode) .workflow-switch {
+  background: rgba(99, 102, 241, 0.05);
+  box-shadow: 0 16px 30px rgba(99, 102, 241, 0.1);
+}
+
+.app-shell:not(.dark-mode) .workflow-switch:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.app-shell:not(.dark-mode) .workflow-switch.active {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+/* 暗色模式下工作流按钮样式 */
+.app-shell.dark-mode .workflow-switch {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.app-shell.dark-mode .workflow-switch:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.app-shell.dark-mode .workflow-switch.active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.app-shell.dark-mode .workflow-switch .workflow-icon {
+  filter: brightness(0) invert(1);
+}
+
+/* 工作流面板覆盖层 */
+.workflow-panel-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.workflow-panel-content {
+  flex: 1;
+  margin: 1rem;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.workflow-panel-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s ease;
+  z-index: 51;
+}
+
+.workflow-panel-close:hover {
+  background: rgba(255, 255, 255, 1);
+  color: #475569;
+  transform: scale(1.1);
+}
+
+/* 暗色模式支持 */
+.app-shell.dark-mode .workflow-panel-close {
+  background: rgba(30, 41, 59, 0.9);
+  color: #94a3b8;
+}
+
+.app-shell.dark-mode .workflow-panel-close:hover {
+  background: rgba(30, 41, 59, 1);
+  color: #e2e8f0;
+}
+
 .app-shell.collapsed-left {
   --left-column-width: 84px;
 }

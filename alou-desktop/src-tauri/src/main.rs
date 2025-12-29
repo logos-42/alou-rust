@@ -13,12 +13,14 @@ mod spec;
 mod sync;
 mod utils;
 mod wallet;
+mod workflow;
 
 use std::path::PathBuf;
 use tauri::Manager;
 
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
 use crate::kubo::download_kubo_binary;
+use crate::workflow::WorkflowState;
 use crate::ipfs_api::{
     diagnose_ipfs_api, get_ipfs_api_address, test_ipfs_api, test_ipfs_api_with_config,
 };
@@ -44,6 +46,10 @@ use crate::sync::{
 };
 use crate::lsp::{execute_lsp, get_supported_languages};
 use crate::spec::{execute_spec, get_spec_templates, load_template_content};
+use crate::workflow::{
+    create_workflow, execute_workflow, get_workflow_status, list_workflows,
+    delete_workflow, retry_workflow_step, pause_workflow, resume_workflow,
+};
 
 fn main() {
     tauri::Builder::default()
@@ -53,6 +59,7 @@ fn main() {
             process: None,
             data_dir: PathBuf::new(),
         }))
+        .manage(WorkflowState::default())
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,
@@ -89,7 +96,16 @@ fn main() {
             test_ipfs_node_connection,
             write_wallet_sync_data,
             read_wallet_sync_data,
-            start_wallet_sync_server
+            start_wallet_sync_server,
+            // Workflow commands
+            create_workflow,
+            execute_workflow,
+            get_workflow_status,
+            list_workflows,
+            delete_workflow,
+            retry_workflow_step,
+            pause_workflow,
+            resume_workflow
         ])
         .setup(|app| {
             // Set window title

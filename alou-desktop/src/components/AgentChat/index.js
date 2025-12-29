@@ -1,9 +1,9 @@
 // Export all custom hooks
-export { useAgentConnection } from './useAgentConnection'
+export { useAgentConnection } from './useAgentConnection.jsx'
 export { useAgentWallet } from './useAgentWallet'
 export { useAgentMessages } from './useAgentMessages'
 export { useAgentDrag } from './useAgentDrag'
-export { useAgentUI } from './useAgentUI'
+export { useAgentUI } from './useAgentUI.jsx'
 export { useChannelManager } from './useChannelManager'
 export { useAgentPersistence } from './useAgentPersistence'
 

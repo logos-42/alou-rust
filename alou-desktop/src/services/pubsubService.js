@@ -176,7 +176,7 @@ class PubSubService {
   async _publishToBackend(topic, message) {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-        (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+        (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
       
       const response = await fetch(`${API_BASE_URL}/api/pubsub/publish`, {
         method: 'POST',
@@ -268,7 +268,7 @@ class PubSubService {
     // 降级：从后端获取
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-        (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+        (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
       
       const since = this.lastMessageTimestamp.get(topic) || 0
       const response = await fetch(

@@ -87,7 +87,9 @@ export const useAgentUI = ({
         }
         const { resource, metadata } = await requestMcpUiResource(target, payload)
         if (!resource) {
-          throw new Error('empty resource response')
+          // 资源为空时静默处理，不抛出错误
+          console.warn(`[MCP UI] 资源为空 (${target})，跳过UI打开`)
+          return
         }
         openUiResource(
           { resource, metadata },
@@ -98,27 +100,12 @@ export const useAgentUI = ({
           },
         )
       } catch (error) {
-        console.error('Failed to load MCP UI resource:', error)
-        const errorMessage = error instanceof Error ? error.message : String(error)
-        recordInteraction('trigger_mcp', {
-          kind: 'ui_error',
-          target,
-          params,
-          error: errorMessage,
-        })
-        setInteractionLogs((prev) => [
-          {
-            id: `mcp_error_${Date.now()}`,
-            action: 'trigger_mcp',
-            label: 'MCP UI 加载失败',
-            timestamp: Date.now(),
-            detail: { target, error: errorMessage },
-          },
-          ...prev,
-        ])
+        // 静默处理MCP UI资源加载错误
+        console.warn(`[MCP UI] 资源加载失败 (${target}):`, error.message)
+        // 不再记录交互日志，避免错误信息干扰
       }
     },
-    [openUiResource, recordInteraction, sessionId],
+    [openUiResource, sessionId],
   )
 
   const closeUiResource = useCallback(() => {

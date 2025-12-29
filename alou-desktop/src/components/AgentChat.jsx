@@ -25,8 +25,8 @@ import TranslationIcon from '@/assets/icon_翻译.png'
 import WorkflowIcon from '@/assets/设置0.3.png'
 
 // Hooks
-import { useAgentUI } from './AgentChat/useAgentUI'
-import { useAgentConnection } from './AgentChat/useAgentConnection'
+import { useAgentUI } from './AgentChat/useAgentUI.jsx'
+import { useAgentConnection } from './AgentChat/useAgentConnection.jsx'
 import { useAgentDrag } from './AgentChat/useAgentDrag'
 import { useAgentMessages } from './AgentChat/useAgentMessages'
 import { useAgentWallet } from './AgentChat/useAgentWallet'
@@ -564,13 +564,18 @@ const AgentChat = () => {
         initLanguage()
         await Promise.all([
           checkConnection(),
-          createSession().then(() => setSessionReady(true)),
+          createSession().then(() => setSessionReady(true)).catch(err => {
+            console.warn('创建会话失败，但应用将继续在本地模式下运行:', err)
+            setSessionReady(true) // 即使会话创建失败，也设置会话为就绪状态
+          }),
           refreshWallet().catch((err) => {
             console.warn('Failed to refresh wallet:', err)
           }),
         ])
       } catch (error) {
         console.error('Error in AgentChat initialization:', error)
+        // 即使初始化出错，也设置会话为就绪状态，让应用可以继续运行
+        setSessionReady(true)
       }
     }
     bootstrap()

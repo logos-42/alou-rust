@@ -32,20 +32,25 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
         const isConnectionError =
           error.code === 'ECONNREFUSED' ||
           error.code === 'ERR_NETWORK' ||
+          error.code === 'ERR_BAD_RESPONSE' ||
           error.message?.includes('ERR_CONNECTION_REFUSED') ||
           error.message?.includes('Failed to fetch') ||
+          error.message?.includes('ETIMEDOUT') ||
           !error.response
 
         if (isConnectionError) {
           console.warn(
-            '[AgentChat] Backend server unavailable. Please start the backend server or configure VITE_API_BASE_URL.',
+            '[AgentChat] 后端服务器不可用，应用将在本地模式下运行。',
           )
+          // 后端不可用时，设置为本地模式
+          setConnectionStatus('local')
         } else {
           console.error('Connection check failed:', error)
+          setConnectionStatus('disconnected')
         }
+      } else {
+        setConnectionStatus('disconnected')
       }
-
-      setConnectionStatus('disconnected')
     }
   }, [])
 
@@ -65,35 +70,48 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
       }
 
       console.log('[useAgentConnection] 正在创建会话...')
-      const data = await agentService.createSession(walletAddress || undefined)
-      console.log('[useAgentConnection] 会话创建成功:', data.session_id)
-      setSessionId(data.session_id)
-      return data.session_id
-    } catch (error) {
-      const isConnectionError =
-        error.code === 'ECONNREFUSED' ||
-        error.code === 'ERR_NETWORK' ||
-        error.message?.includes('ERR_CONNECTION_REFUSED') ||
-        error.message?.includes('Failed to fetch') ||
-        !error.response
+      try {
+        const data = await agentService.createSession(walletAddress || undefined)
+        console.log('[useAgentConnection] 会话创建成功:', data.session_id)
+        setSessionId(data.session_id)
+        return data.session_id
+      } catch (error) {
+        const isConnectionError =
+          error.code === 'ECONNREFUSED' ||
+          error.code === 'ERR_NETWORK' ||
+          error.code === 'ERR_BAD_RESPONSE' ||
+          error.message?.includes('ERR_CONNECTION_REFUSED') ||
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('ETIMEDOUT') ||
+          !error.response
 
-      const now = Date.now()
-      const lastErrorTime = window.__lastCreateSessionError || 0
+        const now = Date.now()
+        const lastErrorTime = window.__lastCreateSessionError || 0
 
-      if (isConnectionError) {
-        if (now - lastErrorTime > 10000) {
-          window.__lastCreateSessionError = now
-          console.warn(
-            '[AgentChat] Cannot create session: backend server unavailable. Please start the backend server or configure VITE_API_BASE_URL.',
-          )
-        }
-      } else {
-        if (now - lastErrorTime > 5000) {
-          window.__lastCreateSessionError = now
-          console.error('Failed to create session:', error)
+        if (isConnectionError) {
+          if (now - lastErrorTime > 10000) {
+            window.__lastCreateSessionError = now
+            console.warn(
+              '[AgentChat] 后端服务器不可用，使用本地会话模式。',
+            )
+          }
+          
+          // 后端不可用时，生成本地会话ID
+          const localSessionId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          console.log('[useAgentConnection] 创建本地会话:', localSessionId)
+          setSessionId(localSessionId)
+          return localSessionId
+        } else {
+          if (now - lastErrorTime > 5000) {
+            window.__lastCreateSessionError = now
+            console.error('Failed to create session:', error)
+          }
+          // 对于非连接错误，仍然抛出
+          throw error
         }
       }
-      // 抛出错误以便调用方处理
+    } catch (error) {
+      console.error('[useAgentConnection] 创建会话失败:', error)
       throw error
     }
   }, [activeChain, preferredChain, setPreferredChain])
@@ -110,4 +128,3 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
     createSession,
   }
 }
-

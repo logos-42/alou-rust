@@ -10,13 +10,27 @@ const sourceMap = {
   error: 'Error',
 }
 
-const formatMessage = (content) =>
-  content
-    ?.replace(/\n/g, '<br>')
+const formatMessage = (content) => {
+  // 如果 content 是 null 或 undefined，返回空字符串
+  if (content == null) {
+    return ''
+  }
+  
+  // 确保 content 是字符串类型
+  const contentStr = String(content)
+  
+  // 如果字符串为空，直接返回
+  if (!contentStr.trim()) {
+    return contentStr
+  }
+  
+  return contentStr
+    .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/`(.*?)`/g, '<code>$1</code>')
     .replace(/•/g, '<span class="bullet">•</span>')
+}
 
 const formatTime = (timestamp) =>
   new Date(timestamp).toLocaleTimeString('zh-CN', {

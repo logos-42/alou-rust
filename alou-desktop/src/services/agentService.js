@@ -53,31 +53,81 @@ export class AgentService {
    * 解析后端返回的 did_document 来提取智能体元数据（名称、头像等）
    */
   async resolveAgent(target, sessionId) {
-    const response = await apiClient.post('/agent/resolve', {
-      target,
-      session_id: sessionId,
-    })
-    
-    const resolvedAgent = response.data
-    
-    // 如果包含 did_document，解析它来提取智能体元数据
-    if (resolvedAgent.did_document) {
-      const parsedAgent = parseDidDocumentToAgent(resolvedAgent.did_document, {
-        cid: resolvedAgent.cid,
-        ipns: resolvedAgent.ipns || null,
+    try {
+      console.log('[AgentService] 开始解析智能体:', { target, sessionId })
+      const response = await apiClient.post('/agent/resolve', {
+        target,
+        session_id: sessionId,
       })
       
-      // 合并解析后的元数据和原始数据
-      return {
-        ...resolvedAgent,
-        ...parsedAgent,
-        // 保留原始的 did_document 以便后续使用
-        did_document: resolvedAgent.did_document,
+      const resolvedAgent = response.data
+      console.log('[AgentService] 智能体解析成功:', { 
+        did: resolvedAgent.did,
+        cid: resolvedAgent.cid,
+        ipns: resolvedAgent.ipns,
+        hasDidDocument: !!resolvedAgent.did_document 
+      })
+      
+      // 如果包含 did_document，解析它来提取智能体元数据
+      if (resolvedAgent.did_document) {
+        const parsedAgent = parseDidDocumentToAgent(resolvedAgent.did_document, {
+          cid: resolvedAgent.cid,
+          ipns: resolvedAgent.ipns || null,
+        })
+        
+        // 合并解析后的元数据和原始数据
+        return {
+          ...resolvedAgent,
+          ...parsedAgent,
+          // 保留原始的 did_document 以便后续使用
+          did_document: resolvedAgent.did_document,
+        }
       }
+      
+      // 如果没有 did_document（fallback 情况），直接返回
+      return resolvedAgent
+    } catch (error) {
+      console.error('[AgentService] 解析智能体失败:', error)
+      
+      // 如果是网络错误，尝试本地回退
+      if (error.isNetworkError || error.code === 'ETIMEDOUT' || error.message?.includes('Network error')) {
+        console.warn('[AgentService] 网络错误，使用本地回退')
+        
+        // 从 target 中提取基本信息
+        let did = null
+        let cid = null
+        let ipns = null
+        
+        if (target.startsWith('did:')) {
+          did = target
+        } else if (target.startsWith('/ipns/') || target.startsWith('k51')) {
+          ipns = target.startsWith('/ipns/') ? target : `/ipns/${target}`
+        } else if (target.startsWith('Qm') || target.startsWith('bafy')) {
+          cid = target
+        }
+        
+        // 创建本地回退的智能体数据
+        const localAgent = {
+          did: did || `did:key:local_${Date.now()}`,
+          cid: cid || `local_${Date.now()}`,
+          ipns: ipns,
+          display_name: target.includes('://') ? new URL(target).hostname : target.substring(0, 20) + '...',
+          name: target.includes('://') ? new URL(target).hostname : target.substring(0, 20) + '...',
+          agent_type: 'local_fallback',
+          role_description: '本地回退智能体（网络不可用）',
+          status: 'local',
+          is_local_fallback: true,
+          error: error.message,
+          session_id: sessionId,
+        }
+        
+        console.log('[AgentService] 本地回退智能体:', localAgent)
+        return localAgent
+      }
+      
+      // 如果不是网络错误，重新抛出
+      throw error
     }
-    
-    // 如果没有 did_document（fallback 情况），直接返回
-    return resolvedAgent
   }
 
   /**

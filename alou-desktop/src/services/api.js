@@ -6,13 +6,22 @@ import axios from 'axios'
 import Cookies from 'js-cookie'
 
 // API base URL - use local dev server in development
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? 'http://127.0.0.1:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+// 在开发环境下，使用Vite代理（当前开发服务器地址）来解决CORS问题
+// 强制在开发模式下使用空字符串，确保通过Vite代理
+const API_BASE_URL = import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev'
+
+// Debug logging
+console.log('[API] Environment:', {
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  DEV: import.meta.env.DEV,
+  MODE: import.meta.env.MODE,
+  API_BASE_URL: API_BASE_URL,
+  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
+})
 
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -54,8 +63,10 @@ apiClient.interceptors.response.use(
     const isConnectionError = 
       error.code === 'ECONNREFUSED' || 
       error.code === 'ERR_NETWORK' ||
+      error.code === 'ETIMEDOUT' ||
       error.message?.includes('ERR_CONNECTION_REFUSED') ||
       error.message?.includes('Failed to fetch') ||
+      error.message?.includes('ETIMEDOUT') ||
       !error.response
 
     // Only log connection errors once per endpoint to avoid spam
@@ -72,12 +83,25 @@ apiClient.interceptors.response.use(
         window.__lastApiError[errorKey] = now
         
         console.warn(`[API] Connection to backend server failed (${API_BASE_URL}). Make sure the backend server is running or set VITE_API_BASE_URL environment variable.`)
+        console.warn(`[API] Error details:`, {
+          code: error.code,
+          message: error.message,
+          url: error.config?.url,
+          method: error.config?.method,
+        })
       }
       
       // For connection errors, don't throw detailed errors for health checks
       if (error.config?.url?.includes('/health')) {
         return Promise.reject(new Error('Backend server unavailable'))
       }
+      
+      // 对于连接错误，返回一个特殊的错误对象，让调用方知道是网络问题
+      const networkError = new Error('Network error: Cannot connect to backend server')
+      networkError.isNetworkError = true
+      networkError.originalError = error
+      networkError.endpoint = error.config?.url
+      return Promise.reject(networkError)
     }
 
     // If 401 and not already retried, try to refresh token
@@ -87,9 +111,9 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('refresh_token')
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-            refresh_token: refreshToken,
-          })
+        const response = await axios.post(API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh', {
+          refresh_token: refreshToken,
+        })
 
           const { access_token } = response.data
           Cookies.set('access_token', access_token, { expires: 1 })

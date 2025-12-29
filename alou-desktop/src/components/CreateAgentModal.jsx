@@ -8,26 +8,7 @@ import CloseIcon from '@/assets/关闭0.3.png'
 import './CreateAgentModal.css'
 
 const DEFAULT_MCP_CODE = `{
-  ports: [
-    {
-      label: 'web_search',
-      endpoint: 'wss://mcp-server.example.com/web-search',
-      port: 443,
-      description: 'Web搜索工具，可以搜索最新信息'
-    },
-    {
-      label: 'blockchain',
-      endpoint: 'wss://mcp-server.example.com/blockchain',
-      port: 443,
-      description: '区块链工具，可以查询余额、发送交易等'
-    },
-    {
-      label: 'file_system',
-      endpoint: 'ws://localhost:8765',
-      port: 8765,
-      description: '本地文件系统工具'
-    }
-  ]
+  "ports": []
 }`
 
 function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel }) {
@@ -47,12 +28,59 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
     try {
       setMcpParseError(null)
       
-      // 移除注释
-      const cleanedCode = code.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+      // 移除注释、控制字符并修剪空白字符
+      let cleanedCode = code
+        .replace(/\/\/.*$/gm, '')  // 移除单行注释
+        .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除多行注释
+        .trim()  // 移除首尾空白
       
-      // 尝试解析为 JavaScript 对象
-      // 使用 Function 构造器来安全执行代码
-      const config = new Function('return ' + cleanedCode)()
+      // 更彻底地移除控制字符
+      cleanedCode = cleanedCode
+        // 移除所有控制字符（除了换行、回车、制表符）
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+        // 移除零宽字符
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        // 修复可能被破坏的 URL（如果 :// 被分割）
+        .replace(/"endpoint"\s*:\s*"([^"]*):\s*\/\/([^"]*)"/g, '"endpoint": "$1://$2"')
+      
+      // 调试：输出清理后的代码
+      console.log('清理后的代码:', cleanedCode)
+      console.log('代码长度:', cleanedCode.length)
+      console.log('前50个字符:', cleanedCode.substring(0, 50))
+      console.log('字符代码（前20个）:', Array.from(cleanedCode.substring(0, 20)).map(c => c.charCodeAt(0)))
+      
+      if (!cleanedCode) {
+        throw new Error('MCP 配置不能为空')
+      }
+      
+      let config = null
+      
+      // 尝试多种解析方式
+      try {
+        // 首先尝试作为 JSON 解析
+        console.log('尝试 JSON 解析...')
+        config = JSON.parse(cleanedCode)
+        console.log('JSON 解析成功')
+      } catch (jsonError) {
+        console.log('JSON 解析失败:', jsonError.message)
+        console.log('失败位置:', jsonError)
+        
+        // 如果 JSON 解析失败，尝试作为 JavaScript 对象解析
+        try {
+          console.log('尝试 JavaScript 解析...')
+          // 确保代码以有效的 JavaScript 对象开始
+          const jsCode = cleanedCode.trim()
+          // 如果代码不以 { 开头，添加它
+          const finalCode = jsCode.startsWith('{') ? jsCode : `{${jsCode}}`
+          console.log('JavaScript 代码:', finalCode.substring(0, 50))
+          // 使用 Function 构造器来安全执行代码
+          config = new Function('return ' + finalCode)()
+          console.log('JavaScript 解析成功')
+        } catch (jsError) {
+          console.log('JavaScript 解析失败:', jsError.message)
+          throw new Error(`解析失败: ${jsonError.message} (JSON) 或 ${jsError.message} (JS)`)
+        }
+      }
       
       if (!config || typeof config !== 'object') {
         throw new Error('配置必须是一个对象')

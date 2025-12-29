@@ -34,10 +34,22 @@ const normalizeResourcePayload = (payload) => {
 }
 
 export const requestMcpUiResource = async (target, params = {}) => {
-  const response = await apiClient.post('/mcp/ui-resource', {
-    target,
-    params,
-  })
+  try {
+    const response = await apiClient.post('/mcp/ui-resource', {
+      target,
+      params,
+    })
 
-  return normalizeResourcePayload(response.data)
+    return normalizeResourcePayload(response.data)
+  } catch (error) {
+    // 静默处理MCP UI资源加载错误，避免阻塞应用其他功能
+    console.warn(`[MCP UI] 资源加载失败 (${target}):`, error.message)
+    
+    // 返回空的资源对象，避免上层代码崩溃
+    return {
+      resource: null,
+      metadata: null,
+      raw: null
+    }
+  }
 }

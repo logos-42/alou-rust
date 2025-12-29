@@ -229,8 +229,10 @@ export const useChannelManager = ({
           const isConnectionError =
             error.code === 'ECONNREFUSED' ||
             error.code === 'ERR_NETWORK' ||
+            error.code === 'ERR_BAD_RESPONSE' ||
             error.message?.includes('ERR_CONNECTION_REFUSED') ||
             error.message?.includes('Failed to fetch') ||
+            error.message?.includes('ETIMEDOUT') ||
             !error.response
 
           const now = Date.now()
@@ -239,16 +241,37 @@ export const useChannelManager = ({
           if (isConnectionError) {
             if (now - lastErrorTime > 10000) {
               window.__lastLoadChannelsError = now
-              console.warn('[AgentChat] Cannot load agent channels: backend server unavailable.')
+              console.warn('[AgentChat] 后端服务器不可用，使用本地存储的智能体。')
+            }
+            
+            // 后端不可用时，检查本地存储是否有智能体
+            if (storedAgents && storedAgents.length > 0) {
+              console.log(`[AgentChat] 从本地存储加载 ${storedAgents.length} 个智能体`)
+              const localChannels = storedAgents
+                .map((agent) => buildChannelFromAgent(agent))
+                .filter(Boolean)
+              
+              if (localChannels.length > 0) {
+                setChannels(prev => {
+                  // 合并去重
+                  const existingIds = new Set(prev.map(c => c.id))
+                  const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
+                  return [...newChannels, ...prev]
+                })
+                setChannelError(null)
+              } else {
+                setChannelError('后端服务器不可用，且本地无存储的智能体')
+              }
+            } else {
+              setChannelError('后端服务器不可用，且本地无存储的智能体')
             }
           } else {
             if (now - lastErrorTime > 5000) {
               window.__lastLoadChannelsError = now
               console.error('Failed to load agent channels:', error)
             }
+            setChannelError(message)
           }
-
-          setChannelError(message)
           // 出错时也不要清空本地已有的频道列表
         })
         return []
@@ -351,10 +374,13 @@ export const useChannelManager = ({
         return
       }
 
+      console.log('[useChannelManager] 开始解析智能体:', { target, channelId: channel.id })
       setChannelLoading(true)
       void (async () => {
         try {
+          console.log('[useChannelManager] 调用 agentService.resolveAgent...')
           const resolvedAgent = await agentService.resolveAgent(target, sessionId)
+          console.log('[useChannelManager] 智能体解析成功:', resolvedAgent)
           const originalMeta = channel.meta ?? {}
           const mergedAgent = {
             ...resolvedAgent,
@@ -518,12 +544,19 @@ export const useChannelManager = ({
       return
     }
     
-    if (!hasHydrated || !isSessionReady) {
+    // 等待状态存储水合完成
+    if (!hasHydrated) {
       return
     }
 
     // 标记已加载
     hasLoadedFromStorageRef.current = true
+
+    console.log('[useChannelManager] 从本地存储加载智能体，存储状态:', {
+      hasHydrated,
+      isSessionReady,
+      storedAgentsCount: storedAgents?.length || 0
+    })
 
     // 如果本地存储有智能体，加载到 channels
     if (storedAgents && storedAgents.length > 0) {
@@ -569,26 +602,61 @@ export const useChannelManager = ({
         console.warn(`[useChannelManager] 本地存储有 ${storedAgents.length} 个智能体，但无法构建任何频道`)
       }
     }
-  }, [hasHydrated, isSessionReady, storedAgents, setChannels, setActiveChannelId, setSelectedAgent])
+  }, [hasHydrated, storedAgents, setChannels, setActiveChannelId, setSelectedAgent])
 
   // 保存新创建的智能体到本地存储
   // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保保存和加载时的ID一致
   const saveAgentToStorage = useCallback((agentMetadata) => {
     try {
+      console.log('[useChannelManager] saveAgentToStorage 被调用，参数:', {
+        name: agentMetadata.display_name || agentMetadata.name,
+        ipns: agentMetadata.ipns,
+        did: agentMetadata.did,
+        cid: agentMetadata.cid,
+        sessionId: agentMetadata.sessionId,
+      })
+      
       // 先构建频道以获取一致的ID
       const channel = buildChannelFromAgent(agentMetadata)
+      console.log('[useChannelManager] 构建的频道:', {
+        id: channel?.id,
+        name: channel?.name,
+        hasChannel: !!channel
+      })
+      
       const agentId = channel ? channel.id : (agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}`)
       
       console.log('[useChannelManager] 保存智能体到本地存储，使用ID:', agentId)
-      addAgentToStore({
+      console.log('[useChannelManager] 调用 addAgentToStore，参数:', {
+        id: agentId,
+        sessionId,
+        name: agentMetadata.display_name || agentMetadata.name,
+      })
+      
+      const result = addAgentToStore({
         ...agentMetadata,
         sessionId,
         id: agentId, // 使用与频道相同的ID，确保一致性
       })
-      console.log('[useChannelManager] ✅ 智能体已保存到本地存储:', agentMetadata.display_name || agentMetadata.name, 'ID:', agentId)
+      
+      console.log('[useChannelManager] ✅ 智能体已保存到本地存储:', {
+        name: agentMetadata.display_name || agentMetadata.name,
+        id: agentId,
+        result: result
+      })
+      
+      // 验证保存是否成功
+      const storedAgents = useAgentStore.getState().agents
+      console.log('[useChannelManager] 当前存储的智能体数量:', storedAgents.length)
+      console.log('[useChannelManager] 存储的智能体列表:', storedAgents.map(a => ({ id: a.id, name: a.name })))
+      
       return true
     } catch (error) {
       console.error('[useChannelManager] ❌ 保存智能体到本地存储失败:', error)
+      console.error('[useChannelManager] 错误详情:', {
+        message: error.message,
+        stack: error.stack
+      })
       return false
     }
   }, [addAgentToStore, sessionId])
@@ -685,6 +753,18 @@ export const useChannelManager = ({
           typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
         const detectedChain = resolveBackendChain({ chainId, chain: preferredChain })
 
+        console.log('[useChannelManager] 开始创建智能体，参数:', {
+          sessionId,
+          walletAddress,
+          chain: detectedChain || preferredChain,
+          name,
+          roleDescription,
+          avatarCid,
+          mcpConfigCid,
+          mcpPorts,
+          diapIdentity,
+        })
+
         const result = await agentService.createClaudeAgent({
           sessionId,
           walletAddress,
@@ -696,6 +776,8 @@ export const useChannelManager = ({
           mcpPorts,
           diapIdentity,
         })
+
+        console.log('[useChannelManager] 智能体创建API响应:', result)
 
         const metadata = result.agent_metadata || {
           did: result.diap_identity?.did,
@@ -711,14 +793,18 @@ export const useChannelManager = ({
           sessionId,
         }
 
+        console.log('[useChannelManager] 构建的元数据:', metadata)
+
         if (diapIdentity) {
           metadata.diapIdentity = diapIdentity
           metadata.did = metadata.did || diapIdentity.did
           metadata.cid = metadata.cid || diapIdentity.cid
           metadata.ipns = metadata.ipns || diapIdentity.ipns
+          console.log('[useChannelManager] 合并 DIAP Identity 后的元数据:', metadata)
         }
 
         const channel = buildChannelFromAgent(metadata)
+        console.log('[useChannelManager] 构建的频道对象:', channel)
         if (channel) {
           setChannels((prev) => {
             // 查找临时频道 - 使用多种方式匹配
@@ -770,8 +856,60 @@ export const useChannelManager = ({
         return result
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        
+        console.error('[useChannelManager] 创建智能体失败，尝试创建本地频道:', message, error)
+        
+        // 即使后端创建失败，也尝试创建本地频道
+        try {
+          const localMetadata = {
+            did: diapIdentity?.did || `did:key:local_${Date.now()}`,
+            cid: diapIdentity?.cid || `temp_${Date.now()}`,
+            ipns: diapIdentity?.ipns,
+            agent_type: 'claude_agent_sdk',
+            display_name: name,
+            role_description: roleDescription,
+            avatar_cid: avatarCid,
+            mcp_config_cid: mcpConfigCid,
+            mcp_ports: mcpPorts,
+            diap_identity: diapIdentity,
+            sessionId,
+            status: 'local_fallback',
+            error: message,
+          }
+          
+          console.log('[useChannelManager] 创建本地回退元数据:', localMetadata)
+          
+          const localChannel = buildChannelFromAgent(localMetadata)
+          if (localChannel) {
+            console.log('[useChannelManager] 本地回退频道:', localChannel)
+            
+            setChannels((prev) => {
+              const others = prev.filter((item) => item.id !== localChannel.id)
+              return [localChannel, ...others]
+            })
+            
+            setActiveChannelId(localChannel.id)
+            setSelectedAgent(localMetadata)
+            
+            // 保存到本地存储
+            saveAgentToStorage(localMetadata)
+            
+            console.log('[useChannelManager] 本地回退频道已创建:', localChannel.name)
+            
+            // 返回一个模拟的成功结果
+            return {
+              success: false,
+              error: message,
+              agent_metadata: localMetadata,
+              is_local_fallback: true,
+            }
+          }
+        } catch (fallbackError) {
+          console.error('[useChannelManager] 本地回退也失败:', fallbackError)
+        }
+        
         if (!isBackgroundUpdate) {
-          setChannelError(message)
+          setChannelError(`创建失败: ${message} (已尝试本地回退)`)
         }
         recordInteraction('create_claude_agent_failed', { error: message })
         console.error('[useChannelManager] 创建智能体失败:', message)

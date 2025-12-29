@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useI18n } from '@/hooks/useI18n'
 import AlouLogo from '@/../src-tauri/icons/Square30x30Logo.png'
 import SettingsIcon from '@/assets/设置 0.7.png'
 import LoginIcon from '@/assets/登录.png'
 import SettingsPanel from './SettingsPanel'
 import ApiConfigModal from './ApiConfigModal'
+import SDKModal from './SDKModal'
 import './ChatHeader.css'
 
 const statusTextMap = {
@@ -25,10 +27,13 @@ const ChatHeader = ({
   onBackgroundChange,
   activeChannelId = null,
 }) => {
+  const navigate = useNavigate()
   const { t } = useI18n()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [showApiConfigModal, setShowApiConfigModal] = useState(false)
+  const [showSDKModal, setShowSDKModal] = useState(false)
+  const [sdkInitialTab, setSDKInitialTab] = useState('lsp')
 
   const statusText = useMemo(() => {
     const key = statusTextMap[connectionStatus] || 'connecting'
@@ -47,6 +52,16 @@ const ChatHeader = ({
   const handleLogoutClick = () => {
     setShowUserMenu(false)
     onLogout?.()
+  }
+
+  const handleOpenLspEditor = () => {
+    setSDKInitialTab('lsp')
+    setShowSDKModal(true)
+  }
+
+  const handleOpenSpecManager = () => {
+    setSDKInitialTab('spec')
+    setShowSDKModal(true)
   }
 
   return (
@@ -94,7 +109,7 @@ const ChatHeader = ({
           )}
         </div>
       </div>
-      {showSettingsPanel && (
+          {showSettingsPanel && (
         <SettingsPanel
           isDarkMode={isDarkMode}
           onToggleTheme={onToggleTheme}
@@ -105,12 +120,26 @@ const ChatHeader = ({
             setShowSettingsPanel(false)
             setShowApiConfigModal(true)
           }}
+          onOpenLspEditor={() => {
+            handleOpenLspEditor()
+          }}
+          onOpenSpecManager={() => {
+            handleOpenSpecManager()
+          }}
         />
       )}
       {showApiConfigModal && (
         <ApiConfigModal
           isOpen={showApiConfigModal}
           onClose={() => setShowApiConfigModal(false)}
+          isDarkMode={isDarkMode}
+        />
+      )}
+      {showSDKModal && (
+        <SDKModal
+          isOpen={showSDKModal}
+          onClose={() => setShowSDKModal(false)}
+          initialTab={sdkInitialTab}
           isDarkMode={isDarkMode}
         />
       )}

@@ -362,7 +362,7 @@ pub async fn get_spec_templates() -> Result<Vec<SpecTemplate>, String> {
 
     let mut templates = vec![];
 
-    let entries = fs::read_dir(&templates_dir)
+    let mut entries = fs::read_dir(&templates_dir)
         .await
         .map_err(|e| format!("读取模板目录失败: {}", e))?;
 
