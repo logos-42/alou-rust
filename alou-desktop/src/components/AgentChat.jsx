@@ -20,7 +20,9 @@ import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
 import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
+import WorkflowVisualizer from '@/components/WorkflowVisualizer'
 import TranslationIcon from '@/assets/icon_翻译.png'
+import WorkflowIcon from '@/assets/设置0.3.png'
 
 // Hooks
 import { useAgentUI } from './AgentChat/useAgentUI'
@@ -39,6 +41,8 @@ import { useRateLimitModal } from './AgentChat/useRateLimitModal'
 import { useAgentBackground } from './AgentChat/useAgentBackground'
 import { useAgentModals } from './AgentChat/useAgentModals'
 import { useGroupChatRemoteControl } from './AgentChat/useGroupChatRemoteControl'
+import { useAgentWorkflow } from './AgentChat/useAgentWorkflow'
+import { useAutoAgentCreator } from './AgentChat/useAutoAgentCreator'
 
 // Utils & Constants
 import { useToolCallHandler } from '@/hooks/useAgentChat'
@@ -88,6 +92,7 @@ const AgentChat = () => {
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
+  const [showWorkflowPanel, setShowWorkflowPanel] = useState(false)
 
   // ==================== Rate Limit Modal Hook ====================
   const { rateLimitModal, openRateLimitModal, closeRateLimitModal, handleSubscribe } = useRateLimitModal()
@@ -307,30 +312,18 @@ const AgentChat = () => {
   // 注意：这里先创建一个占位函数，实际的 handleToolCalls 会在 messageState 之后更新
   const handleToolCallsRef = useRef(null)
   
-  // ==================== 自动创建智能体函数 ====================
-  const handleAutoCreateAgent = useCallback(async (agentInfo) => {
-    console.log('[AgentChat] 开始自动创建智能体:', agentInfo)
-    
-    try {
-      // 使用 handleCreateAgentSubmit 函数创建智能体
-      // 这里使用默认值：没有头像、使用默认 MCP 配置
-      await handleCreateAgentSubmit({
-        name: agentInfo.name,
-        roleDescription: agentInfo.roleDescription,
-        avatarCid: null, // 没有头像
-        mcpConfigCid: null, // 使用默认配置
-        mcpPorts: [], // 空端口列表
-        diapIdentity: null, // 自动创建 DIAP identity
-        tempId: null, // 没有临时 ID
-      })
-      
-      console.log('[AgentChat] 智能体自动创建成功:', agentInfo.name)
-      return true
-    } catch (error) {
-      console.error('[AgentChat] 智能体自动创建失败:', error)
-      throw error
-    }
-  }, [handleCreateAgentSubmit])
+  // ==================== 自动创建智能体 Hook ====================
+  // 使用专门的 hook 处理自动创建，便于 SDK 复用
+  const autoAgentCreator = useAutoAgentCreator({
+    onCreateAgent: handleCreateAgentSubmit,
+  })
+
+  const {
+    autoCreateAgent: handleAutoCreateAgent,
+    isAutoCreating,
+    autoCreationError,
+    resetState: resetAutoCreation,
+  } = autoAgentCreator
 
   // ==================== 6. Message State Hook ====================
   const messageState = useAgentMessages({
@@ -424,6 +417,33 @@ const AgentChat = () => {
     analyzeIntent,
     isCoordinatorReady,
   } = multiAgentCoordinator
+
+  // ==================== Workflow Hook ====================
+  const workflowState = useAgentWorkflow({
+    sessionId,
+    selectedAgent,
+    appendMessage,
+    scrollToBottom,
+    recordInteraction,
+  })
+
+  const {
+    workflows,
+    selectedWorkflow,
+    setSelectedWorkflow,
+    workflowLoading,
+    executingWorkflowId,
+    executionProgress,
+    loadWorkflows,
+    createSampleWorkflow,
+    executeWorkflow,
+    deleteWorkflow,
+    retryStep,
+    pauseWorkflow,
+    resumeWorkflow,
+    handleWorkflowEvent,
+    agentInfo,
+  } = workflowState
 
   // ==================== 10. Stream Handler ====================
   const { streamStatus, streamEvents } = useAgentStreamHandler({
@@ -527,6 +547,17 @@ const AgentChat = () => {
 
 
   // ==================== Bootstrap Effect ====================
+  // 处理头像更新事件 - 使用 useCallback 避免无限循环
+  const handleAvatarUpdated = useCallback((event) => {
+    const { agentId, agent } = event.detail
+    if (selectedAgent?.id === agentId) {
+      setSelectedAgent(agent)
+      setChannels(prevChannels => 
+        avatarManager.updateChannelsAvatar(prevChannels, agent)
+      )
+    }
+  }, [selectedAgent, setSelectedAgent, setChannels])
+
   useEffect(() => {
     const bootstrap = async () => {
       try {
@@ -543,17 +574,6 @@ const AgentChat = () => {
       }
     }
     bootstrap()
-
-    // 处理头像更新事件
-    const handleAvatarUpdated = (event) => {
-      const { agentId, agent } = event.detail
-      if (selectedAgent?.id === agentId) {
-        setSelectedAgent(agent)
-        setChannels(prevChannels => 
-          avatarManager.updateChannelsAvatar(prevChannels, agent)
-        )
-      }
-    }
 
     // Event listeners
     if (typeof window !== 'undefined') {
@@ -572,7 +592,7 @@ const AgentChat = () => {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAgent])
+  }, [handleAvatarUpdated, handleWalletChanged, handleResize, handleGlobalPointerUp])
 
   // ==================== Shell Class Name ====================
   const shellClassName = [
@@ -748,6 +768,26 @@ const AgentChat = () => {
             </button>
           )}
         />
+
+      {/* 工作流面板 */}
+      {showWorkflowPanel && (
+        <div className="workflow-panel-overlay">
+          <WorkflowVisualizer
+            sessionId={sessionId}
+            agentInfo={agentInfo}
+            onWorkflowEvent={handleWorkflowEvent}
+            className="workflow-panel-content"
+          />
+          <button
+            type="button"
+            className="workflow-panel-close"
+            onClick={() => setShowWorkflowPanel(false)}
+            title={t('common.close')}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       </div>
 
       {/* 限额弹窗 - 显示在输入框上方 */}
@@ -819,6 +859,15 @@ const AgentChat = () => {
 
       <button type="button" className="language-switch" onClick={toggleLanguage} title={languageLabel}>
         <img src={TranslationIcon} alt="翻译" className="language-icon" />
+      </button>
+
+      <button
+        type="button"
+        className={`workflow-switch ${showWorkflowPanel ? 'active' : ''}`}
+        onClick={() => setShowWorkflowPanel(!showWorkflowPanel)}
+        title={showWorkflowPanel ? '隐藏工作流面板' : '显示工作流面板'}
+      >
+        <img src={WorkflowIcon} alt="工作流" className="workflow-icon" />
       </button>
     </div>
   )
