@@ -1,0 +1,3 @@
+# Rust桥接层目录
+# 未来用于与Rust代码交互的桥接层
+# 包含JavaScript到Rust的接口定义和适配器

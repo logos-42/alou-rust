@@ -24,10 +24,14 @@
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@ui/*": ["./src/ui/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@bridges/*": ["./src/bridges/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "src/modules", "src/ui", "src/shared", "src/bridges"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 

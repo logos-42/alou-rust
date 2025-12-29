@@ -52,7 +52,13 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // 保持现有别名，确保向后兼容
       '@': path.resolve(__dirname, './src'),
+      // 新增模块化架构别名
+      '@modules': path.resolve(__dirname, './src/modules'),
+      '@ui': path.resolve(__dirname, './src/ui'),
+      '@shared': path.resolve(__dirname, './src/shared'),
+      '@bridges': path.resolve(__dirname, './src/bridges'),
     },
   },
 })
