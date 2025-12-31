@@ -19,6 +19,7 @@ use worker::*;
 
 pub mod agent;
 mod blockchain;
+mod claude;
 mod cluster_action;
 mod diap;
 mod mcp;
@@ -29,6 +30,7 @@ mod user_config;
 mod wallet;
 
 pub struct Router {
+    kv: KvStore,
     session_manager: SessionManager,
     agent_wallet_tool: AgentWalletTool,
     wallet_auth: Option<WalletAuth>,
@@ -49,8 +51,9 @@ impl Router {
         let session_store = kv.clone();
         let wallet_store = kv.clone();
         let pubsub_store = kv.clone();
-        let cluster_action_store = kv;
+        let cluster_action_store = kv.clone();
         Self {
+            kv,
             session_manager: SessionManager::new(session_store),
             agent_wallet_tool: AgentWalletTool::new(wallet_store),
             wallet_auth: None,
@@ -231,7 +234,7 @@ impl Router {
             }
             (Method::Delete, path) if path.starts_with("/api/session/") => {
                 let session_id = path.trim_start_matches("/api/session/");
-                session::handle_delete_session(&self.session_manager, session_id).await
+                session::handle_delete_session(&self.session_manager, session_id, &self.kv).await
             }
 
             (Method::Get, path) if path.starts_with("/api/wallet/nonce/") => {
@@ -291,6 +294,7 @@ impl Router {
                     self.agent_core.as_ref().map(|arc| arc.as_ref()),
                     self.wallet_auth.as_ref(),
                     self.subscription_guard.as_ref(),
+                    &self.kv,
                     req,
                 )
                 .await
@@ -302,6 +306,8 @@ impl Router {
                     req,
                 )
                 .await
+                .map_err(|e| worker::Error::RustError(e.to_string()))
+                .map_err(|e| worker::Error::RustError(e.to_string()))
             }
             (Method::Post, "/api/agent/search") => {
                 agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
@@ -319,7 +325,7 @@ impl Router {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/create-from-command") => {
-                agent::handle_create_agent_from_command(&self.session_manager, req, &env).await
+                agent::handle_create_agent_from_command(&self.session_manager, &env, req).await
             }
             (Method::Post, "/api/agent/batch-create") => {
                 agent::handle_batch_create_agent(&self.session_manager, req, &env).await
@@ -591,7 +597,7 @@ impl Router {
             }
         };
 
-        let events = get_events(&session_id, since).await;
+        let events = get_events(&session_id, since, &self.kv).await;
         let response = json!({
             "session_id": session_id,
             "events": events,
@@ -655,22 +661,26 @@ impl Router {
 pub(crate) fn json_response<T: Serialize>(data: &T) -> Result<Response> {
     let json = serde_json::to_string(data)
         .map_err(|e| worker::Error::RustError(format!("JSON serialization error: {}", e)))?;
-
+ 
     let mut response = Response::ok(json)?;
-    response
-        .headers_mut()
-        .set("Content-Type", "application/json; charset=utf-8")?;
+    let headers = response.headers_mut();
+    headers.set("Content-Type", "application/json; charset=utf-8")?;
+    headers.set("Access-Control-Allow-Origin", "*")?;
+    headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")?;
+    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")?;
     Ok(response)
 }
 
 pub(crate) fn json_response_with_status<T: Serialize>(data: &T, status: u16) -> Result<Response> {
     let json = serde_json::to_string(data)
         .map_err(|e| worker::Error::RustError(format!("JSON serialization error: {}", e)))?;
-
+ 
     let mut response = Response::ok(json)?.with_status(status);
-    response
-        .headers_mut()
-        .set("Content-Type", "application/json; charset=utf-8")?;
+    let headers = response.headers_mut();
+    headers.set("Content-Type", "application/json; charset=utf-8")?;
+    headers.set("Access-Control-Allow-Origin", "*")?;
+    headers.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")?;
+    headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization")?;
     Ok(response)
 }
 

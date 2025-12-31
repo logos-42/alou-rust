@@ -384,7 +384,7 @@ async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
     console_log!("→ Initializing agent core...");
 
     let agent_core =
-        AgentCore::with_provider(&ai_provider, api_key, ai_model, session_manager, executor)
+        AgentCore::with_provider(&ai_provider, api_key, ai_model, session_manager, executor, sessions_store.clone())
             .map_err(|e| {
                 console_error!("✗ Failed to initialize agent core: {}", e);
                 worker::Error::RustError(e.to_string())

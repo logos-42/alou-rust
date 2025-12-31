@@ -5,7 +5,7 @@ use worker::console_log;
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
 use crate::agent::claude_client::{ClaudeClient, ClaudeMessage, ClaudeTool, ToolUse};
 use crate::agent::context::AgentContext;
-use crate::agent::context_compressor::{ContextCompressor, CompressionStrategy, CompressionInfo};
+use crate::agent::context_compressor::{ContextCompressor, CompressionStrategy};
 use crate::agent::error_analyzer::ErrorAnalyzer;
 use crate::agent::error_response::ToolErrorResponse;
 use crate::agent::prompts::{AgentMode, CustomAgentInfo, PromptMode};
@@ -13,6 +13,7 @@ use crate::agent::retry_policy::{RetryPolicy, RetryState, RetryDecision, Backoff
 use crate::agent::session::{ContextEvent, Message, SessionManager};
 use crate::agent::stream::{StreamEvent, StreamPublisher};
 use crate::mcp::executor::{McpExecutor, ToolCall};
+use crate::storage::kv::KvStore;
 use crate::utils::error::{AloudError, Result};
 
 const MAX_TOOL_ITERATIONS: u32 = 10;
@@ -51,6 +52,7 @@ pub struct AgentCore {
     provider_type: AiProviderType,
     session_manager: SessionManager,
     mcp_executor: McpExecutor,
+    kv: KvStore,
 }
 
 impl AgentCore {
@@ -60,6 +62,7 @@ impl AgentCore {
         api_key: String,
         session_manager: SessionManager,
         mcp_executor: McpExecutor,
+        kv: KvStore,
     ) -> Self {
         Self {
             claude_client: Some(ClaudeClient::new(api_key)),
@@ -67,6 +70,7 @@ impl AgentCore {
             provider_type: AiProviderType::Claude,
             session_manager,
             mcp_executor,
+            kv,
         }
     }
 
@@ -77,6 +81,7 @@ impl AgentCore {
         model: Option<String>,
         session_manager: SessionManager,
         mcp_executor: McpExecutor,
+        kv: KvStore,
     ) -> Result<Self> {
         let provider_type = match provider.to_lowercase().as_str() {
             "claude" => AiProviderType::Claude,
@@ -99,6 +104,7 @@ impl AgentCore {
             provider_type,
             session_manager,
             mcp_executor,
+            kv,
         })
     }
 
@@ -128,6 +134,7 @@ impl AgentCore {
                     "role": "user",
                     "content": message,
                 })),
+            &self.kv,
         )
         .await;
 
@@ -163,7 +170,8 @@ impl AgentCore {
                                 "reduction_percent": compressed.compression_info.reduction_percent,
                                 "strategy": format!("{:?}", compressed.compression_info.strategy),
                                 "summary": compressed.compression_info.summary,
-                            }))
+                            })),
+                        &self.kv,
                     ).await;
                     
                     compressed.messages
@@ -304,6 +312,7 @@ impl AgentCore {
                         "iteration": iterations,
                         "tool_count": tools.len(),
                     })),
+                &self.kv,
             )
             .await;
 
@@ -414,6 +423,7 @@ impl AgentCore {
                             "preview": preview,
                             "length": response.content.len(),
                         })),
+                    &self.kv,
                 )
                 .await;
                 break response.content.clone();
@@ -435,6 +445,7 @@ impl AgentCore {
                             }))
                             .collect::<Vec<_>>(),
                     })),
+                &self.kv,
             )
             .await;
 
@@ -492,6 +503,7 @@ impl AgentCore {
                         "tool_call_id": tool_use.id,
                         "name": tool_use.name,
                     })),
+                    &self.kv,
                 )
                 .await;
             }
@@ -509,6 +521,7 @@ impl AgentCore {
                 .with_payload(json!({
                     "length": final_content.len(),
                 })),
+            &self.kv,
         )
         .await;
 
@@ -519,9 +532,9 @@ impl AgentCore {
         })
     }
 
-    async fn emit_stream(stream: &Option<StreamPublisher>, event: StreamEvent) {
+    async fn emit_stream(stream: &Option<StreamPublisher>, event: StreamEvent, kv: &KvStore) {
         if let Some(publisher) = stream {
-            publisher.publish(event).await;
+            publisher.publish(event, kv).await;
         }
     }
 
@@ -596,12 +609,12 @@ impl AgentCore {
                         let corrected_tool_call = ToolCall {
                             id: tool_use.id.clone(),
                             name: tool_use.name.clone(),
-                            args: corrected.args.clone(),
+                            args: corrected.corrected_args.clone(),
                         };
 
                         let retry_result = self
                             .mcp_executor
-                            .execute(&tool_use.name, corrected.args.clone(), context)
+                            .execute(&tool_use.name, corrected.corrected_args.clone(), context)
                             .await;
 
                         match retry_result {

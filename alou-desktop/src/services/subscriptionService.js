@@ -1,13 +1,14 @@
 // Subscription service for API calls
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
+  (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
+const API_BASE = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
 
 class SubscriptionService {
   /**
    * Check trial period status
    */
   async checkTrial(userId, walletAddress) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/check-trial`, {
+    const response = await fetch(`${API_BASE}/subscription/check-trial`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +30,7 @@ class SubscriptionService {
    * Get or create trial period
    */
   async getOrCreateTrial(userId, walletAddress) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/get-trial`, {
+    const response = await fetch(`${API_BASE}/subscription/get-trial`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +52,7 @@ class SubscriptionService {
    * Get all subscription plans
    */
   async getPlans() {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/plans`, {
+    const response = await fetch(`${API_BASE}/subscription/plans`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ class SubscriptionService {
    * Get subscription status
    */
   async getStatus(userId, walletAddress) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/status?user_id=${encodeURIComponent(userId)}&wallet_address=${encodeURIComponent(walletAddress)}`, {
+    const response = await fetch(`${API_BASE}/subscription/status?user_id=${encodeURIComponent(userId)}&wallet_address=${encodeURIComponent(walletAddress)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -87,7 +88,7 @@ class SubscriptionService {
    * Create subscription
    */
   async createSubscription(data) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/create`, {
+    const response = await fetch(`${API_BASE}/subscription/create`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ class SubscriptionService {
    * Renew subscription
    */
   async renewSubscription(data) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/renew`, {
+    const response = await fetch(`${API_BASE}/subscription/renew`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -126,7 +127,7 @@ class SubscriptionService {
    * Verify payment
    */
   async verifyPayment(txHash, chainType) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/verify-payment`, {
+    const response = await fetch(`${API_BASE}/subscription/verify-payment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -148,7 +149,7 @@ class SubscriptionService {
    * Get notifications
    */
   async getNotifications(daysBefore = 7) {
-    const response = await fetch(`${API_BASE_URL}/api/subscription/notifications?days_before=${daysBefore}`, {
+    const response = await fetch(`${API_BASE}/subscription/notifications?days_before=${daysBefore}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

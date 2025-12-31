@@ -29,6 +29,28 @@ pub(crate) struct SearchAgentRequest {
     pub query: String,
 }
 
+#[derive(Deserialize)]
+pub(crate) struct CreateClaudeAgentRequest {
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub wallet_address: Option<String>,
+    #[serde(default)]
+    pub chain: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub avatar_cid: Option<String>,
+    #[serde(default)]
+    pub mcp_config_cid: Option<String>,
+    #[serde(default)]
+    pub role_description: Option<String>,
+    #[serde(default)]
+    pub mcp_ports: Option<Vec<McpPortConfig>>,
+    #[serde(default)]
+    pub diap_identity: Option<ProvidedDiapIdentity>,
+}
+
 #[derive(Serialize)]
 struct SearchAgentResponse {
     pub agents: Vec<ResolvedAgent>,
@@ -71,7 +93,7 @@ pub(crate) async fn handle_resolve_agent(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -122,7 +144,7 @@ pub(crate) async fn handle_search_agents(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -158,7 +180,7 @@ pub(crate) async fn handle_search_agents(
                 count: agents.len(),
                 agents,
             };
-            json_response(&response)
+            Ok(json_response(&response)?)
         }
         Err((status, error_response)) => json_response_with_status(&error_response, status.into()),
     }
@@ -183,7 +205,7 @@ async fn store_and_respond_agent(
             }
         }
     }
-    json_response(&agent)
+    Ok(json_response(&agent)?)
 }
 
 fn fallback_resolve_agent(target: &str) -> Option<ResolvedAgent> {
@@ -328,7 +350,7 @@ pub(crate) async fn handle_get_diap_identity(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -384,10 +406,10 @@ pub(crate) async fn handle_get_diap_identity(
         }
     };
 
-    json_response(&json!({
+    Ok(json_response(&json!({
         "ipns_name": body.ipns_name,
         "identity": identity,
-    }))
+    }))?)
 }
 
 /// Create a new Claude Agent SDK with automatic DIAP identity
@@ -395,48 +417,26 @@ pub(crate) async fn handle_create_claude_agent(
     session_manager: &SessionManager,
     req: &mut Request,
 ) -> Result<Response> {
-    #[derive(Deserialize)]
-    struct CreateClaudeAgentRequest {
-        #[serde(default)]
-        session_id: Option<String>,
-        #[serde(default)]
-        wallet_address: Option<String>,
-        #[serde(default)]
-        chain: Option<String>,
-        #[serde(default)]
-        name: Option<String>,
-        #[serde(default)]
-        avatar_cid: Option<String>,
-        #[serde(default)]
-        mcp_config_cid: Option<String>,
-        #[serde(default)]
-        role_description: Option<String>,
-        #[serde(default)]
-        mcp_ports: Option<Vec<McpPortConfig>>,
-        #[serde(default)]
-        diap_identity: Option<ProvidedDiapIdentity>,
-    }
-
     let body: CreateClaudeAgentRequest = match req.json().await {
         Ok(body) => body,
         Err(e) => {
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
     let result = handle_create_claude_agent_internal(session_manager, body).await?;
     
-    json_response(&json!({
+    Ok(json_response(&json!({
         "session_id": result.session_id,
         "agent_id": result.session_id, // 使用session_id作为agent_id
         "agent_type": "claude_agent_sdk",
         "name": result.name,
         "diap_identity": result.identity,
         "agent_metadata": result.agent_metadata,
-    }))
+    }))?)
 }
 
 /// Internal function to handle Claude agent creation logic
@@ -455,7 +455,7 @@ pub(crate) async fn handle_create_claude_agent_internal(
                 let error_response = ErrorResponse {
                     error: format!("Session not found: {}", e),
                 };
-                worker::Error::RustError(error_response.error.clone())
+                crate::utils::error::AloudError::WorkerError(error_response.error.clone())
             })?;
         sid
     } else {
@@ -467,7 +467,7 @@ pub(crate) async fn handle_create_claude_agent_internal(
                 let error_response = ErrorResponse {
                     error: format!("Failed to create session: {}", e),
                 };
-                worker::Error::RustError(error_response.error.clone())
+                crate::utils::error::AloudError::WorkerError(error_response.error.clone())
             })?
     };
 
@@ -493,7 +493,7 @@ pub(crate) async fn handle_create_claude_agent_internal(
             let error_response = ErrorResponse {
                 error: format!("Failed to store DIAP identity: {}", e),
             };
-            return Err(worker::Error::RustError(error_response.error));
+            return Err(crate::utils::error::AloudError::WorkerError(error_response.error).into());
         }
         stored_identity = Some(identity);
     }
@@ -584,7 +584,7 @@ pub(crate) async fn handle_get_diap_identity_by_session(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -594,10 +594,10 @@ pub(crate) async fn handle_get_diap_identity_by_session(
         Ok(_) => {
             // Session exists, try to get identity
             match session_manager.get_diap_identity(&body.session_id).await {
-                Ok(Some(identity)) => json_response(&json!({
+                Ok(Some(identity)) => Ok(json_response(&json!({
                     "session_id": body.session_id,
                     "identity": identity,
-                })),
+                }))?),
                 Ok(None) => {
                     let error_response = ErrorResponse {
                         error: "DIAP identity not found for this session".to_string(),
@@ -654,7 +654,7 @@ pub(crate) async fn handle_register_agent_onchain(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -686,7 +686,7 @@ pub(crate) async fn handle_register_agent_onchain(
                 let error_response = ErrorResponse {
                     error: format!("Identity validation failed: {}", e),
                 };
-                return json_response_with_status(&error_response, 400);
+                return Ok(json_response_with_status(&error_response, 400)?);
             }
         }
     }
@@ -696,7 +696,7 @@ pub(crate) async fn handle_register_agent_onchain(
         Ok((_, env)) => env,
         Err(msg) => {
             let error_response = ErrorResponse { error: msg };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -724,7 +724,7 @@ pub(crate) async fn handle_register_agent_onchain(
             let registration_fee = client.registration_fee().await.ok();
             let min_stake = client.min_stake_amount().await.ok();
 
-            json_response(&json!({
+            Ok(json_response(&json!({
                 "encoded_call": encoded,
                 "network": body.network,
                 "registration_fee": registration_fee,
@@ -737,7 +737,7 @@ pub(crate) async fn handle_register_agent_onchain(
                     "cid": identity.cid,
                     "public_key": identity.public_key,
                 },
-            }))
+            }))?)
         }
         Err(e) => {
             let error_response = ErrorResponse {
@@ -832,12 +832,12 @@ pub(crate) async fn handle_batch_create_agent(
     //         worker::Error::RustError(format!("Failed to send task to queue: {}", e))
     //     })?;
 
-    json_response(&json!({
+    Ok(json_response(&json!({
         "success": true,
         "task_id": task_id,
         "status": "queued",
         "agents_count": body.agents.len(),
-    }))
+    }))?)
 }
 
 /// 查询批量创建任务状态
@@ -966,12 +966,12 @@ pub(crate) async fn handle_get_batch_agent_sessions(
     // 获取批量任务中所有已创建的智能体会话ID
     match processor.get_batch_agent_sessions(task_id, env).await {
         Ok(session_ids) => {
-            json_response(&json!({
+            Ok(json_response(&json!({
                 "success": true,
                 "task_id": task_id,
                 "session_ids": session_ids,
                 "count": session_ids.len(),
-            }))
+            }))?)
         }
         Err(e) => json_response_with_status(
             &ErrorResponse {
@@ -999,7 +999,7 @@ pub(crate) async fn handle_parse_creation_command(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -1046,7 +1046,7 @@ pub(crate) async fn handle_create_agent_from_command(
             let error_response = ErrorResponse {
                 error: format!("Invalid request body: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -1057,7 +1057,7 @@ pub(crate) async fn handle_create_agent_from_command(
             let error_response = ErrorResponse {
                 error: format!("Failed to parse creation command: {}", e),
             };
-            return json_response_with_status(&error_response, 400);
+            return Ok(json_response_with_status(&error_response, 400)?);
         }
     };
 
@@ -1071,22 +1071,16 @@ pub(crate) async fn handle_create_agent_from_command(
                 let error_response = ErrorResponse {
                     error: format!("Session not found: {}", e),
                 };
-                worker::Error::RustError(error_response.error.clone())
+                crate::utils::error::AloudError::WorkerError(error_response.error.clone())
             })?;
         sid
     } else {
         // 创建新会话
-        let wallet_address = body.wallet_address.unwrap_or_else(|| "default_user".to_string());
-        let session = session_manager
-            .create_session(wallet_address)
-            .await
-            .map_err(|e| {
-                let error_response = ErrorResponse {
-                    error: format!("Failed to create session: {}", e),
-                };
-                worker::Error::RustError(error_response.error.clone())
-            })?;
-        session.id
+        let wallet_address = body.wallet_address.clone().unwrap_or_else(|| "default_user".to_string());
+        let session_id = session_manager
+            .create_session(Some(wallet_address), body.chain.clone())
+            .await?;
+        session_id
     };
 
     // 使用现有的 create_claude_agent 逻辑，但传入解析的信息

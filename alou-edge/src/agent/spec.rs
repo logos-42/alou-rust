@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Task specification for planned execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TaskSpec {
     pub task_id: String,
     pub title: String,
@@ -34,7 +34,11 @@ impl TaskSpec {
             category: None,
             preconditions: Vec::new(),
             steps: Vec::new(),
-            expected_outcome: ExpectedOutcome::default(),
+            expected_outcome: ExpectedOutcome {
+                success_criteria: None,
+                expected_value: None,
+                acceptance_criteria: Vec::new(),
+            },
             validation_rules: Vec::new(),
             metadata: None,
             created_at: now,
@@ -44,7 +48,7 @@ impl TaskSpec {
 }
 
 /// Precondition for task execution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Precondition {
     pub condition_id: String,
     pub description: String,
@@ -60,7 +64,7 @@ pub struct Precondition {
 }
 
 /// Task execution step
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StepSpec {
     pub step_id: String,
     pub step_type: StepType,
@@ -98,10 +102,15 @@ pub enum StepType {
     ManualAction,
 }
 
+impl Default for StepType {
+    fn default() -> Self {
+        StepType::ToolCall
+    }
+}
+
 /// Retry configuration for a step
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryConfig {
-    #[serde(default = "max_attempts")]
     pub max_attempts: u32,
     
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -126,11 +135,11 @@ impl Default for RetryConfig {
 pub struct ExpectedOutcome {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub success_criteria: Option<String>,
-    
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expected_value: Option<Value>,
-    
-    #[serde(skip_serializing_if = "Option::is_none")]
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub acceptance_criteria: Vec<String>,
 }
 
@@ -152,40 +161,44 @@ pub struct ValidationRule {
 }
 
 /// Validation rule type
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationRuleType {
-    #[default]
     OutputFormat,
-    #[default]
     OutputRange,
-    #[default]
     OutputPattern,
-    #[default]
     CustomCheck,
 }
 
+impl Default for ValidationRuleType {
+    fn default() -> Self {
+        ValidationRuleType::OutputFormat
+    }
+}
+
 /// Validation severity
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationSeverity {
-    #[default]
     Info,
-    #[default]
     Warning,
-    #[default]
     Error,
-    #[default]
     Critical,
 }
 
+impl Default for ValidationSeverity {
+    fn default() -> Self {
+        ValidationSeverity::Info
+    }
+}
+
 /// Spec metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SpecMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub creator: Option<String>,
     
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -193,7 +206,7 @@ pub struct SpecMetadata {
 }
 
 /// Execution plan from spec
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExecutionPlan {
     pub task_id: String,
     pub phases: Vec<ExecutionPhase>,
@@ -216,26 +229,35 @@ impl ExecutionPlan {
 }
 
 /// Execution phase (group of steps)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ExecutionPhase {
     pub phase_id: String,
     pub name: String,
     pub step_ids: Vec<String>,
     #[serde(default)]
     pub can_execute_in_parallel: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
 }
 
 /// Validation result
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationResult {
-    #[default]
     pub is_valid: bool,
-    #[default]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<String>,
-    #[default]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+}
+
+impl Default for ValidationResult {
+    fn default() -> Self {
+        Self {
+            is_valid: true,
+            errors: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
 }
 
 impl ValidationResult {
@@ -246,14 +268,16 @@ impl ValidationResult {
             warnings: Vec::new(),
         }
     }
-    
-    pub fn with_error(mut self, error: String) -> Self {
+
+    pub fn with_error(&mut self, error: String) -> &mut Self {
         self.errors.push(error);
         self.is_valid = false;
+        self
     }
-    
-    pub fn with_warning(mut self, warning: String) -> Self {
+
+    pub fn with_warning(&mut self, warning: String) -> &mut Self {
         self.warnings.push(warning);
+        self
     }
 }
 

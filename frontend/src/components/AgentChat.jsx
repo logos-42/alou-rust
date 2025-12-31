@@ -18,6 +18,7 @@ import McpModal from '@/components/mcp/McpModal'
 import CreateAgentModal from '@/components/CreateAgentModal'
 import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
+import WorkflowVisualizer from '@/components/WorkflowVisualizer'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
 // Hooks
@@ -77,6 +78,7 @@ const AgentChat = () => {
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
   const [isCreateAgentModalOpen, setCreateAgentModalOpen] = useState(false)
+  const [showWorkflowPanel, setShowWorkflowPanel] = useState(false)
 
   // ==================== 1. UI State Hook ====================
   const uiState = useAgentUI({
@@ -419,6 +421,72 @@ const AgentChat = () => {
     [fetchAndOpenUiResource],
   )
 
+  const handleWorkflowEvent = useCallback(
+    (event) => {
+      console.log('[AgentChat] Workflow event:', event)
+      recordInteraction('workflow_event', event)
+
+      // 将工作流事件转换为对话消息显示
+      let messageContent = ''
+
+      switch (event.type) {
+        case 'execution_started':
+          messageContent = `🔄 开始执行工作流 ${event.workflowId}`
+          break
+
+        case 'execution_progress':
+          if (event.progress?.currentStep) {
+            messageContent = `⚙️ 当前执行步骤: ${event.progress.currentStep}`
+          }
+          break
+
+        case 'execution_completed':
+          messageContent = `✅ 工作流执行完成!\n结果: ${JSON.stringify(event.result || {}, null, 2)}`
+          break
+
+        case 'execution_error':
+          messageContent = `❌ 工作流执行失败: ${event.error || '未知错误'}`
+          break
+
+        case 'workflow_created':
+          messageContent = `✨ 工作流创建成功: ${event.workflowId}`
+          break
+
+        case 'workflow_deleted':
+          messageContent = `🗑️ 工作流删除成功: ${event.workflowId}`
+          break
+
+        case 'step_retried':
+          messageContent = `🔄 步骤重试成功: ${event.stepId}`
+          break
+
+        case 'workflow_paused':
+          messageContent = `⏸️ 工作流已暂停: ${event.workflowId}`
+          break
+
+        case 'workflow_resumed':
+          messageContent = `▶️ 工作流已恢复: ${event.workflowId}`
+          break
+
+        case 'error':
+          messageContent = `❌ 工作流错误: ${event.message || event.error || '未知错误'}`
+          break
+      }
+
+      if (messageContent) {
+        appendMessage({
+          id: `workflow_${Date.now()}_${Math.random()}`,
+          type: 'assistant',
+          content: messageContent,
+          timestamp: Date.now(),
+          source: 'workflow',
+        })
+        scrollToBottom()
+      }
+    },
+    [appendMessage, recordInteraction, scrollToBottom],
+  )
+
   const createChannel = useCallback(() => {
     setCreateAgentModalOpen(true)
     recordInteraction('open_create_agent_modal')
@@ -759,6 +827,26 @@ const AgentChat = () => {
             </button>
           )}
         />
+
+        {/* 工作流面板 */}
+        {showWorkflowPanel && (
+          <div className="workflow-panel-overlay">
+            <WorkflowVisualizer
+              sessionId={sessionId}
+              walletAddress={typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null}
+              onWorkflowEvent={handleWorkflowEvent}
+              className="workflow-panel-content"
+            />
+            <button
+              type="button"
+              className="workflow-panel-close"
+              onClick={() => setShowWorkflowPanel(false)}
+              title={t('common.close')}
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       <AgentConsoleDock
@@ -808,6 +896,15 @@ const AgentChat = () => {
 
       <button type="button" className="language-switch" onClick={toggleLanguage} title={languageLabel}>
         <img src={TranslationIcon} alt="翻译" className="language-icon" />
+      </button>
+
+      <button
+        type="button"
+        className={`workflow-switch ${showWorkflowPanel ? 'active' : ''}`}
+        onClick={() => setShowWorkflowPanel(!showWorkflowPanel)}
+        title={showWorkflowPanel ? t('common.workflow.hidePanel') : t('common.workflow.showPanel')}
+      >
+        ⚙️
       </button>
     </div>
   )

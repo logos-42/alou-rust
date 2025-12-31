@@ -19,7 +19,7 @@ export default defineConfig({
     // 配置代理解决CORS问题
     proxy: {
       '/api': {
-        target: 'https://alou-edge.yuanjieliu65.workers.dev',
+        target: 'http://127.0.0.1:8787',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, '/api'),

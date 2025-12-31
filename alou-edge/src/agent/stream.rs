@@ -1,13 +1,9 @@
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-use tokio::sync::RwLock;
+use worker::*;
+use crate::storage::kv::KvStore;
 
 const MAX_EVENTS_PER_SESSION: usize = 200;
-
-static EVENT_STORE: Lazy<RwLock<HashMap<String, Vec<StreamEvent>>>> =
-    Lazy::new(|| RwLock::new(HashMap::new()));
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamEvent {
@@ -65,41 +61,50 @@ impl StreamPublisher {
         }
     }
 
-    pub async fn publish(&self, event: StreamEvent) {
+    pub async fn publish(&self, event: StreamEvent, kv: &KvStore) {
         let mut normalized = event;
         normalized.session_id = self.session_id.clone();
-        append_event(normalized).await;
+        append_event(normalized, kv).await;
     }
 }
 
-pub async fn append_event(event: StreamEvent) {
-    let mut store = EVENT_STORE.write().await;
-    let entry = store
-        .entry(event.session_id.clone())
-        .or_insert_with(Vec::new);
-    entry.push(event);
-    if entry.len() > MAX_EVENTS_PER_SESSION {
-        let overflow = entry.len() - MAX_EVENTS_PER_SESSION;
-        entry.drain(0..overflow);
+pub async fn append_event(event: StreamEvent, kv: &KvStore) {
+    let key = format!("stream_events:{}", event.session_id);
+
+    let mut events: Vec<StreamEvent> = match kv.get(&key).await {
+        Ok(Some(value)) => value,
+        _ => Vec::new(),
+    };
+
+    events.push(event);
+
+    if events.len() > MAX_EVENTS_PER_SESSION {
+        let overflow = events.len() - MAX_EVENTS_PER_SESSION;
+        events.drain(0..overflow);
+    }
+
+    let _ = kv.put(&key, &events, Some(3600)).await;
+}
+
+pub async fn get_events(session_id: &str, since: Option<i64>, kv: &KvStore) -> Vec<StreamEvent> {
+    let key = format!("stream_events:{}", session_id);
+
+    let events: Vec<StreamEvent> = match kv.get(&key).await {
+        Ok(Some(value)) => value,
+        _ => Vec::new(),
+    };
+
+    match since {
+        Some(ts) => events
+            .iter()
+            .filter(|event| event.timestamp > ts)
+            .cloned()
+            .collect(),
+        None => events,
     }
 }
 
-pub async fn get_events(session_id: &str, since: Option<i64>) -> Vec<StreamEvent> {
-    let store = EVENT_STORE.read().await;
-    match store.get(session_id) {
-        Some(events) => match since {
-            Some(ts) => events
-                .iter()
-                .filter(|event| event.timestamp > ts)
-                .cloned()
-                .collect(),
-            None => events.clone(),
-        },
-        None => Vec::new(),
-    }
-}
-
-pub async fn cleanup_session(session_id: &str) {
-    let mut store = EVENT_STORE.write().await;
-    store.remove(session_id);
+pub async fn cleanup_session(session_id: &str, kv: &KvStore) {
+    let key = format!("stream_events:{}", session_id);
+    let _ = kv.delete(&key).await;
 }

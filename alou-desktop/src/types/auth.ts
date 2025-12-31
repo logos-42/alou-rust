@@ -1,29 +1,7 @@
-// ============================================
-// Authentication Types
-// ============================================
+/**
+ * 向后兼容的类型重新导出文件
+ * 实际类型定义已迁移到 @shared/types/auth
+ * 此文件仅用于保持现有代码的兼容性
+ */
 
-export interface User {
-  id: string
-  email: string
-  name?: string
-  avatar_url?: string
-  did?: string
-  created_at: string
-}
-
-export interface AuthResponse {
-  access_token: string
-  refresh_token: string
-  expires_in: number
-  user: User
-}
-
-export interface LoginResponse {
-  auth_url: string
-  state: string
-}
-
-export interface UpdateProfileRequest {
-  name?: string
-  avatar_url?: string
-}
+export * from '@shared/types/auth';

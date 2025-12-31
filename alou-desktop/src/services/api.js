@@ -164,11 +164,39 @@ export const apiService = {
         }
       }
       
-      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.code === 'ERR_BAD_RESPONSE') {
+        console.warn('[API Service] 后端服务器不可用，启用本地验证模式')
+        
+        // 在后端不可用时，进行本地基本验证
+        // 1. 检查API密钥格式
+        if (!apiKey || apiKey.trim().length < 10) {
+          return {
+            success: false,
+            error: 'API密钥格式无效（后端服务器不可用，进行本地验证）',
+            details: 'API密钥长度至少10个字符',
+          }
+        }
+        
+        // 2. 检查provider和model
+        const validProviders = ['deepseek', 'openai', 'anthropic', 'google']
+        if (!validProviders.includes(provider)) {
+          return {
+            success: false,
+            error: `不支持的提供商：${provider}（后端服务器不可用，进行本地验证）`,
+            details: `支持的提供商：${validProviders.join(', ')}`,
+          }
+        }
+        
+        // 3. 基本格式验证通过，返回成功（但提示后端不可用）
         return {
-          success: false,
-          error: '无法连接到后端服务器，请检查网络连接',
-          details: error.message,
+          success: true,
+          data: {
+            valid: true,
+            warning: '后端服务器不可用，仅进行了本地格式验证',
+            provider,
+            model,
+            has_api_key: true,
+          },
         }
       }
       
@@ -194,6 +222,40 @@ export const apiService = {
       }
     } catch (error) {
       console.error('[API Service] Save config failed:', error)
+      
+      // 在后端不可用时，保存到本地存储
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.code === 'ERR_BAD_RESPONSE') {
+        console.warn('[API Service] 后端服务器不可用，保存配置到本地存储')
+        
+        try {
+          // 保存到localStorage
+          const config = {
+            api_key: apiKey,
+            provider,
+            model,
+            has_api_key: true,
+            updated_at: Date.now(),
+            is_local: true, // 标记为本地配置
+          }
+          
+          localStorage.setItem('alou_api_config', JSON.stringify(config))
+          
+          return {
+            success: true,
+            data: {
+              ...config,
+              warning: '配置已保存到本地（后端服务器不可用）',
+            },
+          }
+        } catch (localError) {
+          return {
+            success: false,
+            error: '无法保存配置到本地存储',
+            details: localError.message,
+          }
+        }
+      }
+      
       return {
         success: false,
         error: error.response?.data?.error || error.message || '保存配置失败',
@@ -221,6 +283,39 @@ export const apiService = {
             model: 'deepseek-chat',
             has_api_key: false,
             updated_at: 0,
+          },
+        }
+      }
+      
+      // 在后端不可用时，从本地存储读取配置
+      if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK' || error.code === 'ERR_BAD_RESPONSE') {
+        console.warn('[API Service] 后端服务器不可用，尝试从本地存储读取配置')
+        
+        try {
+          const localConfig = localStorage.getItem('alou_api_config')
+          if (localConfig) {
+            const parsed = JSON.parse(localConfig)
+            return {
+              success: true,
+              data: {
+                ...parsed,
+                warning: '配置从本地存储读取（后端服务器不可用）',
+              },
+            }
+          }
+        } catch (localError) {
+          console.warn('[API Service] 无法从本地存储读取配置:', localError)
+        }
+        
+        // 本地存储也没有配置，返回默认配置
+        return {
+          success: true,
+          data: {
+            provider: 'deepseek',
+            model: 'deepseek-chat',
+            has_api_key: false,
+            updated_at: 0,
+            warning: '后端服务器不可用，使用默认配置',
           },
         }
       }

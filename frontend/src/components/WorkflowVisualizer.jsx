@@ -1,0 +1,574 @@
+import React from 'react'
+import { useI18n } from '@/hooks/useI18n'
+import { useWorkflow } from '@/hooks/useWorkflow'
+import './WorkflowVisualizer.css'
+
+/**
+ * WorkflowVisualizer - 桌面版工作流可视化和控制组件
+ * 使用useWorkflow hook管理工作流状态和操作
+ */
+const WorkflowVisualizer = ({
+  sessionId,
+  apiKey,
+  agentInfo = {},
+  onWorkflowEvent,
+  onSendMessage,
+  className = ''
+}) => {
+  const { t } = useI18n()
+
+  const {
+    workflows,
+    selectedWorkflow,
+    setSelectedWorkflow,
+    isLoading,
+    executingWorkflowId,
+    executionProgress,
+    loadWorkflows,
+    createSampleWorkflow,
+    executeWorkflow,
+    deleteWorkflow,
+    retryStep,
+    pauseWorkflow,
+    resumeWorkflow,
+  } = useWorkflow({
+    sessionId,
+    apiKey,
+    agentInfo,
+    onWorkflowMessage: onSendMessage,
+  })
+
+  // 处理工作流事件
+  const handleWorkflowEvent = (event) => {
+    onWorkflowEvent?.(event)
+  }
+                  }
+                  return step
+                })
+              }
+
+              // 更新整体状态
+              if (event.payload.overall_status) {
+                updatedWorkflow.status = event.payload.overall_status
+              }
+
+              return updatedWorkflow
+            }
+            return workflow
+          })
+        )
+      }
+
+      // 通知父组件
+      onWorkflowEvent?.({
+        type: 'stream_event',
+        event: event.event,
+        payload: event.payload,
+        label: event.label
+      })
+    }
+  }, [onWorkflowEvent])
+
+  // 使用流式事件监听
+  const { status: streamStatus } = useAgentStream(sessionId, {
+    enabled: !!sessionId,
+    onEvent: handleStreamEvent,
+  })
+
+  // 加载工作流列表
+  const loadWorkflows = useCallback(async () => {
+    if (!sessionId) return
+
+    try {
+      setIsLoading(true)
+      const response = await agentService.listWorkflows(sessionId, walletAddress)
+
+      if (response.tool_calls) {
+        const workflowToolCall = response.tool_calls.find(call =>
+          call.name === 'workflow' && call.result?.workflows
+        )
+
+        if (workflowToolCall) {
+          setWorkflows(workflowToolCall.result.workflows || [])
+        }
+      }
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 加载工作流列表失败:', error)
+      onWorkflowEvent?.({
+        type: 'error',
+        message: '加载工作流列表失败',
+        error
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }, [sessionId, walletAddress, onWorkflowEvent])
+
+  // 执行工作流
+  const executeWorkflow = async (workflowId) => {
+    if (!sessionId || !apiKey || executingWorkflowId) return
+
+    try {
+      setExecutingWorkflowId(workflowId)
+      setExecutionProgress({ [workflowId]: { status: 'running', currentStep: null } })
+
+      // 在对话框中显示开始执行的消息
+      onSendMessage?.(`🔄 开始执行工作流: ${workflowId}`)
+
+      onWorkflowEvent?.({
+        type: 'execution_started',
+        workflowId
+      })
+
+      const response = await workflowService.executeWorkflow(
+        workflowId,
+        apiKey,
+        agentInfo,
+        (progress) => {
+          // 处理实时进度更新
+          setExecutionProgress(prev => ({
+            ...prev,
+            [workflowId]: {
+              ...prev[workflowId],
+              ...progress
+            }
+          }))
+
+          // 在对话框中显示进度更新
+          if (progress.currentStep) {
+            onSendMessage?.(`⚙️ 执行步骤: ${progress.currentStep}`)
+          }
+
+          onWorkflowEvent?.({
+            type: 'execution_progress',
+            workflowId,
+            progress
+          })
+        }
+      )
+
+      if (response.success) {
+        // 在对话框中显示完成结果
+        onSendMessage?.(`✅ 工作流执行完成!\n${JSON.stringify(response.result, null, 2)}`)
+
+        onWorkflowEvent?.({
+          type: 'execution_completed',
+          workflowId,
+          result: response.result,
+          steps: response.steps
+        })
+      } else {
+        // 在对话框中显示错误
+        onSendMessage?.(`❌ 工作流执行失败: ${response.error}`)
+
+        onWorkflowEvent?.({
+          type: 'execution_error',
+          workflowId,
+          error: response.error
+        })
+      }
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 执行工作流异常:', error)
+      onSendMessage?.(`❌ 工作流执行异常: ${error.message}`)
+      onWorkflowEvent?.({
+        type: 'execution_error',
+        workflowId,
+        error
+      })
+    } finally {
+      setExecutingWorkflowId(null)
+      setExecutionProgress(prev => {
+        const newProgress = { ...prev }
+        delete newProgress[workflowId]
+        return newProgress
+      })
+    }
+  }
+  }
+
+  // 获取工作流状态
+  const getWorkflowStatus = async (workflowId) => {
+    if (!sessionId) return
+
+    try {
+      const response = await agentService.getWorkflowStatus(sessionId, workflowId, walletAddress)
+
+      if (response.tool_calls) {
+        const statusToolCall = response.tool_calls.find(call =>
+          call.name === 'workflow' && call.result?.workflow
+        )
+
+        if (statusToolCall) {
+          return statusToolCall.result.workflow
+        }
+      }
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 获取工作流状态失败:', error)
+    }
+    return null
+  }
+
+  // 创建示例工作流
+  const createSampleWorkflow = async () => {
+    if (!sessionId) return
+
+    const sampleWorkflow = {
+      name: "示例工作流",
+      description: "演示工作流执行的示例",
+      steps: [
+        {
+          id: "step1",
+          name: "检查钱包余额",
+          tool: "agent_wallet",
+          args: { action: "get_wallet" },
+          depends_on: []
+        },
+        {
+          id: "step2",
+          name: "获取交易历史",
+          tool: "agent_wallet",
+          args: { action: "list_transactions" },
+          depends_on: ["step1"]
+        },
+        {
+          id: "step3",
+          name: "生成报告",
+          tool: "echo",
+          args: { message: "工作流执行完成" },
+          depends_on: ["step2"]
+        }
+      ]
+    }
+
+    try {
+      setIsLoading(true)
+      const response = await agentService.createWorkflow(
+        sessionId,
+        sampleWorkflow.name,
+        sampleWorkflow.description,
+        sampleWorkflow.steps,
+        walletAddress
+      )
+
+      onWorkflowEvent?.({
+        type: 'workflow_created',
+        response
+      })
+
+      // 重新加载工作流列表
+      await loadWorkflows()
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 创建工作流失败:', error)
+      onWorkflowEvent?.({
+        type: 'creation_error',
+        error
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 删除工作流
+  const deleteWorkflow = async (workflowId) => {
+    if (!sessionId) return
+
+    try {
+      await agentService.deleteWorkflow(sessionId, workflowId, walletAddress)
+
+      onWorkflowEvent?.({
+        type: 'workflow_deleted',
+        workflowId
+      })
+
+      // 重新加载工作流列表
+      await loadWorkflows()
+
+      // 如果删除的是当前选中的工作流，清除选择
+      if (selectedWorkflow?.id === workflowId) {
+        setSelectedWorkflow(null)
+      }
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 删除工作流失败:', error)
+      onWorkflowEvent?.({
+        type: 'deletion_error',
+        workflowId,
+        error
+      })
+    }
+  }
+
+  // 重试失败的步骤
+  const retryStep = async (workflowId, stepId) => {
+    if (!sessionId) return
+
+    try {
+      // 发送重试命令到智能体
+      await agentService.sendMessage(sessionId, `workflow.retry ${workflowId} ${stepId}`, walletAddress)
+
+      onWorkflowEvent?.({
+        type: 'step_retry',
+        workflowId,
+        stepId
+      })
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 重试步骤失败:', error)
+      onWorkflowEvent?.({
+        type: 'retry_error',
+        workflowId,
+        stepId,
+        error
+      })
+    }
+  }
+
+  // 暂停工作流
+  const pauseWorkflow = async (workflowId) => {
+    if (!sessionId) return
+
+    try {
+      await agentService.sendMessage(sessionId, `workflow.pause ${workflowId}`, walletAddress)
+
+      onWorkflowEvent?.({
+        type: 'workflow_paused',
+        workflowId
+      })
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 暂停工作流失败:', error)
+      onWorkflowEvent?.({
+        type: 'pause_error',
+        workflowId,
+        error
+      })
+    }
+  }
+
+  // 恢复工作流
+  const resumeWorkflow = async (workflowId) => {
+    if (!sessionId) return
+
+    try {
+      await agentService.sendMessage(sessionId, `workflow.resume ${workflowId}`, walletAddress)
+
+      onWorkflowEvent?.({
+        type: 'workflow_resumed',
+        workflowId
+      })
+
+    } catch (error) {
+      console.error('[WorkflowVisualizer] 恢复工作流失败:', error)
+      onWorkflowEvent?.({
+        type: 'resume_error',
+        workflowId,
+        error
+      })
+    }
+  }
+
+  // 获取步骤状态样式
+  const getStepStatusClass = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'completed': return 'step-completed'
+      case 'running': return 'step-running'
+      case 'failed': return 'step-failed'
+      case 'pending': return 'step-pending'
+      case 'paused': return 'step-paused'
+      default: return 'step-unknown'
+    }
+  }
+
+  // 获取步骤状态图标
+  const getStepStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'completed': return '✅'
+      case 'running': return '⏳'
+      case 'failed': return '❌'
+      case 'pending': return '⏸️'
+      case 'paused': return '⏸️'
+      default: return '❓'
+    }
+  }
+
+  // 初始化加载
+  useEffect(() => {
+    if (sessionId) {
+      loadWorkflows()
+    }
+  }, [sessionId, loadWorkflows])
+
+  return (
+    <div className={`workflow-visualizer ${className}`}>
+      <div className="workflow-header">
+        <div className="workflow-header-top">
+          <h3>{t('common.workflow')}</h3>
+          <div className="workflow-stream-status">
+            <span className={`stream-indicator ${streamStatus}`}></span>
+            <span className="stream-label">
+              {streamStatus === 'active' ? t('common.workflow.realtimeUpdate') :
+               streamStatus === 'polling' ? t('common.workflow.connecting') :
+               streamStatus === 'error' ? t('common.workflow.connectionError') : t('common.workflow.notConnected')}
+            </span>
+          </div>
+        </div>
+        <div className="workflow-actions">
+          <button
+            onClick={createSampleWorkflow}
+            disabled={isLoading || !sessionId}
+            className="btn-create"
+          >
+            {isLoading ? t('common.loading') : t('common.workflow.createSample')}
+          </button>
+          <button
+            onClick={loadWorkflows}
+            disabled={isLoading || !sessionId}
+            className="btn-refresh"
+          >
+            {t('common.refresh')}
+          </button>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="workflow-loading">
+          <div className="spinner"></div>
+          加载中...
+        </div>
+      )}
+
+      <div className="workflow-list">
+        {workflows.length === 0 && !isLoading ? (
+          <div className="workflow-empty">
+            <p>{t('common.workflow.noWorkflows')}</p>
+            <p>{t('common.workflow.createSample')}</p>
+          </div>
+        ) : (
+          workflows.map(workflow => (
+            <div key={workflow.id} className="workflow-card">
+              <div className="workflow-card-header">
+                <div className="workflow-info">
+                  <h4>{workflow.name}</h4>
+                  <p>{workflow.description}</p>
+                  <div className="workflow-meta">
+                    <span className="step-count">
+                      {workflow.step_count || workflow.steps?.length || 0} {t('common.workflow.steps')}
+                    </span>
+                    <span className={`workflow-status status-${workflow.status?.toLowerCase()}`}>
+                      {workflow.status === 'pending' ? t('common.workflow.status.pending') :
+                       workflow.status === 'running' ? t('common.workflow.status.running') :
+                       workflow.status === 'completed' ? t('common.workflow.status.completed') :
+                       workflow.status === 'failed' ? t('common.workflow.status.failed') :
+                       workflow.status === 'paused' ? t('common.workflow.status.paused') :
+                       workflow.status || 'Draft'}
+                    </span>
+                  </div>
+                </div>
+                <div className="workflow-controls">
+                  <button
+                    onClick={() => setSelectedWorkflow(
+                      selectedWorkflow?.id === workflow.id ? null : workflow
+                    )}
+                    className="btn-toggle"
+                  >
+                    {selectedWorkflow?.id === workflow.id ? t('common.collapse') : t('common.expand')}
+                  </button>
+                  <button
+                    onClick={() => executeWorkflow(workflow.id)}
+                    disabled={executingWorkflowId === workflow.id}
+                    className="btn-execute"
+                  >
+                    {executingWorkflowId === workflow.id ? t('common.status.processing') : t('common.workflow.execute')}
+                  </button>
+                  <button
+                    onClick={() => deleteWorkflow(workflow.id)}
+                    className="btn-delete"
+                  >
+                    {t('common.workflow.delete')}
+                  </button>
+                </div>
+              </div>
+
+              {selectedWorkflow?.id === workflow.id && (
+                <div className="workflow-details">
+                  <div className="workflow-steps">
+                    {workflow.steps?.map((step, index) => (
+                      <div key={step.id} className={`workflow-step ${getStepStatusClass(step.status)}`}>
+                        <div className="step-header">
+                          <div className="step-icon">
+                            {getStepStatusIcon(step.status)}
+                          </div>
+                          <div className="step-info">
+                            <div className="step-name">{step.name}</div>
+                            <div className="step-tool">工具: {step.tool}</div>
+                          </div>
+                          <div className="step-number">#{index + 1}</div>
+                        </div>
+
+                        {step.depends_on && step.depends_on.length > 0 && (
+                          <div className="step-dependencies">
+                            依赖: {step.depends_on.join(', ')}
+                          </div>
+                        )}
+
+                        {step.result && (
+                          <div className="step-result">
+                            <pre>{JSON.stringify(step.result, null, 2)}</pre>
+                          </div>
+                        )}
+
+                        {step.error && (
+                          <div className="step-error">
+                            {t('common.error')}: {step.error}
+                            <button
+                              onClick={() => retryStep(selectedWorkflow.id, step.id)}
+                              className="step-retry-btn"
+                              title={t('common.workflow.retry')}
+                            >
+                              🔄 {t('common.workflow.retry')}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* 步骤控制按钮 */}
+                        <div className="step-controls">
+                          {step.status === 'running' && (
+                            <button
+                              onClick={() => pauseWorkflow(selectedWorkflow.id)}
+                              className="step-control-btn pause"
+                              title={t('common.workflow.pause')}
+                            >
+                              ⏸️
+                            </button>
+                          )}
+                          {(step.status === 'pending' || step.status === 'paused') && (
+                            <button
+                              onClick={() => resumeWorkflow(selectedWorkflow.id)}
+                              className="step-control-btn resume"
+                              title={t('common.workflow.resume')}
+                            >
+                              ▶️
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    ) : (
+                      <div className="workflow-steps-empty">
+                        {t('common.noData')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default WorkflowVisualizer

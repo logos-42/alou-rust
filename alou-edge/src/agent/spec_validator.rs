@@ -11,19 +11,19 @@ pub struct SpecValidator;
 impl SpecValidator {
     /// Validate a complete task spec
     pub fn validate(&self, spec: &TaskSpec) -> ValidationResult {
-        let mut result = ValidationResult::new();
+        let mut result = ValidationResult::default();
         
         // Validate basic fields
         if spec.task_id.is_empty() {
-            result = result.with_error("task_id 不能为空".to_string());
+            result.with_error("task_id 不能为空".to_string());
         }
-        
+
         if spec.title.trim().is_empty() {
-            result = result.with_error("title 不能为空".to_string());
+            result.with_error("title 不能为空".to_string());
         }
-        
+
         if spec.description.trim().is_empty() {
-            result = result.with_error("description 不能为空".to_string());
+            result.with_error("description 不能为空".to_string());
         }
         
         // Validate steps
@@ -43,16 +43,16 @@ impl SpecValidator {
         
         // Check for circular dependencies
         if self.has_circular_dependencies(&spec.steps) {
-            result = result.with_error("检测到循环依赖".to_string());
+            result.with_error("检测到循环依赖".to_string());
         }
         
         // Warnings
         if spec.steps.is_empty() {
-            result = result.with_warning("任务没有定义任何步骤".to_string());
+            result.with_warning("任务没有定义任何步骤".to_string());
         }
         
         if spec.steps.len() > 20 {
-            result = result.with_warning("任务步骤过多，建议拆分为多个子任务".to_string());
+            result.with_warning("任务步骤过多，建议拆分为多个子任务".to_string());
         }
         
         result
@@ -61,86 +61,70 @@ impl SpecValidator {
     /// Validate steps
     fn validate_steps(&self, steps: &[StepSpec], result: &mut ValidationResult) {
         let mut step_ids = HashSet::new();
-        
+
         for (i, step) in steps.iter().enumerate() {
             // Validate step ID
             if step.step_id.is_empty() {
-                let new_result = result.with_error(format!("步骤 {} (索引 {}) 的 step_id 为空", i, i));
-                *result = new_result;
+                result.with_error(format!("步骤 {} (索引 {}) 的 step_id 为空", i, i));
             }
-            
+
             // Check for duplicate step IDs
             if step_ids.contains(&step.step_id) {
-                let new_result = result.with_error(format!("重复的 step_id: {}", step.step_id));
-                *result = new_result;
+                result.with_error(format!("重复的 step_id: {}", step.step_id));
             } else {
                 step_ids.insert(step.step_id.clone());
             }
-            
+
             // Validate description
             if step.description.trim().is_empty() {
-                let new_result = result.with_warning(format!("步骤 {} 没有描述", step.step_id));
-                *result = new_result;
+                result.with_warning(format!("步骤 {} 没有描述", step.step_id));
             }
-        }
-            
-            // Check for duplicate step IDs
-            if step_ids.contains(&step.step_id) {
-                result = result.with_error(format!("重复的 step_id: {}", step.step_id));
-            } else {
-                step_ids.insert(step.step_id.clone());
-            }
-            
-            // Validate description
-            if step.description.trim().is_empty() {
-                result = result.with_warning(format!("步骤 {} 没有描述", step.step_id));
-            }
-            
+
             // Validate tool call steps have tool specified
             if step.step_type == StepType::ToolCall && step.tool.is_none() {
-                result = result.with_error(format!(
+                result.with_error(format!(
                     "步骤 {} (ToolCall 类型) 必须指定 tool",
                     step.step_id
                 ));
             }
-            
+
             // Validate tool call steps have args if tool is specified
             if step.step_type == StepType::ToolCall {
                 if step.tool.is_some() && step.args.is_none() {
-                    result = result.with_warning(format!(
+                    result.with_warning(format!(
                         "步骤 {} 指定了 tool 但没有 args",
                         step.step_id
                     ));
                 }
             }
-            
+
             // Validate timeout is reasonable
             if let Some(timeout) = step.timeout_ms {
-                if timeout > 300000 { // 5 minutes
-                    result = result.with_warning(format!(
+                if timeout > 300000 {
+                    result.with_warning(format!(
                         "步骤 {} 的超时时间过长 ({}ms > 300000ms)",
                         step.step_id, timeout
                     ));
                 }
                 if timeout == 0 {
-                    result = result.with_error(format!(
+                    result.with_error(format!(
                         "步骤 {} 的超时时间不能为 0",
                         step.step_id
                     ));
                 }
             }
-            
+
             // Validate retry config
             if let Some(ref retry_config) = step.retry_config {
                 if retry_config.max_attempts == 0 {
-                    result = result.with_error(format!(
+                    result.with_error(format!(
                         "步骤 {} 的最大重试次数不能为 0",
                         step.step_id
                     ));
                 }
-                
+
                 if retry_config.max_attempts > 10 {
-                    result = result.with_warning(format!(
+                    result.with_warning(format!(
                         "步骤 {} 的最大重试次数过多 ({} > 10)",
                         step.step_id, retry_config.max_attempts
                     ));
@@ -157,7 +141,7 @@ impl SpecValidator {
             for dep_id in &step.dependencies {
                 // Check if dependency exists
                 if !step_ids.contains(dep_id.as_str()) {
-                    result = result.with_error(format!(
+                    result.with_error(format!(
                         "步骤 {} 依赖不存在的步骤 {}",
                         step.step_id, dep_id
                     ));
@@ -165,7 +149,7 @@ impl SpecValidator {
                 
                 // Check if step depends on itself
                 if step.step_id == *dep_id {
-                    result = result.with_error(format!(
+                    result.with_error(format!(
                         "步骤 {} 不能依赖自身",
                         step.step_id
                     ));
@@ -178,17 +162,17 @@ impl SpecValidator {
     fn validate_preconditions(&self, preconditions: &[Precondition], result: &mut ValidationResult) {
         for (i, cond) in preconditions.iter().enumerate() {
             if cond.condition_id.is_empty() {
-                result = result.with_error(format!("前置条件 {} (索引 {}) 的 ID 为空", i, i));
+                result.with_error(format!("前置条件 {} (索引 {}) 的 ID 为空", i, i));
             }
             
             if cond.description.trim().is_empty() {
-                result = result.with_warning(format!("前置条件 {} 没有描述", cond.condition_id));
+                result.with_warning(format!("前置条件 {} 没有描述", cond.condition_id));
             }
             
             // If check_tool is specified, it should not be empty
             if let Some(ref tool) = cond.check_tool {
                 if tool.is_empty() {
-                    result = result.with_error(format!(
+                    result.with_error(format!(
                         "前置条件 {} 的 check_tool 为空字符串",
                         cond.condition_id
                     ));
@@ -198,33 +182,33 @@ impl SpecValidator {
     }
     
     /// Validate expected outcome
-    fn validate_expected_outcome(&self, outcome: &crate::agent::spec::ExpectedOutcome, result: &mut ValidationResult) {
+    fn validate_expected_outcome(&self, outcome: &crate::agent::spec::ExpectedOutcome, mut result: &mut ValidationResult) {
         if let Some(ref criteria) = outcome.success_criteria {
             if criteria.trim().is_empty() {
-                result = result.with_warning("success_criteria 为空字符串".to_string());
+                result.with_warning("success_criteria 为空字符串".to_string());
             }
         }
         
         if outcome.acceptance_criteria.is_empty() {
-            result = result.with_warning("没有定义验收标准 (acceptance_criteria)".to_string());
+            result.with_warning("没有定义验收标准 (acceptance_criteria)".to_string());
         }
     }
     
     /// Validate validation rules
-    fn validate_validation_rules(&self, rules: &[ValidationRule], result: &mut ValidationResult) {
+    fn validate_validation_rules(&self, rules: &[ValidationRule], mut result: &mut ValidationResult) {
         for (i, rule) in rules.iter().enumerate() {
             if rule.rule_id.is_empty() {
-                result = result.with_error(format!("验证规则 {} (索引 {}) 的 ID 为空", i, i));
+                result.with_error(format!("验证规则 {} (索引 {}) 的 ID 为空", i, i));
             }
             
             if rule.description.trim().is_empty() {
-                result = result.with_warning(format!("验证规则 {} 没有描述", rule.rule_id));
+                result.with_warning(format!("验证规则 {} 没有描述", rule.rule_id));
             }
             
             // CustomCheck rules must have check_tool
             if rule.rule_type == crate::agent::spec::ValidationRuleType::CustomCheck 
                 && rule.check_tool.is_none() {
-                result = result.with_error(format!(
+                result.with_error(format!(
                     "验证规则 {} (CustomCheck 类型) 必须指定 check_tool",
                     rule.rule_id
                 ));
@@ -462,8 +446,8 @@ impl SpecValidator {
             let retry_overhead = step.retry_config.as_ref()
                 .map(|rc| rc.max_attempts * 1000)
                 .unwrap_or(0);
-            
-            total_ms += duration + retry_overhead;
+
+            total_ms += duration + (retry_overhead as u64);
         }
         
         total_ms

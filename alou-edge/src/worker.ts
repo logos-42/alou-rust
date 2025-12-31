@@ -23,10 +23,42 @@ const rustFetch = async (request: Request, env: any, ctx: any): Promise<Response
   return instance.fetch(request);
 };
 
+// 添加 CORS 头到响应
+const addCorsHeaders = (response: Response, headers: Record<string, string> = {}): Response => {
+  const corsHeaders = new Headers(response.headers);
+  corsHeaders.set('Access-Control-Allow-Origin', '*');
+  corsHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  corsHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  corsHeaders.set('Access-Control-Max-Age', '86400');
+  
+  // 合并额外的 headers
+  Object.entries(headers).forEach(([key, value]) => {
+    corsHeaders.set(key, value);
+  });
+  
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: corsHeaders,
+  });
+};
+
 // Worker 入口
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     const url = new URL(request.url);
+    
+    // 处理 OPTIONS 预检请求
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
     
     // 如果是 /api/agent/chat，检查是否需要使用 TypeScript SDK
     if (url.pathname === '/api/agent/chat' && request.method === 'POST') {
@@ -195,13 +227,14 @@ export default {
               }
               
               // 返回响应（格式与 Rust 后端一致）
-              return new Response(JSON.stringify({
+              const response = new Response(JSON.stringify({
                 content: result.response,
                 session_id: body.session_id,
                 tool_calls: result.tool_calls || [],
               }), {
                 headers: { 'Content-Type': 'application/json' }
               });
+              return addCorsHeaders(response, {});
             }
           }
         }

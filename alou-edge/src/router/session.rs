@@ -2,6 +2,7 @@ use crate::agent::core::AgentCore;
 use crate::agent::session::{ContextEvent, SessionManager};
 use crate::agent::stream::{cleanup_session, StreamEvent, StreamPublisher};
 use crate::middleware::SubscriptionGuard;
+use crate::storage::kv::KvStore;
 use crate::utils::error::AloudError;
 use crate::web3::auth::WalletAuth;
 use serde::{Deserialize, Serialize};
@@ -147,10 +148,11 @@ pub(crate) async fn handle_get_session(
 pub(crate) async fn handle_delete_session(
     session_manager: &SessionManager,
     session_id: &str,
+    kv: &KvStore,
 ) -> Result<Response> {
     match session_manager.clear_session(session_id).await {
         Ok(_) => {
-            cleanup_session(session_id).await;
+            cleanup_session(session_id, kv).await;
             Response::ok("Session deleted")
         }
         Err(e) => {
@@ -167,6 +169,7 @@ pub(crate) async fn handle_agent_chat(
     agent_core: Option<&AgentCore>,
     wallet_auth: Option<&WalletAuth>,
     subscription_guard: Option<&SubscriptionGuard>,
+    kv: &KvStore,
     req: &mut Request,
 ) -> Result<Response> {
     let agent_core = match agent_core {
@@ -263,6 +266,7 @@ pub(crate) async fn handle_agent_chat(
                 .with_payload(json!({
                     "message_preview": body.message.chars().take(140).collect::<String>(),
                 })),
+            kv,
         )
         .await;
 
@@ -438,6 +442,7 @@ pub(crate) async fn handle_agent_chat(
                             "tool_calls": response.tool_calls,
                         }))
                         .mark_final(),
+                    kv,
                 )
                 .await;
             json_response(&chat_response)
@@ -457,6 +462,7 @@ pub(crate) async fn handle_agent_chat(
                             "message": error_msg.clone(),
                         }))
                         .mark_final(),
+                    kv,
                 )
                 .await;
             let error_response = ErrorResponse {

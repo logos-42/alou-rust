@@ -4,12 +4,12 @@
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
+  (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 class BlockchainService {
   constructor() {
     this.ethereum = typeof window !== 'undefined' ? window.ethereum : null
-    this.apiBaseUrl = API_BASE_URL
+    this.apiBaseUrl = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
   }
 
   /**
@@ -67,7 +67,7 @@ class BlockchainService {
       token_address: tokenAddress,
     }
 
-    const response = await fetch(`${this.apiBaseUrl}/api/blockchain/balance`, {
+    const response = await fetch(`${this.apiBaseUrl}/blockchain/balance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -140,10 +140,11 @@ class BlockchainService {
   async getAgentWallet(sessionId, chain) {
     const API_BASE_URL =
       import.meta.env.VITE_API_BASE_URL ||
-      (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+      (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
+    const baseUrl = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agent/wallet`, {
+      const response = await fetch(`${baseUrl}/agent/wallet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,10 +173,11 @@ class BlockchainService {
   async listAgentWallets(sessionId) {
     const API_BASE_URL =
       import.meta.env.VITE_API_BASE_URL ||
-      (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev')
+      (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
+    const baseUrl = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/agent/wallet`, {
+      const response = await fetch(`${baseUrl}/agent/wallet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

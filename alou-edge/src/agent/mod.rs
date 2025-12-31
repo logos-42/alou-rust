@@ -10,8 +10,12 @@ pub mod content_generator;
 pub mod context;
 pub mod context_compressor;
 pub mod core;
+pub mod creation;
+pub mod creation_parser;
 pub mod diap_identity;
 pub mod discovery;
+pub mod error_analyzer;
+pub mod error_response;
 pub mod prompts;
 pub mod providers;
 pub mod retry_policy;
@@ -41,6 +45,6 @@ pub use spec::{
 #[allow(unused_imports)]
 pub use spec_validator::SpecValidator;
 #[allow(unused_imports)]
-pub use spec_validator::ValidationResult;
+pub use spec::ValidationResult;
 #[allow(unused_imports)]
 pub use task_orchestrator::TaskOrchestrator;

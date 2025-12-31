@@ -91,4 +91,16 @@ impl From<hex::FromHexError> for AloudError {
     }
 }
 
+impl From<String> for AloudError {
+    fn from(err: String) -> Self {
+        AloudError::InternalError(err)
+    }
+}
+
+impl From<AloudError> for worker::Error {
+    fn from(err: AloudError) -> Self {
+        worker::Error::RustError(err.to_string())
+    }
+}
+
 pub type Result<T> = std::result::Result<T, AloudError>;

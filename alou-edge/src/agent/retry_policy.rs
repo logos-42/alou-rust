@@ -1,5 +1,18 @@
-use crate::agent::error_response::ErrorType;
 use std::time::Duration;
+
+/// Error type for retry decisions
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorType {
+    Transient,
+    Permanent,
+    RateLimited,
+    NetworkError,
+    RateLimitError,
+    TransactionError,
+    ArgumentError,
+    AuthenticationError,
+    PermissionError,
+}
 
 /// Retry decision
 #[derive(Debug, Clone, PartialEq)]

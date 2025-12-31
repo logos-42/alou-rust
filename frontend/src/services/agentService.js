@@ -554,28 +554,119 @@ export class AgentService {
   }
 
   /**
-   * 从 IPFS 加载消息
-   * @param {string} cid - 消息 CID
-   * @returns {Promise<Object>} 消息数据
+    * 从 IPFS 加载消息
+    * @param {string} cid - 消息 CID
+    * @returns {Promise<Object>} 消息数据
+    */
+   async loadMessagesFromIpfs(cid) {
+     try {
+       const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipfs/${cid}`
+       const response = await fetch(gatewayUrl, {
+         method: 'GET',
+         headers: { 'Accept': 'application/json' },
+       })
+
+       if (!response.ok) {
+         throw new Error(`IPFS Gateway 返回错误: ${response.status}`)
+       }
+
+       const data = await response.json()
+       return data
+     } catch (error) {
+       console.error('[AgentService] 从 IPFS 加载消息失败:', error)
+       throw error
+     }
+   }
+
+  /**
+   * 创建工作流
+   * @param {string} sessionId - 会话ID
+   * @param {string} name - 工作流名称
+   * @param {string} description - 工作流描述
+   * @param {Array} steps - 工作流步骤
+   * @param {string} walletAddress - 钱包地址
+   * @returns {Promise<Object>} 创建结果
    */
-  async loadMessagesFromIpfs(cid) {
-    try {
-      const gatewayUrl = `${DEFAULT_IPFS_GATEWAY}/ipfs/${cid}`
-      const response = await fetch(gatewayUrl, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      })
-      
-      if (!response.ok) {
-        throw new Error(`IPFS Gateway 返回错误: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      return data
-    } catch (error) {
-      console.error('[AgentService] 从 IPFS 加载消息失败:', error)
-      throw error
-    }
+  async createWorkflow(sessionId, name, description, steps, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message: `workflow.create ${JSON.stringify({
+        name,
+        description,
+        steps: steps.map(step => ({
+          id: step.id,
+          name: step.name,
+          tool: step.tool,
+          args: step.args || {},
+          depends_on: step.depends_on || []
+        }))
+      })}`,
+      wallet_address: walletAddress,
+    })
+    return response.data
+  }
+
+  /**
+   * 执行工作流
+   * @param {string} sessionId - 会话ID
+   * @param {string} workflowId - 工作流ID
+   * @param {string} walletAddress - 钱包地址
+   * @returns {Promise<Object>} 执行结果
+   */
+  async executeWorkflow(sessionId, workflowId, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message: `workflow.execute ${workflowId}`,
+      wallet_address: walletAddress,
+    })
+    return response.data
+  }
+
+  /**
+   * 获取工作流状态
+   * @param {string} sessionId - 会话ID
+   * @param {string} workflowId - 工作流ID
+   * @param {string} walletAddress - 钱包地址
+   * @returns {Promise<Object>} 工作流状态
+   */
+  async getWorkflowStatus(sessionId, workflowId, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message: `workflow.status ${workflowId}`,
+      wallet_address: walletAddress,
+    })
+    return response.data
+  }
+
+  /**
+   * 列出所有工作流
+   * @param {string} sessionId - 会话ID
+   * @param {string} walletAddress - 钱包地址
+   * @returns {Promise<Object>} 工作流列表
+   */
+  async listWorkflows(sessionId, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message: `workflow.list`,
+      wallet_address: walletAddress,
+    })
+    return response.data
+  }
+
+  /**
+   * 删除工作流
+   * @param {string} sessionId - 会话ID
+   * @param {string} workflowId - 工作流ID
+   * @param {string} walletAddress - 钱包地址
+   * @returns {Promise<Object>} 删除结果
+   */
+  async deleteWorkflow(sessionId, workflowId, walletAddress) {
+    const response = await apiClient.post(`${this.baseUrl}/api/agent/chat`, {
+      session_id: sessionId,
+      message: `workflow.delete ${workflowId}`,
+      wallet_address: walletAddress,
+    })
+    return response.data
   }
 }
 

@@ -189,7 +189,7 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
     try {
       const config = {
         apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 
-                   (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev'),
+                   (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev'),
         aiProvider: import.meta.env.AI_PROVIDER || 'deepseek',
         aiModel: import.meta.env.AI_MODEL || 'deepseek-chat',
         ethRpcUrl: import.meta.env.ETH_RPC_URL || 'https://eth.llamarpc.com',

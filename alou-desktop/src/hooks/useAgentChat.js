@@ -3,7 +3,7 @@ import { walletService } from '@/services/walletService'
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
+  (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
 
 export const NODE_BOUNDARY = 140
 

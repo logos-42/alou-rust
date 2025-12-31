@@ -176,9 +176,10 @@ class PubSubService {
   async _publishToBackend(topic, message) {
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-        (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
+        (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
       
-      const response = await fetch(`${API_BASE_URL}/api/pubsub/publish`, {
+      const baseUrl = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
+      const response = await fetch(`${baseUrl}/pubsub/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -268,11 +269,12 @@ class PubSubService {
     // 降级：从后端获取
     try {
       const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-        (import.meta.env.DEV ? 'http://localhost:1420' : 'https://alou-edge.yuanjieliu65.workers.dev')
+        (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev')
       
       const since = this.lastMessageTimestamp.get(topic) || 0
+      const baseUrl = API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
       const response = await fetch(
-        `${API_BASE_URL}/api/pubsub/messages?topic=${encodeURIComponent(topic)}&since=${since}`,
+        `${baseUrl}/pubsub/messages?topic=${encodeURIComponent(topic)}&since=${since}`,
         { method: 'GET' }
       )
 
