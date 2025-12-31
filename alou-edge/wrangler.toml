@@ -51,6 +51,16 @@ id = "e0f682098b73485b940f1176417f417a"
 # JWT_SECRET - Secret for JWT token signing
 # ETH_RPC_URL - Ethereum RPC endpoint (e.g., Infura, Alchemy)
 # SOL_RPC_URL - Solana RPC endpoint
+
+# Durable Objects for AI task management
+[[durable_objects.bindings]]
+name = "AI_TASKS"
+class_name = "AITaskDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AITaskDO"]
+
   [vars.development]
   DIAP_IPFS_API_URL = "http://127.0.0.1:5001"
   DIAP_IPFS_GATEWAY_URL = "http://127.0.0.1:8080"
@@ -76,6 +86,14 @@ id = "placeholder-create-with-wrangler"
 binding = "NONCES"
 id = "placeholder-create-with-wrangler"
 
+[[env.production.durable_objects.bindings]]
+name = "AI_TASKS"
+class_name = "AITaskDO"
+
+[[env.production.migrations]]
+tag = "v1"
+new_sqlite_classes = ["AITaskDO"]
+
 # Staging environment
 [env.staging]
 name = "alou-edge-staging"
@@ -97,3 +115,11 @@ id = "placeholder-create-with-wrangler"
 [[env.staging.kv_namespaces]]
 binding = "NONCES"
 id = "placeholder-create-with-wrangler"
+
+[[env.staging.durable_objects.bindings]]
+name = "AI_TASKS"
+class_name = "AITaskDO"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["AITaskDO"]

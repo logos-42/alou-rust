@@ -43,6 +43,9 @@ const addCorsHeaders = (response: Response, headers: Record<string, string> = {}
   });
 };
 
+// 导出Durable Objects
+export { AITaskDO } from '../build/index.js';
+
 // Worker 入口
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {

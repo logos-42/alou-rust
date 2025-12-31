@@ -92,7 +92,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "alou-edge"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -112,6 +112,7 @@ dependencies = [
  "jwt-simple",
  "k256",
  "once_cell",
+ "rand 0.8.5",
  "regex",
  "reqwest 0.11.27",
  "serde",

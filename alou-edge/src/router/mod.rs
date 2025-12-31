@@ -289,15 +289,22 @@ impl Router {
             }
 
             (Method::Post, "/api/agent/chat") => {
-                session::handle_agent_chat(
-                    &self.session_manager,
-                    self.agent_core.as_ref().map(|arc| arc.as_ref()),
-                    self.wallet_auth.as_ref(),
-                    self.subscription_guard.as_ref(),
-                    &self.kv,
-                    req,
-                )
-                .await
+                // 首先尝试兼容性处理
+                match self.handle_compatible_chat(req, env).await {
+                    Ok(response) => Ok(response),
+                    Err(_) => {
+                        // 如果兼容性处理失败，回退到原有逻辑
+                        session::handle_agent_chat(
+                            &self.session_manager,
+                            self.agent_core.as_ref().map(|arc| arc.as_ref()),
+                            self.wallet_auth.as_ref(),
+                            self.subscription_guard.as_ref(),
+                            &self.kv,
+                            req,
+                        )
+                        .await
+                    }
+                }
             }
             (Method::Post, "/api/agent/resolve") => {
                 agent::handle_resolve_agent(
@@ -513,6 +520,24 @@ impl Router {
                 }
             }
 
+            // 兼容性路由 - 任务状态查询
+            (Method::Get, path) if path.starts_with("/api/tasks/") => {
+                let task_id = path.trim_start_matches("/api/tasks/");
+                self.handle_task_status(env, task_id).await
+            }
+
+            // 兼容性路由 - 任务取消
+            (Method::Post, path) if path.starts_with("/api/tasks/") && path.ends_with("/cancel") => {
+                let task_id = path.trim_start_matches("/api/tasks/").trim_end_matches("/cancel");
+                self.handle_task_cancel(env, task_id).await
+            }
+
+            // 兼容性路由 - 工具结果提交
+            (Method::Post, path) if path.starts_with("/api/tasks/") && path.ends_with("/tool-result") => {
+                let task_id = path.trim_start_matches("/api/tasks/").trim_end_matches("/tool-result");
+                self.handle_tool_result(env, task_id, req).await
+            }
+
             _ => {
                 console_log!("Route not found: {} {}", method.to_string(), path);
                 let error_response = ErrorResponse {
@@ -702,6 +727,33 @@ struct StatusResponse {
     services: ServiceStatus,
     metrics: crate::utils::metrics::MetricsSnapshot,
     timestamp: String,
+}
+
+// 兼容性处理方法实现
+impl Router {
+    /// 处理兼容性聊天请求
+    async fn handle_compatible_chat(&self, req: &mut Request, env: &Env) -> Result<Response> {
+        use crate::compatibility::router::handle_compatible_chat as handle_chat;
+        handle_chat(env, req).await
+    }
+    
+    /// 处理任务状态查询
+    async fn handle_task_status(&self, env: &Env, task_id: &str) -> Result<Response> {
+        use crate::compatibility::router::handle_task_status as handle_status;
+        handle_status(env, task_id).await
+    }
+    
+    /// 处理任务取消
+    async fn handle_task_cancel(&self, env: &Env, task_id: &str) -> Result<Response> {
+        use crate::compatibility::router::handle_task_cancel as handle_cancel;
+        handle_cancel(env, task_id).await
+    }
+    
+    /// 处理工具结果提交
+    async fn handle_tool_result(&self, env: &Env, task_id: &str, req: &mut Request) -> Result<Response> {
+        use crate::compatibility::router::handle_tool_result as handle_tool;
+        handle_tool(env, task_id, req).await
+    }
 }
 
 #[derive(Serialize)]

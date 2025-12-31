@@ -3,6 +3,8 @@ use std::time::Duration;
 use worker::*;
 
 mod agent;
+mod compatibility;
+mod durable_objects;
 mod mcp;
 mod middleware;
 mod router;
