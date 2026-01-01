@@ -328,6 +328,11 @@ impl Router {
             (Method::Post, "/api/agent/create-claude") => {
                 agent::handle_create_claude_agent(&self.session_manager, req).await
             }
+
+            // Claude Agent SDK 兼容端点
+            (Method::Post, "/api/claude-agent/query") => {
+                claude::handle_claude_sdk_query(req, &env).await
+            }
             (Method::Post, "/api/agent/parse-creation-command") => {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }

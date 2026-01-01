@@ -279,3 +279,6 @@ pub fn estimate_execution_time(request: &CompatibleRequest) -> u64 {
     base_time + prompt_length_factor + history_factor + tools_factor + model_factor
 }
 
+
+
+

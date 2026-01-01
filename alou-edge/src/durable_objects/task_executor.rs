@@ -1,10 +1,9 @@
 //! 任务执行器 - 负责执行AI任务
 
-use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, HistoryMessage, Tool};
+use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, Tool};
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool, AiResponse};
-use serde_json::Value;
 use wasm_bindgen_futures::spawn_local;
-use worker::{Env, Request, Result};
+use worker::{Env, Method, Request, RequestInit, Result, console_error};
 
 /// 任务执行器
 pub struct TaskExecutor;
@@ -23,9 +22,27 @@ impl TaskExecutor {
         let id = namespace.id_from_name(&task_id)?;
         let stub = id.get_stub()?;
         
-        // 初始化任务
+        // 初始化任务 - 使用POST方法发送请求体
+        let request_json = match serde_json::to_string(&request) {
+            Ok(json) => json,
+            Err(e) => {
+                return Err(worker::Error::RustError(
+                    format!("Failed to serialize request: {}", e)
+                ));
+            }
+        };
+        
+        // 使用 fetch_with_request 调用 Durable Object
+        
+        let mut init = RequestInit::new();
+        init.with_method(Method::Post)
+            .with_body(Some(request_json.into()));
+        
+        // Durable Object 期望的 URL 格式
+        let init_request = Request::new_with_init("http://dummy/init", &init)?;
+        
         let init_response = stub
-            .fetch_with_str("/init")
+            .fetch_with_request(init_request)
             .await?;
         
         if init_response.status_code() != 200 {
@@ -34,21 +51,20 @@ impl TaskExecutor {
             ));
         }
         
-        // 异步开始执行任务
-        let env_clone = env.clone();
-        let task_id_clone = task_id.clone();
-        spawn_local(async move {
-            // 重新获取stub来开始执行
-            if let Ok(namespace) = env_clone.durable_object("AI_TASKS") {
-                if let Ok(id) = namespace.id_from_name(&task_id_clone) {
-                    if let Ok(stub) = id.get_stub() {
-                        let _ = stub
-                            .fetch_with_str("/start")
-                            .await;
-                    }
-                }
-            }
-        });
+        // 立即开始执行任务（通过调用 /start 端点，这会设置 Alarm）
+        let mut start_init = RequestInit::new();
+        start_init.with_method(Method::Post);
+        
+        let start_request = Request::new_with_init("http://dummy/start", &start_init)?;
+        
+        let start_response = stub
+            .fetch_with_request(start_request)
+            .await?;
+        
+        if start_response.status_code() != 200 {
+            console_error!("Failed to start task: {}", start_response.status_code());
+            // 即使启动失败，仍然返回任务ID，让用户可以检查状态
+        }
         
         Ok(task_id)
     }
@@ -102,8 +118,13 @@ impl TaskExecutor {
         let id = namespace.id_from_name(task_id)?;
         let stub = id.get_stub()?;
         
+        let mut init = RequestInit::new();
+        init.with_method(Method::Post);
+        
+        let cancel_request = Request::new_with_init("http://dummy/cancel", &init)?;
+        
         let response = stub
-            .fetch_with_str("/cancel")
+            .fetch_with_request(cancel_request)
             .await?;
         
         Ok(response.status_code() == 200)
@@ -119,8 +140,23 @@ impl TaskExecutor {
         let id = namespace.id_from_name(task_id)?;
         let stub = id.get_stub()?;
         
+        let tool_result_json = match serde_json::to_string(&tool_result) {
+            Ok(json) => json,
+            Err(e) => {
+                return Err(worker::Error::RustError(
+                    format!("Failed to serialize tool result: {}", e)
+                ));
+            }
+        };
+        
+        let mut init = RequestInit::new();
+        init.with_method(Method::Post)
+            .with_body(Some(tool_result_json.into()));
+        
+        let tool_request = Request::new_with_init("http://dummy/tool-result", &init)?;
+        
         let response = stub
-            .fetch_with_str("/tool-result")
+            .fetch_with_request(tool_request)
             .await?;
         
         Ok(response.status_code() == 200)
