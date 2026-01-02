@@ -2,7 +2,7 @@
 
 use crate::compatibility::models::{CompatibleRequest, CompatibleResponse};
 use crate::durable_objects::task_executor::TaskExecutor;
-use worker::{Env, Method, Request, Response, Result};
+use worker::{Env, Request, Response, Result};
 
 /// 处理兼容性聊天请求
 pub async fn handle_compatible_chat(

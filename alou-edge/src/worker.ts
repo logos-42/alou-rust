@@ -8,6 +8,97 @@ import RustWorker from '../build/index.js';
 import { ClaudeAgent } from './ts-agent/claude-agent';
 import type { CustomAgentInfo, ChatMessage } from './ts-agent/types';
 
+// WASM初始化状态
+let wasmInitialized = false;
+let wasmInitPromise: Promise<void> | null = null;
+
+// 确保WASM正确初始化
+async function ensureWasmInitialized(): Promise<void> {
+  if (wasmInitialized) return;
+  
+  if (!wasmInitPromise) {
+    wasmInitPromise = (async () => {
+      try {
+        console.log('[Worker] 初始化WASM模块...');
+        
+        // #region agent log - 测试假设C：Worker环境切换问题
+        try {
+          fetch('http://127.0.0.1:7242/ingest/730fa833-2da6-4d3a-bcad-37f577a26c2f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: 'worker.ts:ensureWasmInitialized',
+              message: '开始WASM初始化',
+              data: { wasmInitialized, hasWasmInitPromise: !!wasmInitPromise },
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              runId: 'run1',
+              hypothesisId: 'C'
+            })
+          }).catch(() => {});
+        } catch (e) {}
+        // #endregion
+        
+        // 检查是否有初始化函数
+        if (typeof (RustWorker as any).ensureWasmInitialized === 'function') {
+          await (RustWorker as any).ensureWasmInitialized();
+        }
+        
+        // 尝试创建实例来验证初始化
+        const testInstance = new (RustWorker as any)({}, {});
+        if (testInstance && typeof testInstance.fetch === 'function') {
+          console.log('[Worker] WASM初始化成功');
+          wasmInitialized = true;
+          
+          // #region agent log - 测试假设C：Worker环境切换问题
+          try {
+            fetch('http://127.0.0.1:7242/ingest/730fa833-2da6-4d3a-bcad-37f577a26c2f', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                location: 'worker.ts:ensureWasmInitialized',
+                message: 'WASM初始化成功',
+                data: { wasmInitialized: true },
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'run1',
+                hypothesisId: 'C'
+              })
+            }).catch(() => {});
+          } catch (e) {}
+          // #endregion
+        } else {
+          throw new Error('WASM实例创建失败');
+        }
+      } catch (error) {
+        console.error('[Worker] WASM初始化失败:', error);
+        
+        // #region agent log - 测试假设C：Worker环境切换问题
+        try {
+          fetch('http://127.0.0.1:7242/ingest/730fa833-2da6-4d3a-bcad-37f577a26c2f', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: 'worker.ts:ensureWasmInitialized',
+              message: 'WASM初始化失败',
+              data: { error: error instanceof Error ? error.message : String(error) },
+              timestamp: Date.now(),
+              sessionId: 'debug-session',
+              runId: 'run1',
+              hypothesisId: 'C'
+            })
+          }).catch(() => {});
+        } catch (e) {}
+        // #endregion
+        
+        throw error;
+      }
+    })();
+  }
+  
+  return wasmInitPromise;
+}
+
 // 创建 Rust Worker 实例（用于调用 Rust WASM）
 // WorkerEntrypoint 类需要 (ctx, env) 作为构造函数参数
 const createRustInstance = (env: any, ctx: any) => {
@@ -17,10 +108,24 @@ const createRustInstance = (env: any, ctx: any) => {
   return instance;
 };
 
-// 调用 Rust WASM 的 fetch 方法
+// 调用 Rust WASM 的 fetch 方法（带初始化检查）
 const rustFetch = async (request: Request, env: any, ctx: any): Promise<Response> => {
-  const instance = createRustInstance(env, ctx);
-  return instance.fetch(request);
+  try {
+    // 确保WASM已初始化
+    await ensureWasmInitialized();
+    
+    const instance = createRustInstance(env, ctx);
+    return instance.fetch(request);
+  } catch (error) {
+    console.error('[Worker] Rust WASM调用失败:', error);
+    return new Response(JSON.stringify({
+      error: 'WASM初始化失败',
+      message: error instanceof Error ? error.message : String(error)
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 };
 
 // 添加 CORS 头到响应

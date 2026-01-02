@@ -2,7 +2,6 @@
 
 use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, Tool};
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool, AiResponse};
-use wasm_bindgen_futures::spawn_local;
 use worker::{Env, Method, Request, RequestInit, Result, console_error};
 
 /// 任务执行器
@@ -14,18 +13,54 @@ impl TaskExecutor {
         env: &Env,
         request: CompatibleRequest,
     ) -> Result<String> {
+        console_error!("[TaskExecutor] Starting create_async_task");
+        
         // 生成任务ID
         let task_id = Self::generate_task_id();
+        console_error!("[TaskExecutor] Generated task_id: {}", task_id);
         
         // 获取Durable Object stub
-        let namespace = env.durable_object("AI_TASKS")?;
-        let id = namespace.id_from_name(&task_id)?;
-        let stub = id.get_stub()?;
+        let namespace = match env.durable_object("AI_TASKS") {
+            Ok(ns) => {
+                console_error!("[TaskExecutor] Got AI_TASKS namespace");
+                ns
+            }
+            Err(e) => {
+                console_error!("[TaskExecutor] Failed to get AI_TASKS namespace: {}", e);
+                return Err(e);
+            }
+        };
+        
+        let id = match namespace.id_from_name(&task_id) {
+            Ok(id) => {
+                console_error!("[TaskExecutor] Got DO id from name");
+                id
+            }
+            Err(e) => {
+                console_error!("[TaskExecutor] Failed to get DO id from name: {}", e);
+                return Err(e);
+            }
+        };
+        
+        let stub = match id.get_stub() {
+            Ok(stub) => {
+                console_error!("[TaskExecutor] Got DO stub");
+                stub
+            }
+            Err(e) => {
+                console_error!("[TaskExecutor] Failed to get DO stub: {}", e);
+                return Err(e);
+            }
+        };
         
         // 初始化任务 - 使用POST方法发送请求体
         let request_json = match serde_json::to_string(&request) {
-            Ok(json) => json,
+            Ok(json) => {
+                console_error!("[TaskExecutor] Serialized request to JSON");
+                json
+            }
             Err(e) => {
+                console_error!("[TaskExecutor] Failed to serialize request: {}", e);
                 return Err(worker::Error::RustError(
                     format!("Failed to serialize request: {}", e)
                 ));
@@ -33,39 +68,45 @@ impl TaskExecutor {
         };
         
         // 使用 fetch_with_request 调用 Durable Object
+        console_error!("[TaskExecutor] Creating init-and-start request");
         
+        // 1. 设置正确的Content-Type头
+        let headers = worker::Headers::new();
+        
+        if let Err(e) = headers.set("Content-Type", "application/json") {
+            console_error!("[TaskExecutor] Failed to set Content-Type header: {}", e);
+            return Err(e);
+        }
+        
+        // 2. 合并init和start操作，只调用一次DO
         let mut init = RequestInit::new();
         init.with_method(Method::Post)
+            .with_headers(headers)
             .with_body(Some(request_json.into()));
         
-        // Durable Object 期望的 URL 格式
-        let init_request = Request::new_with_init("http://dummy/init", &init)?;
+        // 使用合并的端点
+        // Durable Object 期望的 URL 格式是 http://dummy/path
+        let combined_request = match Request::new_with_init("http://dummy/init-and-start", &init) {
+            Ok(req) => {
+                console_error!("[TaskExecutor] Created combined request");
+                req
+            }
+            Err(e) => {
+                console_error!("[TaskExecutor] Failed to create combined request: {}", e);
+                return Err(e);
+            }
+        };
         
-        let init_response = stub
-            .fetch_with_request(init_request)
-            .await?;
+        console_error!("[TaskExecutor] Calling DO /init-and-start endpoint");
         
-        if init_response.status_code() != 200 {
-            return Err(worker::Error::RustError(
-                format!("Failed to initialize task: {}", init_response.status_code())
-            ));
-        }
+        // 直接调用DO，但不等待结果
+        // 这样即使DO卡住，我们也能立即返回任务ID
+        let _ = stub.fetch_with_request(combined_request);
         
-        // 立即开始执行任务（通过调用 /start 端点，这会设置 Alarm）
-        let mut start_init = RequestInit::new();
-        start_init.with_method(Method::Post);
+        console_error!("[TaskExecutor] DO call initiated (fire-and-forget), returning task_id: {}", task_id);
+        // 立即返回任务ID，不等待DO响应
         
-        let start_request = Request::new_with_init("http://dummy/start", &start_init)?;
-        
-        let start_response = stub
-            .fetch_with_request(start_request)
-            .await?;
-        
-        if start_response.status_code() != 200 {
-            console_error!("Failed to start task: {}", start_response.status_code());
-            // 即使启动失败，仍然返回任务ID，让用户可以检查状态
-        }
-        
+        console_error!("[TaskExecutor] Returning task_id: {}", task_id);
         Ok(task_id)
     }
     
@@ -79,12 +120,18 @@ impl TaskExecutor {
         let tools = Self::convert_to_ai_tools(&request.tools);
         
         // 创建AI客户端
-        let ai_api_key = match env.var("AI_API_KEY") {
+        let ai_api_key = match env.secret("AI_API_KEY") {
             Ok(key) => key.to_string(),
             Err(_) => {
-                return Ok(CompatibleResponse::error_response(
-                    "AI_API_KEY not configured".to_string(),
-                ));
+                // 尝试DEEPSEEK_API_KEY作为备选
+                match env.secret("DEEPSEEK_API_KEY") {
+                    Ok(key) => key.to_string(),
+                    Err(_) => {
+                        return Ok(CompatibleResponse::error_response(
+                            "AI_API_KEY or DEEPSEEK_API_KEY not configured".to_string(),
+                        ));
+                    }
+                }
             }
         };
         

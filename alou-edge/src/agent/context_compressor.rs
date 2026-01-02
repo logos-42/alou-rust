@@ -1,7 +1,6 @@
 use crate::agent::session::Message;
 use crate::utils::error::{AloudError, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// Compression strategy
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -268,7 +267,7 @@ impl ContextCompressor {
         }
         
         // Look for important messages in earlier history
-        for (i, msg) in messages.iter().enumerate().take(start_index) {
+        for (_i, msg) in messages.iter().enumerate().take(start_index) {
             let is_important = self.is_message_important(msg);
             
             if is_important {

@@ -1,8 +1,9 @@
 use crate::agent::session::SessionManager;
 use crate::agent::ai_client::AiClient;
-use crate::agent::diap_identity::DiapIdentity;
+use crate::agent::spec::TaskSpec;
+use crate::agent::spec_validator::SpecValidator;
 use crate::utils::error::{Result, AloudError};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use worker::*;
 
@@ -36,12 +37,29 @@ pub async fn create_claude_agent_from_parsed(
         .to_string();
 
     // Create or verify session
-    let session = if let Ok(s) = session_manager.get_session(session_id).await {
+    let _session = if let Ok(s) = session_manager.get_session(session_id).await {
         s
     } else {
         return Err(AloudError::AgentError("Session not found".to_string()));
     };
 
+    // Check for task specification in request
+    let task_spec = request.get("task_spec").and_then(|v| serde_json::from_value::<TaskSpec>(v.clone()).ok());
+    
+    // Validate task specification if provided
+    let validation_result = if let Some(ref spec) = task_spec {
+        let validator = SpecValidator;
+        let result = validator.validate(spec);
+        
+        if !result.is_valid {
+            console_log!("Task specification validation failed: {:?}", result.errors);
+        }
+        
+        Some(result)
+    } else {
+        None
+    };
+    
     // Create agent metadata
     let mut metadata = serde_json::json!({
         "agent_type": "claude_agent_sdk",
@@ -49,6 +67,16 @@ pub async fn create_claude_agent_from_parsed(
         "session_id": session_id,
         "role_description": role_description,
     });
+    
+    // Add validation result to metadata if available
+    if let Some(ref validation) = validation_result {
+        metadata["spec_validation"] = serde_json::to_value(validation).unwrap_or(Value::Null);
+    }
+    
+    // Add task spec to metadata if available
+    if let Some(ref spec) = task_spec {
+        metadata["task_spec"] = serde_json::to_value(spec).unwrap_or(Value::Null);
+    }
 
     if let Some(wallet) = &wallet_address {
         metadata["wallet_address"] = Value::String(wallet.clone());

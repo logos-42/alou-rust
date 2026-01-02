@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// Parse result for agent creation command
 #[derive(Debug, Clone, Serialize, Deserialize)]

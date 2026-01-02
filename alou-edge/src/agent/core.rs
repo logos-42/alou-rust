@@ -9,7 +9,7 @@ use crate::agent::context_compressor::{ContextCompressor, CompressionStrategy};
 use crate::agent::error_analyzer::ErrorAnalyzer;
 use crate::agent::error_response::ToolErrorResponse;
 use crate::agent::prompts::{AgentMode, CustomAgentInfo, PromptMode};
-use crate::agent::retry_policy::{RetryPolicy, RetryState, RetryDecision, BackoffStrategy};
+use crate::agent::retry_policy::{ErrorType, RetryPolicy};
 use crate::agent::session::{ContextEvent, Message, SessionManager};
 use crate::agent::stream::{StreamEvent, StreamPublisher};
 use crate::mcp::executor::{McpExecutor, ToolCall};
@@ -53,6 +53,7 @@ pub struct AgentCore {
     session_manager: SessionManager,
     mcp_executor: McpExecutor,
     kv: KvStore,
+    retry_policy: RetryPolicy,
 }
 
 impl AgentCore {
@@ -71,6 +72,7 @@ impl AgentCore {
             session_manager,
             mcp_executor,
             kv,
+            retry_policy: RetryPolicy::default(),
         }
     }
 
@@ -105,6 +107,7 @@ impl AgentCore {
             session_manager,
             mcp_executor,
             kv,
+            retry_policy: RetryPolicy::default(),
         })
     }
 
@@ -606,26 +609,24 @@ impl AgentCore {
                     if let Some(corrected) = &analysis.corrected_args {
                         console_log!("Auto-correcting args for tool {}: {:?}", tool_use.name, corrected.explanation);
 
-                        let corrected_tool_call = ToolCall {
+                        let _corrected_tool_call = ToolCall {
                             id: tool_use.id.clone(),
                             name: tool_use.name.clone(),
                             args: corrected.corrected_args.clone(),
                         };
 
-                        let retry_result = self
-                            .mcp_executor
-                            .execute(&tool_use.name, corrected.corrected_args.clone(), context)
-                            .await;
+                        let corrected_tool_call = ToolCall {
+                            id: tool_use.id.clone(),
+                            name: tool_use.name.clone(),
+                            args: corrected.corrected_args.clone(),
+                        };
+                        
+                        let retry_result = self.execute_tool_with_retry(&corrected_tool_call, context, 0).await;
 
                         match retry_result {
-                            Ok(value) => {
+                            Ok(tool_result) => {
                                 console_log!("Auto-correction succeeded for tool {}", tool_use.name);
-                                enhanced_results.push(crate::mcp::executor::ToolResult {
-                                    id: tool_use.id.clone(),
-                                    name: tool_use.name.clone(),
-                                    result: value,
-                                    error: None,
-                                });
+                                enhanced_results.push(tool_result);
                                 continue;
                             },
                             Err(e2) => {
@@ -683,6 +684,60 @@ impl AgentCore {
                 input_schema: tool_info.input_schema,
             })
             .collect()
+    }
+
+    /// Execute a tool call with retry logic
+    async fn execute_tool_with_retry(
+        &self,
+        tool_call: &ToolCall,
+        context: &AgentContext,
+        attempt: u32,
+    ) -> std::result::Result<crate::mcp::executor::ToolResult, String> {
+        let result = self.mcp_executor.execute(&tool_call.name, tool_call.args.clone(), context).await;
+        
+        match result {
+            Ok(value) => Ok(crate::mcp::executor::ToolResult {
+                id: tool_call.id.clone(),
+                name: tool_call.name.clone(),
+                result: value,
+                error: None,
+            }),
+            Err(error) => {
+                // Determine error type for retry decision
+                let error_str = error.to_string();
+                let error_type = self.classify_error(&error_str);
+                let decision = self.retry_policy.should_retry(&error_type, attempt);
+                
+                match decision {
+                    crate::agent::retry_policy::RetryDecision::Retry { delay_ms, .. } => {
+                        console_log!("Will retry tool {} after {}ms (attempt {})", tool_call.name, delay_ms, attempt + 1);
+                        Err(format!("Retry scheduled after {}ms", delay_ms))
+                    },
+                    crate::agent::retry_policy::RetryDecision::NoRetry { reason } => {
+                        console_log!("Will not retry tool {}: {}", tool_call.name, reason);
+                        Err(error_str)
+                    },
+                    _ => Err(error_str),
+                }
+            }
+        }
+    }
+    
+    /// Classify error for retry decision
+    fn classify_error(&self, error: &str) -> ErrorType {
+        let error_lower = error.to_lowercase();
+        
+        if error_lower.contains("timeout") || error_lower.contains("network") || error_lower.contains("connection") {
+            ErrorType::NetworkError
+        } else if error_lower.contains("rate limit") || error_lower.contains("too many requests") {
+            ErrorType::RateLimitError
+        } else if error_lower.contains("invalid") || error_lower.contains("argument") {
+            ErrorType::ArgumentError
+        } else if error_lower.contains("auth") || error_lower.contains("permission") {
+            ErrorType::AuthenticationError
+        } else {
+            ErrorType::TransactionError
+        }
     }
 
     /// Get MCP executor reference (for tool execution)

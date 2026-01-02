@@ -985,7 +985,7 @@ pub(crate) async fn handle_get_batch_agent_sessions(
 /// Parse agent creation command using AI
 /// 使用AI解析智能体创建指令
 pub(crate) async fn handle_parse_creation_command(
-    session_manager: &SessionManager,
+    _session_manager: &SessionManager,
     req: &mut Request,
 ) -> Result<Response> {
     #[derive(Deserialize)]

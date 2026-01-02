@@ -2,6 +2,7 @@ use serde_json::Value;
 
 /// Session context for error analysis
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SessionContext {
     pub recent_history: Vec<String>,
     pub tool_usage_patterns: Vec<String>,
@@ -18,6 +19,7 @@ impl Default for SessionContext {
 
 /// Placeholder for AgentMessage enum
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum AgentMessage {
     User { content: String },
     Assistant { content: String },
@@ -117,7 +119,7 @@ impl ErrorAnalyzer {
         }
     }
 
-    fn attempt_auto_correction(&self, error: &str, tool_name: &str, tool_args: &Value, error_type: &ErrorType, _session_context: &SessionContext) -> (bool, Option<CorrectedArgs>) {
+    fn attempt_auto_correction(&self, _error: &str, tool_name: &str, tool_args: &Value, error_type: &ErrorType, _session_context: &SessionContext) -> (bool, Option<CorrectedArgs>) {
         match error_type {
             ErrorType::InvalidInput => {
                 // Simple auto-correction for common issues
@@ -158,6 +160,7 @@ pub struct CorrectedArgs {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ErrorAnalysis {
     pub error_type: ErrorType,
     pub can_retry: bool,

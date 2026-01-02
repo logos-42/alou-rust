@@ -23,7 +23,7 @@ anyhow = "1.0"
 
 # Cloudflare Workers
 worker = { version = "0.6", default-features = false, features = ["queue"] }
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.106"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console", "Window"] }
@@ -35,6 +35,9 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 # Async primitives (sync only, no net for WASM compatibility)
 tokio = { version = "1.0", default-features = false, features = ["sync", "time"] }
+
+# Timers for WASM
+gloo-timers = { version = "0.3", features = ["futures"] }
 
 # HTTP client for Claude API (only for non-WASM testing)
 reqwest = { version = "0.11", default-features = false, features = ["json"], optional = true }

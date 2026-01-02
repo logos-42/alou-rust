@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use worker::*;
 use crate::storage::kv::KvStore;
 
 const MAX_EVENTS_PER_SESSION: usize = 200;
@@ -28,7 +27,7 @@ impl StreamEvent {
             label: None,
             step_id: None,
             payload: Value::Null,
-            timestamp: crate::utils::time::now_timestamp_millis(),
+            timestamp: crate::utils::time::now_timestamp_millis_i64(),
             is_final: false,
         }
     }

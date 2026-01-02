@@ -75,6 +75,7 @@ impl DiapIdentityConfig {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_ipns_key(mut self, ipns_key: Option<String>) -> Self {
         self.ipns_key = ipns_key;
         self

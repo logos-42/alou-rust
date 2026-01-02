@@ -333,6 +333,15 @@ impl Router {
             (Method::Post, "/api/claude-agent/query") => {
                 claude::handle_claude_sdk_query(req, &env).await
             }
+            
+            // Claude API 兼容端点 (Anthropic API 格式)
+            (Method::Post, "/v1/messages") => {
+                claude::handle_claude_messages(req, &env).await
+            }
+            (Method::Get, "/v1/models") => {
+                claude::handle_claude_models(req, &env).await
+            }
+            
             (Method::Post, "/api/agent/parse-creation-command") => {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }

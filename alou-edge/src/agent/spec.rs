@@ -25,6 +25,7 @@ pub struct TaskSpec {
 }
 
 impl TaskSpec {
+    #[allow(dead_code)]
     pub fn new(task_id: String, title: String, description: String) -> Self {
         let now = crate::utils::time::now_timestamp();
         Self {
@@ -207,6 +208,7 @@ pub struct SpecMetadata {
 
 /// Execution plan from spec
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[allow(dead_code)]
 pub struct ExecutionPlan {
     pub task_id: String,
     pub phases: Vec<ExecutionPhase>,
@@ -217,6 +219,7 @@ pub struct ExecutionPlan {
 }
 
 impl ExecutionPlan {
+    #[allow(dead_code)]
     pub fn new(task_id: String, phases: Vec<ExecutionPhase>, total_steps: usize) -> Self {
         Self {
             task_id,
@@ -230,6 +233,7 @@ impl ExecutionPlan {
 
 /// Execution phase (group of steps)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[allow(dead_code)]
 pub struct ExecutionPhase {
     pub phase_id: String,
     pub name: String,
@@ -261,6 +265,7 @@ impl Default for ValidationResult {
 }
 
 impl ValidationResult {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             is_valid: true,

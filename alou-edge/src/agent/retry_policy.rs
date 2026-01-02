@@ -2,6 +2,7 @@ use std::time::Duration;
 
 /// Error type for retry decisions
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
 pub enum ErrorType {
     Transient,
     Permanent,
@@ -29,6 +30,7 @@ pub enum RetryDecision {
         reason: String,
     },
     /// Retry with backoff
+    #[allow(dead_code)]
     RetryWithBackoff {
         base_delay_ms: u64,
         backoff_factor: f64,
@@ -39,6 +41,7 @@ pub enum RetryDecision {
 
 /// Backoff strategy
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum BackoffStrategy {
     /// Fixed delay
     Fixed,
@@ -84,6 +87,7 @@ impl Default for RetryPolicy {
 
 impl RetryPolicy {
     /// Create a new retry policy with custom settings
+    #[allow(dead_code)]
     pub fn new(
         max_attempts: u32,
         base_delay_ms: u64,
@@ -98,18 +102,21 @@ impl RetryPolicy {
     }
     
     /// Set backoff factor
+    #[allow(dead_code)]
     pub fn with_backoff_factor(mut self, factor: f64) -> Self {
         self.backoff_factor = factor;
         self
     }
     
     /// Set max delay
+    #[allow(dead_code)]
     pub fn with_max_delay(mut self, delay_ms: u64) -> Self {
         self.max_delay_ms = delay_ms;
         self
     }
     
     /// Add retryable error type
+    #[allow(dead_code)]
     pub fn with_retryable_error(mut self, error_type: ErrorType) -> Self {
         if !self.retryable_errors.contains(&error_type) {
             self.retryable_errors.push(error_type);
@@ -118,6 +125,7 @@ impl RetryPolicy {
     }
     
     /// Add non-retryable error type
+    #[allow(dead_code)]
     pub fn with_non_retryable_error(mut self, error_type: ErrorType) -> Self {
         if !self.non_retryable_errors.contains(&error_type) {
             self.non_retryable_errors.push(error_type);
@@ -179,6 +187,7 @@ impl RetryPolicy {
     }
     
     /// Get a Duration for the retry delay
+    #[allow(dead_code)]
     pub fn retry_duration(&self, decision: &RetryDecision) -> Option<Duration> {
         match decision {
             RetryDecision::Retry { delay_ms, .. } => {
@@ -195,6 +204,7 @@ impl RetryPolicy {
 
 /// Retry state tracking
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RetryState {
     pub current_attempt: u32,
     pub last_error: Option<String>,
@@ -213,36 +223,43 @@ impl Default for RetryState {
 
 impl RetryState {
     /// Create a new retry state
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
     
     /// Increment attempt count
+    #[allow(dead_code)]
     pub fn increment(&mut self) {
         self.current_attempt += 1;
     }
     
     /// Record error
+    #[allow(dead_code)]
     pub fn record_error(&mut self, error: String) {
         self.last_error = Some(error);
     }
     
     /// Add delay to total
+    #[allow(dead_code)]
     pub fn add_delay(&mut self, delay_ms: u64) {
         self.total_delay_ms += delay_ms;
     }
     
     /// Reset the retry state
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         *self = Self::default();
     }
     
     /// Check if should give up
+    #[allow(dead_code)]
     pub fn should_give_up(&self, max_attempts: u32) -> bool {
         self.current_attempt >= max_attempts
     }
     
     /// Get retry statistics
+    #[allow(dead_code)]
     pub fn stats(&self) -> RetryStats {
         RetryStats {
             total_attempts: self.current_attempt,
@@ -254,6 +271,7 @@ impl RetryState {
 
 /// Retry statistics
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct RetryStats {
     pub total_attempts: u32,
     pub total_delay_ms: u64,
@@ -371,6 +389,7 @@ mod tests {
 
 // Helper for display
 impl RetryDecision {
+    #[allow(dead_code)]
     pub fn to_string(&self) -> String {
         match self {
             RetryDecision::NoRetry { reason } => {

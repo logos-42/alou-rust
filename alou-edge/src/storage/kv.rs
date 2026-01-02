@@ -38,7 +38,7 @@ impl KvStore {
         match self.kv.get(key).json::<T>().await {
             Ok(value) => Ok(value),
             Err(e) => Err(AloudError::CacheError(format!(
-                "Failed to get key {}: {}",
+                "Failed to get key {}: {:?}",
                 key, e
             ))),
         }
@@ -50,7 +50,7 @@ impl KvStore {
         match self.kv.get(key).text().await {
             Ok(value) => Ok(value),
             Err(e) => Err(AloudError::CacheError(format!(
-                "Failed to get key {}: {}",
+                "Failed to get key {}: {:?}",
                 key, e
             ))),
         }
@@ -62,11 +62,11 @@ impl KvStore {
         T: Serialize,
     {
         let json = serde_json::to_string(value)
-            .map_err(|e| AloudError::CacheError(format!("Failed to serialize value: {}", e)))?;
+            .map_err(|e| AloudError::CacheError(format!("Failed to serialize value: {:?}", e)))?;
 
         let builder = {
             let mut b = self.kv.put(key, json).map_err(|e| {
-                AloudError::CacheError(format!("Failed to create put builder: {}", e))
+                AloudError::CacheError(format!("Failed to create put builder: {:?}", e))
             })?;
 
             if let Some(ttl) = ttl_seconds {
@@ -78,7 +78,7 @@ impl KvStore {
         builder
             .execute()
             .await
-            .map_err(|e| AloudError::CacheError(format!("Failed to put key {}: {}", key, e)))?;
+            .map_err(|e| AloudError::CacheError(format!("Failed to put key {}: {:?}", key, e)))?;
 
         Ok(())
     }
@@ -88,7 +88,7 @@ impl KvStore {
     pub async fn put_string(&self, key: &str, value: &str, ttl_seconds: Option<u64>) -> Result<()> {
         let builder = {
             let mut b = self.kv.put(key, value).map_err(|e| {
-                AloudError::CacheError(format!("Failed to create put builder: {}", e))
+                AloudError::CacheError(format!("Failed to create put builder: {:?}", e))
             })?;
 
             if let Some(ttl) = ttl_seconds {
@@ -100,7 +100,7 @@ impl KvStore {
         builder
             .execute()
             .await
-            .map_err(|e| AloudError::CacheError(format!("Failed to put key {}: {}", key, e)))?;
+            .map_err(|e| AloudError::CacheError(format!("Failed to put key {}: {:?}", key, e)))?;
 
         Ok(())
     }
@@ -110,7 +110,7 @@ impl KvStore {
         self.kv
             .delete(key)
             .await
-            .map_err(|e| AloudError::CacheError(format!("Failed to delete key {}: {}", key, e)))?;
+            .map_err(|e| AloudError::CacheError(format!("Failed to delete key {}: {:?}", key, e)))?;
 
         Ok(())
     }
@@ -122,7 +122,7 @@ impl KvStore {
             Ok(Some(_)) => Ok(true),
             Ok(None) => Ok(false),
             Err(e) => Err(AloudError::CacheError(format!(
-                "Failed to check key {}: {}",
+                "Failed to check key {}: {:?}",
                 key, e
             ))),
         }
@@ -147,7 +147,7 @@ impl KvStore {
         let result = list_builder
             .execute()
             .await
-            .map_err(|e| AloudError::CacheError(format!("Failed to list keys: {}", e)))?;
+            .map_err(|e| AloudError::CacheError(format!("Failed to list keys: {:?}", e)))?;
 
         Ok(result.keys.into_iter().map(|k| k.name).collect())
     }

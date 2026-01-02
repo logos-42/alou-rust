@@ -10,6 +10,7 @@ use std::sync::Arc;
 /// 集群执行器
 pub struct ClusterExecutor {
     agent_core: Arc<AgentCore>,
+    #[allow(dead_code)]
     session_manager: SessionManager,
     pubsub_manager: PubSubManager,
 }

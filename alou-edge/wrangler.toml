@@ -8,6 +8,11 @@ command = "npm run build"
 # 确保在构建时先编译 Rust WASM，然后 wrangler 会处理 TypeScript
 # TypeScript 入口文件已在顶层 main 字段指定，wrangler 会自动编译并包含所有导入的模块
 
+# Wasm 模块规则配置
+[[rules]]
+globs = ["**/*.wasm"]
+type = "CompiledWasm"
+
 [vars]
 ENVIRONMENT = "development"
 AI_PROVIDER = "deepseek"

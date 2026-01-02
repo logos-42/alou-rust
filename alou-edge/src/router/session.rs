@@ -213,7 +213,7 @@ pub(crate) async fn handle_agent_chat(
                         error: format!(
                             "每日请求限额已用完。您今天已经使用了所有可用请求。\n\nDaily request limit exceeded. You have used all available requests for today.\n\n剩余请求 / Remaining requests: {}\n重置时间 / Reset time: {} (UTC)",
                             remaining,
-                            crate::utils::time::timestamp_to_rfc3339(next_day)
+                            crate::utils::time::timestamp_to_rfc3339(next_day as u64)
                         ),
                         remaining_requests: remaining,
                         limit_exceeded: true,

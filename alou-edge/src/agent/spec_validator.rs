@@ -2,7 +2,6 @@ use crate::agent::spec::{
     StepSpec, StepType, TaskSpec, Precondition, ValidationRule,
     ExecutionPlan, ExecutionPhase, ValidationResult,
 };
-use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 /// Spec validator for validating task specifications
@@ -182,7 +181,7 @@ impl SpecValidator {
     }
     
     /// Validate expected outcome
-    fn validate_expected_outcome(&self, outcome: &crate::agent::spec::ExpectedOutcome, mut result: &mut ValidationResult) {
+    fn validate_expected_outcome(&self, outcome: &crate::agent::spec::ExpectedOutcome, result: &mut ValidationResult) {
         if let Some(ref criteria) = outcome.success_criteria {
             if criteria.trim().is_empty() {
                 result.with_warning("success_criteria 为空字符串".to_string());
@@ -195,7 +194,7 @@ impl SpecValidator {
     }
     
     /// Validate validation rules
-    fn validate_validation_rules(&self, rules: &[ValidationRule], mut result: &mut ValidationResult) {
+    fn validate_validation_rules(&self, rules: &[ValidationRule], result: &mut ValidationResult) {
         for (i, rule) in rules.iter().enumerate() {
             if rule.rule_id.is_empty() {
                 result.with_error(format!("验证规则 {} (索引 {}) 的 ID 为空", i, i));
@@ -356,7 +355,7 @@ impl SpecValidator {
     }
     
     /// Group steps into phases
-    fn group_into_phases(&self, sorted_steps: Vec<StepSpec>, all_steps: &[StepSpec]) -> Vec<ExecutionPhase> {
+    fn group_into_phases(&self, sorted_steps: Vec<StepSpec>, _all_steps: &[StepSpec]) -> Vec<ExecutionPhase> {
         let mut phases = Vec::new();
         
         if sorted_steps.is_empty() {

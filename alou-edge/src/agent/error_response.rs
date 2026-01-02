@@ -20,6 +20,7 @@ pub struct ToolErrorResponse {
 }
 
 impl ToolErrorResponse {
+    #[allow(dead_code)]
     pub fn new(error: impl Into<String>, error_type: ErrorType, retryable: bool) -> Self {
         Self {
             error: error.into(),
@@ -29,6 +30,7 @@ impl ToolErrorResponse {
         }
     }
 
+    #[allow(dead_code)]
     pub fn with_context(mut self, context: Value) -> Self {
         self.context = Some(context);
         self
