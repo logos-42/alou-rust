@@ -5,6 +5,7 @@
 import apiClient from './api'
 import agentResolverService from './agentResolverService'
 import ipfsContentService from './ipfsContentService'
+import asyncTaskService from './asyncTaskService'
 import { parseDidDocumentToAgent } from './didDocumentParser'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
@@ -38,14 +39,154 @@ export class AgentService {
 
   /**
    * Send message to agent
+   * 如果后端支持异步任务，会自动使用异步处理
    */
-  async sendMessage(sessionId, message, walletAddress) {
-    const response = await apiClient.post('/agent/chat', {
-      session_id: sessionId,
-      message,
-      wallet_address: walletAddress,
+  async sendMessage(sessionId, message, walletAddress, options = {}) {
+    const {
+      chain = 'ethereum',
+      contextEvents = [],
+      eventSummary = '',
+      useAsync = true, // 默认使用异步处理
+      timeout = 30000, // 30秒超时
+    } = options
+
+    try {
+      console.log('[AgentService] 发送消息到AI:', {
+        sessionId,
+        messageLength: message?.length,
+        walletAddress,
+        chain,
+        useAsync,
+      })
+
+      // 如果启用异步且后端支持，使用异步任务接口
+      if (useAsync) {
+        try {
+          // 尝试使用异步任务接口
+          const response = await apiClient.post('/ai-task/init-and-start', {
+            session_id: sessionId,
+            message,
+            wallet_address: walletAddress,
+            chain,
+            context_events: contextEvents,
+            event_summary: eventSummary,
+          }, {
+            timeout,
+          })
+
+          const taskData = response.data
+          console.log('[AgentService] 异步任务创建成功:', {
+            taskId: taskData.task_id,
+            status: taskData.status,
+          })
+
+          // 如果任务立即完成，返回结果
+          if (taskData.status === 'completed' && taskData.result) {
+            return {
+              content: taskData.result.content || taskData.result,
+              session_id: sessionId,
+              task_id: taskData.task_id,
+              is_async: true,
+              completed: true,
+            }
+          }
+
+          // 否则返回任务信息，让调用方决定是否轮询
+          return {
+            content: `任务已创建，正在异步处理中。任务ID: ${taskData.task_id}`,
+            session_id: sessionId,
+            task_id: taskData.task_id,
+            is_async: true,
+            status: taskData.status,
+            progress: taskData.progress || 0,
+            current_step: taskData.current_step || '',
+          }
+        } catch (asyncError) {
+          // 如果异步接口失败，回退到同步接口
+          console.warn('[AgentService] 异步接口失败，回退到同步接口:', asyncError.message)
+        }
+      }
+
+      // 使用同步接口（或异步失败后的回退）
+      const response = await apiClient.post('/agent/chat', {
+        session_id: sessionId,
+        message,
+        wallet_address: walletAddress,
+        chain,
+        context_events: contextEvents,
+        event_summary: eventSummary,
+      }, {
+        timeout,
+      })
+
+      return {
+        ...response.data,
+        is_async: false,
+      }
+    } catch (error) {
+      console.error('[AgentService] 发送消息失败:', error)
+      
+      // 提供更友好的错误信息
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new Error(`请求超时（${timeout}ms）。请检查网络连接或稍后重试。`)
+      }
+      
+      if (error.response?.status === 404) {
+        throw new Error('AI服务暂时不可用，请稍后重试')
+      }
+      
+      throw error
+    }
+  }
+
+  /**
+   * 获取异步任务状态（可选功能）
+   * @param {string} taskId - 任务ID
+   * @returns {Promise<Object>} 任务状态
+   */
+  async getTaskStatus(taskId) {
+    try {
+      const response = await apiClient.get(`/ai-task/${taskId}/status`)
+      return response.data
+    } catch (error) {
+      console.error('[AgentService] 获取任务状态失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 等待异步任务完成（可选功能）
+   * @param {string} taskId - 任务ID
+   * @param {number} pollInterval - 轮询间隔（毫秒，默认2000）
+   * @param {number} timeout - 超时时间（毫秒，默认60000）
+   * @returns {Promise<Object>} 任务结果
+   */
+  async waitForTaskCompletion(taskId, pollInterval = 2000, timeout = 60000) {
+    const startTime = Date.now()
+    
+    return new Promise((resolve, reject) => {
+      const checkStatus = async () => {
+        try {
+          const status = await this.getTaskStatus(taskId)
+          
+          if (status.status === 'completed') {
+            resolve(status)
+          } else if (status.status === 'failed' || status.status === 'cancelled') {
+            reject(new Error(`任务${status.status}: ${status.error || '未知错误'}`))
+          } else if (Date.now() - startTime > timeout) {
+            reject(new Error(`任务等待超时（${timeout}ms）`))
+          } else {
+            // 继续轮询
+            setTimeout(checkStatus, pollInterval)
+          }
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      // 开始轮询
+      checkStatus()
     })
-    return response.data
   }
 
   /**
