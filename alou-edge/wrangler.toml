@@ -62,9 +62,19 @@ id = "e0f682098b73485b940f1176417f417a"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
+# Migrations for Durable Objects (main environment)
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AITaskDO"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["AITaskDO"]
+
 [[migrations]]
 tag = "v3"
-deleted_classes = ["TestDO"]
+new_sqlite_classes = ["AITaskDO"]
+
 
   [vars.development]
   DIAP_IPFS_API_URL = "http://127.0.0.1:5001"

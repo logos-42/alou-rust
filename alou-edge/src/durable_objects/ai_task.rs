@@ -2,6 +2,12 @@
 //! 
 //! 负责管理AI任务的执行状态、进度跟踪和结果存储
 
+// 存储键名常量，避免硬编码错误
+const STATE_KEY: &str = "task_state";
+const REQUEST_KEY: &str = "task_request";
+const RESULT_KEY: &str = "task_result";
+const TOOL_RESULT_KEY: &str = "last_tool_result";
+
 use crate::compatibility::models::{
     CompatibleRequest, CompatibleResponse, TaskStatus, TaskStatusResponse,
 };
@@ -40,6 +46,9 @@ pub struct AITaskDO {
     /// 是否正在执行任务
     #[allow(dead_code)]
     is_executing: RefCell<bool>,
+    /// 内存日志缓冲区（用于调试，即使 wrangler tail 不可用）
+    #[allow(dead_code)]
+    debug_logs: RefCell<Vec<String>>,
 }
 
 /// 任务缓存（内存中的状态副本）
@@ -70,6 +79,7 @@ impl DurableObject for AITaskDO {
             env,
             cache: RefCell::new(None),
             is_executing: RefCell::new(false),
+            debug_logs: RefCell::new(Vec::new()),
         }
     }
     
@@ -116,6 +126,7 @@ impl DurableObject for AITaskDO {
     async fn alarm(&self) -> Result<Response> {
         console_error!("!!! ALARM ACTIVE !!! Task: {}", self.task_name());
         console_log!("🚨 AITaskDO ALARM STARTED for task: {}", self.task_name());
+        console_log!("[DEBUG] Current DO ID: {}", self.state.id().to_string());
         
         // 设置 panic hook 来捕获 panic
         #[cfg(target_arch = "wasm32")]
@@ -268,6 +279,7 @@ impl AITaskDO {
     /// 处理任务初始化和启动（合并操作）
     async fn handle_init_and_start(&self, mut req: Request) -> Result<Response> {
         console_log!("[INIT-START] Handling init-and-start for task: {}", self.task_name());
+        console_log!("[DEBUG] Current DO ID: {}", self.state.id().to_string());
         
         // 1. 快速解析请求
         let request: CompatibleRequest = match req.json().await {
@@ -281,23 +293,20 @@ impl AITaskDO {
             }
         };
         
-        // 2. 快速保存请求（不等待结果）
+        // 2. 同步保存请求（确保保存完成）
         let task_id = self.task_name();
-        let request_clone = request.clone();
         let storage = self.state.storage();
         
-        // 使用spawn_local来异步保存，不阻塞当前请求
-        let task_id_clone1 = task_id.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            console_log!("[AITaskDO-Spawn] Saving request data for task: {}", task_id_clone1);
-            if let Err(e) = storage.put("request", &request_clone).await {
-                console_error!("[AITaskDO-Spawn] Failed to save request: {}", e);
-            } else {
-                console_log!("[AITaskDO-Spawn] Request saved successfully");
+        console_log!("[AITaskDO] Synchronously saving request data for task: {}", task_id);
+        match storage.put(REQUEST_KEY, &request).await {
+            Ok(_) => console_log!("[AITaskDO] Request saved successfully to key: {}", REQUEST_KEY),
+            Err(e) => {
+                console_error!("[AITaskDO] Failed to save request: {}", e);
+                // 即使保存失败，仍然继续，让用户可以检查状态
             }
-        });
+        }
         
-        // 3. 快速创建初始状态并保存（不等待结果）
+        // 3. 同步创建初始状态并保存（确保保存完成）
         let now = current_timestamp_secs();
         
         let initial_state_data = serde_json::json!({
@@ -309,35 +318,73 @@ impl AITaskDO {
             "error": serde_json::Value::Null
         });
         
-        let storage2 = self.state.storage();
-        let task_id_clone2 = task_id.clone();
-        wasm_bindgen_futures::spawn_local(async move {
-            console_log!("[AITaskDO-Spawn] Saving initial state for task: {}", task_id_clone2);
-            if let Err(e) = storage2.put("state", initial_state_data).await {
-                console_error!("[AITaskDO-Spawn] Failed to save initial state: {}", e);
-            } else {
-                console_log!("[AITaskDO-Spawn] Initial state saved successfully");
+        console_log!("[AITaskDO] Synchronously saving initial state for task: {}", task_id);
+        match storage.put(STATE_KEY, initial_state_data).await {
+            Ok(_) => console_log!("[AITaskDO] Initial state saved successfully to key: {}", STATE_KEY),
+            Err(e) => {
+                console_error!("[AITaskDO] Failed to save initial state: {}", e);
+                // 即使保存失败，仍然继续，让用户可以检查状态
             }
-        });
-        
-        // 4. 立即设置Alarm（不等待前面的保存操作完成）
-        let storage3 = self.state.storage();
-        // 使用当前时间戳 + 1000ms（1秒）来设置alarm
-        let current_time = self.get_current_timestamp_millis();
-        let alarm_at = current_time + 1000; // 1秒后触发
-        
-        // 将 u64 转换为 i64，因为 ScheduledTime 实现了 From<i64>
-        let alarm_at_i64 = alarm_at as i64;
-        
-        if let Err(e) = storage3.set_alarm(alarm_at_i64).await {
-            console_error!("[AITaskDO] Failed to set alarm: {}", e);
-            
-            // 即使Alarm设置失败，仍然返回成功，让用户可以检查状态
-        } else {
-            console_log!("[AITaskDO] Alarm scheduled at: {} (current: {})", alarm_at, current_time);
         }
         
-        // 5. ！！！关键：立即返回响应，释放DO锁！！！
+        // 4. 同步设置Alarm（确保设置完成）
+        // ！！！强制使用当前时间 + 5秒的偏移量，确保不因为计算错误导致时间点已经过去！！！
+        let now_ms = self.get_current_timestamp_millis();
+        let scheduled_time = now_ms + 5000; // 明确 5000 毫秒后（5秒）
+        
+        console_log!("[DEBUG] Current timestamp (ms): {}", now_ms);
+        console_log!("[DEBUG] Setting alarm to absolute MS: {} (5 seconds from now)", scheduled_time);
+        
+        match storage.set_alarm(scheduled_time as i64).await {
+            Ok(_) => {
+                console_log!("!!! ALARM SET SUCCESS !!! Task: {}", task_id);
+                console_log!("[DEBUG] Alarm scheduled at absolute time (ms): {}", scheduled_time);
+                
+                // ！！！关键自检：立即验证Alarm是否真的被设置了！！！
+                // 注意：由于存储事务可能尚未提交，这里可能返回 None
+                // 但我们仍然要检查，至少能看到一些信息
+                match storage.get_alarm().await {
+                    Ok(Some(confirmed_alarm)) => {
+                        console_log!("!!! ALARM CONFIRMED !!! Task: {}, Confirmed alarm time: {}", task_id, confirmed_alarm);
+                        console_log!("[DEBUG] Alarm successfully stored in Cloudflare scheduler");
+                        console_log!("[DEBUG] Alarm will trigger in {}ms", confirmed_alarm as u64 - now_ms);
+                    }
+                    Ok(None) => {
+                        console_error!("!!! ALARM NOT STORED !!! Task: {}", task_id);
+                        console_error!("[DEBUG] CRITICAL: set_alarm returned success but get_alarm returned None!");
+                        console_error!("[DEBUG] This could mean:");
+                        console_error!("[DEBUG] 1. Storage transaction not yet committed (normal during request)");
+                        console_error!("[DEBUG] 2. Cloudflare environment rejected the alarm setting");
+                        console_error!("[DEBUG] 3. Time is in the past (expired immediately)");
+                        console_error!("[DEBUG] Current time: {}, Scheduled time: {}", now_ms, scheduled_time);
+                    }
+                    Err(e) => {
+                        console_error!("!!! ALARM VERIFICATION FAILED !!! Task: {}, Error: {}", task_id, e);
+                        console_error!("[DEBUG] Failed to verify alarm: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                console_error!("[AITaskDO] Failed to set alarm: {}", e);
+                console_error!("!!! ALARM SET FAILED !!! Task: {}, Error: {}", task_id, e);
+                // 即使Alarm设置失败，仍然返回成功，让用户可以检查状态
+            }
+        }
+        
+        // 5. ！！！测试：直接执行任务，不依赖 Alarm！！！
+        console_log!("[TEST] Direct task execution for task: {}", self.task_name());
+        
+        // 立即开始执行任务（同步）
+        match self.execute_task().await {
+            Ok(_) => {
+                console_log!("[TEST] Task executed successfully!");
+            }
+            Err(e) => {
+                console_error!("[TEST] Task execution failed: {}", e);
+            }
+        }
+        
+        // 返回响应
         console_log!("[AITaskDO] Returning immediate response for task: {}", self.task_name());
         
         let response = TaskStatusResponse::new(
@@ -444,12 +491,19 @@ impl AITaskDO {
         // 设置 Alarm 来触发任务执行（100毫秒后，给状态保存一些时间）
         // 这样即使 fetch 返回了，Cloudflare 也会保证 DO 被唤醒并执行 alarm 逻辑
         let storage = self.state.storage();
-        if let Err(e) = storage.set_alarm(100).await { // 增加到100ms，确保状态保存完成
+        let now = self.get_current_timestamp_millis();
+        let alarm_at = now + 100; // 100ms后的绝对时间戳
+        
+        // 将 u64 转换为 i64，因为 ScheduledTime 实现了 From<i64>
+        let alarm_at_i64 = alarm_at as i64;
+        
+        console_log!("Setting alarm at absolute time: {} for task: {}", alarm_at_i64, self.task_name());
+        if let Err(e) = storage.set_alarm(alarm_at_i64).await {
             console_error!("Failed to set alarm: {}", e);
             return Response::error(format!("Failed to schedule task execution: {}", e), 500);
         }
         
-        console_log!("Task {} scheduled for execution via alarm (100ms)", self.task_name());
+        console_log!("Task {} scheduled for execution via alarm at {}", self.task_name(), alarm_at_i64);
         
         let response = TaskStatusResponse::new(
             self.task_name(),
@@ -465,25 +519,67 @@ impl AITaskDO {
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
-    /// 处理获取状态（带超时保护）
+    /// 处理获取状态（从存储读取真实状态）
     async fn handle_get_status(&self) -> Result<Response> {
         console_log!("[STATUS] handle_get_status called for task: {}", self.task_name());
+        
+        // 从存储中读取真实状态
+        let state = match self.load_state().await {
+            Ok(state) => state,
+            Err(e) => {
+                console_error!("[STATUS] Failed to load state: {}", e);
+                // 如果加载失败，返回错误状态
+                let error_response = crate::compatibility::models::TaskStatusResponse {
+                    task_id: self.task_name(),
+                    status: "error".to_string(),
+                    progress: Some(0.0),
+                    current_step: Some("状态加载失败".to_string()),
+                    result: None,
+                    error: Some(format!("Failed to load state: {}", e)),
+                    created_at: crate::utils::time::current_timestamp_secs(),
+                    updated_at: crate::utils::time::current_timestamp_secs(),
+                };
+                return Ok(Response::from_json(&error_response)?);
+            }
+        };
+        
+        // 调试：检查当前是否有闹钟被挂起（只读，不修改）
+        console_log!("[DEBUG] Checking alarm status for task: {}", self.task_name());
+        match self.state.storage().get_alarm().await {
+            Ok(Some(scheduled_time)) => {
+                console_log!("[DEBUG] Alarm scheduled at: {:?}", scheduled_time);
+                let now = self.get_current_timestamp_millis();
+                let scheduled_ms = scheduled_time as u64;
+                if scheduled_ms > now {
+                    console_log!("[DEBUG] Alarm will trigger in {}ms", scheduled_ms - now);
+                } else {
+                    console_log!("[DEBUG] Alarm should have triggered {}ms ago", now - scheduled_ms);
+                }
+            }
+            Ok(None) => {
+                console_log!("[DEBUG] No alarm scheduled for this task");
+            }
+            Err(e) => {
+                console_error!("[DEBUG] Failed to get alarm: {}", e);
+            }
+        }
         
         // 使用 TaskStatusResponse 结构体，确保正确的 JSON 序列化
         use crate::compatibility::models::TaskStatusResponse;
         
         let response = TaskStatusResponse {
             task_id: self.task_name(),
-            status: "queued".to_string(),
-            progress: Some(0.0),
-            current_step: Some("测试响应".to_string()),
-            result: None,
-            error: None,
-            created_at: crate::utils::time::current_timestamp_secs(),
-            updated_at: crate::utils::time::current_timestamp_secs(),
+            status: state.status.to_string(),
+            progress: Some(state.progress),
+            current_step: Some(state.current_step),
+            result: None, // 如果需要返回结果，可以从存储中读取
+            error: state.error,
+            created_at: state.created_at,
+            updated_at: state.updated_at,
         };
         
-        console_log!("[STATUS] Returning test response");
+        console_log!("[STATUS] Returning real state: status={}, progress={}%", 
+            state.status, state.progress * 100.0);
         
         // 显式设置 UTF-8 字符集
         let headers = Headers::new();
@@ -553,7 +649,7 @@ impl AITaskDO {
         
         // 保存工具结果
         let storage = self.state.storage();
-        if let Err(e) = storage.put("last_tool_result", tool_result).await {
+        if let Err(e) = storage.put(TOOL_RESULT_KEY, tool_result).await {
             console_error!("Failed to save tool result: {}", e);
         }
         
@@ -598,8 +694,8 @@ impl AITaskDO {
         let storage = self.state.storage();
         
         // 尝试获取状态，但如果超时则返回默认状态
-        console_log!("[AITaskDO] Attempting to get state from storage...");
-        let state_data_result = storage.get::<Value>("state").await;
+        console_log!("[AITaskDO] Attempting to get state from storage with key: {}...", STATE_KEY);
+        let state_data_result = storage.get::<Value>(STATE_KEY).await;
         
         match state_data_result {
             Ok(state_data) => {
@@ -680,7 +776,8 @@ impl AITaskDO {
             "error": state.error,
         });
         
-        storage.put("state", state_data).await?;
+        console_log!("[DEBUG] Saving state to key: {}", STATE_KEY);
+        storage.put(STATE_KEY, state_data).await?;
         Ok(())
     }
     
@@ -688,7 +785,8 @@ impl AITaskDO {
     async fn get_request(&self) -> Result<Option<CompatibleRequest>> {
         let storage = self.state.storage();
         
-        if let Ok(request) = storage.get::<CompatibleRequest>("request").await {
+        console_log!("[DEBUG] Getting request from key: {}", REQUEST_KEY);
+        if let Ok(request) = storage.get::<CompatibleRequest>(REQUEST_KEY).await {
             Ok(Some(request))
         } else {
             Ok(None)
@@ -698,7 +796,8 @@ impl AITaskDO {
     /// 保存请求数据
     async fn save_request(&self, request: &CompatibleRequest) -> Result<()> {
         let storage = self.state.storage();
-        storage.put("request", request).await?;
+        console_log!("[DEBUG] Saving request to key: {}", REQUEST_KEY);
+        storage.put(REQUEST_KEY, request).await?;
         Ok(())
     }
     
@@ -706,7 +805,8 @@ impl AITaskDO {
     async fn get_result(&self) -> Result<Option<CompatibleResponse>> {
         let storage = self.state.storage();
         
-        if let Ok(result) = storage.get::<CompatibleResponse>("result").await {
+        console_log!("[DEBUG] Getting result from key: {}", RESULT_KEY);
+        if let Ok(result) = storage.get::<CompatibleResponse>(RESULT_KEY).await {
             Ok(Some(result))
         } else {
             Ok(None)
@@ -716,7 +816,8 @@ impl AITaskDO {
     /// 保存结果数据
     async fn save_result(&self, result: &CompatibleResponse) -> Result<()> {
         let storage = self.state.storage();
-        storage.put("result", result).await?;
+        console_log!("[DEBUG] Saving result to key: {}", RESULT_KEY);
+        storage.put(RESULT_KEY, result).await?;
         Ok(())
     }
     
@@ -914,14 +1015,14 @@ impl AITaskDO {
         });
         
         let storage = self.state.storage();
-        if let Err(e) = storage.put("state", running_state).await {
+        if let Err(e) = storage.put(STATE_KEY, running_state).await {
             console_error!("[SIMPLIFIED-ERROR] Failed to save running state: {}", e);
             return Err(worker::Error::RustError(format!("Failed to save state: {}", e)));
         }
         
         // 2. 获取请求数据（简化版）
         console_log!("[SIMPLIFIED] Step 2: Getting request data");
-        let request = match storage.get::<CompatibleRequest>("request").await {
+        let request = match storage.get::<CompatibleRequest>(REQUEST_KEY).await {
             Ok(req) => {
                 console_log!("[SIMPLIFIED] Request found - prompt length: {}", req.prompt.len());
                 req
@@ -985,7 +1086,7 @@ impl AITaskDO {
                     error: None,
                 };
                 
-                if let Err(e) = storage.put("result", &response).await {
+                if let Err(e) = storage.put(RESULT_KEY, &response).await {
                     console_error!("[SIMPLIFIED-WARN] Failed to save result: {}", e);
                 }
                 
@@ -1000,7 +1101,7 @@ impl AITaskDO {
                     "error": serde_json::Value::Null
                 });
                 
-                if let Err(e) = storage.put("state", completed_state).await {
+                if let Err(e) = storage.put(STATE_KEY, completed_state).await {
                     console_error!("[SIMPLIFIED-WARN] Failed to save completed state: {}", e);
                 }
                 
@@ -1021,7 +1122,7 @@ impl AITaskDO {
                     "error": format!("AI调用失败: {}", e)
                 });
                 
-                if let Err(save_err) = storage.put("state", failed_state).await {
+                if let Err(save_err) = storage.put(STATE_KEY, failed_state).await {
                     console_error!("[SIMPLIFIED-ERROR] Failed to save failed state: {}", save_err);
                 }
                 
@@ -1212,6 +1313,25 @@ impl AITaskDO {
                 .unwrap_or_default()
                 .as_millis() as u64
         }
+    }
+    
+    /// 添加调试日志到内存缓冲区
+    fn add_debug_log(&self, message: String) {
+        let mut logs = self.debug_logs.borrow_mut();
+        logs.push(format!("[{}] {}", self.get_current_timestamp_millis(), message));
+        
+        // 只保留最近50条日志
+        if logs.len() > 50 {
+            logs.remove(0);
+        }
+        
+        // 同时输出到 console_log 以便 wrangler tail 也能看到
+        console_log!("[DEBUG-LOG] {}", message);
+    }
+    
+    /// 获取最近的调试日志
+    fn get_recent_logs(&self) -> Vec<String> {
+        self.debug_logs.borrow().clone()
     }
     
     /// 安全标记任务为失败状态（不会panic）- 极度简化版

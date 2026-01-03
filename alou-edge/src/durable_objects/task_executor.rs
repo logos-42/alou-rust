@@ -99,12 +99,19 @@ impl TaskExecutor {
         
         console_error!("[TaskExecutor] Calling DO /init-and-start endpoint");
         
-        // 直接调用DO，但不等待结果
-        // 这样即使DO卡住，我们也能立即返回任务ID
-        let _ = stub.fetch_with_request(combined_request);
-        
-        console_error!("[TaskExecutor] DO call initiated (fire-and-forget), returning task_id: {}", task_id);
-        // 立即返回任务ID，不等待DO响应
+        // 等待DO调用完成，确保任务正确初始化
+        match stub.fetch_with_request(combined_request).await {
+            Ok(response) => {
+                console_error!("[TaskExecutor] DO call succeeded, status: {}", response.status_code());
+                if response.status_code() != 200 {
+                    console_error!("[TaskExecutor] DO returned non-200 status: {}", response.status_code());
+                }
+            }
+            Err(e) => {
+                console_error!("[TaskExecutor] DO call failed: {}", e);
+                // 即使DO调用失败，仍然返回任务ID，让用户可以检查状态
+            }
+        }
         
         console_error!("[TaskExecutor] Returning task_id: {}", task_id);
         Ok(task_id)
