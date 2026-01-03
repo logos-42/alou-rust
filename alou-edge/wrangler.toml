@@ -63,8 +63,8 @@ name = "AI_TASKS"
 class_name = "AITaskDO"
 
 [[migrations]]
-tag = "v1"
-new_sqlite_classes = ["AITaskDO"]
+tag = "v3"
+deleted_classes = ["TestDO"]
 
   [vars.development]
   DIAP_IPFS_API_URL = "http://127.0.0.1:5001"

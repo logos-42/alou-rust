@@ -44,11 +44,13 @@ pub fn now_timestamp() -> i64 {
 }
 
 /// 显式别名：获取当前时间戳（秒）返回 i64
+#[allow(dead_code)]
 pub fn now_timestamp_i64() -> i64 {
     current_timestamp_secs() as i64
 }
 
 /// 显式别名：获取当前时间戳（秒）返回 u64 (用于 TaskState)
+#[allow(dead_code)]
 pub fn current_timestamp_secs_u64() -> u64 {
     current_timestamp_secs()
 }
@@ -66,6 +68,7 @@ pub fn now_timestamp_millis() -> u128 {
 // --- 其他高精度及格式化工具 ---
 
 /// 获取当前时间戳（秒，带小数部分）
+#[allow(dead_code)]
 pub fn current_timestamp_secs_f64() -> f64 {
     #[cfg(target_arch = "wasm32")]
     {

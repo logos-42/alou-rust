@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 历史消息结构（兼容claude-agent.js）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,10 +201,8 @@ pub struct TaskStatusResponse {
 
 impl TaskStatusResponse {
     pub fn new(task_id: String, status: String) -> Self {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        // 使用兼容WASM的时间函数
+        let now = crate::utils::time::current_timestamp_secs();
         
         Self {
             task_id,
@@ -225,6 +222,7 @@ impl TaskStatusResponse {
 pub enum TaskStatus {
     Queued,
     Running,
+    Processing,  // 新增：正在处理中（如调用AI、执行工具等）
     Completed,
     Failed,
 }
@@ -234,6 +232,7 @@ impl std::fmt::Display for TaskStatus {
         match self {
             TaskStatus::Queued => write!(f, "queued"),
             TaskStatus::Running => write!(f, "running"),
+            TaskStatus::Processing => write!(f, "processing"),
             TaskStatus::Completed => write!(f, "completed"),
             TaskStatus::Failed => write!(f, "failed"),
         }
@@ -278,6 +277,8 @@ pub fn estimate_execution_time(request: &CompatibleRequest) -> u64 {
     
     base_time + prompt_length_factor + history_factor + tools_factor + model_factor
 }
+
+
 
 
 

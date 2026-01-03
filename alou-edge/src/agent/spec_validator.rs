@@ -269,6 +269,7 @@ impl SpecValidator {
     }
     
     /// Generate execution plan from spec
+    #[allow(dead_code)]
     pub fn generate_execution_plan(&self, spec: &TaskSpec) -> ExecutionPlan {
         // Topological sort for execution order
         let execution_order = self.topological_sort(&spec.steps);

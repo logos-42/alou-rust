@@ -19,12 +19,16 @@ pub struct ClaudeMessageRequest {
     #[serde(default)]
     pub tools: Option<Vec<ClaudeTool>>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub temperature: Option<f32>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub top_p: Option<f32>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub top_k: Option<u32>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub stop_sequences: Option<Vec<String>>,
 }
 
@@ -257,6 +261,7 @@ async fn route_to_ai_service(
 }
 
 /// 创建模拟响应（临时实现）
+#[allow(dead_code)]
 fn create_mock_response(request: &ClaudeMessageRequest) -> ClaudeMessageResponse {
     // 从消息中提取文本
     let user_message = request

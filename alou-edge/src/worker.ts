@@ -149,7 +149,10 @@ const addCorsHeaders = (response: Response, headers: Record<string, string> = {}
 };
 
 // 导出Durable Objects
-export { AITaskDO } from '../build/index.js';
+// 注意：build/index.js 中 AITaskDO 被导出为 It 的别名
+// 我们需要确保正确导入
+import { AITaskDO as RustAITaskDO, TestDO as RustTestDO } from '../build/index.js';
+export { RustAITaskDO as AITaskDO, RustTestDO as TestDO };
 
 // Worker 入口
 export default {

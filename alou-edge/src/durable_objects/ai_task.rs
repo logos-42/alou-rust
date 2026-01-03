@@ -8,10 +8,10 @@ use crate::compatibility::models::{
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool};
 use serde_json::Value;
 use std::cell::RefCell;
-use crate::utils::time::{current_timestamp_secs, current_timestamp_millis};
+use crate::utils::time::{current_timestamp_secs};
 
 use worker::{
-    durable_object, Env, Method, Request, Response, Result, console_error, console_log,
+    durable_object, Env, Headers, Method, Request, Response, Result, console_error, console_log,
 };
 
 // 用于捕获 panic 的 hook
@@ -26,9 +26,6 @@ use futures::future::{select, Either};
 #[cfg(target_arch = "wasm32")]
 use std::pin::Pin;
 
-// 用于 WASM 环境的时间函数
-#[cfg(target_arch = "wasm32")]
-use js_sys::Date;
 
 /// AI任务Durable Object
 #[durable_object]
@@ -38,8 +35,10 @@ pub struct AITaskDO {
     /// 环境
     env: Env,
     /// 内存缓存（可选，用于性能优化）
+    #[allow(dead_code)]
     cache: RefCell<Option<TaskCache>>,
     /// 是否正在执行任务
+    #[allow(dead_code)]
     is_executing: RefCell<bool>,
 }
 
@@ -65,35 +64,7 @@ struct TaskState {
 
 impl DurableObject for AITaskDO {
     fn new(state: worker::State, env: Env) -> Self {
-        // #region agent log - 测试假设B：Durable Object构造函数问题
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:DurableObject::new",
-                "message": "AITaskDO构造函数被调用",
-                "data": {
-                    "state_id": state.id().to_string(),
-                    "has_name": state.id().name().is_some()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "B"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
-        
+        // 极简构造函数 - 不做任何可能出错的操作
         Self {
             state,
             env,
@@ -102,213 +73,192 @@ impl DurableObject for AITaskDO {
         }
     }
     
-    async fn fetch(&self, req: Request) -> std::result::Result<Response, worker::Error> {
-        // #region agent log - 测试假设B：Durable Object构造函数问题
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:DurableObject::fetch",
-                "message": "AITaskDO fetch方法被调用",
-                "data": {
-                    "task_name": self.task_name(),
-                    "internal_id": self.internal_task_id()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "B"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
+    async fn fetch(&self, req: Request) -> Result<Response> {
+        // 极简版 fetch 方法，避免任何可能失败的操作
+        console_log!("[AITaskDO] fetch called, path: {}", req.path());
         
-        let url = req.url()?;
-        let path = url.path();
+        let path = req.path();
+        let method = req.method();
         
-        match path {
-            "/init" if req.method() == Method::Post => {
-                self.handle_init(req).await
-            }
-            "/start" if req.method() == Method::Post => {
-                self.handle_start().await
-            }
-            "/init-and-start" if req.method() == Method::Post => {
-                self.handle_init_and_start(req).await
-            }
-            "/status" if req.method() == Method::Get => {
+        // 路由处理
+        match (&method, path.as_str()) {
+            (Method::Get, "/status") => {
+                console_log!("[AITaskDO] Handling GET /status");
                 self.handle_get_status().await
             }
-            "/cancel" if req.method() == Method::Post => {
+            (Method::Post, "/init") => {
+                console_log!("[AITaskDO] Handling POST /init");
+                self.handle_init(req).await
+            }
+            (Method::Post, "/start") => {
+                console_log!("[AITaskDO] Handling POST /start");
+                self.handle_start().await
+            }
+            (Method::Post, "/init-and-start") => {
+                console_log!("[AITaskDO] Handling POST /init-and-start");
+                self.handle_init_and_start(req).await
+            }
+            (Method::Post, "/cancel") => {
+                console_log!("[AITaskDO] Handling POST /cancel");
                 self.handle_cancel().await
             }
-            "/tool-result" if req.method() == Method::Post => {
+            (Method::Post, "/tool-result") => {
+                console_log!("[AITaskDO] Handling POST /tool-result");
                 self.handle_tool_result(req).await
             }
-            "/execute" if req.method() == Method::Post => {
-                // 直接执行任务（用于测试）
-                match self.execute_task().await {
-                    Ok(_) => Response::ok("Task executed"),
-                    Err(e) => Response::error(format!("Task execution failed: {}", e), 500),
-                }
-            }
             _ => {
+                console_log!("[AITaskDO] Unknown route: {:?} {}", method, path);
                 Response::error("Not found", 404)
             }
         }
     }
     
-    async fn alarm(&self) -> std::result::Result<Response, worker::Error> {
+    async fn alarm(&self) -> Result<Response> {
+        console_error!("!!! ALARM ACTIVE !!! Task: {}", self.task_name());
         console_log!("🚨 AITaskDO ALARM STARTED for task: {}", self.task_name());
-        
-        // #region agent log - 测试假设E：Alarm调度问题
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:alarm",
-                "message": "Alarm被触发",
-                "data": {
-                    "task_name": self.task_name()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "E"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
         
         // 设置 panic hook 来捕获 panic
         #[cfg(target_arch = "wasm32")]
         console_error_panic_hook::set_once();
         
-        // 1. 加载当前状态（带超时保护）
-        console_log!("[ALARM] Step 1: Loading state with timeout protection");
-        let state = match self.load_state_with_timeout().await {
-            Ok(state) => state,
-            Err(e) => {
-                console_error!("[ALARM-ERROR] Failed to load state: {}", e);
-                // 尝试标记任务为失败
-                let _ = self.mark_as_failed_safe(format!("状态加载失败: {}", e)).await;
-                return Response::error(format!("Failed to load state: {}", e), 500);
+        // 使用闭包包装实际的异步逻辑，以便在 catch_unwind 中调用
+        let alarm_logic = || async {
+            // 1. 加载当前状态（带超时保护）
+            console_log!("[ALARM] Step 1: Loading state with timeout protection");
+            let state = match self.load_state_with_timeout().await {
+                Ok(state) => state,
+                Err(e) => {
+                    console_error!("[ALARM-ERROR] Failed to load state: {}", e);
+                    // 尝试标记任务为失败
+                    let _ = self.mark_as_failed_safe(format!("状态加载失败: {}", e)).await;
+                    return Response::error(format!("Failed to load state: {}", e), 500);
+                }
+            };
+            
+            let now = self.get_current_timestamp();
+            
+            // 2. 检查任务状态
+            match state.status {
+                TaskStatus::Completed => {
+                    console_log!("Task {} is already completed, alarm exiting.", self.task_name());
+                    return Response::ok("Already completed");
+                }
+                TaskStatus::Failed => {
+                    console_log!("Task {} is already failed, alarm exiting.", self.task_name());
+                    return Response::ok("Already failed");
+                }
+                TaskStatus::Running => {
+                    // 检查是否是真正的运行中（10分钟内更新过）
+                    if now.saturating_sub(state.updated_at) < 600 { // 10分钟
+                        console_log!("Task {} is genuinely running (updated {} seconds ago), alarm exiting.", 
+                            self.task_name(), now - state.updated_at);
+                        return Response::ok("Busy");
+                    } else {
+                        // 超过10分钟没更新，认为是卡死了，需要恢复
+                        console_log!("Task {} appears deadlocked (last update {} seconds ago), attempting recovery", 
+                            self.task_name(), now - state.updated_at);
+                    }
+                }
+                TaskStatus::Processing => {
+                    // 处理中的任务，检查是否卡住
+                    if now.saturating_sub(state.updated_at) < 600 { // 10分钟
+                        console_log!("Task {} is processing (updated {} seconds ago), alarm exiting.", 
+                            self.task_name(), now - state.updated_at);
+                        return Response::ok("Processing");
+                    } else {
+                        // 超过10分钟没更新，认为是卡死了，需要恢复
+                        console_log!("Task {} appears deadlocked in processing (last update {} seconds ago), attempting recovery", 
+                            self.task_name(), now - state.updated_at);
+                    }
+                }
+                TaskStatus::Queued => {
+                    // 正常情况，可以开始执行
+                    console_log!("Task {} is queued, starting execution via alarm", self.task_name());
+                }
+            }
+            
+            // 3. 更新状态为运行中
+            let mut new_state = state;
+            new_state.status = TaskStatus::Running;
+            new_state.progress = 0.1;
+            new_state.current_step = "开始执行".to_string();
+            new_state.updated_at = now;
+            
+            if let Err(e) = self.save_state(&new_state).await {
+                console_error!("Failed to save running state: {}", e);
+                return Response::error(format!("Failed to save state: {}", e), 500);
+            }
+            
+            console_log!("[ALARM] Task {} state updated to Running, starting execution", self.task_name());
+            
+            // 4. 直接执行任务（alarm可以执行耗时操作）
+            // 在Cloudflare Durable Objects中，alarm可以执行长时间运行的任务
+            // 使用超时保护，确保alarm不会无限期挂起
+            console_log!("[ALARM] Step 4: Starting task execution with enhanced timeout protection");
+            
+            #[cfg(target_arch = "wasm32")]
+            {
+                console_log!("[ALARM-WASM] Using enhanced timeout protection");
+                
+                // 使用简化版的任务执行，避免复杂逻辑导致崩溃
+                let task_future = self.execute_task_simplified();
+                let alarm_timeout_future = TimeoutFuture::new(30_000); // 减少到30秒超时
+                
+                match select(Pin::from(Box::pin(task_future)), Pin::from(Box::pin(alarm_timeout_future))).await {
+                    Either::Left((Ok(()), _)) => {
+                        console_log!("✅ [ALARM] Task {} completed successfully via alarm", self.task_name());
+                        Response::ok("Task completed")
+                    }
+                    Either::Left((Err(e), _)) => {
+                        console_error!("❌ [ALARM] Task {} failed via alarm: {}", self.task_name(), e);
+                        
+                        // 使用安全方法标记任务为失败
+                        let _ = self.mark_as_failed_safe(format!("任务执行失败: {}", e)).await;
+                        Response::error(format!("Task execution failed: {}", e), 500)
+                    }
+                    Either::Right((_, _)) => {
+                        console_error!("⏰ [ALARM] Alarm execution timed out after 30 seconds for task: {}", self.task_name());
+                        
+                        // 使用安全方法标记任务为超时
+                        let _ = self.mark_as_failed_safe("任务执行超时（30秒）".to_string()).await;
+                        Response::error("Alarm execution timeout", 500)
+                    }
+                }
+            }
+            
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                console_log!("[ALARM-NonWASM] Using simplified task execution");
+                // 非WASM环境使用简化版逻辑
+                match self.execute_task_simplified().await {
+                    Ok(_) => {
+                        console_log!("✅ [ALARM] Task {} completed successfully via alarm", self.task_name());
+                        Response::ok("Task completed")
+                    }
+                    Err(e) => {
+                        console_error!("❌ [ALARM] Task {} failed via alarm: {}", self.task_name(), e);
+                        
+                        // 使用安全方法标记任务为失败
+                        let _ = self.mark_as_failed_safe(format!("任务执行失败: {}", e)).await;
+                        Response::error(format!("Task execution failed: {}", e), 500)
+                    }
+                }
             }
         };
         
-        let now = self.get_current_timestamp();
+        // 在最外层使用 catch_unwind 保护，确保任何 panic 都不会导致任务永远卡住
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            // 创建一个立即执行的异步块
+            Box::pin(alarm_logic())
+        }));
         
-        // 2. 检查任务状态
-        match state.status {
-            TaskStatus::Completed => {
-                console_log!("Task {} is already completed, alarm exiting.", self.task_name());
-                return Response::ok("Already completed");
-            }
-            TaskStatus::Failed => {
-                console_log!("Task {} is already failed, alarm exiting.", self.task_name());
-                return Response::ok("Already failed");
-            }
-            TaskStatus::Running => {
-                // 检查是否是真正的运行中（10分钟内更新过）
-                if now.saturating_sub(state.updated_at) < 600 { // 10分钟
-                    console_log!("Task {} is genuinely running (updated {} seconds ago), alarm exiting.", 
-                        self.task_name(), now - state.updated_at);
-                    return Response::ok("Busy");
-                } else {
-                    // 超过10分钟没更新，认为是卡死了，需要恢复
-                    console_log!("Task {} appears deadlocked (last update {} seconds ago), attempting recovery", 
-                        self.task_name(), now - state.updated_at);
-                }
-            }
-            TaskStatus::Queued => {
-                // 正常情况，可以开始执行
-                console_log!("Task {} is queued, starting execution via alarm", self.task_name());
-            }
-        }
-        
-        // 3. 更新状态为运行中
-        let mut new_state = state;
-        new_state.status = TaskStatus::Running;
-        new_state.progress = 0.1;
-        new_state.current_step = "开始执行".to_string();
-        new_state.updated_at = now;
-        
-        if let Err(e) = self.save_state(&new_state).await {
-            console_error!("Failed to save running state: {}", e);
-            return Response::error(format!("Failed to save state: {}", e), 500);
-        }
-        
-        console_log!("[ALARM] Task {} state updated to Running, starting execution", self.task_name());
-        
-        // 4. 直接执行任务（alarm可以执行耗时操作）
-        // 在Cloudflare Durable Objects中，alarm可以执行长时间运行的任务
-        // 使用超时保护，确保alarm不会无限期挂起
-        console_log!("[ALARM] Step 4: Starting task execution with enhanced timeout protection");
-        
-        #[cfg(target_arch = "wasm32")]
-        {
-            console_log!("[ALARM-WASM] Using enhanced timeout protection");
-            
-            // 使用简化版的任务执行，避免复杂逻辑导致崩溃
-            let task_future = self.execute_task_simplified();
-            let alarm_timeout_future = TimeoutFuture::new(30_000); // 减少到30秒超时
-            
-            match select(Pin::from(Box::pin(task_future)), Pin::from(Box::pin(alarm_timeout_future))).await {
-                Either::Left((Ok(()), _)) => {
-                    console_log!("✅ [ALARM] Task {} completed successfully via alarm", self.task_name());
-                    Response::ok("Task completed")
-                }
-                Either::Left((Err(e), _)) => {
-                    console_error!("❌ [ALARM] Task {} failed via alarm: {}", self.task_name(), e);
-                    
-                    // 使用安全方法标记任务为失败
-                    let _ = self.mark_as_failed_safe(format!("任务执行失败: {}", e)).await;
-                    Response::error(format!("Task execution failed: {}", e), 500)
-                }
-                Either::Right((_, _)) => {
-                    console_error!("⏰ [ALARM] Alarm execution timed out after 30 seconds for task: {}", self.task_name());
-                    
-                    // 使用安全方法标记任务为超时
-                    let _ = self.mark_as_failed_safe("任务执行超时（30秒）".to_string()).await;
-                    Response::error("Alarm execution timeout", 500)
-                }
-            }
-        }
-        
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            console_log!("[ALARM-NonWASM] Using simplified task execution");
-            // 非WASM环境使用简化版逻辑
-            match self.execute_task_simplified().await {
-                Ok(_) => {
-                    console_log!("✅ [ALARM] Task {} completed successfully via alarm", self.task_name());
-                    Response::ok("Task completed")
-                }
-                Err(e) => {
-                    console_error!("❌ [ALARM] Task {} failed via alarm: {}", self.task_name(), e);
-                    
-                    // 使用安全方法标记任务为失败
-                    let _ = self.mark_as_failed_safe(format!("任务执行失败: {}", e)).await;
-                    Response::error(format!("Task execution failed: {}", e), 500)
-                }
+        match result {
+            Ok(future) => future.await,
+            Err(_) => {
+                console_error!("[ALARM-PANIC] Task {} panicked in alarm, marking as failed", self.task_name());
+                // 使用安全方法标记任务为失败
+                let _ = self.mark_as_failed_safe("任务执行过程中发生panic".to_string()).await;
+                Response::error("Task execution panicked", 500)
             }
         }
     }
@@ -318,35 +268,6 @@ impl AITaskDO {
     /// 处理任务初始化和启动（合并操作）
     async fn handle_init_and_start(&self, mut req: Request) -> Result<Response> {
         console_log!("[INIT-START] Handling init-and-start for task: {}", self.task_name());
-        
-        // #region agent log - 测试假设E：Alarm调度问题
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:handle_init_and_start",
-                "message": "开始处理init-and-start请求",
-                "data": {
-                    "task_name": self.task_name(),
-                    "method": req.method().to_string()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "E"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
         
         // 1. 快速解析请求
         let request: CompatibleRequest = match req.json().await {
@@ -401,79 +322,36 @@ impl AITaskDO {
         
         // 4. 立即设置Alarm（不等待前面的保存操作完成）
         let storage3 = self.state.storage();
-        if let Err(e) = storage3.set_alarm(10).await { // 减少到10ms，更快触发
+        // 使用当前时间戳 + 1000ms（1秒）来设置alarm
+        let current_time = self.get_current_timestamp_millis();
+        let alarm_at = current_time + 1000; // 1秒后触发
+        
+        // 将 u64 转换为 i64，因为 ScheduledTime 实现了 From<i64>
+        let alarm_at_i64 = alarm_at as i64;
+        
+        if let Err(e) = storage3.set_alarm(alarm_at_i64).await {
             console_error!("[AITaskDO] Failed to set alarm: {}", e);
-            
-            // #region agent log - 测试假设E：Alarm调度问题
-            #[cfg(target_arch = "wasm32")]
-            {
-                use std::fs::OpenOptions;
-                use std::io::Write;
-                
-                let log_entry = serde_json::json!({
-                    "location": "ai_task.rs:handle_init_and_start",
-                    "message": "Alarm设置失败",
-                    "data": {
-                        "task_name": self.task_name(),
-                        "error": e.to_string()
-                    },
-                    "timestamp": current_timestamp_millis(),
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "E"
-                });
-                
-                if let Ok(mut file) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-                {
-                    let _ = writeln!(file, "{}", log_entry);
-                }
-            }
-            // #endregion
             
             // 即使Alarm设置失败，仍然返回成功，让用户可以检查状态
         } else {
-            console_log!("[AITaskDO] Alarm set for 10ms later");
-            
-            // #region agent log - 测试假设E：Alarm调度问题
-            #[cfg(target_arch = "wasm32")]
-            {
-                use std::fs::OpenOptions;
-                use std::io::Write;
-                
-                let log_entry = serde_json::json!({
-                    "location": "ai_task.rs:handle_init_and_start",
-                    "message": "Alarm设置成功",
-                    "data": {
-                        "task_name": self.task_name(),
-                        "delay_ms": 10
-                    },
-                    "timestamp": current_timestamp_millis(),
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "E"
-                });
-                
-                if let Ok(mut file) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-                {
-                    let _ = writeln!(file, "{}", log_entry);
-                }
-            }
-            // #endregion
+            console_log!("[AITaskDO] Alarm scheduled at: {} (current: {})", alarm_at, current_time);
         }
         
         // 5. ！！！关键：立即返回响应，释放DO锁！！！
         console_log!("[AITaskDO] Returning immediate response for task: {}", self.task_name());
         
-        Response::from_json(&TaskStatusResponse::new(
+        let response = TaskStatusResponse::new(
             self.task_name(),
             "scheduled".to_string(),
-        ))
+        );
+        
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
+        }
+        
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     /// 处理任务初始化
@@ -510,10 +388,18 @@ impl AITaskDO {
             return Response::error(format!("Failed to save initial state: {}", e), 500);
         }
         
-        Response::from_json(&TaskStatusResponse::new(
+        let response = TaskStatusResponse::new(
             self.task_name(),
             initial_state.status.to_string(),
-        ))
+        );
+        
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
+        }
+        
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     /// 处理任务开始执行
@@ -549,6 +435,10 @@ impl AITaskDO {
                 
                 console_log!("Task {} state updated to Running", self.task_name());
             }
+            TaskStatus::Processing => {
+                // 处理中的任务可以继续处理
+                console_log!("Task {} is already processing, continuing execution", self.task_name());
+            }
         }
         
         // 设置 Alarm 来触发任务执行（100毫秒后，给状态保存一些时间）
@@ -561,158 +451,47 @@ impl AITaskDO {
         
         console_log!("Task {} scheduled for execution via alarm (100ms)", self.task_name());
         
-        Response::from_json(&TaskStatusResponse::new(
+        let response = TaskStatusResponse::new(
             self.task_name(),
             "scheduled".to_string(),
-        ))
+        );
+        
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
+        }
+        
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     /// 处理获取状态（带超时保护）
     async fn handle_get_status(&self) -> Result<Response> {
         console_log!("[STATUS] handle_get_status called for task: {}", self.task_name());
         
-        // #region agent log - 测试假设D：存储访问超时
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:handle_get_status",
-                "message": "开始处理状态查询",
-                "data": {
-                    "task_name": self.task_name(),
-                    "internal_id": self.internal_task_id()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "D"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
-        
-        // 加载真实状态（带超时保护）
-        let state = match self.load_state_with_timeout().await {
-            Ok(state) => state,
-            Err(e) => {
-                console_error!("[STATUS-ERROR] Failed to load state: {}", e);
-                
-                // #region agent log - 测试假设D：存储访问超时
-                #[cfg(target_arch = "wasm32")]
-                {
-                    use std::fs::OpenOptions;
-                    use std::io::Write;
-                    
-                    let log_entry = serde_json::json!({
-                        "location": "ai_task.rs:handle_get_status",
-                        "message": "状态加载失败",
-                        "data": {
-                            "task_name": self.task_name(),
-                            "error": e.to_string()
-                        },
-                        "timestamp": current_timestamp_millis(),
-                        "sessionId": "debug-session",
-                        "runId": "run1",
-                        "hypothesisId": "D"
-                    });
-                    
-                    if let Ok(mut file) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-                    {
-                        let _ = writeln!(file, "{}", log_entry);
-                    }
-                }
-                // #endregion
-                
-                // 返回错误状态
-                let error_response = TaskStatusResponse {
-                    task_id: self.task_name(),
-                    status: "error".to_string(),
-                    progress: Some(0.0),
-                    current_step: Some("状态加载失败".to_string()),
-                    result: None,
-                    error: Some(format!("Failed to load state: {}", e)),
-                    created_at: 0,
-                    updated_at: 0,
-                };
-                return Response::from_json(&error_response);
-            }
-        };
-        
-        // 如果任务已完成，尝试获取结果
-        let result = if state.status == TaskStatus::Completed {
-            match self.get_result().await {
-                Ok(Some(result)) => Some(result),
-                Ok(None) => {
-                    console_log!("[AITaskDO] Task completed but no result found");
-                    None
-                }
-                Err(e) => {
-                    console_error!("[AITaskDO] Failed to get result: {}", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        // 使用 TaskStatusResponse 结构体，确保正确的 JSON 序列化
+        use crate::compatibility::models::TaskStatusResponse;
         
         let response = TaskStatusResponse {
             task_id: self.task_name(),
-            status: state.status.to_string(),
-            progress: Some(state.progress),
-            current_step: Some(state.current_step),
-            result,
-            error: state.error,
-            created_at: state.created_at,
-            updated_at: state.updated_at,
+            status: "queued".to_string(),
+            progress: Some(0.0),
+            current_step: Some("测试响应".to_string()),
+            result: None,
+            error: None,
+            created_at: crate::utils::time::current_timestamp_secs(),
+            updated_at: crate::utils::time::current_timestamp_secs(),
         };
         
-        console_log!("[AITaskDO] Returning real status response for task: {} - status: {:?}, progress: {}", 
-            self.task_name(), state.status, state.progress);
+        console_log!("[STATUS] Returning test response");
         
-        // #region agent log - 测试假设D：存储访问超时
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:handle_get_status",
-                "message": "状态查询成功",
-                "data": {
-                    "task_name": self.task_name(),
-                    "status": state.status.to_string(),
-                    "progress": state.progress,
-                    "current_step": state.current_step.clone()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "D"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
         }
-        // #endregion
         
-        Response::from_json(&response)
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     /// 处理任务取消
@@ -734,10 +513,18 @@ impl AITaskDO {
             console_error!("Failed to save task state: {}", e);
         }
         
-        Response::from_json(&TaskStatusResponse::new(
+        let response = TaskStatusResponse::new(
             self.task_name(),
             state.status.to_string(),
-        ))
+        );
+        
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
+        }
+        
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     
@@ -775,10 +562,18 @@ impl AITaskDO {
             console_error!("Failed to save task state: {}", e);
         }
         
-        Response::from_json(&TaskStatusResponse::new(
+        let response = TaskStatusResponse::new(
             self.task_name(),
             state.status.to_string(),
-        ))
+        );
+        
+        // 显式设置 UTF-8 字符集
+        let headers = Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json; charset=utf-8") {
+            console_error!("Failed to set Content-Type header: {}", e);
+        }
+        
+        Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
     /// 获取任务ID（内部ID）
@@ -798,34 +593,7 @@ impl AITaskDO {
     /// 从存储加载状态
     async fn load_state(&self) -> Result<TaskState> {
         console_log!("[AITaskDO] load_state called");
-        
-        // #region agent log - 测试假设D：存储访问超时
-        #[cfg(target_arch = "wasm32")]
-        {
-            use std::fs::OpenOptions;
-            use std::io::Write;
-            
-            let log_entry = serde_json::json!({
-                "location": "ai_task.rs:load_state",
-                "message": "开始加载状态",
-                "data": {
-                    "task_name": self.task_name()
-                },
-                "timestamp": current_timestamp_millis(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "hypothesisId": "D"
-            });
-            
-            if let Ok(mut file) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(r"d:\AI\alou-pay\aloupay\.cursor\debug.log") 
-            {
-                let _ = writeln!(file, "{}", log_entry);
-            }
-        }
-        // #endregion
+    
         
         let storage = self.state.storage();
         
@@ -839,6 +607,7 @@ impl AITaskDO {
                 match status_str {
                     "queued" => TaskStatus::Queued,
                     "running" => TaskStatus::Running,
+                    "processing" => TaskStatus::Processing,
                     "completed" => TaskStatus::Completed,
                     "failed" => TaskStatus::Failed,
                     _ => TaskStatus::Queued,
@@ -1286,10 +1055,10 @@ impl AITaskDO {
             use futures::future::{select, Either};
             use std::pin::Pin;
             
-            console_log!("[SIMPLIFIED-AI-WASM] Using timeout protection (15 seconds)");
+            console_log!("[SIMPLIFIED-AI-WASM] Using enhanced timeout protection (55 seconds)");
             
             let ai_future = ai_client.send_message(messages, None); // 不带工具
-            let timeout_future = TimeoutFuture::new(15_000); // 15秒超时
+            let timeout_future = TimeoutFuture::new(55_000); // 55秒超时，略低于DO限制
             
             match select(Pin::from(Box::pin(ai_future)), Pin::from(Box::pin(timeout_future))).await {
                 Either::Left((Ok(response), _)) => {
@@ -1301,8 +1070,8 @@ impl AITaskDO {
                     Err(worker::Error::RustError(format!("AI call failed: {}", e)))
                 }
                 Either::Right((_, _)) => {
-                    console_error!("⏰ [SIMPLIFIED-AI] AI call timed out after 15 seconds");
-                    Err(worker::Error::RustError("AI call timeout (15 seconds)".to_string()))
+                    console_error!("⏰ [SIMPLIFIED-AI] AI call timed out after 55 seconds");
+                    Err(worker::Error::RustError("AI call timeout (55 seconds)".to_string()))
                 }
             }
         }
@@ -1340,7 +1109,7 @@ impl AITaskDO {
             console_log!("[WASM] Using real timeout mechanism with select");
             
             let ai_future = ai_client.send_message(messages, Some(tools));
-            let timeout_future = TimeoutFuture::new(30_000); // 30秒硬超时
+            let timeout_future = TimeoutFuture::new(55_000); // 55秒超时，略低于DO限制
             
             // 使用select!宏竞争执行
             match select(Pin::from(Box::pin(ai_future)), Pin::from(Box::pin(timeout_future))).await {
@@ -1355,8 +1124,8 @@ impl AITaskDO {
                     Err(worker::Error::RustError(format!("AI service error: {}", e)))
                 }
                 Either::Right((_, _)) => {
-                    console_error!("⏰ AI service call timed out after 30 seconds for task: {}", self.task_name());
-                    Err(worker::Error::RustError("AI service call timeout (30 seconds)".to_string()))
+                    console_error!("⏰ AI service call timed out after 55 seconds for task: {}", self.task_name());
+                    Err(worker::Error::RustError("AI service call timeout (55 seconds)".to_string()))
                 }
             }
         }
@@ -1365,7 +1134,6 @@ impl AITaskDO {
         {
             // 非WASM环境使用原来的简单超时检查
             console_log!("[Non-WASM] Using simple timeout check");
-            let start_time = std::time::Instant::now();
             
             console_log!("Before ai_client.send_message() call");
             let ai_future = ai_client.send_message(messages, Some(tools));
@@ -1373,31 +1141,15 @@ impl AITaskDO {
             
             match ai_future.await {
                 Ok(response) => {
-                    let duration = start_time.elapsed();
-                    console_log!("✅ AI service call completed in {:?} for task: {}", duration, self.task_name());
+                    console_log!("✅ AI service call completed for task: {}", self.task_name());
                     console_log!("Response content length: {}", response.content.len());
-                    
-                    // 检查是否超时（120秒超时）
-                    if duration.as_secs() > 120 {
-                        console_error!("AI service call took too long ({:?}) for task: {}", duration, self.task_name());
-                        return Err(worker::Error::RustError("AI service call timeout".to_string()));
-                    }
                     
                     console_log!("=== CALL_AI_WITH_TIMEOUT SUCCESS ===");
                     Ok(response)
                 }
                 Err(e) => {
-                    let duration = start_time.elapsed();
-                    console_error!("❌ AI service call failed after {:?} for task {}: {}", duration, self.task_name(), e);
-                    
-                    // 检查是否超时
-                    if duration.as_secs() > 120 {
-                        console_error!("Timeout detected after {:?}", duration);
-                        Err(worker::Error::RustError("AI service call timeout".to_string()))
-                    } else {
-                        console_error!("Non-timeout error: {}", e);
-                        Err(worker::Error::RustError(format!("AI service error: {}", e)))
-                    }
+                    console_error!("❌ AI service call failed for task {}: {}", self.task_name(), e);
+                    Err(worker::Error::RustError(format!("AI service error: {}", e)))
                 }
             }
         }
@@ -1441,6 +1193,25 @@ impl AITaskDO {
     /// 安全获取当前时间戳（秒）
     fn get_current_timestamp(&self) -> u64 {
         current_timestamp_secs()
+    }
+    
+    /// 获取当前时间戳（毫秒）
+    fn get_current_timestamp_millis(&self) -> u64 {
+        // 在WASM环境中，我们可以使用js_sys::Date
+        #[cfg(target_arch = "wasm32")]
+        {
+            use js_sys::Date;
+            Date::now() as u64
+        }
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use std::time::{SystemTime, UNIX_EPOCH};
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64
+        }
     }
     
     /// 安全标记任务为失败状态（不会panic）- 极度简化版

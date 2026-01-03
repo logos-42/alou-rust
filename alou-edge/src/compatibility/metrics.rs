@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 /// 兼容性监控指标
 #[derive(Clone)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub struct CompatibilityMetrics {
     inner: Arc<CompatibilityMetricsInner>,
 }

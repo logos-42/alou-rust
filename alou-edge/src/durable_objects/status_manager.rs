@@ -55,8 +55,9 @@ impl StatusManager {
         };
         
         // 调用Durable Object获取状态
+        // 注意：必须使用绝对URL，即使Host是虚拟的
         console_log!("[StatusManager] Calling DO /status endpoint");
-        match stub.fetch_with_str("/status").await {
+        match stub.fetch_with_str("http://do/status").await {
             Ok(mut response) => {
                 console_log!("[StatusManager] Got DO response, status: {}", response.status_code());
                 
@@ -93,6 +94,7 @@ impl StatusManager {
     }
     
     /// 批量获取任务状态
+    #[allow(dead_code)]
     pub async fn batch_get_task_status(
         env: &Env,
         task_ids: &[String],
@@ -116,12 +118,14 @@ impl StatusManager {
     }
     
     /// 检查任务是否存在
+    #[allow(dead_code)]
     pub async fn task_exists(env: &Env, task_id: &str) -> Result<bool> {
         let status = Self::get_task_status(env, task_id).await?;
         Ok(status.status != "not_found")
     }
     
     /// 获取活跃任务列表
+    #[allow(dead_code)]
     pub async fn get_active_tasks(_env: &Env) -> Result<Vec<String>> {
         // 注意：Durable Objects没有内置的列表功能
         // 在实际部署中，可能需要使用额外的KV存储来跟踪活跃任务
@@ -130,6 +134,7 @@ impl StatusManager {
     }
     
     /// 清理过期任务
+    #[allow(dead_code)]
     pub async fn cleanup_expired_tasks(_env: &Env, _max_age_seconds: u64) -> Result<u64> {
         // 在实际部署中，这里会清理过期的任务
         // 现在返回0作为占位符

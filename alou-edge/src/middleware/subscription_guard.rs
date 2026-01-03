@@ -113,6 +113,7 @@ impl SubscriptionGuard {
     }
 
     /// Check if user has premium subscription
+    #[allow(dead_code)]
     pub async fn is_premium(&self, user_id: &str, wallet_address: &str) -> Result<bool> {
         let subscription = self
             .storage
@@ -127,6 +128,7 @@ impl SubscriptionGuard {
     }
 
     /// Check if user is in trial period
+    #[allow(dead_code)]
     pub async fn is_in_trial(&self, user_id: &str, wallet_address: &str) -> Result<bool> {
         let trial = self.storage.check_trial(user_id, wallet_address).await?;
 
@@ -138,6 +140,7 @@ impl SubscriptionGuard {
     }
 
     /// Get user's subscription status
+    #[allow(dead_code)]
     pub async fn get_user_status(
         &self,
         user_id: &str,

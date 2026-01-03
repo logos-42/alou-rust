@@ -42,5 +42,18 @@ if (child.error) {
   process.exit(child.status ?? 1);
 }
 
+// 在 worker-build 完成后，应用 WASM 修复
+console.log("[worker-build] applying WASM initialization fix...");
+const fixChild = spawnSync("node", ["./scripts/fix-wasm-init.js"], {
+  cwd: projectRoot,
+  stdio: "inherit",
+  shell: true,
+});
+
+if (fixChild.error) {
+  console.error("[worker-build] failed to apply WASM fix:", fixChild.error);
+  process.exit(fixChild.status ?? 1);
+}
+
 process.exit(child.status ?? 0);
 

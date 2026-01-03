@@ -8,6 +8,7 @@ use worker::Result;
 
 /// 工具特征
 #[async_trait(?Send)]
+#[allow(dead_code)]
 pub trait CompatibleTool {
     /// 工具名称
     fn name(&self) -> &str;
@@ -23,6 +24,7 @@ pub trait CompatibleTool {
 }
 
 /// 工具执行器
+#[allow(dead_code)]
 pub struct ToolExecutor {
     tools: HashMap<String, Box<dyn CompatibleTool>>,
 }
@@ -90,6 +92,7 @@ impl ToolExecutor {
 }
 
 /// 获取当前时间工具
+#[allow(dead_code)]
 struct GetCurrentTimeTool;
 
 #[async_trait(?Send)]
@@ -148,6 +151,7 @@ impl CompatibleTool for GetCurrentTimeTool {
 }
 
 /// 计算工具
+#[allow(dead_code)]
 struct CalculateTool;
 
 #[async_trait(?Send)]
@@ -201,6 +205,7 @@ impl CompatibleTool for CalculateTool {
 }
 
 /// 网页搜索工具
+#[allow(dead_code)]
 struct SearchWebTool;
 
 #[async_trait(?Send)]
@@ -265,6 +270,7 @@ impl CompatibleTool for SearchWebTool {
 }
 
 /// 简单的表达式求值函数
+#[allow(dead_code)]
 fn evaluate_simple_expression(expr: &str) -> std::result::Result<f64, String> {
     // 移除空白字符
     let expr = expr.replace(' ', "");

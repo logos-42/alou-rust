@@ -13,6 +13,9 @@ mod storage;
 mod utils;
 mod web3;
 
+// 导出 Durable Objects（必须在根模块导出才能被 wasm-bindgen 识别）
+pub use durable_objects::ai_task::AITaskDO;
+
 use agent::{
     ai_client::AiClient,
     batch_create::BatchCreateTask,

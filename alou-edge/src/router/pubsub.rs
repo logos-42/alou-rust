@@ -184,6 +184,7 @@ impl PubSubManager {
     }
 
     /// 订阅群聊消息（返回消息列表，实际订阅由前端处理）
+    #[allow(dead_code)]
     pub async fn subscribe_to_group(
         &self,
         topic: &str,
@@ -193,6 +194,7 @@ impl PubSubManager {
     }
 
     /// 获取群聊消息（用于结果聚合）
+    #[allow(dead_code)]
     pub async fn get_group_messages(
         &self,
         topic: &str,
