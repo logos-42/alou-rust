@@ -30,7 +30,7 @@ const API_CONFIG = {
   
   endpoints: {
     session: '/session',
-    agentChat: '/agent/chat',
+    agentChat: '/claude-agent/query', // 使用 Claude Agent SDK 兼容端点
     agentCreate: '/agent/create',
     // 其他端点...
   },

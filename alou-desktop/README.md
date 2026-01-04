@@ -7,6 +7,11 @@
 - ✅ 支持两种智能体类型：
   - **支付智能体**：系统预设的支付助手
   - **Claude Agent SDK**：可创建的智能体，自动生成 DIAP 身份
+- ✅ **Claude Agent SDK 内置工具集成**：
+  - **核心工具**: Bash、Read、Write、Edit、Glob、Grep、NotebookEdit
+  - **网络工具**: WebSearch、WebFetch
+  - **流程控制**: Plan、ExitPlanMode、AskUserQuestion、Subagents
+  - **Web3工具**: 区块链查询、交易构建、钱包管理等
 - ✅ DIAP 去中心化通信集成
 - ✅ 轻量化前端设计
 - ✅ 后端运行在 Cloudflare Workers
@@ -216,7 +221,110 @@ TAURI_COMPRESSION=1 npm run build:tauri:release
 2. 确保 Kubo 二进制文件已下载
 3. 检查 `tauri.conf.json` 配置是否正确
 
+## Claude Agent SDK 工具集成
+
+Alou Desktop 已完整集成 Claude Agent SDK 的所有内置工具，让AI能够像程序员一样在本地执行任务。
+
+### 可用工具
+
+#### 核心内置工具
+- **Bash**: 运行终端命令、脚本、Git操作（支持持久化会话）
+- **Read**: 读取工作目录中的任何文件内容
+- **Write**: 创建新文件并写入内容
+- **Edit**: 差分编辑，精确修改已有文件
+- **Glob**: 使用模式匹配查找文件
+- **Grep**: 使用正则表达式搜索文件内容
+- **NotebookEdit**: 专门针对Jupyter Notebook文件的单元格操作
+
+#### 网络与多模态工具
+- **WebSearch**: 调用搜索引擎获取实时互联网信息
+- **WebFetch**: 获取并解析网页的Markdown内容
+
+#### 辅助与流程控制工具
+- **Plan**: 进入"规划模式"，列出步骤并寻求用户确认
+- **ExitPlanMode**: 退出规划模式，开始执行任务
+- **AskUserQuestion**: 当遇到模糊需求时，主动询问用户
+- **Subagents**: 创建"子Agent"来并行处理特定任务
+
+#### Web3专用工具
+- **query_blockchain**: 查询区块链数据
+- **build_transaction**: 构建区块链交易
+- **broadcast_transaction**: 广播交易
+- **wallet_manager**: 钱包管理
+- **agent_wallet**: 智能体钱包操作
+
+### 快速使用示例
+
+```javascript
+import { AgentService } from './src/services/agentService';
+
+const agentService = new AgentService();
+
+// 使用Claude Agent SDK工具
+const response = await agentService.sendMessage(
+  sessionId,
+  "请帮我分析这个项目的代码结构",
+  walletAddress,
+  {
+    mode: 'agent',
+    categories: ['CORE', 'NETWORK'] // 使用核心和网络工具
+  }
+);
+
+// 处理工具调用结果
+if (response.tool_calls && response.tool_calls.length > 0) {
+  console.log('Agent调用了以下工具:', response.tool_calls);
+  
+  response.tool_results?.forEach(result => {
+    if (result.success) {
+      console.log(`工具 ${result.tool} 执行成功:`, result.result);
+    } else {
+      console.error(`工具 ${result.tool} 执行失败:`, result.error);
+    }
+  });
+}
+```
+
+### 预定义配置
+
+项目提供了多个预定义配置，位于 `config/claude-agent-tools.example.js`：
+
+```javascript
+import { 
+  DEVELOPER_AGENT_CONFIG,    // 开发者配置
+  WEB3_AGENT_CONFIG,         // Web3专家配置  
+  FULL_FEATURED_AGENT_CONFIG // 全功能配置
+} from './config/claude-agent-tools.example';
+
+// 使用预定义配置
+const response = await agentService.sendMessage(
+  sessionId,
+  message,
+  walletAddress,
+  {
+    ...DEVELOPER_AGENT_CONFIG,
+    mode: 'agent'
+  }
+);
+```
+
+### 测试工具集成
+
+```bash
+# 运行测试脚本
+cd alou-desktop
+node scripts/test-claude-agent-tools.js
+```
+
+### 安全注意事项
+
+1. **Bash工具**: 避免执行未知来源的命令，敏感操作需用户确认
+2. **文件操作**: 重要文件操作前建议备份，限制操作范围
+3. **网络操作**: 验证URL安全性，使用HTTPS连接
+4. **权限控制**: 限制工具执行权限，记录操作日志
+
 ## 相关文档
 
 - [架构说明](../docs/ARCHITECTURE.md) - 前后端分离架构
 - [部署指南](../docs/DEPLOYMENT.md) - 自动更新和部署说明
+- [Claude Agent SDK 集成指南](../docs/CLAUDE_AGENT_SDK_INTEGRATION.md) - 详细工具使用说明

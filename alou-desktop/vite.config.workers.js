@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-// https://vitejs.dev/config/
+// Workers 生产环境配置
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
@@ -16,12 +16,10 @@ export default defineConfig({
     watch: {
       ignored: ['**/src-tauri/**'],
     },
-    // 配置代理解决CORS问题
-    // 注意：Web开发环境使用代理到本地后端
-    // Tauri桌面应用直接连接到生产环境（见api.js配置）
+    // 配置代理到 Workers 生产环境
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8787',
+        target: 'https://alou-edge.yuanjieliu65.workers.dev',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, '/api'),
@@ -44,8 +42,6 @@ export default defineConfig({
   },
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    // BigInt literals are required by blockchain libs (viem/ox). Safari 13 lacks support,
-    // so we target modern runtimes (Tauri desktop Chromium/WebKit >= 14).
     target: 'esnext',
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     sourcemap: !!process.env.TAURI_DEBUG,
@@ -54,9 +50,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // 保持现有别名，确保向后兼容
       '@': path.resolve(__dirname, './src'),
-      // 新增模块化架构别名
       '@modules': path.resolve(__dirname, './src/modules'),
       '@ui': path.resolve(__dirname, './src/ui'),
       '@shared': path.resolve(__dirname, './src/shared'),

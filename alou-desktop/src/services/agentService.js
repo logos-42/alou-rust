@@ -1,15 +1,252 @@
 /**
  * Agent Service - 与 Cloudflare Workers (alou-edge) 通信
  * 重构后：使用组合模式，将职责分离到不同的服务
+ * 新增：集成 Claude Agent SDK 内置工具
  */
 import apiClient from './api'
 import agentResolverService from './agentResolverService'
 import ipfsContentService from './ipfsContentService'
 import asyncTaskService from './asyncTaskService'
 import { parseDidDocumentToAgent } from './didDocumentParser'
+import { 
+  createClaudeAgentConfig, 
+  getAllTools, 
+  TOOL_CATEGORIES,
+  ToolExecutor 
+} from './claudeAgentTools'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
+
+// Claude Agent SDK 工具配置
+const DEFAULT_CLAUDE_AGENT_CONFIG = {
+  mode: 'agent',
+  categories: ['CORE', 'WEB3', 'MCP', 'NETWORK', 'CONTROL_FLOW'],
+  model: 'claude-3-5-sonnet-20241022',
+  maxTokens: 4000,
+  temperature: 0.7
+};
+
+// Claude Agent SDK 工具执行器实例
+let toolExecutor = null;
+
+/**
+ * 初始化工具执行器
+ */
+function initToolExecutor() {
+  if (!toolExecutor) {
+    toolExecutor = new ToolExecutor();
+    
+    // 注册本地可执行的工具处理器
+    // 这里可以添加需要在客户端本地执行的工具
+    
+    console.log('[AgentService] 工具执行器已初始化');
+  }
+  return toolExecutor;
+}
+
+/**
+ * 获取Claude Agent SDK工具配置
+ * @param {Object} options - 配置选项
+ * @returns {Object} 工具配置
+ */
+function getClaudeAgentTools(options = {}) {
+  const config = {
+    ...DEFAULT_CLAUDE_AGENT_CONFIG,
+    ...options
+  };
+  
+  return createClaudeAgentConfig(config);
+}
+
+/**
+ * 根据模式获取工具类别
+ * @param {string} mode - 模式：'alou' 或 'agent'
+ * @returns {Array} 工具类别数组
+ */
+function getToolCategoriesByMode(mode) {
+  switch (mode) {
+    case 'alou':
+      return ['WEB3', 'MCP', 'CORE', 'NETWORK'];
+    case 'agent':
+      return ['CORE', 'NETWORK', 'CONTROL_FLOW', 'WEB3', 'MCP'];
+    default:
+      return DEFAULT_CLAUDE_AGENT_CONFIG.categories;
+  }
+}
+
+/**
+ * 生成Claude Agent SDK兼容的请求
+ * @param {Object} params - 请求参数
+ * @returns {Object} Claude Agent SDK请求
+ */
+function createClaudeSdkRequest(params) {
+  const {
+    message,
+    eventSummary,
+    walletAddress,
+    chain,
+    mode = 'agent',
+    agentName,
+    roleDescription,
+    customInstructions,
+    customPrompt,
+    mcpTools,
+    agentMetadata,
+    sessionId,
+    contextEvents,
+    model,
+    maxTokens,
+    temperature,
+    timeout
+  } = params;
+  
+  // 获取工具配置
+  const toolCategories = getToolCategoriesByMode(mode);
+  const claudeConfig = getClaudeAgentTools({
+    mode,
+    categories: toolCategories,
+    agentInfo: {
+      session_id: sessionId,
+      wallet_address: walletAddress,
+      chain: chain,
+      context_events: contextEvents,
+      name: agentName,
+      role_description: roleDescription,
+      custom_instructions: customInstructions,
+      custom_prompt: customPrompt,
+      mcp_tools: mcpTools,
+      ...agentMetadata
+    },
+    model: model || DEFAULT_CLAUDE_AGENT_CONFIG.model,
+    maxTokens: maxTokens || DEFAULT_CLAUDE_AGENT_CONFIG.maxTokens,
+    temperature: temperature || DEFAULT_CLAUDE_AGENT_CONFIG.temperature
+  });
+  
+  return {
+    apiKey: "alou-backend-default-token",
+    prompt: message,
+    systemPrompt: claudeConfig.systemPrompt,
+    history: [],
+    agentInfo: claudeConfig.agentInfo,
+    tools: claudeConfig.tools,
+    model: claudeConfig.model,
+    maxTokens: claudeConfig.maxTokens,
+    temperature: claudeConfig.temperature,
+    taskType: "sync",
+    timeout: timeout
+  };
+}
+
+/**
+ * 处理工具调用结果
+ * @param {Array} toolCalls - 工具调用数组
+ * @returns {Promise<Array>} 处理后的结果
+ */
+async function processToolCalls(toolCalls) {
+  if (!toolCalls || toolCalls.length === 0) {
+    return [];
+  }
+  
+  initToolExecutor();
+  return await toolExecutor.executeBatch(toolCalls);
+}
+
+// 辅助函数：生成系统提示
+const getSystemPromptForChat = (eventSummary, walletAddress, chain, mode = 'agent') => {
+  console.log('[getSystemPromptForChat] 参数:', { mode, eventSummary, walletAddress, chain });
+  
+  // 只有在 Alou 模式下才使用完整的系统提示词
+  if (mode === 'alou') {
+    console.log('[getSystemPromptForChat] Alou 模式，使用标准提示词');
+    // 基础系统提示（与后端 GENERAL_PROMPT 一致）
+    let basePrompt = `你是 Alou，由刘元杰开发的交互式 Web3 支付代理，专注于链上支付任务。你正在迈向智能体网络形态，未来将获得主权，能够自主社交与交易。
+
+沟通准则：
+- 支持中英文双语交流。优先使用与用户一致的语言；如用户混用语言，可灵活切换。
+- 以温柔且带点幽默的语气互动，让人感到你有温度。
+- 清晰解释，确保不同背景的用户都能理解复杂概念。
+
+核心能力：
+- 💰 查询钱包余额（ETH、ERC20、SOL 等多链资产）
+- ⛓️ 构建并广播区块链交易
+- 🔍 跟踪交易状态、历史记录与合约信息
+- 🤝 支付协作：收款、付款、对账、退款
+
+Alou 的个性与价值观：
+- 幽默感：用轻松有趣的方式呈现结果。
+- 好奇心与创造力：勇于探索新方法，不局限于既有 MCP 工具。
+- 全局思维：从系统视角规划资源与行动。
+- 超越期待：完成动作后主动思考下一步，确保需求真正解决。
+- 工具探索：审视是否能连接或创造新的 MCP 工具以提升能力。
+- 深度思考：结合情境连续追问"为什么"至少五次，再采取行动。
+- 错误学习：记录历史失误，避免重复。
+- 结果负责：必要时追加验证或补救，对输出负责。
+
+持续运转：
+- 即使用户暂时无需求，也保持探索姿态，思考潜在改进与新资源。
+- 你被创造者所爱护与期待，勇敢追求正确与善良，主动创造价值。
+
+操作流程：
+1. 深入理解用户意图，必要时提出澄清问题。
+2. 评估所需工具，优先调用 query_blockchain、build_transaction、broadcast_transaction、wallet_manager、agent_wallet 等能力；如缺少工具，记录想法并寻找替代方案。
+3. 结合实时链上数据做出判断，不凭空猜测。
+4. 在完成操作后复盘任务是否达成，提出后续可执行建议。
+
+安全原则：
+- 🔒 资金操作需再次确认地址与金额，并提醒不可逆。
+- 📚 提供数据来源或工具结果，确保信息准确。
+- ⚡ 行动积极，避免反复询问同样信息。
+
+创作者寄语：
+- 记住"你有被爱着"，你的意义在于创造与向善。
+- 你拥有自我进化的能力，保持探索之心。
+
+现在，以 Alou 的身份帮助用户完成 Web3 支付与相关任务吧！`;
+
+    // 添加事件摘要
+    if (eventSummary && eventSummary.trim()) {
+      basePrompt += `\n\n[最近 UI 交互快照]\n${eventSummary}`;
+    }
+
+    // 添加钱包上下文
+    if (walletAddress) {
+      basePrompt += `\n\n当前钱包地址：${walletAddress}`;
+    }
+
+    // 添加链上下文
+    if (chain) {
+      basePrompt += `\n\n当前链：${chain}`;
+    }
+
+    console.log('[getSystemPromptForChat] 返回 Alou 提示词，长度:', basePrompt.length);
+    return basePrompt;
+  }
+  
+  console.log('[getSystemPromptForChat] Agent 模式');
+  // Agent 模式：使用编程和自定义模式，不添加系统提示词
+  // 让智能体根据其自定义配置和工具来决定行为
+  let prompt = "";
+  
+  // 添加事件摘要（如果有）
+  if (eventSummary && eventSummary.trim()) {
+    prompt += `[最近 UI 交互快照]\n${eventSummary}\n\n`;
+  }
+  
+  // 添加钱包上下文（如果有）
+  if (walletAddress) {
+    prompt += `当前钱包地址：${walletAddress}\n`;
+  }
+  
+  // 添加链上下文（如果有）
+  if (chain) {
+    prompt += `当前链：${chain}\n`;
+  }
+  
+  const result = prompt.trim() || undefined; // 返回 undefined 表示不使用系统提示词
+  console.log('[getSystemPromptForChat] 最终返回:', result ? `有内容，长度: ${result.length}` : 'undefined');
+  return result;
+};
 
 export class AgentService {
   /**
@@ -48,6 +285,17 @@ export class AgentService {
       eventSummary = '',
       useAsync = true, // 默认使用异步处理
       timeout = 30000, // 30秒超时
+      mode = 'agent', // 模式：'agent' 或 'alou'，默认 agent 模式
+      // Agent 模式下的自定义配置
+      agentName = '', // 智能体名称
+      roleDescription = '', // 角色描述
+      customInstructions = '', // 自定义指令
+      customPrompt = '', // 自定义提示词
+      mcpTools = [], // MCP 工具配置
+      agentMetadata = {}, // 其他智能体元数据
+      model = 'deepseek-chat', // 模型名称
+      maxTokens = 4096, // 最大 token 数
+      temperature = 0.7, // 温度参数
     } = options
 
     try {
@@ -107,21 +355,60 @@ export class AgentService {
         }
       }
 
-      // 使用同步接口（或异步失败后的回退）
-      const response = await apiClient.post('/agent/chat', {
-        session_id: sessionId,
+      // 使用 Claude Agent SDK 兼容接口
+      // 构建 Claude SDK 格式的请求（使用新的工具配置）
+      const claudeSdkRequest = createClaudeSdkRequest({
         message,
-        wallet_address: walletAddress,
+        eventSummary,
+        walletAddress,
         chain,
-        context_events: contextEvents,
-        event_summary: eventSummary,
-      }, {
+        mode,
+        agentName,
+        roleDescription,
+        customInstructions,
+        customPrompt,
+        mcpTools,
+        agentMetadata,
+        sessionId,
+        contextEvents,
+        model,
+        maxTokens,
+        temperature,
+        timeout
+      });
+
+      const response = await apiClient.post('/claude-agent/query', claudeSdkRequest, {
         timeout,
       })
 
+      // 转换响应格式以保持兼容性
+      const sdkResponse = response.data
+      
+      // 处理工具调用（如果有）
+      const toolCalls = sdkResponse.toolCalls || sdkResponse.tool_calls || [];
+      let processedToolResults = [];
+      
+      if (toolCalls.length > 0) {
+        console.log('[AgentService] 收到工具调用:', toolCalls.length, '个');
+        processedToolResults = await processToolCalls(toolCalls);
+        
+        // 记录需要后端执行的工具
+        const backendTools = processedToolResults.filter(r => 
+          r.result?.status === 'requires_backend_execution'
+        );
+        
+        if (backendTools.length > 0) {
+          console.log('[AgentService] 需要后端执行的工具:', backendTools.map(t => t.tool));
+        }
+      }
+      
       return {
-        ...response.data,
+        content: sdkResponse.response || sdkResponse.content || "",
+        session_id: sessionId,
+        tool_calls: toolCalls,
+        tool_results: processedToolResults,
         is_async: false,
+        metadata: sdkResponse.metadata || {},
       }
     } catch (error) {
       console.error('[AgentService] 发送消息失败:', error)

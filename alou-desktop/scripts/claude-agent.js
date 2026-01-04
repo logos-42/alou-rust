@@ -38,8 +38,9 @@ function loadConfig() {
 
   let config = {
     env: {
-      // 默认值 - 指向您的后端API
-      ANTHROPIC_BASE_URL: 'https://alou-edge.yuanjieliu65.workers.dev/api/claude-proxy',
+      // 默认值 - 指向 Workers 生产环境
+      // 使用 Claude Agent SDK 兼容端点
+      ANTHROPIC_BASE_URL: 'https://alou-edge.yuanjieliu65.workers.dev/api/claude-agent/query',
       ANTHROPIC_API_KEY: 'alou-backend-default-token',
       ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-3-5-sonnet-20241022',
       ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-3-haiku-20240307',
@@ -47,9 +48,10 @@ function loadConfig() {
     },
     routing: {
       // 模型路由映射 - 扩展支持更多模型
-      'claude-3-5-sonnet-20241022': 'claude',
-      'claude-3-haiku-20240307': 'claude',
-      'claude-3-opus-20240229': 'claude',
+      // 注意：后端配置的是 deepseek，所以将 Claude 模型路由到 deepseek
+      'claude-3-5-sonnet-20241022': 'deepseek',
+      'claude-3-haiku-20240307': 'deepseek',
+      'claude-3-opus-20240229': 'deepseek',
       'deepseek-chat': 'deepseek',
       'deepseek-reasoner': 'deepseek',
       'gpt-4o': 'openai',

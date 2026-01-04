@@ -20,7 +20,7 @@ import InviteAgentModal from '@/components/InviteAgentModal'
 import AgentProfilePanel from '@/components/AgentProfilePanel'
 import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
-import WorkflowVisualizer from '@/components/WorkflowVisualizer'
+import SkillsManager from '@/components/SkillsManager'
 import TranslationIcon from '@/assets/icon_翻译.png'
 import WorkflowIcon from '@/assets/设置0.3.png'
 
@@ -774,14 +774,15 @@ const AgentChat = () => {
           )}
         />
 
-      {/* 工作流面板 */}
+      {/* 技能管理面板 */}
       {showWorkflowPanel && (
         <div className="workflow-panel-overlay">
-          <WorkflowVisualizer
+          <SkillsManager
             sessionId={sessionId}
             agentInfo={agentInfo}
-            onWorkflowEvent={handleWorkflowEvent}
+            onSkillEvent={handleWorkflowEvent}
             className="workflow-panel-content"
+            isDarkMode={isDarkMode}
           />
           <button
             type="button"

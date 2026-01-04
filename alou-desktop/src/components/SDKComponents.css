@@ -11,8 +11,8 @@
 
 /* LSP Editor 暗色主题 */
 .sdk-modal.dark .lsp-editor {
-  background: var(--bg-primary, #1a1a1a);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05); /* 与主应用一致的透明背景 */
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
 }
 
 .lsp-editor__toolbar {
@@ -34,7 +34,7 @@
 
 /* LSP Editor 工具栏暗色主题 */
 .sdk-modal.dark .lsp-editor__toolbar {
-  border-bottom-color: var(--border-color, #333333);
+  border-bottom-color: rgba(255, 255, 255, 0.1); /* 白色10%透明度边框 */
 }
 
 .lsp-editor__toolbar select {
@@ -75,9 +75,41 @@
 
 /* LSP Editor 文本区域暗色主题 */
 .sdk-modal.dark .lsp-editor__textarea {
-  background: var(--bg-secondary, #2a2a2a);
-  border-color: var(--border-color, #333333);
-  color: var(--text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.08); /* 与主应用一致的透明背景 */
+  border-color: rgba(255, 255, 255, 0.15); /* 白色15%透明度边框 */
+  color: #ffffff; /* 白色文字 */
+}
+
+/* LSP Editor 文本区域滚动条样式 */
+.lsp-editor__textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lsp-editor__textarea::-webkit-scrollbar-track {
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 4px;
+}
+
+.lsp-editor__textarea::-webkit-scrollbar-thumb {
+  background: var(--text-secondary, #666666);
+  border-radius: 4px;
+}
+
+.lsp-editor__textarea::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary, #333333);
+}
+
+/* 暗黑模式下的滚动条样式 */
+.sdk-modal.dark .lsp-editor__textarea::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05); /* 白色5%透明度背景 */
+}
+
+.sdk-modal.dark .lsp-editor__textarea::-webkit-scrollbar-thumb {
+  background: #666666; /* 灰色滚动条滑块 */
+}
+
+.sdk-modal.dark .lsp-editor__textarea::-webkit-scrollbar-thumb:hover {
+  background: #888888; /* 悬停时稍亮的灰色 */
 }
 
 .lsp-editor__textarea:focus {
@@ -103,9 +135,9 @@
 
 /* 代码补全下拉框暗色主题 */
 .sdk-modal.dark .lsp-editor__completions {
-  background: var(--bg-primary, #1a1a1a);
-  border-color: var(--border-color, #333333);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.9); /* 黑色90%透明度背景 */
+  border-color: rgba(255, 255, 255, 0.2); /* 白色20%透明度边框 */
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
 }
 
 .completion-item {
@@ -120,14 +152,23 @@
 }
 
 /* 补全项暗色主题 */
+.sdk-modal.dark .completion-item {
+  border-bottom-color: rgba(255, 255, 255, 0.1); /* 白色10%透明度边框 */
+}
+
 .sdk-modal.dark .completion-item:hover {
-  background: var(--bg-secondary, #3a3a3a);
+  background: rgba(255, 255, 255, 0.1); /* 白色10%透明度背景 */
 }
 
 .completion-item__label {
   font-weight: 600;
   color: var(--text-primary, #333333);
   margin-bottom: 0.25rem;
+}
+
+/* 补全项标签暗色主题 */
+.sdk-modal.dark .completion-item__label {
+  color: #ffffff; /* 白色文字 */
 }
 
 .completion-item__detail {
@@ -213,8 +254,8 @@
 
 /* Spec Manager 暗色主题 */
 .sdk-modal.dark .spec-manager {
-  background: var(--bg-primary, #1a1a1a);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05); /* 与主应用一致的透明背景 */
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
 }
 
 .spec-manager__header {
@@ -228,7 +269,7 @@
 
 /* Spec Manager 头部暗色主题 */
 .sdk-modal.dark .spec-manager__header {
-  border-bottom-color: var(--border-color, #333333);
+  border-bottom-color: rgba(255, 255, 255, 0.1); /* 白色10%透明度边框 */
 }
 
 .spec-manager__header h2 {
@@ -236,6 +277,10 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary, #333333);
+}
+
+.sdk-modal.dark .spec-manager__header h2 {
+  color: #ffffff; /* 白色文字 */
 }
 
 .spec-manager__header button {
@@ -254,6 +299,16 @@
   background: var(--primary-hover, #0056b3);
 }
 
+/* 创建规格按钮暗色主题 */
+.sdk-modal.dark .spec-manager__header button {
+  background: #ffffff; /* 白色背景 */
+  color: #000000; /* 黑色文字 */
+}
+
+.sdk-modal.dark .spec-manager__header button:hover {
+  background: rgba(255, 255, 255, 0.8); /* 浅白色背景 */
+}
+
 .spec-manager__content {
   display: flex;
   flex: 1;
@@ -270,7 +325,7 @@
 
 /* Spec Manager 列表暗色主题 */
 .sdk-modal.dark .spec-manager__list {
-  border-right-color: var(--border-color, #333333);
+  border-right-color: rgba(255, 255, 255, 0.1); /* 白色10%透明度边框 */
 }
 
 .spec-list {
@@ -438,7 +493,7 @@
 
 /* 模态框样式 */
 .modal-overlay {
-  position: fixed;
+  position: absolute; /* 改为absolute，相对于SDK模态框定位 */
   top: 0;
   left: 0;
   right: 0;
@@ -447,7 +502,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
+  z-index: 10000; /* 比SDK模态框更高 */
 }
 
 .modal {
@@ -456,8 +511,14 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   max-width: 600px;
   width: 90%;
-  max-height: 90vh;
+  max-height: 70vh; /* 进一步降低高度，确保在SDK模态框内完全可见 */
   overflow: hidden;
+}
+
+/* 模态框暗色主题 */
+.sdk-modal.dark .modal {
+  background: #000000; /* 纯黑色背景 */
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
 }
 
 .modal__header {
@@ -468,10 +529,20 @@
   border-bottom: 1px solid var(--border-color, #e0e0e0);
 }
 
+/* 模态框头部暗色主题 */
+.sdk-modal.dark .modal__header {
+  border-bottom-color: rgba(255, 255, 255, 0.1); /* 白色10%透明度边框 */
+}
+
 .modal__header h3 {
   margin: 0;
   font-size: 1.125rem;
   color: var(--text-primary, #333333);
+}
+
+/* 模态框标题暗色主题 */
+.sdk-modal.dark .modal__header h3 {
+  color: #ffffff; /* 白色文字 */
 }
 
 .modal__header button {
@@ -496,7 +567,7 @@
 .modal__body {
   padding: 1.5rem;
   overflow-y: auto;
-  max-height: calc(90vh - 80px);
+  max-height: calc(60vh - 90px); /* 与模态框新高度匹配 */
 }
 
 .form-group {
@@ -533,9 +604,9 @@
 .sdk-modal.dark .form-group select,
 .sdk-modal.dark .form-group input,
 .sdk-modal.dark .form-group textarea {
-  background: var(--bg-secondary, #2a2a2a);
-  border-color: var(--border-color, #333333);
-  color: var(--text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.08); /* 白色8%透明度背景 */
+  border-color: rgba(255, 255, 255, 0.15); /* 白色15%透明度边框 */
+  color: #ffffff; /* 白色文字 */
 }
 
 .form-group select:focus,

@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react'
 import { LspEditor, SpecManager } from '@/components/SDKComponents'
-import WorkflowVisualizer from '@/components/WorkflowVisualizer'
+import SkillsManager from '@/components/SkillsManager'
 import '@/components/SDKComponents.css'
 
 function SdkTestPage() {
@@ -197,12 +197,12 @@ console.log(data);`)
             </div>
           </div>
 
-          {/* 工作流可视化组件 */}
-          <WorkflowVisualizer
+          {/* 技能管理组件 */}
+          <SkillsManager
             sessionId="sdk-test-session"
-            apiKey={apiKey}
             agentInfo={agentInfo}
-            onWorkflowEvent={handleWorkflowEvent}
+            onSkillEvent={handleWorkflowEvent}
+            isDarkMode={false}
           />
 
           {/* 使用说明 */}

@@ -5,18 +5,24 @@
 import axios from 'axios'
 import Cookies from 'js-cookie'
 
-// API base URL - use local dev server in development
-// 在开发环境下，使用Vite代理（当前开发服务器地址）来解决CORS问题
-// 强制在开发模式下使用空字符串，确保通过Vite代理
-const API_BASE_URL = import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev'
+// API base URL - 根据环境配置
+// 1. Tauri桌面应用：连接到生产环境 (https://alou-edge.yuanjieliu65.workers.dev)
+// 2. Web开发环境：使用Vite代理（空字符串）
+// 3. Web生产环境：使用远程Workers
+const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+const API_BASE_URL = isTauri 
+  ? 'https://alou-edge.yuanjieliu65.workers.dev' 
+  : (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev');
 
 // Debug logging
 console.log('[API] Environment:', {
   VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
   DEV: import.meta.env.DEV,
   MODE: import.meta.env.MODE,
+  isTauri: isTauri,
   API_BASE_URL: API_BASE_URL,
-  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api'
+  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
+  note: isTauri ? 'Tauri桌面应用连接到生产环境' : 'Web应用根据环境配置'
 })
 
 // Create axios instance

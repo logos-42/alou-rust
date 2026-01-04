@@ -1,0 +1,19 @@
+{
+  "success": true,
+  "response": "",
+  "toolCalls": [],
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+  },
+  "metadata": {
+    "backend_url": "http://127.0.0.1:8787/api/claude-agent/query",
+    "routed_to": "deepseek",
+    "model_used": "deepseek-chat",
+    "model_provider": "deepseek",
+    "supports_tools": false,
+    "supports_system_prompt": true,
+    "request_adjusted": true,
+    "timestamp": "2026-01-04T07:42:49.277Z"
+  }
+}
