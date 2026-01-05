@@ -63,17 +63,10 @@ name = "AI_TASKS"
 class_name = "AITaskDO"
 
 # Migrations for Durable Objects (main environment)
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["AITaskDO"]
-
-[[migrations]]
-tag = "v2"
-new_sqlite_classes = ["AITaskDO"]
-
-[[migrations]]
-tag = "v3"
-new_sqlite_classes = ["AITaskDO"]
+# [[migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["AITaskDO"]
+# 注释掉迁移配置，因为 AITaskDO 已经存在
 
 
   [vars.development]
@@ -105,9 +98,10 @@ id = "placeholder-create-with-wrangler"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-[[env.production.migrations]]
-tag = "v1"
-new_sqlite_classes = ["AITaskDO"]
+# [[env.production.migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["AITaskDO"]
+# 注释掉迁移配置，因为 AITaskDO 已经存在
 
 # Staging environment
 [env.staging]
@@ -135,6 +129,7 @@ id = "placeholder-create-with-wrangler"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-[[env.staging.migrations]]
-tag = "v1"
-new_sqlite_classes = ["AITaskDO"]
+# [[env.staging.migrations]]
+# tag = "v1"
+# new_sqlite_classes = ["AITaskDO"]
+# 注释掉迁移配置，因为 AITaskDO 已经存在

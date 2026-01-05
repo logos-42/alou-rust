@@ -330,6 +330,206 @@ export const CLAUDE_AGENT_TOOLS = {
       },
       required: ["skill_name", "action"]
     }
+  },
+
+  // LSP开发工具
+  CODE_COMPLETION: {
+    name: "code_completion",
+    description: "获取代码补全建议",
+    category: "development",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "代码内容"
+        },
+        language: {
+          type: "string",
+          description: "编程语言",
+          enum: ["javascript", "typescript", "python", "rust", "go", "java", "csharp", "cpp", "html", "css", "json", "markdown"]
+        },
+        position: {
+          type: "object",
+          description: "光标位置",
+          properties: {
+            line: {
+              type: "number",
+              description: "行号（从0开始）"
+            },
+            character: {
+              type: "number",
+              description: "字符位置（从0开始）"
+            }
+          },
+          required: ["line", "character"]
+        }
+      },
+      required: ["code", "language", "position"]
+    }
+  },
+
+  CODE_DIAGNOSTICS: {
+    name: "code_diagnostics",
+    description: "诊断代码问题",
+    category: "development",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "代码内容"
+        },
+        language: {
+          type: "string",
+          description: "编程语言",
+          enum: ["javascript", "typescript", "python", "rust", "go", "java", "csharp", "cpp", "html", "css", "json", "markdown"]
+        }
+      },
+      required: ["code", "language"]
+    }
+  },
+
+  CODE_FORMAT: {
+    name: "code_format",
+    description: "格式化代码",
+    category: "development",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "代码内容"
+        },
+        language: {
+          type: "string",
+          description: "编程语言",
+          enum: ["javascript", "typescript", "python", "rust", "go", "java", "csharp", "cpp", "html", "css", "json", "markdown"]
+        }
+      },
+      required: ["code", "language"]
+    }
+  },
+
+  CODE_HOVER: {
+    name: "code_hover",
+    description: "获取代码悬停信息",
+    category: "development",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "代码内容"
+        },
+        language: {
+          type: "string",
+          description: "编程语言",
+          enum: ["javascript", "typescript", "python", "rust", "go", "java", "csharp", "cpp", "html", "css", "json", "markdown"]
+        },
+        position: {
+          type: "object",
+          description: "光标位置",
+          properties: {
+            line: {
+              type: "number",
+              description: "行号（从0开始）"
+            },
+            character: {
+              type: "number",
+              description: "字符位置（从0开始）"
+            }
+          },
+          required: ["line", "character"]
+        }
+      },
+      required: ["code", "language", "position"]
+    }
+  },
+
+  // Spec文档工具
+  CREATE_SPEC: {
+    name: "create_spec",
+    description: "创建规格文档",
+    category: "documentation",
+    parameters: {
+      type: "object",
+      properties: {
+        specType: {
+          type: "string",
+          description: "规格类型",
+          enum: ["product", "technical", "design", "api", "user_story", "tasks", "structure"]
+        },
+        specData: {
+          type: "object",
+          description: "规格数据"
+        },
+        templateId: {
+          type: "string",
+          description: "模板ID（可选）"
+        }
+      },
+      required: ["specType", "specData"]
+    }
+  },
+
+  GET_SPEC: {
+    name: "get_spec",
+    description: "获取规格文档",
+    category: "documentation",
+    parameters: {
+      type: "object",
+      properties: {
+        specType: {
+          type: "string",
+          description: "规格类型",
+          enum: ["product", "technical", "design", "api", "user_story", "tasks", "structure"]
+        },
+        specId: {
+          type: "string",
+          description: "规格ID"
+        }
+      },
+      required: ["specType", "specId"]
+    }
+  },
+
+  LIST_SPECS: {
+    name: "list_specs",
+    description: "列出所有规格文档",
+    category: "documentation",
+    parameters: {
+      type: "object",
+      properties: {
+        specType: {
+          type: "string",
+          description: "规格类型",
+          enum: ["product", "technical", "design", "api", "user_story", "tasks", "structure"]
+        }
+      },
+      required: ["specType"]
+    }
+  },
+
+  VALIDATE_SPEC: {
+    name: "validate_spec",
+    description: "验证规格文档",
+    category: "documentation",
+    parameters: {
+      type: "object",
+      properties: {
+        specType: {
+          type: "string",
+          description: "规格类型",
+          enum: ["product", "technical", "design", "api", "user_story", "tasks", "structure"]
+        },
+        specData: {
+          type: "object",
+          description: "规格数据"
+        }
+      },
+      required: ["specType", "specData"]
+    }
   }
 };
 
@@ -342,7 +542,9 @@ export const TOOL_CATEGORIES = {
   CONTROL_FLOW: ["plan", "exit_plan_mode", "ask_user_question", "subagents"],
   WEB3: ["query_blockchain", "build_transaction", "broadcast_transaction", "wallet_manager", "agent_wallet"],
   MCP: ["mcp_*"], // 所有MCP工具
-  SKILLS: ["skill"] // Skills工具
+  SKILLS: ["skill"], // Skills工具
+  DEVELOPMENT: ["code_completion", "code_diagnostics", "code_format", "code_hover"], // LSP开发工具
+  DOCUMENTATION: ["create_spec", "get_spec", "list_specs", "validate_spec"] // Spec文档工具
 };
 
 /**

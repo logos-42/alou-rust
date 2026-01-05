@@ -48,10 +48,8 @@ function AgentProfilePanel({ agent, onInspect }) {
   return (
     <div className="agent-profile-panel" onClick={onInspect}>
       <div className="agent-profile-panel__header">
-        <img src={avatar} alt={name} />
-        <div>
-          <h3>{name}</h3>
-        </div>
+        {/* 移除头像，避免与AgentCanvas中的头像重复 */}
+       
       </div>
       {ports.length > 0 && (
         <div className="agent-profile-panel__ports">

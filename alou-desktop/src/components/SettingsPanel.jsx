@@ -5,7 +5,7 @@ import CloseIcon from '@/assets/关闭0.3.png'
 import { blurImage } from '@/utils/imageBlur'
 import './SettingsPanel.css'
 
-const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null, onOpenApiConfig, onOpenLspEditor, onOpenSpecManager }) => {
+const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null, onOpenApiConfig }) => {
   const { t } = useI18n()
   const panelRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -147,35 +147,6 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
           </div>
 
           {/* SDK 功能 */}
-          <div className="settings-section">
-            <div className="settings-section-title">SDK 功能</div>
-            <div className="settings-option">
-              <span className="option-label">LSP 编辑器</span>
-              <button
-                type="button"
-                className="btn-select-image"
-                onClick={() => {
-                  onClose()
-                  onOpenLspEditor?.()
-                }}
-              >
-                打开
-              </button>
-            </div>
-            <div className="settings-option">
-              <span className="option-label">Spec 管理</span>
-              <button
-                type="button"
-                className="btn-select-image"
-                onClick={() => {
-                  onClose()
-                  onOpenSpecManager?.()
-                }}
-              >
-                打开
-              </button>
-            </div>
-          </div>
 
           {/* 背景设置 */}
           <div className="settings-section">

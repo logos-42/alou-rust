@@ -40,7 +40,12 @@ export const useAgentDrag = ({ canvasRef, recordInteraction, openConversationPan
 
   const startDrag = useCallback(
     (event) => {
-      console.log('[useAgentDrag] startDrag called', event)
+      console.log('[useAgentDrag] startDrag called', {
+        button: event.button,
+        type: event.type,
+        target: event.target?.className,
+        time: Date.now()
+      })
       
       // 只处理主按钮（左键），pointer 事件中 button 可能不存在
       if (event.button !== undefined && event.button !== 0) {
@@ -83,12 +88,21 @@ export const useAgentDrag = ({ canvasRef, recordInteraction, openConversationPan
 
   const onDrag = useCallback(
     (event) => {
-      console.log('[useAgentDrag] onDrag called', { pressStartTime: dragStateRef.current.pressStartTime, clientX: event.clientX, clientY: event.clientY })
-      
-      // 如果没有按下，直接返回
+      // 如果没有按下，直接返回（不记录日志，避免控制台噪音）
       if (dragStateRef.current.pressStartTime === 0) {
-        console.log('[useAgentDrag] onDrag rejected - pressStartTime is 0')
         return
+      }
+      
+      // 只在开发环境记录详细日志
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[useAgentDrag] onDrag called', { 
+          pressStartTime: dragStateRef.current.pressStartTime, 
+          clientX: event.clientX, 
+          clientY: event.clientY,
+          dragging: dragStateRef.current.dragging,
+          moved: dragStateRef.current.moved,
+          isLongPress: dragStateRef.current.isLongPress
+        })
       }
 
       const canvasElement = canvasRef.current?.getElement?.()

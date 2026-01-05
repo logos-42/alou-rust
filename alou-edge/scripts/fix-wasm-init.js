@@ -5,7 +5,7 @@
  * 解决方案：修改生成的index.js文件，移除对 __wbindgen_start 的调用
  */
 
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,6 +17,13 @@ const indexJsPath = join(buildDir, 'index.js');
 console.log(`[fix-wasm-init] 开始修复 ${indexJsPath}`);
 
 try {
+  // 检查文件是否存在
+  if (!existsSync(indexJsPath)) {
+    console.log(`[fix-wasm-init] 文件不存在: ${indexJsPath}`);
+    console.log('[fix-wasm-init] 跳过修复，文件可能不需要修复');
+    process.exit(0);
+  }
+  
   // 读取生成的index.js文件
   let content = readFileSync(indexJsPath, 'utf-8');
   

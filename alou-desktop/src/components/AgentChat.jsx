@@ -21,8 +21,8 @@ import AgentProfilePanel from '@/components/AgentProfilePanel'
 import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
 import SkillsManager from '@/components/SkillsManager'
+import SDKModal from '@/components/SDKModal'
 import TranslationIcon from '@/assets/icon_翻译.png'
-import WorkflowIcon from '@/assets/设置0.3.png'
 
 // Hooks
 import { useAgentUI } from './AgentChat/useAgentUI.jsx'
@@ -93,6 +93,7 @@ const AgentChat = () => {
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
   const [showWorkflowPanel, setShowWorkflowPanel] = useState(false)
+  const [showSkillsPanel, setShowSkillsPanel] = useState(false)
 
   // ==================== Rate Limit Modal Hook ====================
   const { rateLimitModal, openRateLimitModal, closeRateLimitModal, handleSubscribe } = useRateLimitModal()
@@ -668,6 +669,7 @@ const AgentChat = () => {
                 onPointerUp={stopDrag}
                 onPointerLeave={stopDrag}
                 onAgentActivate={handleAgentActivate}
+                onOpenSkills={() => setShowSkillsPanel(true)}
               />
               {selectedAgent && <AgentProfilePanel agent={selectedAgent} />}
             </div>
@@ -775,19 +777,19 @@ const AgentChat = () => {
         />
 
       {/* 技能管理面板 */}
-      {showWorkflowPanel && (
-        <div className="workflow-panel-overlay">
+      {showSkillsPanel && (
+        <div className="skills-panel-overlay">
           <SkillsManager
             sessionId={sessionId}
             agentInfo={agentInfo}
             onSkillEvent={handleWorkflowEvent}
-            className="workflow-panel-content"
+            className="skills-panel-content"
             isDarkMode={isDarkMode}
           />
           <button
             type="button"
-            className="workflow-panel-close"
-            onClick={() => setShowWorkflowPanel(false)}
+            className="skills-panel-close"
+            onClick={() => setShowSkillsPanel(false)}
             title={t('common.close')}
           >
             ✕
@@ -867,14 +869,6 @@ const AgentChat = () => {
         <img src={TranslationIcon} alt="翻译" className="language-icon" />
       </button>
 
-      <button
-        type="button"
-        className={`workflow-switch ${showWorkflowPanel ? 'active' : ''}`}
-        onClick={() => setShowWorkflowPanel(!showWorkflowPanel)}
-        title={showWorkflowPanel ? '隐藏工作流面板' : '显示工作流面板'}
-      >
-        <img src={WorkflowIcon} alt="工作流" className="workflow-icon" />
-      </button>
     </div>
   )
 }

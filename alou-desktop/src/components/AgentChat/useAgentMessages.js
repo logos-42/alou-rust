@@ -2,7 +2,11 @@ import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import apiClient from '@/services/api'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
-import { createClaudeAgentConfig } from '@/services/claudeAgentTools'
+import { 
+  createClaudeAgentConfig, 
+  CLAUDE_AGENT_TOOLS, 
+  TOOL_CATEGORIES 
+} from '@/services/claudeAgentTools'
 
 /**
  * 根据模式和智能体信息获取工具类别
@@ -30,9 +34,7 @@ const getToolCategoriesByMode = (mode, agentInfo) => {
  */
 const getToolsByCategories = (categories) => {
   try {
-    // 导入工具配置
-    const { CLAUDE_AGENT_TOOLS, TOOL_CATEGORIES } = require('@/services/claudeAgentTools');
-    
+    // 直接使用已导入的工具配置
     const tools = [];
     const seen = new Set();
     
@@ -447,23 +449,34 @@ export const useAgentMessages = ({
   }, [conversationOverlayRef])
 
   // 保存消息到 IPFS
-  const saveMessagesToIpfs = useCallback(async (channelId, agentId) => {
+  const saveMessagesToIpfs = useCallback(async (channelId, agentId, force = false) => {
     const channelMessages = messagesByChannel[channelId] || []
     const savedCount = savedMessageCountRef.current[channelId] || 0
     
-    // 如果没有新消息，跳过保存
-    if (channelMessages.length === 0 || channelMessages.length <= savedCount) {
+    // 检查是否需要保存
+    const hasNewMessages = channelMessages.length > savedCount
+    const shouldSave = force || hasNewMessages
+    
+    if (!shouldSave || channelMessages.length === 0) {
       return null
     }
     
     try {
-      console.log(`[useAgentMessages] 保存 ${channelMessages.length} 条消息到 IPFS，频道: ${channelId}`)
+      console.log(`[useAgentMessages] 保存 ${channelMessages.length} 条消息到 IPFS，频道: ${channelId}，新消息: ${hasNewMessages}`)
       
-      const cid = await agentService.uploadMessagesToIpfs(channelMessages, agentId)
+      // 只保存新消息（增量保存）
+      const newMessages = hasNewMessages 
+        ? channelMessages.slice(savedCount)
+        : channelMessages
+      
+      const cid = await agentService.uploadMessagesToIpfs(newMessages, agentId)
       
       // 更新 agentStore 中的 messages_cid
       if (cid && agentId) {
-        updateAgent(agentId, { messages_cid: cid })
+        updateAgent(agentId, { 
+          messages_cid: cid,
+          last_saved_at: Date.now()
+        })
         console.log(`[useAgentMessages] 消息已保存到 IPFS，CID: ${cid}`)
       }
       

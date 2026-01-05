@@ -223,9 +223,14 @@ pub fn create_default_metadata(model: &str, provider: &str) -> ClaudeSdkMetadata
 }
 
 /// 根据模型名称确定提供商
+/// 注意：为了与 claude-agent.js 中的路由配置保持一致，Claude 模型被路由到 deepseek
 pub fn get_provider_from_model(model: &str) -> &'static str {
     match model {
-        m if m.starts_with("claude-") => "claude",
+        // Claude 模型路由到 deepseek（与 claude-agent.js 配置一致）
+        m if m.starts_with("claude-3-5-sonnet-") => "deepseek",
+        m if m.starts_with("claude-3-haiku-") => "deepseek",
+        m if m.starts_with("claude-3-opus-") => "deepseek",
+        m if m.starts_with("claude-") => "claude", // 其他 Claude 模型
         m if m.starts_with("deepseek-") => "deepseek",
         m if m.starts_with("gpt-") => "openai",
         m if m.starts_with("kimi-") => "kimi",

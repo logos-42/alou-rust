@@ -194,10 +194,12 @@ export const computeAgentProfile = (selectedAgent) => {
   }
 
   const displayName =
+    selectedAgent.display_name ||
+    selectedAgent.name ||
     (selectedAgent.ipns && selectedAgent.ipns.replace(/^\/?ipns\//, '').slice(0, 42)) ||
     (selectedAgent.did && selectedAgent.did.split(':').filter(Boolean).slice(-1)[0]) ||
     selectedAgent.cid ||
-    '解析智能体'
+    '智能体'
 
   const role = selectedAgent.did ? 'DID 智能体' : '去中心化智能体'
 

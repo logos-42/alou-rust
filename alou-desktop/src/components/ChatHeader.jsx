@@ -6,7 +6,6 @@ import SettingsIcon from '@/assets/设置 0.7.png'
 import LoginIcon from '@/assets/登录.png'
 import SettingsPanel from './SettingsPanel'
 import ApiConfigModal from './ApiConfigModal'
-import SDKModal from './SDKModal'
 import './ChatHeader.css'
 
 const statusTextMap = {
@@ -32,8 +31,6 @@ const ChatHeader = ({
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showSettingsPanel, setShowSettingsPanel] = useState(false)
   const [showApiConfigModal, setShowApiConfigModal] = useState(false)
-  const [showSDKModal, setShowSDKModal] = useState(false)
-  const [sdkInitialTab, setSDKInitialTab] = useState('lsp')
 
   const statusText = useMemo(() => {
     const key = statusTextMap[connectionStatus] || 'connecting'
@@ -54,15 +51,6 @@ const ChatHeader = ({
     onLogout?.()
   }
 
-  const handleOpenLspEditor = () => {
-    setSDKInitialTab('lsp')
-    setShowSDKModal(true)
-  }
-
-  const handleOpenSpecManager = () => {
-    setSDKInitialTab('spec')
-    setShowSDKModal(true)
-  }
 
   return (
     <nav className="top-nav">
@@ -120,26 +108,12 @@ const ChatHeader = ({
             setShowSettingsPanel(false)
             setShowApiConfigModal(true)
           }}
-          onOpenLspEditor={() => {
-            handleOpenLspEditor()
-          }}
-          onOpenSpecManager={() => {
-            handleOpenSpecManager()
-          }}
         />
       )}
       {showApiConfigModal && (
         <ApiConfigModal
           isOpen={showApiConfigModal}
           onClose={() => setShowApiConfigModal(false)}
-          isDarkMode={isDarkMode}
-        />
-      )}
-      {showSDKModal && (
-        <SDKModal
-          isOpen={showSDKModal}
-          onClose={() => setShowSDKModal(false)}
-          initialTab={sdkInitialTab}
           isDarkMode={isDarkMode}
         />
       )}

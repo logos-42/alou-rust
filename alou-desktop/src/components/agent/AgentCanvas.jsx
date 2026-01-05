@@ -11,11 +11,15 @@ const AgentCanvas = forwardRef(
       onPointerUp,
       onPointerLeave,
       onAgentActivate,
+      onOpenSkills,
     },
     ref,
   ) => {
     const rootRef = useRef(null)
     const avatarRef = useRef(null)
+    const isDraggingRef = useRef(false)
+    const dragStartTimeRef = useRef(0)
+    const dragStartPosRef = useRef({ x: 0, y: 0 })
 
     useImperativeHandle(
       ref,
@@ -27,14 +31,29 @@ const AgentCanvas = forwardRef(
     )
 
     const handleAvatarPointerDown = (event) => {
-      console.log('[AgentCanvas] handleAvatarPointerDown called', event)
+      // 只在开发环境记录详细日志
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AgentCanvas] handleAvatarPointerDown called', {
+          button: event.button,
+          type: event.type,
+          time: Date.now()
+        })
+      }
       
-      // 只处理左键
-      if (event.button !== 0 && event.button !== undefined) {
-        console.log('[AgentCanvas] Wrong button, rejecting', event.button)
+      // 只处理左键拖动（右键在 onContextMenu 中处理）
+      // 与 useAgentDrag 保持一致：如果 button 是 undefined（某些指针事件），也允许通过
+      if (event.button !== undefined && event.button !== 0) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[AgentCanvas] Wrong button, rejecting', event.button)
+        }
         return
       }
       event.stopPropagation()
+      
+      // 记录拖动开始状态
+      isDraggingRef.current = false
+      dragStartTimeRef.current = Date.now()
+      dragStartPosRef.current = { x: event.clientX, y: event.clientY }
       
       // 在头像容器元素上设置指针捕获
       if (avatarRef.current && typeof avatarRef.current.setPointerCapture === 'function') {
@@ -50,13 +69,29 @@ const AgentCanvas = forwardRef(
 
     const handleAvatarPointerMove = (event) => {
       // 如果设置了指针捕获，事件会在头像元素上触发
+      // 只在开发环境记录详细日志
+      if (process.env.NODE_ENV === 'development' && dragStartTimeRef.current > 0) {
+        console.log('[AgentCanvas] Avatar pointer move', {
+          clientX: event.clientX,
+          clientY: event.clientY,
+          time: Date.now()
+        })
+      }
+      
       onPointerMove?.(event)
     }
 
     const handleAvatarPointerUp = (event) => {
       event.stopPropagation()
       
-      console.log('[AgentCanvas] Avatar pointer up', { pointerId: event.pointerId })
+      // 只在开发环境记录详细日志
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[AgentCanvas] Avatar pointer up', {
+          pointerId: event.pointerId,
+          button: event.button,
+          time: Date.now()
+        })
+      }
       
       // 释放指针捕获
       if (avatarRef.current && typeof avatarRef.current.releasePointerCapture === 'function') {
@@ -78,6 +113,56 @@ const AgentCanvas = forwardRef(
       }
     }
 
+    // 添加全局测试函数（仅开发环境）
+    React.useEffect(() => {
+      if (process.env.NODE_ENV === 'development') {
+        window.testAvatarClick = () => {
+          console.log('[AgentCanvas] Manual test: Simulating right click on avatar')
+          if (avatarRef.current) {
+            const event = new MouseEvent('contextmenu', {
+              bubbles: true,
+              cancelable: true,
+              button: 2,
+              buttons: 2
+            })
+            avatarRef.current.dispatchEvent(event)
+          }
+        }
+        
+        window.testAvatarDrag = () => {
+          console.log('[AgentCanvas] Manual test: Simulating drag on avatar')
+          if (avatarRef.current) {
+            const downEvent = new PointerEvent('pointerdown', {
+              bubbles: true,
+              cancelable: true,
+              button: 0,
+              buttons: 1,
+              clientX: 100,
+              clientY: 100
+            })
+            avatarRef.current.dispatchEvent(downEvent)
+            
+            setTimeout(() => {
+              const moveEvent = new PointerEvent('pointermove', {
+                bubbles: true,
+                cancelable: true,
+                button: 0,
+                buttons: 1,
+                clientX: 150,
+                clientY: 150
+              })
+              avatarRef.current.dispatchEvent(moveEvent)
+            }, 100)
+          }
+        }
+        
+        return () => {
+          delete window.testAvatarClick
+          delete window.testAvatarDrag
+        }
+      }
+    }, [])
+    
     // 在组件挂载时检查元素
     React.useEffect(() => {
       console.log('[AgentCanvas] Component mounted, checking avatarRef', avatarRef.current)
@@ -90,6 +175,7 @@ const AgentCanvas = forwardRef(
           pointerEvents: computedStyle.pointerEvents,
           zIndex: computedStyle.zIndex,
           position: computedStyle.position,
+          isolation: computedStyle.isolation,
           rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height }
         })
         
@@ -113,11 +199,24 @@ const AgentCanvas = forwardRef(
               className: elementAtPoint?.className,
               tagName: elementAtPoint?.tagName,
               isAvatar: elementAtPoint === avatarRef.current,
-              isAvatarChild: avatarRef.current.contains(elementAtPoint)
+              isAvatarChild: avatarRef.current.contains(elementAtPoint),
+              avatarZIndex: computedStyle.zIndex,
+              elementZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : 'N/A'
             })
+            
+            // 如果仍然被覆盖，尝试强制提升z-index
+            if (elementAtPoint && elementAtPoint !== avatarRef.current && !avatarRef.current.contains(elementAtPoint)) {
+              console.log('[AgentCanvas] Avatar is still covered, trying to increase z-index')
+              avatarRef.current.style.zIndex = '100000'
+            }
           }
         }
-        setTimeout(checkOverlay, 1000)
+        
+        // 多次检查，因为布局可能随时间变化
+        setTimeout(checkOverlay, 500)
+        setTimeout(checkOverlay, 2000)
+        setTimeout(checkOverlay, 5000)
+        
         return () => {
           if (avatarRef.current) {
             avatarRef.current.removeEventListener('click', testClick, true)
@@ -147,7 +246,11 @@ const AgentCanvas = forwardRef(
 
         <div
           className="agent-node"
-          style={agentStyle}
+          style={{
+            ...agentStyle,
+            zIndex: 99, // 略低于头像
+            position: 'relative'
+          }}
           onClick={handleNodeClick}
           onPointerDown={(e) => {
             // agent-node pointerdown
@@ -159,16 +262,32 @@ const AgentCanvas = forwardRef(
             className="agent-avatar"
             style={{ 
               pointerEvents: 'auto', 
-              zIndex: 10000,
+              zIndex: 100, // 合理的z-index，避免覆盖其他重要元素
               position: 'relative',
-              backgroundColor: 'rgba(255, 0, 0, 0.1)' // 临时添加，用于可视化调试
+              backgroundColor: 'rgba(255, 0, 0, 0.1)', // 临时添加，用于可视化调试
+              isolation: 'isolate' // 创建新的层叠上下文
             }}
             onPointerDown={(e) => {
-              console.log('[AgentCanvas] Avatar onPointerDown (React handler)', e)
+              // 只在开发环境记录详细日志
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AgentCanvas] Avatar onPointerDown (React handler)', {
+                  button: e.button,
+                  type: e.type,
+                  target: e.target.className,
+                  time: Date.now()
+                })
+              }
+              e.stopPropagation()
               handleAvatarPointerDown(e)
             }}
-            onPointerMove={handleAvatarPointerMove}
-            onPointerUp={handleAvatarPointerUp}
+            onPointerMove={(e) => {
+              e.stopPropagation()
+              handleAvatarPointerMove(e)
+            }}
+            onPointerUp={(e) => {
+              e.stopPropagation()
+              handleAvatarPointerUp(e)
+            }}
             onMouseDown={(e) => {
               console.log('[AgentCanvas] Avatar onMouseDown (React handler)', e)
               e.stopPropagation()
@@ -176,6 +295,22 @@ const AgentCanvas = forwardRef(
             onClick={(e) => {
               console.log('[AgentCanvas] Avatar onClick (React handler)', e)
               e.stopPropagation()
+            }}
+            onContextMenu={(e) => {
+              // 只在开发环境记录详细日志
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[AgentCanvas] Avatar onContextMenu (React handler)', {
+                  button: e.button,
+                  type: e.type,
+                  target: e.target.className,
+                  time: Date.now(),
+                  hasOnOpenSkills: !!onOpenSkills
+                })
+                console.log('[AgentCanvas] Calling onOpenSkills callback')
+              }
+              e.preventDefault()
+              e.stopPropagation()
+              onOpenSkills?.()
             }}
             onTouchStart={(e) => {
               console.log('[AgentCanvas] Avatar onTouchStart (React handler)', e)

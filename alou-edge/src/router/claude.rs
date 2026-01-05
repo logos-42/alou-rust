@@ -411,6 +411,24 @@ fn get_api_key_for_provider(provider_type: &str, env: &Env) -> std::result::Resu
     }
 }
 
+/// 将 Claude 模型名称转换为 DeepSeek 模型名称
+/// DeepSeek API 不接受 Claude 模型名称，所以需要转换
+fn convert_claude_model_to_deepseek(claude_model: &str) -> String {
+    match claude_model {
+        // Claude 模型映射到 deepseek-chat
+        "claude-3-5-sonnet-20241022" => "deepseek-chat".to_string(),
+        "claude-3-haiku-20240307" => "deepseek-chat".to_string(),
+        "claude-3-opus-20240229" => "deepseek-chat".to_string(),
+        
+        // DeepSeek 模型保持不变
+        "deepseek-chat" => "deepseek-chat".to_string(),
+        "deepseek-reasoner" => "deepseek-reasoner".to_string(),
+        
+        // 其他模型默认使用 deepseek-chat
+        _ => "deepseek-chat".to_string(),
+    }
+}
+
 /// 转换 AI 响应到 Claude 格式
 fn convert_ai_response_to_claude(
     ai_response: AiResponse,
@@ -508,8 +526,18 @@ pub async fn handle_claude_sdk_query(
         }
     };
 
+    // 转换模型名称：如果提供商是 deepseek，将 Claude 模型名称转换为 DeepSeek 模型名称
+    let model_for_ai = if provider == "deepseek" {
+        convert_claude_model_to_deepseek(&claude_sdk_req.model)
+    } else {
+        claude_sdk_req.model.clone()
+    };
+    
+    console_log!("Claude SDK: 模型转换 - 原始: {}, 转换后: {}, 提供商: {}", 
+        claude_sdk_req.model, model_for_ai, provider);
+
     // 创建 AI 客户端
-    let ai_client = match AiClient::new(provider, api_key, Some(claude_sdk_req.model.clone())) {
+    let ai_client = match AiClient::new(provider, api_key, Some(model_for_ai)) {
         Ok(client) => client,
         Err(e) => {
             console_error!("Failed to create AI client: {}", e);
@@ -522,8 +550,13 @@ pub async fn handle_claude_sdk_query(
     };
 
     // 调用 AI 服务
+    console_log!("Claude SDK: Sending request to AI service with {} messages", messages.len());
     let ai_response = match ai_client.send_message(messages, tools_option).await {
-        Ok(response) => response,
+        Ok(response) => {
+            console_log!("Claude SDK: AI service response received, content length: {}, tool calls: {}", 
+                response.content.len(), response.tool_calls.len());
+            response
+        },
         Err(e) => {
             console_error!("AI service error: {}", e);
             let error_response = crate::compatibility::claude_sdk::create_error_response(
