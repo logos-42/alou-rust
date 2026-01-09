@@ -1232,6 +1232,43 @@ export const useAgentMessages = ({
     previousChannelRef.current = activeChannelId
   }, [activeChannelId, messagesByChannel, saveMessagesToIpfs])
 
+  // 自动定期保存消息到 IPFS（每15分钟）
+  useEffect(() => {
+    if (!activeChannelId || !selectedAgent) return
+    
+    const autoSaveInterval = setInterval(() => {
+      const channelMessages = messagesByChannel[activeChannelId] || []
+      const savedCount = savedMessageCountRef.current[activeChannelId] || 0
+      
+      // 检查是否有新消息需要保存
+      if (channelMessages.length > savedCount) {
+        console.log(`[useAgentMessages] 自动保存 ${channelMessages.length - savedCount} 条新消息`)
+        saveMessagesToIpfs(activeChannelId, selectedAgent.id).catch(err => {
+          console.error('[useAgentMessages] 自动保存失败:', err)
+        })
+      }
+    }, 15 * 60 * 1000) // 每15分钟
+    
+    return () => clearInterval(autoSaveInterval)
+  }, [activeChannelId, selectedAgent, messagesByChannel, saveMessagesToIpfs])
+
+  // 监听消息数量变化，达到阈值时自动保存（每10条新消息）
+  useEffect(() => {
+    if (!activeChannelId || !selectedAgent) return
+    
+    const channelMessages = messagesByChannel[activeChannelId] || []
+    const savedCount = savedMessageCountRef.current[activeChannelId] || 0
+    const newMessageCount = channelMessages.length - savedCount
+    
+    // 当新消息达到10条时自动保存
+    if (newMessageCount >= 10) {
+      console.log(`[useAgentMessages] 检测到 ${newMessageCount} 条新消息，触发自动保存`)
+      saveMessagesToIpfs(activeChannelId, selectedAgent.id).catch(err => {
+        console.error('[useAgentMessages] 阈值保存失败:', err)
+      })
+    }
+  }, [messagesByChannel, activeChannelId, selectedAgent, saveMessagesToIpfs])
+
   /**
    * 终止指定智能体的执行
    */

@@ -203,7 +203,7 @@ const AgentCanvas = forwardRef(
               avatarZIndex: computedStyle.zIndex,
               elementZIndex: elementAtPoint ? window.getComputedStyle(elementAtPoint).zIndex : 'N/A'
             })
-            
+          
             // 如果仍然被覆盖，尝试强制提升z-index
             if (elementAtPoint && elementAtPoint !== avatarRef.current && !avatarRef.current.contains(elementAtPoint)) {
               console.log('[AgentCanvas] Avatar is still covered, trying to increase z-index')
@@ -249,7 +249,10 @@ const AgentCanvas = forwardRef(
           style={{
             ...agentStyle,
             zIndex: 99, // 略低于头像
-            position: 'relative'
+            position: 'relative',
+            outline: 'none',
+            border: 'none',
+            background: 'none'
           }}
           onClick={handleNodeClick}
           onPointerDown={(e) => {
@@ -264,8 +267,10 @@ const AgentCanvas = forwardRef(
               pointerEvents: 'auto', 
               zIndex: 100, // 合理的z-index，避免覆盖其他重要元素
               position: 'relative',
-              backgroundColor: 'rgba(255, 0, 0, 0.1)', // 临时添加，用于可视化调试
-              isolation: 'isolate' // 创建新的层叠上下文
+              isolation: 'isolate', // 创建新的层叠上下文
+              outline: 'none',
+              border: 'none',
+              background: 'none'
             }}
             onPointerDown={(e) => {
               // 只在开发环境记录详细日志

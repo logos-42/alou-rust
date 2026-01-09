@@ -63,6 +63,9 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  outline: none;
+  border: none;
+  background: none;
 }
 
 .conversation-stack .agent-visual {
@@ -75,6 +78,9 @@
   transition:
     transform 0.3s ease,
     opacity 0.3s ease;
+  outline: none;
+  border: none;
+  background: none;
 }
 
 .conversation-stack .conversation-shell {

@@ -1,8 +1,6 @@
 .agent-canvas {
   position: relative;
-  background:
-    radial-gradient(circle at top, rgba(99, 102, 241, 0.08), transparent 55%),
-    radial-gradient(circle at bottom, rgba(14, 165, 233, 0.12), transparent 60%), var(--background);
+  background: transparent !important;
   overflow: hidden;
 }
 
@@ -26,14 +24,30 @@
   -webkit-user-select: none;
   user-select: none;
   pointer-events: none;
+  outline: none !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden;
 }
 
 .agent-canvas .agent-node > * {
   pointer-events: auto;
 }
 
+/* 重置所有 SVG 元素的样式 */
+.agent-canvas svg {
+  outline: none !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
 .agent-canvas .agent-glow {
   display: none;
+  outline: none;
+  border: none;
+  background: none;
 }
 
 .agent-canvas .agent-avatar {
@@ -41,8 +55,7 @@
   height: 60px;
   border-radius: 50%;
   overflow: hidden;
-  border: 4px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 15px 40px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
   position: relative;
   z-index: 10000 !important;
   cursor: grab;
@@ -51,16 +64,18 @@
   user-select: none;
   pointer-events: auto !important;
   touch-action: none;
+  outline: none;
+  border: none;
 }
 
 .agent-canvas .agent-avatar:active {
   cursor: grabbing;
   transform: scale(1.05);
-  box-shadow: 0 20px 50px rgba(99, 102, 241, 0.5);
+  box-shadow: 0 12px 30px rgba(99, 102, 241, 0.3);
 }
 
 .agent-canvas .agent-avatar:hover {
-  box-shadow: 0 18px 45px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.25);
 }
 
 .agent-canvas .agent-avatar img {
@@ -68,8 +83,25 @@
   height: 100%;
   object-fit: cover;
   pointer-events: none;
-  user-select: none;
   -webkit-user-select: none;
+  user-select: none;
+  outline: none;
+  border: none;
+}
+
+/* 如果头像是 SVG 格式 */
+.agent-canvas .agent-avatar img[src*=".svg"],
+.agent-canvas .agent-avatar img[src*="svg"] {
+  outline: none !important;
+  border: none !important;
+  background: none !important;
+}
+
+.agent-canvas .agent-avatar svg {
+  outline: none !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
 }
 
 .agent-canvas .agent-label {
