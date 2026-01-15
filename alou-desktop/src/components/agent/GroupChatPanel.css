@@ -3,12 +3,17 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: var(--background, #f8fafc);
-  border-radius: 24px;
-  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 1.75rem;
+  padding: 1.5rem 2rem;
   box-shadow: var(--shadow, 0 12px 32px rgba(15, 23, 42, 0.12));
   overflow: hidden;
   position: relative;
+  pointer-events: auto;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease;
 }
 
 /* 头部 */
@@ -388,7 +393,8 @@
 
 /* 暗色模式 */
 .app-shell.dark-mode .group-chat-panel {
-  background: var(--background, #000000);
+  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .app-shell.dark-mode .group-chat-header,
