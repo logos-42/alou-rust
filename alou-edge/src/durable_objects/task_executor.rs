@@ -4,6 +4,10 @@ use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, Tool};
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool, AiResponse};
 use worker::{Env, Method, Request, RequestInit, Result, console_error};
 
+// 添加随机数生成支持
+#[cfg(target_arch = "wasm32")]
+use js_sys::Math;
+
 /// 任务执行器
 pub struct TaskExecutor;
 
@@ -218,10 +222,22 @@ impl TaskExecutor {
     
     /// 生成任务ID
     fn generate_task_id() -> String {
-        // 使用时间戳和随机数生成任务ID
+        // 使用时间戳和真正的随机数生成任务ID
         let timestamp = worker::Date::now().as_millis();
-        let random_part = (timestamp % 1000000) as u32;
-        format!("task_{:x}_{:x}", timestamp, random_part)
+        
+        #[cfg(target_arch = "wasm32")]
+        let random_part = (Math::random() * 1000000.0) as u32;
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        let random_part = {
+            use std::collections::hash_map::RandomState;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = RandomState::new().build_hasher();
+            timestamp.hash(&mut hasher);
+            hasher.finish() as u32 % 1000000
+        };
+        
+        format!("task_{}_{}", timestamp, random_part)
     }
     
     /// 估计任务执行时间
