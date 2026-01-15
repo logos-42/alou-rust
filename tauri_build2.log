@@ -1,0 +1,545 @@
+﻿node :         Info Looking up installed tauri packages to check mismatched versions...
+At line:1 char:43
++ ... u-desktop'; node 'node_modules\@tauri-apps\cli\tauri.js' build --debu ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (        Info Lo...hed versions...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+     Running beforeBuildCommand `npm run build`
+
+> alou-desktop@0.1.8 build
+> vite build
+
+[36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+transforming...
+[33mnode_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the
+ comment. The comment will be removed to avoid issues.[39m
+[32m✓[39m 1587 modules transformed.
+rendering chunks...
+[33m[plugin vite:reporter] 
+(!) D:/AI/alou-pay/aloupay/alou-desktop/src/services/api.js is dynamically imported by D:/AI/alou-pay/aloupay/alou-desk
+top/src/components/AgentChat/useGroupChatRemoteControl.js but also statically imported by D:/AI/alou-pay/aloupay/alou-d
+esktop/src/components/AgentChat/useAgentMessages.js, D:/AI/alou-pay/aloupay/alou-desktop/src/components/AgentChat/useGr
+oupChat.js, D:/AI/alou-pay/aloupay/alou-desktop/src/components/ApiConfigModal.jsx, D:/AI/alou-pay/aloupay/alou-desktop/
+src/services/agentResolverService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/agentService.js, D:/AI/alou-pay/
+aloupay/alou-desktop/src/services/asyncTaskService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/authService.js,
+ D:/AI/alou-pay/aloupay/alou-desktop/src/services/cliService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/clust
+erActionService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/mcpUiService.js, D:/AI/alou-pay/aloupay/alou-deskt
+op/src/services/userService.js, dynamic import will not move module into another chunk.
+[39m
+[33m[plugin vite:reporter] 
+(!) D:/AI/alou-pay/aloupay/alou-desktop/node_modules/@tauri-apps/api/core.js is dynamically imported by D:/AI/alou-pay/
+aloupay/alou-desktop/src/components/wallet/WalletConnectQR.jsx, D:/AI/alou-pay/aloupay/alou-desktop/src/routes/AppRoute
+s.jsx, D:/AI/alou-pay/aloupay/alou-desktop/src/services/agentResolverService.js, D:/AI/alou-pay/aloupay/alou-desktop/sr
+c/services/agentService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/agentService.js, D:/AI/alou-pay/aloupay/al
+ou-desktop/src/services/agentService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/ipfsContentService.js, D:/AI/
+alou-pay/aloupay/alou-desktop/src/services/walletSyncService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/walle
+tSyncService.js but also statically imported by D:/AI/alou-pay/aloupay/alou-desktop/node_modules/@tauri-apps/api/dpi.js
+, D:/AI/alou-pay/aloupay/alou-desktop/node_modules/@tauri-apps/api/event.js, D:/AI/alou-pay/aloupay/alou-desktop/node_m
+odules/@tauri-apps/api/image.js, D:/AI/alou-pay/aloupay/alou-desktop/node_modules/@tauri-apps/api/window.js, D:/AI/alou
+-pay/aloupay/alou-desktop/src/components/SDKComponents.jsx, D:/AI/alou-pay/aloupay/alou-desktop/src/components/agent/Di
+apIdentityPanel.jsx, D:/AI/alou-pay/aloupay/alou-desktop/src/services/agentAssetsService.js, D:/AI/alou-pay/aloupay/alo
+u-desktop/src/services/desktopWalletService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/diapService.js, D:/AI/
+alou-pay/aloupay/alou-desktop/src/services/ipfsService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/kiloCliServ
+ice.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/lspService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/service
+s/pubsubService.js, D:/AI/alou-pay/aloupay/alou-desktop/src/services/specService.js, D:/AI/alou-pay/aloupay/alou-deskto
+p/src/services/workflowService.js, dynamic import will not move module into another chunk.
+[39m
+[33m[plugin vite:reporter] 
+(!) D:/AI/alou-pay/aloupay/alou-desktop/src/services/desktopWalletService.js is dynamically imported by D:/AI/alou-pay/
+aloupay/alou-desktop/src/services/walletService.js but also statically imported by D:/AI/alou-pay/aloupay/alou-desktop/
+src/components/wallet/LocalWalletForm.jsx, D:/AI/alou-pay/aloupay/alou-desktop/src/components/wallet/WalletConnectQR.js
+x, D:/AI/alou-pay/aloupay/alou-desktop/src/views/LoginView.jsx, dynamic import will not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mindex.html                               [39m[1m[2m    0.49 kB[22m[1m[22m[2m │ gzip:   0.32 kB[22m
+[2mdist/[22m[32massets/设置 0.7-B7cfnK54.png               [39m[1m[2m    4.16 kB[22m[1m[22m
+[2mdist/[22m[32massets/钱包0.3-uz_dx3EM.png                [39m[1m[2m    4.39 kB[22m[1m[22m
+[2mdist/[22m[32massets/刷新0.2-Dngaj36O.png                [39m[1m[2m    4.57 kB[22m[1m[22m
+[2mdist/[22m[32massets/icon_翻译-BGOgOenL.png              [39m[1m[2m    4.66 kB[22m[1m[22m
+[2mdist/[22m[32massets/创建-P5XHfrUh.png                   [39m[1m[2m    4.82 kB[22m[1m[22m
+[2mdist/[22m[32massets/关闭0.3-B0ij6vXB.png                [39m[1m[2m    4.86 kB[22m[1m[22m
+[2mdist/[22m[32massets/加载0.2-D4wA2mqL.png                [39m[1m[2m    5.09 kB[22m[1m[22m
+[2mdist/[22m[32massets/搜索-BqvwV6ic.png                   [39m[1m[2m    5.30 kB[22m[1m[22m
+[2mdist/[22m[32massets/收缩6-1uov1L64.png                  [39m[1m[2m    5.33 kB[22m[1m[22m
+[2mdist/[22m[32massets/登录-DWyJq7sS.png                   [39m[1m[2m    5.59 kB[22m[1m[22m
+[2mdist/[22m[32massets/链接0.2-ILmol1oB.png                [39m[1m[2m    6.54 kB[22m[1m[22m
+[2mdist/[22m[32massets/群组-8bPyGzcN.png                   [39m[1m[2m    6.72 kB[22m[1m[22m
+[2mdist/[22m[32massets/设置0.3-CiIAR45n.png                [39m[1m[2m    8.67 kB[22m[1m[22m
+[2mdist/[22m[35massets/index-B2iXpuh3.css                [39m[1m[2m  172.12 kB[22m[1m[22m[2m │ gzip:  26.70 kB[22m
+[2mdist/[22m[36massets/PhCaretLeft-B7YLoNEF.js           [39m[1m[2m    1.88 kB[22m[1m[22m[2m │ gzip:   0.92 kB[22m
+[2mdist/[22m[36massets/PhCaretDown-ddSjwcwm.js           [39m[1m[2m    1.94 kB[22m[1m[22m[2m │ gzip:   0.96 kB[22m
+[2mdist/[22m[36massets/PhCaretRight-BY8D5MIg.js          [39m[1m[2m    1.96 kB[22m[1m[22m[2m │ gzip:   0.94 kB[22m
+[2mdist/[22m[36massets/PhCaretUp-BG10nSut.js             [39m[1m[2m    2.02 kB[22m[1m[22m[2m │ gzip:   0.94 kB[22m
+[2mdist/[22m[36massets/PhArrowUpRight-Bn-JhHsY.js        [39m[1m[2m    2.06 kB[22m[1m[22m[2m │ gzip:   1.02 kB[22m
+[2mdist/[22m[36massets/PhArrowDown-CkoOD89h.js           [39m[1m[2m    2.10 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[36massets/PhArrowRight-BI-V03Xf.js          [39m[1m[2m    2.11 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[36massets/PhPlus-CBvZvLax.js                [39m[1m[2m    2.11 kB[22m[1m[22m[2m │ gzip:   0.97 kB[22m
+[2mdist/[22m[36massets/PhCheck-DrKd7pBC.js               [39m[1m[2m    2.11 kB[22m[1m[22m[2m │ gzip:   0.99 kB[22m
+[2mdist/[22m[36massets/PhArrowLeft-C0jlxVhM.js           [39m[1m[2m    2.12 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[36massets/PhArrowUp-izKvURUW.js             [39m[1m[2m    2.17 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[36massets/PhMagnifyingGlass-B6D0sWFL.js     [39m[1m[2m    2.21 kB[22m[1m[22m[2m │ gzip:   1.08 kB[22m
+[2mdist/[22m[36massets/PhBrowser-BjzAmrHO.js             [39m[1m[2m    2.22 kB[22m[1m[22m[2m │ gzip:   0.97 kB[22m
+[2mdist/[22m[36massets/PhDotsThree-CSAEcba1.js           [39m[1m[2m    2.25 kB[22m[1m[22m[2m │ gzip:   0.95 kB[22m
+[2mdist/[22m[36massets/PhFunnelSimple-DKx35ITq.js        [39m[1m[2m    2.36 kB[22m[1m[22m[2m │ gzip:   1.00 kB[22m
+[2mdist/[22m[36massets/PhCopy-rgttky8E.js                [39m[1m[2m    2.36 kB[22m[1m[22m[2m │ gzip:   1.01 kB[22m
+[2mdist/[22m[36massets/PhClock-Sj17weCB.js               [39m[1m[2m    2.37 kB[22m[1m[22m[2m │ gzip:   1.03 kB[22m
+[2mdist/[22m[36massets/PhWarningCircle-Cm58gXb9.js       [39m[1m[2m    2.43 kB[22m[1m[22m[2m │ gzip:   1.05 kB[22m
+[2mdist/[22m[36massets/PhX-C3b4cCEy.js                   [39m[1m[2m    2.50 kB[22m[1m[22m[2m │ gzip:   1.06 kB[22m
+[2mdist/[22m[36massets/PhDeviceMobile-CnybhXY-.js        [39m[1m[2m    2.57 kB[22m[1m[22m[2m │ gzip:   1.07 kB[22m
+[2mdist/[22m[36massets/PhArrowClockwise-mOiWYLMV.js      [39m[1m[2m    2.59 kB[22m[1m[22m[2m │ gzip:   1.19 kB[22m
+[2mdist/[22m[36massets/PhUser-A2fxqIV0.js                [39m[1m[2m    2.68 kB[22m[1m[22m[2m │ gzip:   1.26 kB[22m
+[2mdist/[22m[36massets/PhEnvelope-SmaNeXoQ.js            [39m[1m[2m    2.68 kB[22m[1m[22m[2m │ gzip:   1.18 kB[22m
+[2mdist/[22m[36massets/PhCircleHalf-Bk9C4DvT.js          [39m[1m[2m    2.71 kB[22m[1m[22m[2m │ gzip:   1.21 kB[22m
+[2mdist/[22m[36massets/PhSignOut-Cq2PivQ6.js             [39m[1m[2m    2.77 kB[22m[1m[22m[2m │ gzip:   1.16 kB[22m
+[2mdist/[22m[36massets/PhInfo-X33f06Ej.js                [39m[1m[2m    2.78 kB[22m[1m[22m[2m │ gzip:   1.22 kB[22m
+[2mdist/[22m[36massets/PhPower-D8-AcNM6.js               [39m[1m[2m    2.78 kB[22m[1m[22m[2m │ gzip:   1.28 kB[22m
+[2mdist/[22m[36massets/PhDesktop-BuCDXYJj.js             [39m[1m[2m    2.79 kB[22m[1m[22m[2m │ gzip:   1.12 kB[22m
+[2mdist/[22m[36massets/PhArrowsLeftRight-CYsRQ2qh.js     [39m[1m[2m    2.80 kB[22m[1m[22m[2m │ gzip:   1.18 kB[22m
+[2mdist/[22m[36massets/PhArrowCircleDown-BtlNV0TZ.js     [39m[1m[2m    2.81 kB[22m[1m[22m[2m │ gzip:   1.18 kB[22m
+[2mdist/[22m[36massets/PhQuestionMark-W55Txvvb.js        [39m[1m[2m    2.84 kB[22m[1m[22m[2m │ gzip:   1.30 kB[22m
+[2mdist/[22m[36massets/PhArrowSquareOut-DnQ7n_B4.js      [39m[1m[2m    2.93 kB[22m[1m[22m[2m │ gzip:   1.25 kB[22m
+[2mdist/[22m[36massets/PhArrowsDownUp-PZosTqZG.js        [39m[1m[2m    2.93 kB[22m[1m[22m[2m │ gzip:   1.18 kB[22m
+[2mdist/[22m[36massets/PhCreditCard-CZpdid2n.js          [39m[1m[2m    2.93 kB[22m[1m[22m[2m │ gzip:   1.16 kB[22m
+[2mdist/[22m[36massets/PhBank-hhPAIPVb.js                [39m[1m[2m    2.94 kB[22m[1m[22m[2m │ gzip:   1.25 kB[22m
+[2mdist/[22m[36massets/PhVault-B8m1usHw.js               [39m[1m[2m    2.97 kB[22m[1m[22m[2m │ gzip:   1.20 kB[22m
+[2mdist/[22m[36massets/PhCompass-Df1ugFO-.js             [39m[1m[2m    2.98 kB[22m[1m[22m[2m │ gzip:   1.28 kB[22m
+[2mdist/[22m[36massets/PhPaperPlaneRight-Dvo-nXr9.js     [39m[1m[2m    3.10 kB[22m[1m[22m[2m │ gzip:   1.42 kB[22m
+[2mdist/[22m[36massets/PhTrash-BamrmMsN.js               [39m[1m[2m    3.12 kB[22m[1m[22m[2m │ gzip:   1.19 kB[22m
+[2mdist/[22m[36massets/PhCurrencyDollar-B6IKKjue.js      [39m[1m[2m    3.24 kB[22m[1m[22m[2m │ gzip:   1.33 kB[22m
+[2mdist/[22m[36massets/PhQuestion-rUoqC2sC.js            [39m[1m[2m    3.32 kB[22m[1m[22m[2m │ gzip:   1.45 kB[22m
+[2mdist/[22m[36massets/PhImage-BYrKfN9k.js               [39m[1m[2m    3.44 kB[22m[1m[22m[2m │ gzip:   1.45 kB[22m
+[2mdist/[22m[36massets/PhArrowsClockwise-Brtx2Re-.js     [39m[1m[2m    3.87 kB[22m[1m[22m[2m │ gzip:   1.59 kB[22m
+[2mdist/[22m[36massets/PhWarning-CpkID9oi.js             [39m[1m[2m    3.91 kB[22m[1m[22m[2m │ gzip:   1.49 kB[22m
+[2mdist/[22m[36massets/walletSyncService-DXe0zY8O.js     [39m[1m[2m    4.17 kB[22m[1m[22m[2m │ gzip:   1.72 kB[22m
+[2mdist/[22m[36massets/PhIdentificationCard-BeLXJpfZ.js  [39m[1m[2m    4.22 kB[22m[1m[22m[2m │ gzip:   1.65 kB[22m
+[2mdist/[22m[36massets/PhSpinner-CZMtAFdX.js             [39m[1m[2m    4.45 kB[22m[1m[22m[2m │ gzip:   1.65 kB[22m
+[2mdist/[22m[36massets/PhLightbulb-DMZJsowR.js           [39m[1m[2m    4.92 kB[22m[1m[22m[2m │ gzip:   1.86 kB[22m
+[2mdist/[22m[36massets/PhQrCode-uIXlI5ER.js              [39m[1m[2m    4.92 kB[22m[1m[22m[2m │ gzip:   1.47 kB[22m
+[2mdist/[22m[36massets/PhPuzzlePiece-C-7mYqGO.js         [39m[1m[2m    5.37 kB[22m[1m[22m[2m │ gzip:   1.96 kB[22m
+[2mdist/[22m[36massets/PhGlobe-q1mqj65V.js               [39m[1m[2m    5.72 kB[22m[1m[22m[2m │ gzip:   1.92 kB[22m
+[2mdist/[22m[36massets/features-u9OlM8GJ.js              [39m[1m[2m    5.84 kB[22m[1m[22m[2m │ gzip:   2.30 kB[22m
+[2mdist/[22m[36massets/PhSealCheck-BeVLq9PH.js           [39m[1m[2m   12.10 kB[22m[1m[22m[2m │ gzip:   4.02 kB[22m
+[2mdist/[22m[36massets/window-DZZtwZoZ.js                [39m[1m[2m   14.24 kB[22m[1m[22m[2m │ gzip:   3.57 kB[22m
+[2mdist/[22m[36massets/property-CnFDNXw5.js              [39m[1m[2m   17.20 kB[22m[1m[22m[2m │ gzip:   6.41 kB[22m
+[2mdist/[22m[36massets/index-DQo684Il.js                 [39m[1m[2m   46.74 kB[22m[1m[22m[2m │ gzip:  15.07 kB[22m
+[2mdist/[22m[36massets/w3m-modal-CnQyfmch.js             [39m[1m[2m   80.78 kB[22m[1m[22m[2m │ gzip:  17.62 kB[22m
+[2mdist/[22m[36massets/index-DjmeBjDY.js                 [39m[1m[2m   84.89 kB[22m[1m[22m[2m │ gzip:  22.99 kB[22m
+[2mdist/[22m[36massets/basic-ROdgLNVA.js                 [39m[1m[2m  115.98 kB[22m[1m[22m[2m │ gzip:  30.40 kB[22m
+[2mdist/[22m[36massets/index-J-eWgCVj.js                 [39m[1m[2m  217.11 kB[22m[1m[22m[2m │ gzip:  69.26 kB[22m
+[2mdist/[22m[36massets/core-D89Uwx-e.js                  [39m[1m[33m  568.09 kB[39m[22m[2m │ gzip: 164.72 kB[22m
+[2mdist/[22m[36massets/index-CO3Xq2-m.js                 [39m[1m[33m1,595.06 kB[39m[22m[2m │ gzip: 530.52 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-m
+anualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 26.78s[39m
+   Compiling tauri-utils v2.8.0
+   Compiling windows v0.61.3
+   Compiling hashbrown v0.13.2
+   Compiling fdeflate v0.3.7
+   Compiling nested_enum_utils v0.2.3
+   Compiling same-file v1.0.6
+   Compiling webpki-roots v1.0.4
+   Compiling jsonptr v0.6.3
+   Compiling sharded-slab v0.1.7
+   Compiling chrono v0.4.42
+   Compiling erased-serde v0.4.9
+   Compiling phf_shared v0.11.3
+memory allocation of 1048576 bytes failed
+memory allocation of 1048576 bytes failed
+memory allocation of 1048576 bytes failed
+memory allocation of 1048576 bytes failed
+error: could not compile `windows` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Mechrevo\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe -
+-crate-name windows --edition=2021 C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\windows-0.61.
+3\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-
+info,metadata,link -C embed-bitcode=no -C debuginfo=2 --warn=rust_2018_idioms --warn=unsafe_op_in_unsafe_fn --warn=unex
+pected_cfgs --warn=missing_docs --check-cfg "cfg(windows_raw_dylib, windows_slim_errors)" --cfg "feature=\"Win32\"" --c
+fg "feature=\"Win32_Devices\"" --cfg "feature=\"Win32_Devices_HumanInterfaceDevice\"" --cfg "feature=\"Win32_Foundation
+\"" --cfg "feature=\"Win32_Globalization\"" --cfg "feature=\"Win32_Graphics\"" --cfg "feature=\"Win32_Graphics_Dwm\"" -
+-cfg "feature=\"Win32_Graphics_Gdi\"" --cfg "feature=\"Win32_NetworkManagement\"" --cfg "feature=\"Win32_NetworkManagem
+ent_IpHelper\"" --cfg "feature=\"Win32_NetworkManagement_Ndis\"" --cfg "feature=\"Win32_Networking\"" --cfg "feature=\"
+Win32_Networking_WinSock\"" --cfg "feature=\"Win32_System\"" --cfg "feature=\"Win32_System_Com\"" --cfg "feature=\"Win3
+2_System_Com_StructuredStorage\"" --cfg "feature=\"Win32_System_DataExchange\"" --cfg "feature=\"Win32_System_Diagnosti
+cs\"" --cfg "feature=\"Win32_System_Diagnostics_Debug\"" --cfg "feature=\"Win32_System_LibraryLoader\"" --cfg "feature=
+\"Win32_System_Memory\"" --cfg "feature=\"Win32_System_Ole\"" --cfg "feature=\"Win32_System_SystemInformation\"" --cfg 
+"feature=\"Win32_System_SystemServices\"" --cfg "feature=\"Win32_System_Threading\"" --cfg "feature=\"Win32_System_Vari
+ant\"" --cfg "feature=\"Win32_System_WinRT\"" --cfg "feature=\"Win32_System_WindowsProgramming\"" --cfg "feature=\"Win3
+2_UI\"" --cfg "feature=\"Win32_UI_Accessibility\"" --cfg "feature=\"Win32_UI_Controls\"" --cfg "feature=\"Win32_UI_HiDp
+i\"" --cfg "feature=\"Win32_UI_Input\"" --cfg "feature=\"Win32_UI_Input_Ime\"" --cfg "feature=\"Win32_UI_Input_Keyboard
+AndMouse\"" --cfg "feature=\"Win32_UI_Input_Pointer\"" --cfg "feature=\"Win32_UI_Input_Touch\"" --cfg "feature=\"Win32_
+UI_Shell\"" --cfg "feature=\"Win32_UI_TextServices\"" --cfg "feature=\"Win32_UI_WindowsAndMessaging\"" --cfg "feature=\
+"default\"" --cfg "feature=\"std\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"AI\", \"AI_MachineL
+earning\", \"ApplicationModel\", \"ApplicationModel_Activation\", \"ApplicationModel_AppExtensions\", \"ApplicationMode
+l_AppService\", \"ApplicationModel_Appointments\", \"ApplicationModel_Appointments_AppointmentsProvider\", \"Applicatio
+nModel_Appointments_DataProvider\", \"ApplicationModel_Background\", \"ApplicationModel_Calls\", \"ApplicationModel_Cal
+ls_Background\", \"ApplicationModel_Calls_Provider\", \"ApplicationModel_Chat\", \"ApplicationModel_CommunicationBlocki
+ng\", \"ApplicationModel_Contacts\", \"ApplicationModel_Contacts_DataProvider\", \"ApplicationModel_Contacts_Provider\"
+, \"ApplicationModel_ConversationalAgent\", \"ApplicationModel_Core\", \"ApplicationModel_DataTransfer\", \"Application
+Model_DataTransfer_DragDrop\", \"ApplicationModel_DataTransfer_DragDrop_Core\", \"ApplicationModel_DataTransfer_ShareTa
+rget\", \"ApplicationModel_Email\", \"ApplicationModel_Email_DataProvider\", \"ApplicationModel_ExtendedExecution\", \"
+ApplicationModel_ExtendedExecution_Foreground\", \"ApplicationModel_Holographic\", \"ApplicationModel_LockScreen\", \"A
+pplicationModel_PackageExtensions\", \"ApplicationModel_Payments\", \"ApplicationModel_Payments_Provider\", \"Applicati
+onModel_Preview\", \"ApplicationModel_Preview_Holographic\", \"ApplicationModel_Preview_InkWorkspace\", \"ApplicationMo
+del_Preview_Notes\", \"ApplicationModel_Resources\", \"ApplicationModel_Resources_Core\", \"ApplicationModel_Resources_
+Management\", \"ApplicationModel_Search\", \"ApplicationModel_Search_Core\", \"ApplicationModel_UserActivities\", \"App
+licationModel_UserActivities_Core\", \"ApplicationModel_UserDataAccounts\", \"ApplicationModel_UserDataAccounts_Provide
+r\", \"ApplicationModel_UserDataAccounts_SystemAccess\", \"ApplicationModel_UserDataTasks\", \"ApplicationModel_UserDat
+aTasks_DataProvider\", \"ApplicationModel_VoiceCommands\", \"ApplicationModel_Wallet\", \"ApplicationModel_Wallet_Syste
+m\", \"Data\", \"Data_Html\", \"Data_Json\", \"Data_Pdf\", \"Data_Text\", \"Data_Xml\", \"Data_Xml_Dom\", \"Data_Xml_Xs
+l\", \"Devices\", \"Devices_Adc\", \"Devices_Adc_Provider\", \"Devices_Background\", \"Devices_Bluetooth\", \"Devices_B
+luetooth_Advertisement\", \"Devices_Bluetooth_Background\", \"Devices_Bluetooth_GenericAttributeProfile\", \"Devices_Bl
+uetooth_Rfcomm\", \"Devices_Custom\", \"Devices_Display\", \"Devices_Display_Core\", \"Devices_Enumeration\", \"Devices
+_Enumeration_Pnp\", \"Devices_Geolocation\", \"Devices_Geolocation_Geofencing\", \"Devices_Geolocation_Provider\", \"De
+vices_Gpio\", \"Devices_Gpio_Provider\", \"Devices_Haptics\", \"Devices_HumanInterfaceDevice\", \"Devices_I2c\", \"Devi
+ces_I2c_Provider\", \"Devices_Input\", \"Devices_Input_Preview\", \"Devices_Lights\", \"Devices_Lights_Effects\", \"Dev
+ices_Midi\", \"Devices_PointOfService\", \"Devices_PointOfService_Provider\", \"Devices_Portable\", \"Devices_Power\", 
+\"Devices_Printers\", \"Devices_Printers_Extensions\", \"Devices_Pwm\", \"Devices_Pwm_Provider\", \"Devices_Radios\", \
+"Devices_Scanners\", \"Devices_Sensors\", \"Devices_Sensors_Custom\", \"Devices_SerialCommunication\", \"Devices_SmartC
+ards\", \"Devices_Sms\", \"Devices_Spi\", \"Devices_Spi_Provider\", \"Devices_Usb\", \"Devices_WiFi\", \"Devices_WiFiDi
+rect\", \"Devices_WiFiDirect_Services\", \"Embedded\", \"Embedded_DeviceLockdown\", \"Foundation\", \"Foundation_Collec
+tions\", \"Foundation_Diagnostics\", \"Foundation_Metadata\", \"Foundation_Numerics\", \"Gaming\", \"Gaming_Input\", \"
+Gaming_Input_Custom\", \"Gaming_Input_ForceFeedback\", \"Gaming_Input_Preview\", \"Gaming_Preview\", \"Gaming_Preview_G
+amesEnumeration\", \"Gaming_UI\", \"Gaming_XboxLive\", \"Gaming_XboxLive_Storage\", \"Globalization\", \"Globalization_
+Collation\", \"Globalization_DateTimeFormatting\", \"Globalization_Fonts\", \"Globalization_NumberFormatting\", \"Globa
+lization_PhoneNumberFormatting\", \"Graphics\", \"Graphics_Capture\", \"Graphics_DirectX\", \"Graphics_DirectX_Direct3D
+11\", \"Graphics_Display\", \"Graphics_Display_Core\", \"Graphics_Effects\", \"Graphics_Holographic\", \"Graphics_Imagi
+ng\", \"Graphics_Printing\", \"Graphics_Printing3D\", \"Graphics_Printing_OptionDetails\", \"Graphics_Printing_PrintSup
+port\", \"Graphics_Printing_PrintTicket\", \"Graphics_Printing_Workflow\", \"Management\", \"Management_Core\", \"Manag
+ement_Deployment\", \"Management_Deployment_Preview\", \"Management_Policies\", \"Management_Setup\", \"Management_Upda
+te\", \"Management_Workplace\", \"Media\", \"Media_AppBroadcasting\", \"Media_AppRecording\", \"Media_Audio\", \"Media_
+Capture\", \"Media_Capture_Core\", \"Media_Capture_Frames\", \"Media_Casting\", \"Media_ClosedCaptioning\", \"Media_Con
+tentRestrictions\", \"Media_Control\", \"Media_Core\", \"Media_Core_Preview\", \"Media_Devices\", \"Media_Devices_Core\
+", \"Media_DialProtocol\", \"Media_Editing\", \"Media_Effects\", \"Media_FaceAnalysis\", \"Media_Import\", \"Media_Medi
+aProperties\", \"Media_Miracast\", \"Media_Ocr\", \"Media_PlayTo\", \"Media_Playback\", \"Media_Playlists\", \"Media_Pr
+otection\", \"Media_Protection_PlayReady\", \"Media_Render\", \"Media_SpeechRecognition\", \"Media_SpeechSynthesis\", \
+"Media_Streaming\", \"Media_Streaming_Adaptive\", \"Media_Transcoding\", \"Networking\", \"Networking_BackgroundTransfe
+r\", \"Networking_Connectivity\", \"Networking_NetworkOperators\", \"Networking_Proximity\", \"Networking_PushNotificat
+ions\", \"Networking_ServiceDiscovery\", \"Networking_ServiceDiscovery_Dnssd\", \"Networking_Sockets\", \"Networking_Vp
+n\", \"Networking_XboxLive\", \"Perception\", \"Perception_Automation\", \"Perception_Automation_Core\", \"Perception_P
+eople\", \"Perception_Spatial\", \"Perception_Spatial_Preview\", \"Perception_Spatial_Surfaces\", \"Phone\", \"Phone_Ap
+plicationModel\", \"Phone_Devices\", \"Phone_Devices_Notification\", \"Phone_Devices_Power\", \"Phone_Management\", \"P
+hone_Management_Deployment\", \"Phone_Media\", \"Phone_Media_Devices\", \"Phone_Notification\", \"Phone_Notification_Ma
+nagement\", \"Phone_PersonalInformation\", \"Phone_PersonalInformation_Provisioning\", \"Phone_Speech\", \"Phone_Speech
+_Recognition\", \"Phone_StartScreen\", \"Phone_System\", \"Phone_System_Power\", \"Phone_System_Profile\", \"Phone_Syst
+em_UserProfile\", \"Phone_System_UserProfile_GameServices\", \"Phone_System_UserProfile_GameServices_Core\", \"Phone_UI
+\", \"Phone_UI_Input\", \"Security\", \"Security_Authentication\", \"Security_Authentication_Identity\", \"Security_Aut
+hentication_Identity_Core\", \"Security_Authentication_OnlineId\", \"Security_Authentication_Web\", \"Security_Authenti
+cation_Web_Core\", \"Security_Authentication_Web_Provider\", \"Security_Authorization\", \"Security_Authorization_AppCa
+pabilityAccess\", \"Security_Credentials\", \"Security_Credentials_UI\", \"Security_Cryptography\", \"Security_Cryptogr
+aphy_Certificates\", \"Security_Cryptography_Core\", \"Security_Cryptography_DataProtection\", \"Security_DataProtectio
+n\", \"Security_EnterpriseData\", \"Security_ExchangeActiveSyncProvisioning\", \"Security_Isolation\", \"Services\", \"
+Services_Maps\", \"Services_Maps_Guidance\", \"Services_Maps_LocalSearch\", \"Services_Maps_OfflineMaps\", \"Services_S
+tore\", \"Services_TargetedContent\", \"Storage\", \"Storage_AccessCache\", \"Storage_BulkAccess\", \"Storage_Compressi
+on\", \"Storage_FileProperties\", \"Storage_Pickers\", \"Storage_Pickers_Provider\", \"Storage_Provider\", \"Storage_Se
+arch\", \"Storage_Streams\", \"System\", \"System_Diagnostics\", \"System_Diagnostics_DevicePortal\", \"System_Diagnost
+ics_Telemetry\", \"System_Diagnostics_TraceReporting\", \"System_Display\", \"System_Implementation\", \"System_Impleme
+ntation_FileExplorer\", \"System_Inventory\", \"System_Power\", \"System_Profile\", \"System_Profile_SystemManufacturer
+s\", \"System_RemoteDesktop\", \"System_RemoteDesktop_Input\", \"System_RemoteDesktop_Provider\", \"System_RemoteSystem
+s\", \"System_Threading\", \"System_Threading_Core\", \"System_Update\", \"System_UserProfile\", \"UI\", \"UI_Accessibi
+lity\", \"UI_ApplicationSettings\", \"UI_Composition\", \"UI_Composition_Core\", \"UI_Composition_Desktop\", \"UI_Compo
+sition_Diagnostics\", \"UI_Composition_Effects\", \"UI_Composition_Interactions\", \"UI_Composition_Scenes\", \"UI_Core
+\", \"UI_Core_AnimationMetrics\", \"UI_Core_Preview\", \"UI_Input\", \"UI_Input_Core\", \"UI_Input_Inking\", \"UI_Input
+_Inking_Analysis\", \"UI_Input_Inking_Core\", \"UI_Input_Inking_Preview\", \"UI_Input_Preview\", \"UI_Input_Preview_Inj
+ection\", \"UI_Input_Spatial\", \"UI_Notifications\", \"UI_Notifications_Management\", \"UI_Notifications_Preview\", \"
+UI_Popups\", \"UI_Shell\", \"UI_StartScreen\", \"UI_Text\", \"UI_Text_Core\", \"UI_UIAutomation\", \"UI_UIAutomation_Co
+re\", \"UI_ViewManagement\", \"UI_ViewManagement_Core\", \"UI_WebUI\", \"UI_WebUI_Core\", \"UI_WindowManagement\", \"UI
+_WindowManagement_Preview\", \"Wdk\", \"Wdk_Devices\", \"Wdk_Devices_Bluetooth\", \"Wdk_Devices_HumanInterfaceDevice\",
+ \"Wdk_Foundation\", \"Wdk_Graphics\", \"Wdk_Graphics_Direct3D\", \"Wdk_NetworkManagement\", \"Wdk_NetworkManagement_Nd
+is\", \"Wdk_NetworkManagement_WindowsFilteringPlatform\", \"Wdk_Storage\", \"Wdk_Storage_FileSystem\", \"Wdk_Storage_Fi
+leSystem_Minifilters\", \"Wdk_System\", \"Wdk_System_IO\", \"Wdk_System_Memory\", \"Wdk_System_OfflineRegistry\", \"Wdk
+_System_Registry\", \"Wdk_System_SystemInformation\", \"Wdk_System_SystemServices\", \"Wdk_System_Threading\", \"Web\",
+ \"Web_AtomPub\", \"Web_Http\", \"Web_Http_Diagnostics\", \"Web_Http_Filters\", \"Web_Http_Headers\", \"Web_Syndication
+\", \"Web_UI\", \"Web_UI_Interop\", \"Win32\", \"Win32_AI\", \"Win32_AI_MachineLearning\", \"Win32_AI_MachineLearning_D
+irectML\", \"Win32_AI_MachineLearning_WinML\", \"Win32_Data\", \"Win32_Data_HtmlHelp\", \"Win32_Data_RightsManagement\"
+, \"Win32_Data_Xml\", \"Win32_Data_Xml_MsXml\", \"Win32_Data_Xml_XmlLite\", \"Win32_Devices\", \"Win32_Devices_AllJoyn\
+", \"Win32_Devices_Beep\", \"Win32_Devices_BiometricFramework\", \"Win32_Devices_Bluetooth\", \"Win32_Devices_Cdrom\", 
+\"Win32_Devices_Communication\", \"Win32_Devices_DeviceAccess\", \"Win32_Devices_DeviceAndDriverInstallation\", \"Win32
+_Devices_DeviceQuery\", \"Win32_Devices_Display\", \"Win32_Devices_Dvd\", \"Win32_Devices_Enumeration\", \"Win32_Device
+s_Enumeration_Pnp\", \"Win32_Devices_Fax\", \"Win32_Devices_FunctionDiscovery\", \"Win32_Devices_Geolocation\", \"Win32
+_Devices_HumanInterfaceDevice\", \"Win32_Devices_ImageAcquisition\", \"Win32_Devices_Nfc\", \"Win32_Devices_Nfp\", \"Wi
+n32_Devices_PortableDevices\", \"Win32_Devices_Properties\", \"Win32_Devices_Pwm\", \"Win32_Devices_Sensors\", \"Win32_
+Devices_SerialCommunication\", \"Win32_Devices_Tapi\", \"Win32_Devices_Usb\", \"Win32_Devices_WebServicesOnDevices\", \
+"Win32_Foundation\", \"Win32_Gaming\", \"Win32_Globalization\", \"Win32_Graphics\", \"Win32_Graphics_CompositionSwapcha
+in\", \"Win32_Graphics_DXCore\", \"Win32_Graphics_Direct2D\", \"Win32_Graphics_Direct2D_Common\", \"Win32_Graphics_Dire
+ct3D\", \"Win32_Graphics_Direct3D10\", \"Win32_Graphics_Direct3D11\", \"Win32_Graphics_Direct3D11on12\", \"Win32_Graphi
+cs_Direct3D12\", \"Win32_Graphics_Direct3D9\", \"Win32_Graphics_Direct3D9on12\", \"Win32_Graphics_Direct3D_Dxc\", \"Win
+32_Graphics_Direct3D_Fxc\", \"Win32_Graphics_DirectComposition\", \"Win32_Graphics_DirectDraw\", \"Win32_Graphics_Direc
+tManipulation\", \"Win32_Graphics_DirectWrite\", \"Win32_Graphics_Dwm\", \"Win32_Graphics_Dxgi\", \"Win32_Graphics_Dxgi
+_Common\", \"Win32_Graphics_Gdi\", \"Win32_Graphics_GdiPlus\", \"Win32_Graphics_Hlsl\", \"Win32_Graphics_Imaging\", \"W
+in32_Graphics_Imaging_D2D\", \"Win32_Graphics_OpenGL\", \"Win32_Graphics_Printing\", \"Win32_Graphics_Printing_PrintTic
+ket\", \"Win32_Management\", \"Win32_Management_MobileDeviceManagementRegistration\", \"Win32_Media\", \"Win32_Media_Au
+dio\", \"Win32_Media_Audio_Apo\", \"Win32_Media_Audio_DirectMusic\", \"Win32_Media_Audio_DirectSound\", \"Win32_Media_A
+udio_Endpoints\", \"Win32_Media_Audio_XAudio2\", \"Win32_Media_DeviceManager\", \"Win32_Media_DirectShow\", \"Win32_Med
+ia_DirectShow_Tv\", \"Win32_Media_DirectShow_Xml\", \"Win32_Media_DxMediaObjects\", \"Win32_Media_KernelStreaming\", \"
+Win32_Media_LibrarySharingServices\", \"Win32_Media_MediaFoundation\", \"Win32_Media_MediaPlayer\", \"Win32_Media_Multi
+media\", \"Win32_Media_PictureAcquisition\", \"Win32_Media_Speech\", \"Win32_Media_Streaming\", \"Win32_Media_WindowsMe
+diaFormat\", \"Win32_NetworkManagement\", \"Win32_NetworkManagement_Dhcp\", \"Win32_NetworkManagement_Dns\", \"Win32_Ne
+tworkManagement_InternetConnectionWizard\", \"Win32_NetworkManagement_IpHelper\", \"Win32_NetworkManagement_MobileBroad
+band\", \"Win32_NetworkManagement_Multicast\", \"Win32_NetworkManagement_Ndis\", \"Win32_NetworkManagement_NetBios\", \
+"Win32_NetworkManagement_NetManagement\", \"Win32_NetworkManagement_NetShell\", \"Win32_NetworkManagement_NetworkDiagno
+sticsFramework\", \"Win32_NetworkManagement_NetworkPolicyServer\", \"Win32_NetworkManagement_P2P\", \"Win32_NetworkMana
+gement_QoS\", \"Win32_NetworkManagement_Rras\", \"Win32_NetworkManagement_Snmp\", \"Win32_NetworkManagement_WNet\", \"W
+in32_NetworkManagement_WebDav\", \"Win32_NetworkManagement_WiFi\", \"Win32_NetworkManagement_WindowsConnectNow\", \"Win
+32_NetworkManagement_WindowsConnectionManager\", \"Win32_NetworkManagement_WindowsFilteringPlatform\", \"Win32_NetworkM
+anagement_WindowsFirewall\", \"Win32_NetworkManagement_WindowsNetworkVirtualization\", \"Win32_Networking\", \"Win32_Ne
+tworking_ActiveDirectory\", \"Win32_Networking_BackgroundIntelligentTransferService\", \"Win32_Networking_Clustering\",
+ \"Win32_Networking_HttpServer\", \"Win32_Networking_Ldap\", \"Win32_Networking_NetworkListManager\", \"Win32_Networkin
+g_RemoteDifferentialCompression\", \"Win32_Networking_WebSocket\", \"Win32_Networking_WinHttp\", \"Win32_Networking_Win
+Inet\", \"Win32_Networking_WinSock\", \"Win32_Networking_WindowsWebServices\", \"Win32_Security\", \"Win32_Security_App
+Locker\", \"Win32_Security_Authentication\", \"Win32_Security_Authentication_Identity\", \"Win32_Security_Authenticatio
+n_Identity_Provider\", \"Win32_Security_Authorization\", \"Win32_Security_Authorization_UI\", \"Win32_Security_Configur
+ationSnapin\", \"Win32_Security_Credentials\", \"Win32_Security_Cryptography\", \"Win32_Security_Cryptography_Catalog\"
+, \"Win32_Security_Cryptography_Certificates\", \"Win32_Security_Cryptography_Sip\", \"Win32_Security_Cryptography_UI\"
+, \"Win32_Security_DiagnosticDataQuery\", \"Win32_Security_DirectoryServices\", \"Win32_Security_EnterpriseData\", \"Wi
+n32_Security_ExtensibleAuthenticationProtocol\", \"Win32_Security_Isolation\", \"Win32_Security_LicenseProtection\", \"
+Win32_Security_NetworkAccessProtection\", \"Win32_Security_Tpm\", \"Win32_Security_WinTrust\", \"Win32_Security_WinWlx\
+", \"Win32_Storage\", \"Win32_Storage_Cabinets\", \"Win32_Storage_CloudFilters\", \"Win32_Storage_Compression\", \"Win3
+2_Storage_DataDeduplication\", \"Win32_Storage_DistributedFileSystem\", \"Win32_Storage_EnhancedStorage\", \"Win32_Stor
+age_FileHistory\", \"Win32_Storage_FileServerResourceManager\", \"Win32_Storage_FileSystem\", \"Win32_Storage_Imapi\", 
+\"Win32_Storage_IndexServer\", \"Win32_Storage_InstallableFileSystems\", \"Win32_Storage_IscsiDisc\", \"Win32_Storage_J
+et\", \"Win32_Storage_Nvme\", \"Win32_Storage_OfflineFiles\", \"Win32_Storage_OperationRecorder\", \"Win32_Storage_Pack
+aging\", \"Win32_Storage_Packaging_Appx\", \"Win32_Storage_Packaging_Opc\", \"Win32_Storage_ProjectedFileSystem\", \"Wi
+n32_Storage_StructuredStorage\", \"Win32_Storage_Vhd\", \"Win32_Storage_VirtualDiskService\", \"Win32_Storage_Vss\", \"
+Win32_Storage_Xps\", \"Win32_Storage_Xps_Printing\", \"Win32_System\", \"Win32_System_AddressBook\", \"Win32_System_Ant
+imalware\", \"Win32_System_ApplicationInstallationAndServicing\", \"Win32_System_ApplicationVerifier\", \"Win32_System_
+AssessmentTool\", \"Win32_System_ClrHosting\", \"Win32_System_Com\", \"Win32_System_Com_CallObj\", \"Win32_System_Com_C
+hannelCredentials\", \"Win32_System_Com_Events\", \"Win32_System_Com_Marshal\", \"Win32_System_Com_StructuredStorage\",
+ \"Win32_System_Com_UI\", \"Win32_System_Com_Urlmon\", \"Win32_System_ComponentServices\", \"Win32_System_Console\", \"
+Win32_System_Contacts\", \"Win32_System_CorrelationVector\", \"Win32_System_DataExchange\", \"Win32_System_DeploymentSe
+rvices\", \"Win32_System_DesktopSharing\", \"Win32_System_DeveloperLicensing\", \"Win32_System_Diagnostics\", \"Win32_S
+ystem_Diagnostics_Ceip\", \"Win32_System_Diagnostics_ClrProfiling\", \"Win32_System_Diagnostics_Debug\", \"Win32_System
+_Diagnostics_Debug_ActiveScript\", \"Win32_System_Diagnostics_Debug_Extensions\", \"Win32_System_Diagnostics_Etw\", \"W
+in32_System_Diagnostics_ProcessSnapshotting\", \"Win32_System_Diagnostics_ToolHelp\", \"Win32_System_Diagnostics_TraceL
+ogging\", \"Win32_System_DistributedTransactionCoordinator\", \"Win32_System_Environment\", \"Win32_System_ErrorReporti
+ng\", \"Win32_System_EventCollector\", \"Win32_System_EventLog\", \"Win32_System_EventNotificationService\", \"Win32_Sy
+stem_GroupPolicy\", \"Win32_System_HostCompute\", \"Win32_System_HostComputeNetwork\", \"Win32_System_HostComputeSystem
+\", \"Win32_System_Hypervisor\", \"Win32_System_IO\", \"Win32_System_Iis\", \"Win32_System_Ioctl\", \"Win32_System_JobO
+bjects\", \"Win32_System_Js\", \"Win32_System_Kernel\", \"Win32_System_LibraryLoader\", \"Win32_System_Mailslots\", \"W
+in32_System_Mapi\", \"Win32_System_Memory\", \"Win32_System_Memory_NonVolatile\", \"Win32_System_MessageQueuing\", \"Wi
+n32_System_MixedReality\", \"Win32_System_Mmc\", \"Win32_System_Ole\", \"Win32_System_ParentalControls\", \"Win32_Syste
+m_PasswordManagement\", \"Win32_System_Performance\", \"Win32_System_Performance_HardwareCounterProfiling\", \"Win32_Sy
+stem_Pipes\", \"Win32_System_Power\", \"Win32_System_ProcessStatus\", \"Win32_System_RealTimeCommunications\", \"Win32_
+System_Recovery\", \"Win32_System_Registry\", \"Win32_System_RemoteAssistance\", \"Win32_System_RemoteDesktop\", \"Win3
+2_System_RemoteManagement\", \"Win32_System_RestartManager\", \"Win32_System_Restore\", \"Win32_System_Rpc\", \"Win32_S
+ystem_Search\", \"Win32_System_Search_Common\", \"Win32_System_SecurityCenter\", \"Win32_System_ServerBackup\", \"Win32
+_System_Services\", \"Win32_System_SettingsManagementInfrastructure\", \"Win32_System_SetupAndMigration\", \"Win32_Syst
+em_Shutdown\", \"Win32_System_SideShow\", \"Win32_System_StationsAndDesktops\", \"Win32_System_SubsystemForLinux\", \"W
+in32_System_SystemInformation\", \"Win32_System_SystemServices\", \"Win32_System_TaskScheduler\", \"Win32_System_Thread
+ing\", \"Win32_System_Time\", \"Win32_System_TpmBaseServices\", \"Win32_System_TransactionServer\", \"Win32_System_Upda
+teAgent\", \"Win32_System_UpdateAssessment\", \"Win32_System_UserAccessLogging\", \"Win32_System_Variant\", \"Win32_Sys
+tem_VirtualDosMachines\", \"Win32_System_WinRT\", \"Win32_System_WinRT_AllJoyn\", \"Win32_System_WinRT_Composition\", \
+"Win32_System_WinRT_CoreInputView\", \"Win32_System_WinRT_Direct3D11\", \"Win32_System_WinRT_Display\", \"Win32_System_
+WinRT_Graphics\", \"Win32_System_WinRT_Graphics_Capture\", \"Win32_System_WinRT_Graphics_Direct2D\", \"Win32_System_Win
+RT_Graphics_Imaging\", \"Win32_System_WinRT_Holographic\", \"Win32_System_WinRT_Isolation\", \"Win32_System_WinRT_ML\",
+ \"Win32_System_WinRT_Media\", \"Win32_System_WinRT_Metadata\", \"Win32_System_WinRT_Pdf\", \"Win32_System_WinRT_Printi
+ng\", \"Win32_System_WinRT_Shell\", \"Win32_System_WinRT_Storage\", \"Win32_System_WindowsProgramming\", \"Win32_System
+_WindowsSync\", \"Win32_System_Wmi\", \"Win32_UI\", \"Win32_UI_Accessibility\", \"Win32_UI_Animation\", \"Win32_UI_Colo
+rSystem\", \"Win32_UI_Controls\", \"Win32_UI_Controls_Dialogs\", \"Win32_UI_Controls_RichEdit\", \"Win32_UI_HiDpi\", \"
+Win32_UI_Input\", \"Win32_UI_Input_Ime\", \"Win32_UI_Input_Ink\", \"Win32_UI_Input_KeyboardAndMouse\", \"Win32_UI_Input
+_Pointer\", \"Win32_UI_Input_Radial\", \"Win32_UI_Input_Touch\", \"Win32_UI_Input_XboxController\", \"Win32_UI_Interact
+ionContext\", \"Win32_UI_LegacyWindowsEnvironmentFeatures\", \"Win32_UI_Magnification\", \"Win32_UI_Notifications\", \"
+Win32_UI_Ribbon\", \"Win32_UI_Shell\", \"Win32_UI_Shell_Common\", \"Win32_UI_Shell_PropertiesSystem\", \"Win32_UI_Table
+tPC\", \"Win32_UI_TextServices\", \"Win32_UI_WindowsAndMessaging\", \"Win32_UI_Wpf\", \"Win32_Web\", \"Win32_Web_Intern
+etExplorer\", \"default\", \"deprecated\", \"docs\", \"std\"))" -C metadata=cdb2da9d959e78ee -C extra-filename=-ac30db1
+8eaacfe03 --out-dir D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps -L dependency=D:\AI\alou-pay\aloupa
+y\alou-desktop\src-tauri\target\debug\deps --extern windows_collections=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\t
+arget\debug\deps\libwindows_collections-658f8a94be3ab5be.rmeta --extern windows_core=D:\AI\alou-pay\aloupay\alou-deskto
+p\src-tauri\target\debug\deps\libwindows_core-2b9cdecae3137271.rmeta --extern windows_future=D:\AI\alou-pay\aloupay\alo
+u-desktop\src-tauri\target\debug\deps\libwindows_future-a647e04fdcba675a.rmeta --extern windows_link=D:\AI\alou-pay\alo
+upay\alou-desktop\src-tauri\target\debug\deps\libwindows_link-a4fc8a62db122a61.rmeta --extern windows_numerics=D:\AI\al
+ou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\libwindows_numerics-0f87bca3f0e4af9e.rmeta --cap-lints allow` (
+exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `sharded-slab` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Mechrevo\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe -
+-crate-name sharded_slab --edition=2018 C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\sharded-
+slab-0.1.7\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --
+emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, v
+alues(\"loom\"))" -C metadata=200072a9a02f6b27 -C extra-filename=-90140f6af92ef84b --out-dir D:\AI\alou-pay\aloupay\alo
+u-desktop\src-tauri\target\debug\deps -L dependency=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps --e
+xtern lazy_static=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\liblazy_static-58dc5c2d4098de3b.rmeta
+ --cap-lints allow` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+error: could not compile `erased-serde` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Mechrevo\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe -
+-crate-name erased_serde --edition=2021 C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\erased-s
+erde-0.4.9\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --
+emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg "feature=\"alloc\"" --check-cfg cfg(docsrs,test) -
+-check-cfg "cfg(feature, values(\"alloc\", \"default\", \"std\", \"unstable-debug\"))" -C metadata=986ec0920b4d4fd1 -C 
+extra-filename=-3740b4e7d877852a --out-dir D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps -L dependenc
+y=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps --extern serde_core=D:\AI\alou-pay\aloupay\alou-deskt
+op\src-tauri\target\debug\deps\libserde_core-a4447d8c959f31a0.rmeta --extern typeid=D:\AI\alou-pay\aloupay\alou-desktop
+\src-tauri\target\debug\deps\libtypeid-85a2673792e79fc6.rmeta --cap-lints allow --check-cfg cfg(no_diagnostic_namespace
+)` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+error: could not compile `hashbrown` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Mechrevo\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe -
+-crate-name hashbrown --edition=2021 C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\hashbrown-0
+.13.2\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=
+dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg "feature=\"ahash\"" --cfg "feature=\"default\"" --cfg "
+feature=\"inline-more\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"ahash\", \"alloc\", \"bumpalo\
+", \"compiler_builtins\", \"core\", \"default\", \"inline-more\", \"nightly\", \"raw\", \"rayon\", \"rustc-dep-of-std\"
+, \"rustc-internal-api\", \"serde\"))" -C metadata=e3c9150dae8c919e -C extra-filename=-805ce58ba49890e4 --out-dir D:\AI
+\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps -L dependency=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\
+target\debug\deps --extern ahash=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\libahash-36cc2f3385594
+393.rmeta --cap-lints allow` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+note: no errors encountered even though delayed bugs were created
+
+note: those delayed bugs will now be shown as internal compiler errors
+
+error: internal compiler error: could not resolve trait item being implemented
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\weekday.rs:207:5
+    |
+207 | /     fn from_i64(n: i64) -> Option<Weekday> {
+208 | |         match n {
+209 | |             0 => Some(Weekday::Mon),
+210 | |             1 => Some(Weekday::Tue),
+...   |
+218 | |     }
+    | |_____^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\item.rs:1135:40 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\weekday.rs:207:5
+    |
+207 | /     fn from_i64(n: i64) -> Option<Weekday> {
+208 | |         match n {
+209 | |             0 => Some(Weekday::Mon),
+210 | |             1 => Some(Weekday::Tue),
+...   |
+218 | |     }
+    | |_____^
+
+error: internal compiler error: could not resolve trait item being implemented
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\weekday.rs:221:5
+    |
+221 | /     fn from_u64(n: u64) -> Option<Weekday> {
+222 | |         match n {
+223 | |             0 => Some(Weekday::Mon),
+224 | |             1 => Some(Weekday::Tue),
+...   |
+232 | |     }
+    | |_____^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\item.rs:1135:40 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\weekday.rs:221:5
+    |
+221 | /     fn from_u64(n: u64) -> Option<Weekday> {
+222 | |         match n {
+223 | |             0 => Some(Weekday::Mon),
+224 | |             1 => Some(Weekday::Tue),
+...   |
+232 | |     }
+    | |_____^
+
+error: internal compiler error: could not resolve trait item being implemented
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:219:5
+    |
+219 | /     fn from_u64(n: u64) -> Option<Month> {
+220 | |         Self::from_u32(n as u32)
+221 | |     }
+    | |_____^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\item.rs:1135:40 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:219:5
+    |
+219 | /     fn from_u64(n: u64) -> Option<Month> {
+220 | |         Self::from_u32(n as u32)
+221 | |     }
+    | |_____^
+
+error: internal compiler error: could not resolve trait item being implemented
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:224:5
+    |
+224 | /     fn from_i64(n: i64) -> Option<Month> {
+225 | |         Self::from_u32(n as u32)
+226 | |     }
+    | |_____^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\item.rs:1135:40 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:224:5
+    |
+224 | /     fn from_i64(n: i64) -> Option<Month> {
+225 | |         Self::from_u32(n as u32)
+226 | |     }
+    | |_____^
+
+error: internal compiler error: could not resolve trait item being implemented
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:229:5
+    |
+229 | /     fn from_u32(n: u32) -> Option<Month> {
+230 | |         match n {
+231 | |             1 => Some(Month::January),
+232 | |             2 => Some(Month::February),
+...   |
+245 | |     }
+    | |_____^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\item.rs:1135:40 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\month.rs:229:5
+    |
+229 | /     fn from_u32(n: u32) -> Option<Month> {
+230 | |         match n {
+231 | |             1 => Some(Month::January),
+232 | |             2 => Some(Month::February),
+...   |
+245 | |     }
+    | |_____^
+
+error: internal compiler error: no resolution for an import
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\traits.rs:271:13
+    |
+271 |         use num_traits::FromPrimitive;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: delayed at compiler\rustc_ast_lowering\src\lib.rs:760:24 - disabled backtrace
+   --> C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\src\traits.rs:271:13
+    |
+271 |         use num_traits::FromPrimitive;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: we would appreciate a bug report: https://github.com/rust-lang/rust/issues/new?labels=C-bug%2C+I-ICE%2C+T-compile
+r&template=ice.md
+
+note: rustc 1.91.1 (ed61e7d7e 2025-11-07) running on x86_64-pc-windows-msvc
+
+note: compiler flags: --crate-type lib -C embed-bitcode=no -C debuginfo=2
+
+note: some of the compiler flags provided by cargo are hidden
+
+query stack during panic:
+end of query stack
+error: could not compile `chrono` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Mechrevo\.rustup\toolchains\stable-x86_64-pc-windows-msvc\bin\rustc.exe -
+-crate-name chrono --edition=2021 C:\Users\Mechrevo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\chrono-0.4.42\
+src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-in
+fo,metadata,link -C embed-bitcode=no -C debuginfo=2 --cfg "feature=\"alloc\"" --cfg "feature=\"clock\"" --cfg "feature=
+\"default\"" --cfg "feature=\"iana-time-zone\"" --cfg "feature=\"js-sys\"" --cfg "feature=\"now\"" --cfg "feature=\"old
+time\"" --cfg "feature=\"serde\"" --cfg "feature=\"std\"" --cfg "feature=\"wasm-bindgen\"" --cfg "feature=\"wasmbind\""
+ --cfg "feature=\"winapi\"" --cfg "feature=\"windows-link\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, val
+ues(\"__internal_bench\", \"alloc\", \"arbitrary\", \"clock\", \"core-error\", \"default\", \"iana-time-zone\", \"js-sy
+s\", \"libc\", \"now\", \"oldtime\", \"pure-rust-locales\", \"rkyv\", \"rkyv-16\", \"rkyv-32\", \"rkyv-64\", \"rkyv-val
+idation\", \"serde\", \"std\", \"unstable-locales\", \"wasm-bindgen\", \"wasmbind\", \"winapi\", \"windows-link\"))" -C
+ metadata=91aac568d4b43596 -C extra-filename=-3a96a1c0296120fb --out-dir D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\
+target\debug\deps -L dependency=D:\AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps --extern num_traits=D:\
+AI\alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\libnum_traits-dbbe2ad70552e68d.rmeta --extern serde=D:\AI\
+alou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\libserde-07086ee8daa2f764.rmeta --extern windows_link=D:\AI\a
+lou-pay\aloupay\alou-desktop\src-tauri\target\debug\deps\libwindows_link-96cbc5d04678fdd0.rmeta --cap-lints allow` (exi
+t code: 101)
+failed to build app: failed to build app
+       Error failed to build app: failed to build app

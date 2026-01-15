@@ -3,6 +3,7 @@
 use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, Tool};
 use crate::agent::ai_client::{AiClient, AiMessage, AiTool, AiResponse};
 use worker::{Env, Method, Request, RequestInit, Result, console_error};
+use std::hash::BuildHasher;
 
 // 添加随机数生成支持
 #[cfg(target_arch = "wasm32")]

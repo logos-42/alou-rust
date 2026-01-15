@@ -490,13 +490,61 @@ pub async fn handle_claude_sdk_query(
         claude_sdk_req.tools.len()
     );
 
-    // 确定提供商
-    let provider = get_provider_from_model(&claude_sdk_req.model);
-    let metadata = create_default_metadata(&claude_sdk_req.model, provider);
-
     // 转换到兼容性格式
     let compat_req = crate::compatibility::claude_sdk::convert_from_claude_sdk(&claude_sdk_req);
-    
+
+    // 检查是否应该使用异步处理
+    if crate::compatibility::models::should_use_async(&compat_req) {
+        console_log!("Claude SDK: Request qualifies for async processing");
+        return handle_async_claude_sdk_query(compat_req, env).await;
+    }
+
+    // 同步处理
+    console_log!("Claude SDK: Using sync processing");
+    handle_sync_claude_sdk_query(compat_req, env).await
+}
+
+/// 处理异步 Claude SDK 请求
+async fn handle_async_claude_sdk_query(
+    compat_req: crate::compatibility::models::CompatibleRequest,
+    env: &Env,
+) -> Result<Response> {
+    console_log!("Claude SDK: Creating async task");
+
+    // 先计算预估时间
+    let estimated_time = crate::compatibility::models::estimate_execution_time(&compat_req);
+
+    // 创建异步任务
+    match crate::durable_objects::task_executor::TaskExecutor::create_async_task(env, compat_req).await {
+        Ok(task_id) => {
+            console_log!("Claude SDK: Async task created with ID: {}, estimated time: {}s", task_id, estimated_time);
+
+            // 返回异步任务响应
+            let async_response = crate::compatibility::models::CompatibleResponse::async_task(
+                task_id,
+                estimated_time as u64,
+            );
+            json_response(&async_response)
+        }
+        Err(e) => {
+            console_error!("Claude SDK: Failed to create async task: {}", e);
+            let error_response = crate::compatibility::models::CompatibleResponse::error_response(
+                format!("Failed to create async task: {}", e),
+            );
+            json_response(&error_response)
+        }
+    }
+}
+
+/// 处理同步 Claude SDK 请求
+async fn handle_sync_claude_sdk_query(
+    compat_req: crate::compatibility::models::CompatibleRequest,
+    env: &Env,
+) -> Result<Response> {
+    // 确定提供商
+    let provider = get_provider_from_model(&compat_req.model);
+    let metadata = create_default_metadata(&compat_req.model, provider);
+
     // 转换到 AI 客户端格式
     let messages = match crate::compatibility::claude_sdk::convert_to_ai_messages(&compat_req) {
         Ok(msgs) => msgs,
@@ -528,13 +576,13 @@ pub async fn handle_claude_sdk_query(
 
     // 转换模型名称：如果提供商是 deepseek，将 Claude 模型名称转换为 DeepSeek 模型名称
     let model_for_ai = if provider == "deepseek" {
-        convert_claude_model_to_deepseek(&claude_sdk_req.model)
+        convert_claude_model_to_deepseek(&compat_req.model)
     } else {
-        claude_sdk_req.model.clone()
+        compat_req.model.clone()
     };
-    
-    console_log!("Claude SDK: 模型转换 - 原始: {}, 转换后: {}, 提供商: {}", 
-        claude_sdk_req.model, model_for_ai, provider);
+
+    console_log!("Claude SDK: 模型转换 - 原始: {}, 转换后: {}, 提供商: {}",
+        compat_req.model, model_for_ai, provider);
 
     // 创建 AI 客户端
     let ai_client = match AiClient::new(provider, api_key, Some(model_for_ai)) {
@@ -553,7 +601,7 @@ pub async fn handle_claude_sdk_query(
     console_log!("Claude SDK: Sending request to AI service with {} messages", messages.len());
     let ai_response = match ai_client.send_message(messages, tools_option).await {
         Ok(response) => {
-            console_log!("Claude SDK: AI service response received, content length: {}, tool calls: {}", 
+            console_log!("Claude SDK: AI service response received, content length: {}, tool calls: {}",
                 response.content.len(), response.tool_calls.len());
             response
         },

@@ -105,26 +105,36 @@ impl AITaskDO {
     
     async fn handle_get_status(&self) -> Result<Response> {
         console_log!("[STATUS] Getting status for task: {}", self.task_name());
-        
+
         let state = self.load_state().await.map_err(|e| {
             console_error!("[STATUS] Failed to load state: {}", e);
             e
         })?;
-        
+
+        // 如果任务已完成，尝试加载结果
+        let result = if state.status == TaskStatus::Completed {
+            match self.load_result().await {
+                Ok(Some(res)) => Some(res),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         let response = TaskStatusResponse {
             task_id: self.task_name(),
             status: state.status.to_string(),
             progress: Some(state.progress),
             current_step: Some(state.current_step),
-            result: None,
+            result,
             error: state.error,
             created_at: state.created_at,
             updated_at: state.updated_at,
         };
-        
+
         let headers = Headers::new();
         headers.set("Content-Type", "application/json; charset=utf-8")?;
-        
+
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
     
@@ -277,6 +287,12 @@ impl AITaskDO {
         let result_key = get_result_key(&self.task_name());
         storage.put(&result_key, result).await?;
         Ok(())
+    }
+
+    async fn load_result(&self) -> Result<Option<CompatibleResponse>> {
+        let storage = self.state.storage();
+        let result_key = get_result_key(&self.task_name());
+        Ok(storage.get::<CompatibleResponse>(&result_key).await.ok())
     }
     
     fn get_current_timestamp(&self) -> u64 {

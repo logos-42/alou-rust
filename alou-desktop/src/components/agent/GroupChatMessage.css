@@ -26,8 +26,9 @@
 }
 
 .group-chat-message.user-message .message-bubble {
-  background: var(--primary-color, #6366f1);
-  color: #ffffff;
+  background: var(--surface, rgba(255, 255, 255, 0.85));
+  color: var(--text-primary, #0f172a);
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
   border-radius: 8px 8px 2px 8px;
 }
 
@@ -271,6 +272,7 @@
 }
 
 /* 暗色模式 */
+.app-shell.dark-mode .group-chat-message.user-message .message-bubble,
 .app-shell.dark-mode .group-chat-message.agent-message .message-bubble {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.1);

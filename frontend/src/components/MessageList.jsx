@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
 
@@ -43,6 +43,15 @@ const MessageList = forwardRef(
     [],
   )
 
+  const handleCopy = useCallback(async (content, messageId) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      // 可以添加提示用户复制成功
+    } catch (error) {
+      console.error('复制失败:', error)
+    }
+  }, [])
+
   const renderedMessages = useMemo(
     () =>
       messages.map((message) => ({
@@ -80,9 +89,22 @@ const MessageList = forwardRef(
                 />
                 <div className="message-footer">
                   <span className="timestamp">{message.formattedTime}</span>
-                  {message.formattedSource && (
-                    <span className="source-tag">{message.formattedSource}</span>
-                  )}
+                  <div className="message-actions">
+                    <button
+                      type="button"
+                      className="copy-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleCopy(message.content, message.id)
+                      }}
+                      title="复制内容"
+                    >
+                      📋
+                    </button>
+                    {message.formattedSource && (
+                      <span className="source-tag">{message.formattedSource}</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

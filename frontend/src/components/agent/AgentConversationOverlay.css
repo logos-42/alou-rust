@@ -29,21 +29,24 @@
 .conversation-panel.embedded {
   position: relative;
   width: 100%;
-  height: auto;
-  min-height: 320px;
-  border-radius: 1.25rem;
-  padding: 1.25rem 1.5rem;
+  height: auto !important;
+  max-height: 180px !important;
+  min-height: 140px !important;
+  border-radius: 1rem !important;
+  padding: 0.75rem 1rem !important;
   background: var(--surface);
   border: 1px solid var(--border-color);
   box-shadow: none;
 }
 
 .conversation-panel.embedded .conversation-body {
-  padding-right: 0;
-  border-radius: 1rem;
+  padding-right: 0 !important;
+  border-radius: 0.5rem !important;
   border: 1px dashed rgba(15, 23, 42, 0.08);
-  padding: 1rem;
+  padding: 0.5rem !important;
   background: rgba(255, 255, 255, 0.65);
+  max-height: 110px !important;
+  overflow-y: auto !important;
 }
 
 .app-shell.dark-mode .conversation-panel.embedded .conversation-body {
@@ -61,21 +64,30 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.conversation-panel.embedded header {
+  margin-bottom: 0.35rem !important;
 }
 
 .conversation-panel .title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   font-weight: 600;
   color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.conversation-panel.embedded .title {
+  font-size: 0.75rem !important;
 }
 
 .conversation-panel .agent-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.1);
   display: inline-flex;
@@ -90,6 +102,11 @@
   object-fit: cover;
 }
 
+.conversation-panel.embedded .agent-avatar {
+  width: 24px !important;
+  height: 24px !important;
+}
+
 .app-shell.dark-mode .conversation-panel .agent-avatar {
   border-color: rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.08);
@@ -98,32 +115,40 @@
 .conversation-panel .title-text {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.05rem;
 }
 
 .conversation-panel .title-text small {
-  font-size: 0.78rem;
+  font-size: 0.65rem;
   color: var(--text-secondary);
   font-weight: 400;
+}
+
+.conversation-panel.embedded .title-text small {
+  font-size: 0.6rem !important;
 }
 
 .conversation-panel .header-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .conversation-panel .status {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
+  gap: 0.3rem;
+  font-size: 0.65rem;
   color: var(--text-secondary);
 }
 
+.conversation-panel.embedded .status {
+  font-size: 0.6rem !important;
+}
+
 .conversation-panel .status .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #94a3b8;
 }
@@ -157,6 +182,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.conversation-panel.embedded .close-btn {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 0.8rem !important;
 }
 
 .conversation-panel .close-btn:hover {
