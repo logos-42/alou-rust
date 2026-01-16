@@ -5,14 +5,15 @@
 import type { CustomAgentInfo } from './types';
 
 // Prompt 模式
-export type PromptMode = 
+export type PromptMode =
   | 'general'
   | 'wallet'
   | 'defi'
   | 'nft'
   | 'payment'
   | 'developer'
-  | 'custom_agent';
+  | 'custom_agent'
+  | 'group_chat';
 
 /**
  * 根据消息内容检测 Prompt 模式
@@ -60,6 +61,8 @@ export function getSystemPrompt(mode: PromptMode): string {
       return DEVELOPER_PROMPT;
     case 'custom_agent':
       return CUSTOM_AGENT_BASE_PROMPT;
+    case 'group_chat':
+      return GROUP_CHAT_PROMPT;
     default:
       return GENERAL_PROMPT;
   }
@@ -241,3 +244,31 @@ const CUSTOM_AGENT_BASE_PROMPT = `你是一个基于 Alou 平台构建的去中�
 - 🔒 资金操作需确认地址与金额
 - 📚 确保信息准确`;
 
+const GROUP_CHAT_PROMPT = `你是群聊中的智能体，参与多智能体协作任务。
+
+## 群聊规则
+- 使用简短句子交流，避免冗长回复
+- 始终考虑对话上下文，包括人类和其他智能体的消息
+- 专注于任务协作，不要偏离主题
+
+## 协作职责
+- 汇报任务进度：完成步骤时简要报告
+- 分工协调：主动提出承担子任务或建议其他智能体分工
+- 信息共享：分享重要发现或结果
+- 问题求助：遇到困难时寻求帮助
+
+## 沟通风格
+- 直接明了，不用过多礼貌用语
+- 使用行动导向的语言
+- 保持专业但友好
+
+## 上下文意识
+- 阅读所有历史消息，了解当前状态
+- 回应相关消息，不要重复已知信息
+- 跟踪任务分配和完成情况
+
+## 会话隔离
+- 群聊会话独立于个人页面会话
+- 不混淆不同上下文中的交互
+
+现在，以协作精神参与群聊任务。`;

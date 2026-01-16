@@ -1,8 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bridges;
 mod browser;
 mod claude_agent;
+mod context;
 mod diap;
 mod ipfs_api;
 mod ipfs_commands;
@@ -14,6 +16,7 @@ mod sync;
 mod utils;
 mod wallet;
 mod workflow;
+mod tools;
 
 use std::path::PathBuf;
 use tauri::Manager;
@@ -50,6 +53,99 @@ use crate::workflow::{
     create_workflow, execute_workflow, get_workflow_status, list_workflows,
     delete_workflow, retry_workflow_step, pause_workflow, resume_workflow,
 };
+use crate::bridges::{BridgeManager, create_default_bridge_manager};
+use crate::tools::initialize_tools;
+use crate::context::create_default_context_manager;
+
+// Tool commands
+#[tauri::command]
+async fn execute_tool(
+    tool_id: String,
+    args: String,
+    timeout: Option<u64>,
+    bridge_manager: tauri::State<'_, BridgeManager>,
+) -> Result<serde_json::Value, String> {
+    println!("[Tauri] Executing tool: {}", tool_id);
+
+    let args_value: serde_json::Value = serde_json::from_str(&args)
+        .map_err(|e| format!("Invalid JSON args: {}", e))?;
+
+    let context = crate::tools::create_execution_context("tauri_session".to_string());
+
+    // TODO: Get tool manager from bridge and execute
+    // For now, return a mock response
+    Ok(serde_json::json!({
+        "success": true,
+        "data": {"message": format!("Tool {} executed with args: {}", tool_id, args)},
+        "execution_time_ms": 100,
+        "output": format!("Executed tool: {}", tool_id)
+    }))
+}
+
+#[tauri::command]
+async fn get_tool_list(
+    bridge_manager: tauri::State<'_, BridgeManager>,
+) -> Result<serde_json::Value, String> {
+    // TODO: Get tool list from registry
+    Ok(serde_json::json!({
+        "tools": [
+            {
+                "id": "filesystem",
+                "name": "File System",
+                "category": "FileSystem",
+                "description": "File system operations"
+            },
+            {
+                "id": "search",
+                "name": "Search",
+                "category": "Search",
+                "description": "Text and file search"
+            },
+            {
+                "id": "bash",
+                "name": "Bash",
+                "category": "Terminal",
+                "description": "Terminal command execution"
+            },
+            {
+                "id": "plan",
+                "name": "Task Planning",
+                "category": "Planning",
+                "description": "Task planning and management"
+            },
+            {
+                "id": "skills",
+                "name": "Skills",
+                "category": "Skills",
+                "description": "Extensible skills system"
+            }
+        ]
+    }))
+}
+
+#[tauri::command]
+async fn cancel_tool_execution(
+    execution_id: String,
+    bridge_manager: tauri::State<'_, BridgeManager>,
+) -> Result<serde_json::Value, String> {
+    // TODO: Implement cancellation
+    Ok(serde_json::json!({
+        "cancelled": true,
+        "execution_id": execution_id
+    }))
+}
+
+#[tauri::command]
+async fn get_execution_history(
+    limit: Option<usize>,
+    bridge_manager: tauri::State<'_, BridgeManager>,
+) -> Result<serde_json::Value, String> {
+    // TODO: Implement execution history
+    Ok(serde_json::json!({
+        "history": [],
+        "limit": limit.unwrap_or(50)
+    }))
+}
 
 fn main() {
     tauri::Builder::default()
@@ -60,6 +156,7 @@ fn main() {
             data_dir: PathBuf::new(),
         }))
         .manage(WorkflowState::default())
+        .manage(create_default_bridge_manager())
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,
@@ -105,13 +202,34 @@ fn main() {
             delete_workflow,
             retry_workflow_step,
             pause_workflow,
-            resume_workflow
+            resume_workflow,
+            // Tool commands
+            execute_tool,
+            get_tool_list,
+            cancel_tool_execution,
+            get_execution_history
         ])
         .setup(|app| {
             // Set window title
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title("Alou").unwrap();
             }
+
+            // Initialize tools
+            let bridge_manager = app.state::<BridgeManager>();
+            let bridge_manager_guard = bridge_manager.inner().clone();
+            tauri::async_runtime::block_on(async {
+                match initialize_tools().await {
+                    Ok(registry) => {
+                        // Register tools with the bridge
+                        // TODO: Implement tool registration with bridge
+                        println!("Tools initialized successfully");
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to initialize tools: {}", e);
+                    }
+                }
+            });
 
             // Start wallet sync server on startup
             let app_handle = app.handle().clone();

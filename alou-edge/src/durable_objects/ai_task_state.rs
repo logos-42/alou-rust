@@ -22,6 +22,14 @@ pub fn get_tool_result_key(task_id: &str) -> String {
     format!("{}:last_tool_result", task_id)
 }
 
+pub fn get_pending_tool_calls_key(task_id: &str) -> String {
+    format!("{}:pending_tool_calls", task_id)
+}
+
+pub fn get_conversation_history_key(task_id: &str) -> String {
+    format!("{}:conversation_history", task_id)
+}
+
 /// 任务缓存（内存中的状态副本）
 #[derive(Clone)]
 pub struct TaskCache {

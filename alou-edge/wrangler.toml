@@ -63,10 +63,10 @@ name = "AI_TASKS"
 class_name = "AITaskDO"
 
 # Migrations for Durable Objects (main environment)
+# Durable Objects already exist, no migration needed
 # [[migrations]]
 # tag = "v1"
 # new_sqlite_classes = ["AITaskDO"]
-# 注释掉迁移配置，因为 AITaskDO 已经存在
 
 
   [vars.development]

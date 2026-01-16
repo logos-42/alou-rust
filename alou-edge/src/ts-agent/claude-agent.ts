@@ -60,6 +60,7 @@ export interface AgentQueryResult {
     input_tokens: number;
     output_tokens: number;
   };
+  task_id?: string; // 异步任务ID
 }
 
 /**
@@ -84,18 +85,73 @@ export class ClaudeAgent {
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
+
+  /**
+   * 创建异步任务（使用Rust WASM后端）
+   */
+  private async createAsyncTask(compatRequest: any, env: any, ctx: any, aiTasksNamespace?: any): Promise<string> {
+    console.log('[Claude SDK] Creating async task via Rust WASM backend');
+
+    try {
+      // 构建内部请求URL
+      const baseUrl = `http://dummy`; // Durable Object使用相对URL
+
+      // 创建任务初始化请求
+      const requestBody = JSON.stringify(compatRequest);
+      const headers = new Headers();
+      headers.set('Content-Type', 'application/json');
+
+      // 注意：这里我们需要使用Rust WASM的Durable Object
+      // 由于在TypeScript环境中，我们通过fetch调用Rust WASM后端
+      // 但是由于路由问题，我们直接创建Durable Object实例
+
+      // 获取Durable Object命名空间（优先使用传入的命名空间）
+      const namespace = aiTasksNamespace || env.AI_TASKS;
+      if (!namespace) {
+        throw new Error('AI_TASKS Durable Object namespace not found. Make sure Durable Objects are properly configured.');
+      }
+
+      // 生成任务ID
+      const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`[Claude SDK] Generated task ID: ${taskId}`);
+
+      // 获取Durable Object存根
+      const id = namespace.idFromName(taskId);
+      const stub = id.getStub();
+
+      // 调用init-and-start端点
+      const response = await stub.fetch('http://dummy/init-and-start', {
+        method: 'POST',
+        headers: headers,
+        body: requestBody,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create async task: ${response.status} ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log(`[Claude SDK] Async task created successfully: ${taskId}`);
+
+      return taskId;
+    } catch (error: any) {
+      console.error('[Claude SDK] Failed to create async task:', error);
+      throw new Error(`Async task creation failed: ${error.message}`);
+    }
+  }
   
   /**
    * 方案 B: 自定义适配器（DeepSeek API 直接调用）
-   * 
+   *
    * 在 Cloudflare Workers 环境中，这是唯一可行的方案：
    * 1. Claude Agent SDK 需要进程执行，Workers 不支持
    * 2. 我们只需要简单的聊天功能，不需要代码执行
    * 3. DeepSeek API 兼容 OpenAI 格式，可以直接调用
-   * 
+   *
    * 这个实现提供了与 Claude Agent SDK 兼容的接口风格，并支持工具调用
    */
-  async query(options: AgentQueryOptions): Promise<AgentQueryResult> {
+  async query(options: AgentQueryOptions, env?: any, ctx?: any, aiTasksNamespace?: any): Promise<AgentQueryResult> {
     const {
       prompt,
       systemPrompt: customSystemPrompt,
@@ -109,7 +165,55 @@ export class ClaudeAgent {
       tools = [],
       toolExecutor,
     } = options;
-    
+
+    // 🚀 检查是否应该使用异步处理（强制异步）
+    console.log('🚀🚀🚀 CLAUDE SDK ASYNC CHECK START 🚀🚀🚀');
+    console.log('[Claude SDK] Checking if should use async processing...');
+    console.log(`[Claude SDK] env exists: ${!!env}, ctx exists: ${!!ctx}`);
+    console.log(`[Claude SDK] env.AI_TASKS exists: ${!!(env && env.AI_TASKS)}`);
+    console.log(`[Claude SDK] aiTasksNamespace exists: ${!!aiTasksNamespace}`);
+    console.log(`[Claude SDK] FORCED ASYNC MODE ENABLED`);
+    const shouldUseAsync = true; // 强制使用异步处理
+
+    if (shouldUseAsync && (env || aiTasksNamespace)) {
+      console.log('✅✅✅ USING ASYNC PROCESSING - CREATING BACKGROUND TASK ✅✅✅');
+      console.log('[Claude SDK] Using async processing - creating background task');
+
+      // 构建兼容性请求
+      const compatRequest = {
+        prompt,
+        system_prompt: customSystemPrompt,
+        history: history.map(h => ({
+          role: h.role,
+          content: h.content,
+          timestamp: h.timestamp,
+        })),
+        agent_info: agentInfo,
+        tools: tools.map(t => ({
+          name: t.function.name,
+          description: t.function.description,
+          parameters: t.function.parameters,
+        })),
+        model,
+        max_tokens: maxTokens,
+        temperature,
+        task_type: 'async', // 强制异步
+      };
+
+      // 创建异步任务（使用Rust WASM后端）
+      const taskId = await this.createAsyncTask(compatRequest, env, ctx, aiTasksNamespace);
+
+      return {
+        response: `异步任务已创建，任务ID: ${taskId}`,
+        tool_calls: undefined,
+        usage: undefined,
+        task_id: taskId, // 返回任务ID
+      };
+    }
+
+    console.log('❌❌❌ FALLBACK TO SYNC PROCESSING ❌❌❌');
+    console.log('[Claude SDK] Using sync processing');
+
     // 确定系统 Prompt
     let systemPrompt: string;
     if (customSystemPrompt) {
@@ -120,7 +224,7 @@ export class ClaudeAgent {
       const mode = detectPromptMode(prompt);
       systemPrompt = getSystemPrompt(mode);
     }
-    
+
     systemPrompt = addContextToPrompt(systemPrompt, walletAddress, chain);
     
     // 构建消息历史（DeepSeek 使用 OpenAI 兼容格式）
@@ -347,9 +451,10 @@ export class ClaudeAgent {
     chain?: string;
     tools?: ToolDefinition[];
     toolExecutor?: (toolCall: ToolCall) => Promise<{ result: any; error?: string }>;
-  }): Promise<{
+  }, env?: any, ctx?: any, aiTasksNamespace?: any): Promise<{
     response: string;
     tool_calls?: ToolCall[];
+    task_id?: string;
   }> {
     const result = await this.query({
       prompt: options.message,
@@ -359,11 +464,12 @@ export class ClaudeAgent {
       chain: options.chain,
       tools: options.tools,
       toolExecutor: options.toolExecutor,
-    });
-    
+    }, env, ctx, aiTasksNamespace);
+
     return {
       response: result.response,
       tool_calls: result.tool_calls,
+      task_id: result.task_id,
     };
   }
 }
