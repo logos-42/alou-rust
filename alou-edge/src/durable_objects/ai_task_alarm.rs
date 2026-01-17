@@ -6,17 +6,19 @@ use crate::compatibility::models::ToolCall;
 use crate::durable_objects::ai_task_state::{TaskState, TaskStatus, get_state_key, get_pending_tool_calls_key, get_tool_result_key};
 use crate::durable_objects::ai_task_persistence::TaskPersistence;
 use crate::durable_objects::ai_task_execution::TaskExecutionContext;
-use crate::durable_objects::ai_task_workflow::{WorkflowDecisionHandler, Workflow};
+use crate::durable_objects::ai_task_workflow::WorkflowDecisionHandler;
+use crate::mcp::tools::workflow::Workflow;
 use worker::{Result, console_log, console_error};
 
 /// Alarm 处理器
 pub struct AlarmHandler<'a> {
     pub ctx: TaskExecutionContext<'a>,
+    pub state: &'a worker::State,
 }
 
 impl<'a> AlarmHandler<'a> {
-    pub fn new(ctx: TaskExecutionContext<'a>) -> Self {
-        Self { ctx }
+    pub fn new(ctx: TaskExecutionContext<'a>, state: &'a worker::State) -> Self {
+        Self { ctx, state }
     }
 
     /// 处理 Alarm 逻辑
@@ -29,7 +31,7 @@ impl<'a> AlarmHandler<'a> {
         console_log!("[ALARM-LOGIC] Handling alarm for task: {}", self.ctx.task_name);
 
         // 加载状态
-        let state = self.load_state()?;
+        let state = self.load_state().await?;
         console_log!("[STATE-TRANSITION] Task {}: status={}, progress={}, step='{}'",
                      self.ctx.task_name, state.status, state.progress, state.current_step);
 
@@ -204,8 +206,12 @@ impl<'a> AlarmHandler<'a> {
         let result_key = get_tool_result_key(self.ctx.task_name);
         let tool_result = match self.ctx.storage.get::<serde_json::Value>(&result_key).await {
             Ok(Some(res)) => res,
-            _ => {
+            Ok(None) => {
                 console_log!("[WORKFLOW-AI] No tool result found");
+                return Ok(());
+            }
+            Err(_) => {
+                console_log!("[WORKFLOW-AI] Error getting tool result");
                 return Ok(());
             }
         };
@@ -238,7 +244,7 @@ impl<'a> AlarmHandler<'a> {
         // 5. 使用工作流 AI 决策器获取决策
         use crate::durable_objects::ai_task_workflow::{WorkflowAIDecider, WorkflowDecisionHandler};
         let ai_caller = crate::durable_objects::ai_task_ai::DefaultAiCaller;
-        let ai_decider = WorkflowAIDecider::new(&ai_caller, self.ctx.storage, self.ctx.task_name.to_string());
+        let ai_decider = WorkflowAIDecider::new(&ai_caller, self.state, self.ctx.task_name.to_string());
         let decision = ai_decider.get_ai_decision(&ai_client, &workflow, &tool_result).await;
 
         let decision = match decision {

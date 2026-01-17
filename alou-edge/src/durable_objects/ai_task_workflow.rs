@@ -2,7 +2,7 @@
 //!
 //! 负责工作流的异步分步执行、AI 决策和状态管理
 
-use crate::compatibility::models::{TaskStatus, CompatibleResponse};
+use crate::compatibility::models::CompatibleResponse;
 use crate::durable_objects::{
     ai_task_state::{get_state_key, get_workflow_key, get_workflow_results_key, get_tool_result_key},
 };
@@ -12,6 +12,7 @@ use crate::durable_objects::ai_task_ai::DefaultAiCaller;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use worker::{console_log, console_error};
 
 /// AI 决策结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,7 +302,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
 
         let current_step = state_data
             .get_mut("current_step")
-            .and_then(|s| s.as_str_mut())
+            .and_then(|s| s.as_str())
             .unwrap();
 
         *current_step = "重试当前步骤（根据 AI 判断）";
@@ -361,7 +362,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
         let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
 
         state_data["status"] = serde_json::Value::String("completed".to_string());
-        state_data["progress"] = serde_json::Value::Number(serde_json::Number::from(1.0f64));
+        state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
         state_data["current_step"] = serde_json::Value::String(format!("工作流终止：{}", reason));
 
         self.state.storage().put(&state_key, &state_data).await?;
@@ -437,7 +438,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
             // 更新状态
             let state_key = get_state_key(&self.task_name);
             let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
-            state_data["progress"] = serde_json::Value::Number(serde_json::Number::from(executor.calculate_workflow_progress(workflow)));
+            state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(executor.calculate_workflow_progress(workflow) as f64).unwrap());
             state_data["current_step"] = serde_json::Value::String(format!("执行步骤: {}", step.name));
             self.state.storage().put(&state_key, &state_data).await?;
 
@@ -484,7 +485,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
                 let state_key = get_state_key(&self.task_name);
                 let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
                 state_data["status"] = serde_json::Value::String("completed".to_string());
-                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from(1.0f64));
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
                 state_data["current_step"] = serde_json::Value::String("工作流完成".to_string());
                 self.state.storage().put(&state_key, &state_data).await?;
             } else {
@@ -501,7 +502,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
                 let state_key = get_state_key(&self.task_name);
                 let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
                 state_data["status"] = serde_json::Value::String("completed".to_string());
-                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from(1.0f64));
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
                 state_data["current_step"] = serde_json::Value::String("工作流完成".to_string());
                 self.state.storage().put(&state_key, &state_data).await?;
             } else {
@@ -510,7 +511,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
                 let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
                 state_data["status"] = serde_json::Value::String("failed".to_string());
                 state_data["error"] = serde_json::Value::String("工作流执行失败：无法继续执行".to_string());
-                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from(1.0f64));
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
                 self.state.storage().put(&state_key, &state_data).await?;
             }
         }

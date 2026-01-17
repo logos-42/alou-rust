@@ -21,6 +21,7 @@ use crate::durable_objects::{
     ai_task_handlers::AITaskHandlers,
 };
 use crate::mcp::tools::workflow::Workflow;
+use crate::compatibility::models::{CompatibleRequest, TaskStatus};
 use std::cell::RefCell;
 
 use worker::{
@@ -101,17 +102,18 @@ impl DurableObject for AITaskDO {
         console_error_panic_hook::set_once();
 
         // 使用 AlarmHandler 处理 alarm 逻辑
+        let task_name = self.task_name();
         let ctx = TaskExecutionContext::new(
             &self.state.storage(),
-            &self.task_name(),
+            &task_name,
             &self.env,
         );
-        let alarm_handler = AlarmHandler::new(ctx);
+        let alarm_handler = AlarmHandler::new(ctx, &self.state);
 
         match alarm_handler.handle_alarm_logic(
-            || self.execute_workflow_task(),
-            || self.execute_task(),
-            || self.continue_with_tool_results(),
+            || async { self.execute_workflow_task().await },
+            || async { self.execute_task().await },
+            || async { self.continue_with_tool_results().await },
         ).await {
             Ok(_) => Response::ok("Alarm handled"),
             Err(e) => {
@@ -194,7 +196,8 @@ impl AITaskDO {
         console_log!("[CONTINUE] Continuing conversation with tool results");
 
         // 创建执行上下文
-        let ctx = TaskExecutionContext::new(&self.state.storage(), &self.task_name(), &self.env);
+        let task_name = self.task_name();
+        let ctx = TaskExecutionContext::new(&self.state.storage(), &task_name, &self.env);
         let executor = TaskExecutorImpl::new(ctx);
 
         executor.continue_with_tool_results().await
@@ -209,7 +212,8 @@ impl AITaskDO {
     /// 执行任务
     async fn execute_task(&self) -> Result<()> {
         // 创建执行上下文
-        let ctx = TaskExecutionContext::new(&self.state.storage(), &self.task_name(), &self.env);
+        let task_name = self.task_name();
+        let ctx = TaskExecutionContext::new(&self.state.storage(), &task_name, &self.env);
         let executor = TaskExecutorImpl::new(ctx);
 
         executor.execute_full_task().await
