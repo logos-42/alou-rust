@@ -74,6 +74,73 @@ impl FileSystemTool {
         Ok(old_text.len())
     }
 
+
+    /// 按行删除
+    async fn delete_lines(&self, path: &str, start_line: usize, end_line: Option<usize>) -> Result<usize, ToolError> {
+        let content = self.read_file(path).await?;
+        let lines: Vec<&str> = content.lines().collect();
+
+        if start_line == 0 {
+            return Err(ToolError::ExecutionFailed("Start line must be greater than 0".to_string()));
+        }
+
+        let end_line = end_line.unwrap_or(start_line);
+        if end_line < start_line {
+            return Err(ToolError::ExecutionFailed("End line must be greater than or equal to start line".to_string()));
+        }
+
+        if start_line > lines.len() {
+            return Err(ToolError::ExecutionFailed(format!("Start line {} exceeds file length {}", start_line, lines.len())));
+        }
+
+        let actual_end_line = end_line.min(lines.len());
+        let deleted_lines = actual_end_line - start_line + 1;
+
+        let new_content = lines.into_iter()
+            .enumerate()
+            .filter(|(i, _)| *i < start_line - 1 || *i > actual_end_line - 1)
+            .map(|(_, line)| line)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        fs::write(path, new_content).await
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write file: {}", e)))?;
+
+        Ok(deleted_lines)
+    }
+
+    /// 按块删除
+    async fn delete_block(&self, path: &str, block_text: &str, all_occurrences: bool) -> Result<usize, ToolError> {
+        let content = self.read_file(path).await?;
+
+        if !content.contains(block_text) {
+            return Err(ToolError::ExecutionFailed(format!("Block text '{}' not found", block_text)));
+        }
+
+        let (new_content, deleted_count) = if all_occurrences {
+            // 删除所有匹配的块
+            let new_content = content.replace(block_text, "");
+            let deleted_count = content.matches(block_text).count();
+            (new_content, deleted_count)
+        } else {
+            // 只删除第一个匹配的块
+            if let Some(pos) = content.find(block_text) {
+                let new_content = format!("{}{}",
+                    &content[..pos],
+                    &content[pos + block_text.len()..]
+                );
+                (new_content, 1)
+            } else {
+                (content, 0)
+            }
+        };
+
+        fs::write(path, new_content).await
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to write file: {}", e)))?;
+
+        Ok(deleted_count)
+    }
+
     /// 列出目录内容
     async fn list_directory(&self, path: &str, recursive: bool, depth: Option<usize>) -> Result<Vec<FileInfo>, ToolError> {
         let mut files = Vec::new();
@@ -321,6 +388,43 @@ impl ToolExecutor for FileSystemTool {
                 })
             },
 
+            FileOperation::DeleteLines { path, start_line, end_line } => {
+                let lines_deleted = self.delete_lines(&path, start_line, end_line).await?;
+                Ok(ToolResult {
+                    success: true,
+                    data: serde_json::json!({
+                        "path": path,
+                        "lines_deleted": lines_deleted,
+                        "start_line": start_line,
+                        "end_line": end_line,
+                        "operation": "delete_lines"
+                    }),
+                    error: None,
+                    execution_time_ms: 0,
+                    output: Some(format!("Deleted {} lines from {} (lines {}-{})", lines_deleted, path, start_line, end_line.unwrap_or(start_line))),
+                    warnings: vec![],
+                    context: None,
+                })
+            },
+
+            FileOperation::DeleteBlock { path, block_text, all_occurrences } => {
+                let blocks_deleted = self.delete_block(&path, &block_text, all_occurrences).await?;
+                Ok(ToolResult {
+                    success: true,
+                    data: serde_json::json!({
+                        "path": path,
+                        "blocks_deleted": blocks_deleted,
+                        "all_occurrences": all_occurrences,
+                        "operation": "delete_block"
+                    }),
+                    error: None,
+                    execution_time_ms: 0,
+                    output: Some(format!("Deleted {} block(s) from {}", blocks_deleted, path)),
+                    warnings: vec![],
+                    context: None,
+                })
+            },
+
             FileOperation::List { path, recursive, depth } => {
                 let files = self.list_directory(&path, recursive, depth).await?;
                 Ok(ToolResult {
@@ -423,6 +527,8 @@ Available operations:
 - read: Read file contents
 - write: Write content to a file (create if not exists)
 - edit: Edit file by exact text replacement
+- delete_lines: Delete specific lines from a file
+- delete_block: Delete text blocks from a file
 - list: List directory contents
 - copy: Copy file/directory
 - move: Move/rename file/directory
@@ -440,6 +546,20 @@ Example usage:
   "path": "/path/to/file.txt",
   "content": "Hello, World!",
   "create_dirs": true
+}
+
+{
+  "operation": "delete_lines",
+  "path": "/path/to/file.txt",
+  "start_line": 5,
+  "end_line": 10
+}
+
+{
+  "operation": "delete_block",
+  "path": "/path/to/file.txt",
+  "block_text": "function oldFunction() {\n  // old code\n}",
+  "all_occurrences": false
 }
 
 {
@@ -469,6 +589,23 @@ pub enum FileOperation {
         path: String,
         old_text: String,
         new_text: String,
+    },
+    /// 按行删除
+    DeleteLines {
+        path: String,
+        /// 起始行号（1-based）
+        start_line: usize,
+        /// 结束行号（包含，可选，为None时只删除start_line行）
+        end_line: Option<usize>,
+    },
+    /// 按文本块删除
+    DeleteBlock {
+        path: String,
+        /// 要删除的文本块
+        block_text: String,
+        /// 是否删除所有匹配的块（默认false，只删除第一个）
+        #[serde(default)]
+        all_occurrences: bool,
     },
     /// 列出目录
     List {
@@ -586,6 +723,28 @@ mod tests {
             "path": test_file.to_str().unwrap(),
             "old_text": "World",
             "new_text": "Rust"
+        });
+
+        let result = tool.execute(args, &context).await;
+        assert!(result.is_ok());
+
+        // 测试按行删除
+        let args = serde_json::json!({
+            "operation": "delete_lines",
+            "path": test_file.to_str().unwrap(),
+            "start_line": 1,
+            "end_line": 1
+        });
+
+        let result = tool.execute(args, &context).await;
+        assert!(result.is_ok());
+
+        // 测试按文本块删除
+        let args = serde_json::json!({
+            "operation": "delete_block",
+            "path": test_file.to_str().unwrap(),
+            "block_text": "Hello",
+            "all_occurrences": false
         });
 
         let result = tool.execute(args, &context).await;

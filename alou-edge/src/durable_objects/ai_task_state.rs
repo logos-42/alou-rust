@@ -30,6 +30,18 @@ pub fn get_conversation_history_key(task_id: &str) -> String {
     format!("{}:conversation_history", task_id)
 }
 
+pub fn get_workflow_key(task_id: &str) -> String {
+    format!("{}:workflow", task_id)
+}
+
+pub fn get_workflow_steps_key(task_id: &str) -> String {
+    format!("{}:workflow_steps", task_id)
+}
+
+pub fn get_workflow_results_key(task_id: &str) -> String {
+    format!("{}:workflow_results", task_id)
+}
+
 /// 任务缓存（内存中的状态副本）
 #[derive(Clone)]
 pub struct TaskCache {

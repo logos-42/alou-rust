@@ -556,7 +556,7 @@ mod tests {
         manager.add_entry(entry).await.unwrap();
 
         // 导出
-        let export_data = manager.export_context().unwrap();
+        let export_data = manager.export_context().await.unwrap();
 
         // 创建新管理器并导入
         let mut new_manager = create_default_context_manager();

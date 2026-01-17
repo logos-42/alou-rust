@@ -1,156 +1,15 @@
 /**
  * Agent Service - 与 Cloudflare Workers (alou-edge) 通信
  * 重构后：使用组合模式，将职责分离到不同的服务
- * 新增：集成 Claude Agent SDK 内置工具
  */
 import apiClient from './api'
 import agentResolverService from './agentResolverService'
 import ipfsContentService from './ipfsContentService'
 import asyncTaskService from './asyncTaskService'
 import { parseDidDocumentToAgent } from './didDocumentParser'
-import { 
-  createClaudeAgentConfig, 
-  getAllTools, 
-  TOOL_CATEGORIES,
-  ToolExecutor 
-} from './claudeAgentTools'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
-
-// Claude Agent SDK 工具配置
-const DEFAULT_CLAUDE_AGENT_CONFIG = {
-  mode: 'agent',
-  categories: ['CORE', 'WEB3', 'MCP', 'NETWORK', 'CONTROL_FLOW'],
-  model: 'claude-3-5-sonnet-20241022',
-  maxTokens: 4000,
-  temperature: 0.7
-};
-
-// Claude Agent SDK 工具执行器实例
-let toolExecutor = null;
-
-/**
- * 初始化工具执行器
- */
-function initToolExecutor() {
-  if (!toolExecutor) {
-    toolExecutor = new ToolExecutor();
-    
-    // 注册本地可执行的工具处理器
-    // 这里可以添加需要在客户端本地执行的工具
-    
-    console.log('[AgentService] 工具执行器已初始化');
-  }
-  return toolExecutor;
-}
-
-/**
- * 获取Claude Agent SDK工具配置
- * @param {Object} options - 配置选项
- * @returns {Object} 工具配置
- */
-function getClaudeAgentTools(options = {}) {
-  const config = {
-    ...DEFAULT_CLAUDE_AGENT_CONFIG,
-    ...options
-  };
-  
-  return createClaudeAgentConfig(config);
-}
-
-/**
- * 根据模式获取工具类别
- * @param {string} mode - 模式：'alou' 或 'agent'
- * @returns {Array} 工具类别数组
- */
-function getToolCategoriesByMode(mode) {
-  switch (mode) {
-    case 'alou':
-      return ['WEB3', 'MCP', 'CORE', 'NETWORK'];
-    case 'agent':
-      return ['CORE', 'NETWORK', 'CONTROL_FLOW', 'WEB3', 'MCP'];
-    default:
-      return DEFAULT_CLAUDE_AGENT_CONFIG.categories;
-  }
-}
-
-/**
- * 生成Claude Agent SDK兼容的请求
- * @param {Object} params - 请求参数
- * @returns {Object} Claude Agent SDK请求
- */
-function createClaudeSdkRequest(params) {
-  const {
-    message,
-    eventSummary,
-    walletAddress,
-    chain,
-    mode = 'agent',
-    agentName,
-    roleDescription,
-    customInstructions,
-    customPrompt,
-    mcpTools,
-    agentMetadata,
-    sessionId,
-    contextEvents,
-    model,
-    maxTokens,
-    temperature,
-    timeout
-  } = params;
-  
-  // 获取工具配置
-  const toolCategories = getToolCategoriesByMode(mode);
-  const claudeConfig = getClaudeAgentTools({
-    mode,
-    categories: toolCategories,
-    agentInfo: {
-      session_id: sessionId,
-      wallet_address: walletAddress,
-      chain: chain,
-      context_events: contextEvents,
-      name: agentName,
-      role_description: roleDescription,
-      custom_instructions: customInstructions,
-      custom_prompt: customPrompt,
-      mcp_tools: mcpTools,
-      ...agentMetadata
-    },
-    model: model || DEFAULT_CLAUDE_AGENT_CONFIG.model,
-    maxTokens: maxTokens || DEFAULT_CLAUDE_AGENT_CONFIG.maxTokens,
-    temperature: temperature || DEFAULT_CLAUDE_AGENT_CONFIG.temperature
-  });
-  
-  return {
-    apiKey: "alou-backend-default-token",
-    prompt: message,
-    systemPrompt: claudeConfig.systemPrompt,
-    history: [],
-    agentInfo: claudeConfig.agentInfo,
-    tools: claudeConfig.tools,
-    model: claudeConfig.model,
-    maxTokens: claudeConfig.maxTokens,
-    temperature: claudeConfig.temperature,
-    taskType: "sync",
-    timeout: timeout
-  };
-}
-
-/**
- * 处理工具调用结果
- * @param {Array} toolCalls - 工具调用数组
- * @returns {Promise<Array>} 处理后的结果
- */
-async function processToolCalls(toolCalls) {
-  if (!toolCalls || toolCalls.length === 0) {
-    return [];
-  }
-  
-  initToolExecutor();
-  return await toolExecutor.executeBatch(toolCalls);
-}
 
 // 辅助函数：生成系统提示
 const getSystemPromptForChat = (eventSummary, walletAddress, chain, mode = 'agent') => {
@@ -355,60 +214,48 @@ export class AgentService {
         }
       }
 
-      // 使用 Claude Agent SDK 兼容接口
-      // 构建 Claude SDK 格式的请求（使用新的工具配置）
-      const claudeSdkRequest = createClaudeSdkRequest({
-        message,
+      // 获取系统提示词
+      const systemPrompt = getSystemPromptForChat(
         eventSummary,
         walletAddress,
         chain,
-        mode,
-        agentName,
-        roleDescription,
-        customInstructions,
-        customPrompt,
-        mcpTools,
-        agentMetadata,
-        sessionId,
-        contextEvents,
-        model,
-        maxTokens,
-        temperature,
-        timeout
-      });
+        mode
+      )
 
-      const response = await apiClient.post('/claude-agent/query', claudeSdkRequest, {
+      // 构建请求
+      const requestBody = {
+        message,
+        session_id: sessionId,
+        system_prompt: systemPrompt,
+        wallet_address: walletAddress,
+        chain,
+        mode,
+        agent_name: agentName,
+        role_description: roleDescription,
+        custom_instructions: customInstructions,
+        custom_prompt: customPrompt,
+        mcp_tools: mcpTools,
+        agent_metadata: agentMetadata,
+        context_events: contextEvents,
+        model,
+        max_tokens: maxTokens,
+        temperature,
+      }
+
+      const response = await apiClient.post('/agent/chat', requestBody, {
         timeout,
       })
 
       // 转换响应格式以保持兼容性
-      const sdkResponse = response.data
-      
-      // 处理工具调用（如果有）
-      const toolCalls = sdkResponse.toolCalls || sdkResponse.tool_calls || [];
-      let processedToolResults = [];
-      
-      if (toolCalls.length > 0) {
-        console.log('[AgentService] 收到工具调用:', toolCalls.length, '个');
-        processedToolResults = await processToolCalls(toolCalls);
-        
-        // 记录需要后端执行的工具
-        const backendTools = processedToolResults.filter(r => 
-          r.result?.status === 'requires_backend_execution'
-        );
-        
-        if (backendTools.length > 0) {
-          console.log('[AgentService] 需要后端执行的工具:', backendTools.map(t => t.tool));
-        }
-      }
-      
+      const data = response.data
+
       return {
-        content: sdkResponse.response || sdkResponse.content || "",
+        content: data.response || data.content || "",
         session_id: sessionId,
-        tool_calls: toolCalls,
-        tool_results: processedToolResults,
+        tool_calls: data.tool_calls || [],
+        tool_results: [],
         is_async: false,
-        metadata: sdkResponse.metadata || {},
+        metadata: data.metadata || {},
       }
     } catch (error) {
       console.error('[AgentService] 发送消息失败:', error)
@@ -661,44 +508,9 @@ export class AgentService {
   }
 
   /**
-   * Create a new Claude Agent SDK with automatic DIAP identity
-   */
-  async createClaudeAgent({
-    sessionId,
-    walletAddress,
-    chain,
-    name,
-    avatarCid,
-    mcpConfigCid,
-    roleDescription,
-    mcpPorts,
-    diapIdentity,
-  }) {
-    const response = await apiClient.post('/agent/create-claude', {
-      session_id: sessionId,
-      wallet_address: walletAddress,
-      chain,
-      name,
-      avatar_cid: avatarCid,
-      mcp_config_cid: mcpConfigCid,
-      role_description: roleDescription,
-      mcp_ports: mcpPorts,
-      diap_identity: diapIdentity
-        ? {
-            did: diapIdentity.did,
-            cid: diapIdentity.cid,
-            ipns: diapIdentity.ipns,
-            public_key: diapIdentity.public_key,
-          }
-        : undefined,
-    })
-    return response.data
-  }
-
-  /**
    * Parse agent creation command using backend API
    * 使用后端API解析智能体创建指令
-   * 
+   *
    * @param {string} command - 创建指令
    * @returns {Promise<Object>} 解析结果 {name, roleDescription}
    */
@@ -733,78 +545,6 @@ export class AgentService {
       chain,
     })
     return response.data
-  }
-
-  /**
-   * Query Claude Agent SDK directly (using local Tauri command)
-   * 使用 Claude Agent SDK 直接查询（通过 Tauri 命令）
-   * 
-   * @param {Object} options - 查询选项
-   * @param {string} options.apiKey - Claude API key
-   * @param {string} options.prompt - 用户提示
-   * @param {string} [options.systemPrompt] - 系统提示（可选）
-   * @param {Array} [options.history] - 消息历史（可选）
-   * @param {Object} [options.agentInfo] - 智能体信息（可选）
-   * @param {Array} [options.tools] - 工具定义（可选）
-   * @param {string} [options.model] - 模型名称（默认: claude-3-5-sonnet-20241022）
-   * @param {number} [options.maxTokens] - 最大 token 数（默认: 4096）
-   * @param {number} [options.temperature] - 温度参数（默认: 0.7）
-   * @returns {Promise<Object>} 查询结果
-   */
-  async queryClaudeAgentDirect({
-    apiKey,
-    prompt,
-    systemPrompt,
-    history = [],
-    agentInfo,
-    tools = [],
-    model = 'claude-3-5-sonnet-20241022',
-    maxTokens = 4096,
-    temperature = 0.7,
-  }) {
-    // 验证必需参数
-    if (!apiKey) {
-      throw new Error('API key 不能为空')
-    }
-    if (!prompt) {
-      throw new Error('Prompt 不能为空')
-    }
-
-    const { invoke } = await import('@tauri-apps/api/core')
-
-    // 构建请求对象（使用 snake_case 以匹配 Rust 结构体）
-    const request = {
-      api_key: apiKey,
-      prompt,
-      ...(systemPrompt && { system_prompt: systemPrompt }),
-      ...(history.length > 0 && { history }),
-      ...(agentInfo && { agent_info: agentInfo }),
-      ...(tools.length > 0 && { tools }),
-      model,
-      max_tokens: maxTokens,
-      temperature,
-    }
-
-    try {
-      const response = await invoke('query_claude_agent', { request })
-      
-      // 检查响应是否成功
-      if (!response.success) {
-        throw new Error(response.error || '查询失败')
-      }
-
-      return {
-        response: response.response || '',
-        toolCalls: response.tool_calls || [],
-        usage: response.usage || {
-          input_tokens: 0,
-          output_tokens: 0,
-        },
-      }
-    } catch (error) {
-      console.error('[AgentService] queryClaudeAgentDirect 错误:', error)
-      throw new Error(error.message || '调用 Claude Agent SDK 失败')
-    }
   }
 
   /**

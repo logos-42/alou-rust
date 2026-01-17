@@ -6,7 +6,7 @@ pub mod tool_bridge;
 pub mod context_bridge;
 
 // 重新导出核心类型和接口
-pub use tool_bridge::{ToolBridge, ToolBridgeConfig};
+pub use tool_bridge::{ToolBridge, ToolBridgeConfig, ToolCallRequest, ToolCallResponse};
 pub use context_bridge::{ContextBridge, ContextBridgeConfig};
 
 use serde::{Deserialize, Serialize};

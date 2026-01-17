@@ -180,7 +180,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_store_and_retrieve() {
-        let manager = CacheManager::new(10, CompressionStrategy::Simple);
+        let manager = CacheManager::new(10, CompressionStrategy::Adaptive);
 
         let key = "test_key".to_string();
         let data = serde_json::json!({"message": "cached data"});
@@ -197,7 +197,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_size_limit() {
-        let manager = CacheManager::new(2, CompressionStrategy::Simple);
+        let manager = CacheManager::new(2, CompressionStrategy::Adaptive);
 
         // 存储超过限制的条目
         manager.store("key1".to_string(), serde_json::json!("data1")).await.unwrap();
@@ -210,7 +210,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_stats() {
-        let manager = CacheManager::new(10, CompressionStrategy::Simple);
+        let manager = CacheManager::new(10, CompressionStrategy::Adaptive);
 
         manager.store("key1".to_string(), serde_json::json!("data1")).await.unwrap();
         manager.store("key2".to_string(), serde_json::json!("data2")).await.unwrap();
@@ -226,7 +226,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cache_clear() {
-        let manager = CacheManager::new(10, CompressionStrategy::Simple);
+        let manager = CacheManager::new(10, CompressionStrategy::Adaptive);
 
         manager.store("key1".to_string(), serde_json::json!("data1")).await.unwrap();
         assert_eq!(manager.size().await.unwrap(), 1);

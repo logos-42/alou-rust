@@ -3,7 +3,6 @@
 
 mod bridges;
 mod browser;
-mod claude_agent;
 mod context;
 mod diap;
 mod ipfs_api;
@@ -16,6 +15,14 @@ mod sync;
 mod utils;
 mod wallet;
 mod workflow;
+mod workflow_types;
+mod workflow_commands;
+mod workflow_ralph_loop;
+mod workflow_history;
+mod workflow_executor;
+mod workflow_storage;
+mod workflow_events;
+mod workflow_monitor;
 mod tools;
 
 use std::path::PathBuf;
@@ -24,6 +31,7 @@ use tauri::Manager;
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
 use crate::kubo::download_kubo_binary;
 use crate::workflow::WorkflowState;
+use crate::workflow_executor::AsyncWorkflowExecutor;
 use crate::ipfs_api::{
     diagnose_ipfs_api, get_ipfs_api_address, test_ipfs_api, test_ipfs_api_with_config,
 };
@@ -35,7 +43,6 @@ use crate::ipfs_commands::{
     ipfs_pubsub_ls,
 };
 use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, stop_ipfs_node};
-use crate::claude_agent::query_claude_agent;
 use crate::diap::{
     create_local_diap_identity,
     get_local_diap_identity,
@@ -53,6 +60,11 @@ use crate::workflow::{
     create_workflow, execute_workflow, get_workflow_status, list_workflows,
     delete_workflow, retry_workflow_step, pause_workflow, resume_workflow,
 };
+use crate::workflow_executor::{
+    get_execution_status, pause_execution, resume_execution, cancel_execution,
+    get_execution_logs, get_performance_metrics,
+};
+use crate::workflow_events::start_workflow_event_listener;
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
 use crate::tools::initialize_tools;
 use crate::context::create_default_context_manager;
@@ -70,16 +82,37 @@ async fn execute_tool(
     let args_value: serde_json::Value = serde_json::from_str(&args)
         .map_err(|e| format!("Invalid JSON args: {}", e))?;
 
-    let context = crate::tools::create_execution_context("tauri_session".to_string());
+    // Get tool bridge and execute tool
+    let tool_bridge = bridge_manager.tool_bridge();
 
-    // TODO: Get tool manager from bridge and execute
-    // For now, return a mock response
-    Ok(serde_json::json!({
-        "success": true,
-        "data": {"message": format!("Tool {} executed with args: {}", tool_id, args)},
-        "execution_time_ms": 100,
-        "output": format!("Executed tool: {}", tool_id)
-    }))
+    let request = crate::bridges::ToolCallRequest {
+        session_id: "tauri_session".to_string(),
+        user_id: None,
+        tool_id: tool_id.clone(),
+        args: args_value,
+        working_directory: std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(|s| s.to_string())),
+        environment: std::env::vars().collect(),
+        timeout_seconds: timeout,
+        permissions: vec!["read".to_string(), "write".to_string()],
+    };
+
+    match tool_bridge.handle_request(request).await {
+        Ok(response) => {
+            if response.success {
+                Ok(serde_json::json!({
+                    "success": true,
+                    "data": response.result.map(|r| r.data).unwrap_or_else(|| serde_json::json!({"status": "success"})),
+                    "execution_time_ms": 100,
+                    "output": format!("Tool '{}' executed successfully", tool_id)
+                }))
+            } else {
+                Err(response.error.unwrap_or_else(|| format!("Tool '{}' execution failed", tool_id)))
+            }
+        }
+        Err(e) => Err(format!("Tool bridge error: {}", e))
+    }
 }
 
 #[tauri::command]
@@ -156,6 +189,7 @@ fn main() {
             data_dir: PathBuf::new(),
         }))
         .manage(WorkflowState::default())
+        .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
         .manage(create_default_bridge_manager())
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
@@ -178,8 +212,6 @@ fn main() {
             get_local_diap_identity,
             update_local_diap_identity,
             test_ipns_on_public_gateway,
-            // Claude Agent SDK command
-            query_claude_agent,
             // LSP SDK commands
             execute_lsp,
             get_supported_languages,
@@ -203,6 +235,14 @@ fn main() {
             retry_workflow_step,
             pause_workflow,
             resume_workflow,
+            // Async execution commands
+            get_execution_status,
+            pause_execution,
+            resume_execution,
+            cancel_execution,
+            // Monitoring commands
+            get_execution_logs,
+            get_performance_metrics,
             // Tool commands
             execute_tool,
             get_tool_list,
@@ -215,21 +255,10 @@ fn main() {
                 window.set_title("Alou").unwrap();
             }
 
-            // Initialize tools
-            let bridge_manager = app.state::<BridgeManager>();
-            let bridge_manager_guard = bridge_manager.inner().clone();
-            tauri::async_runtime::block_on(async {
-                match initialize_tools().await {
-                    Ok(registry) => {
-                        // Register tools with the bridge
-                        // TODO: Implement tool registration with bridge
-                        println!("Tools initialized successfully");
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to initialize tools: {}", e);
-                    }
-                }
-            });
+            // Initialize tools (synchronous logging for now)
+            // Note: In Tauri, we can't modify state directly in setup
+            // Tools are registered in the ToolBridge constructor
+            println!("ℹ️  Tool system initialized (tools registered in ToolBridge constructor)");
 
             // Start wallet sync server on startup
             let app_handle = app.handle().clone();
@@ -244,6 +273,11 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 bootstrap_ipfs(ipfs_app_handle).await;
             });
+
+            // Start workflow event listener
+            let workflow_app_handle = app.handle().clone();
+            let workflow_executor = app.state::<AsyncWorkflowExecutor>().inner().clone();
+            start_workflow_event_listener(workflow_app_handle, workflow_executor);
 
             Ok(())
         })

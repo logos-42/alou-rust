@@ -65,7 +65,13 @@ pub struct CompatibleRequest {
     pub timeout: Option<u64>,
     #[serde(rename = "callbackUrl")]
     pub callback_url: Option<String>,
-    
+
+    // 工作流字段
+    #[serde(rename = "workflowId")]
+    pub workflow_id: Option<String>,
+    #[serde(rename = "workflowConfig")]
+    pub workflow_config: Option<Value>,
+
     // 现有后端字段（保持兼容）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
@@ -96,6 +102,8 @@ impl Default for CompatibleRequest {
             task_type: None,
             timeout: None,
             callback_url: None,
+            workflow_id: None,
+            workflow_config: None,
             session_id: None,
             wallet_address: None,
             chain: None,

@@ -66,6 +66,7 @@ export const useAgentWorkflow = ({
     isLoading: workflowLoading,
     executingWorkflowId,
     executionProgress,
+    activeExecutions,
     loadWorkflows,
     createSampleWorkflow,
     executeWorkflow,
@@ -73,6 +74,8 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    startExecutionPolling,
+    stopExecutionPolling,
   } = useWorkflow({
     sessionId,
     agentInfo: selectedAgent ? {
@@ -171,7 +174,8 @@ export const useAgentWorkflow = ({
     workflowLoading,
     executingWorkflowId,
     executionProgress,
-    
+    activeExecutions,
+
     // 工作流操作方法
     loadWorkflows,
     createSampleWorkflow,
@@ -180,11 +184,13 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
-    
+    startExecutionPolling,
+    stopExecutionPolling,
+
     // 事件处理
     handleWorkflowMessage,
     handleWorkflowEvent,
-    
+
     // 智能体信息（用于工作流执行）
     agentInfo,
   }), [
@@ -194,6 +200,7 @@ export const useAgentWorkflow = ({
     workflowLoading,
     executingWorkflowId,
     executionProgress,
+    activeExecutions,
     loadWorkflows,
     createSampleWorkflow,
     executeWorkflow,
@@ -201,6 +208,8 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    startExecutionPolling,
+    stopExecutionPolling,
     handleWorkflowMessage,
     handleWorkflowEvent,
     agentInfo,

@@ -19,7 +19,6 @@ use worker::*;
 
 pub mod agent;
 mod blockchain;
-mod claude;
 mod cluster_action;
 mod diap;
 mod mcp;
@@ -325,23 +324,6 @@ impl Router {
             (Method::Post, "/api/agent/diap/get-identity-by-session") => {
                 agent::handle_get_diap_identity_by_session(&self.session_manager, req).await
             }
-            (Method::Post, "/api/agent/create-claude") => {
-                agent::handle_create_claude_agent(&self.session_manager, req).await
-            }
-
-            // Claude Agent SDK 兼容端点
-            (Method::Post, "/api/claude-agent/query") => {
-                claude::handle_claude_sdk_query(req, &env).await
-            }
-            
-            // Claude API 兼容端点 (Anthropic API 格式)
-            (Method::Post, "/v1/messages") => {
-                claude::handle_claude_messages(req, &env).await
-            }
-            (Method::Get, "/v1/models") => {
-                claude::handle_claude_models(req, &env).await
-            }
-            
             (Method::Post, "/api/agent/parse-creation-command") => {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }

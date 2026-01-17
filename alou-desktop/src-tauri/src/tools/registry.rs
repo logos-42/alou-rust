@@ -2,8 +2,7 @@
 //!
 //! 管理所有已注册的工具，提供工具查询、执行、状态管理等功能
 
-use super::{ToolExecutor, ToolMetadata, ToolStatus, ExecutionContext, ToolResult, ToolError};
-use super::ToolCategory;
+use super::{ToolExecutor, ToolMetadata, ToolStatus, ExecutionContext, ToolResult, ToolError, ToolCategory, ToolPriority};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

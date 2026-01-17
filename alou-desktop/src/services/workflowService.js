@@ -46,7 +46,7 @@ export class WorkflowService {
   }
 
   /**
-   * 执行工作流
+   * 执行工作流（异步）
    * @param {string} workflowId - 工作流ID
    * @param {string} apiKey - Claude API密钥
    * @param {Object} agentInfo - 智能体信息
@@ -59,26 +59,118 @@ export class WorkflowService {
         workflowId,
         apiKey,
         agentInfo,
-        onProgress: !!onProgress
       })
 
-      // 处理实时进度更新
-      if (onProgress && result.progress_stream) {
-        // 这里可以设置事件监听器来接收实时进度
-        this._setupProgressListener(onProgress)
-      }
-
+      // 返回执行ID，表明异步执行已启动
       return {
         success: true,
-        result: result.execution_result,
-        steps: result.step_results || [],
-        message: '工作流执行完成'
+        executionId: result.execution_id,
+        workflowId: result.workflow_id,
+        status: result.status,
+        message: result.message
       }
     } catch (error) {
       console.error('[WorkflowService] 执行工作流失败:', error)
       return {
         success: false,
         error: error.message || '执行工作流失败'
+      }
+    }
+  }
+
+  /**
+   * 获取执行状态
+   * @param {string} executionId - 执行ID
+   * @returns {Promise<Object>} 执行状态
+   */
+  async getExecutionStatus(executionId) {
+    try {
+      const result = await invoke('get_execution_status', { executionId })
+
+      return {
+        success: true,
+        execution: result.execution,
+        status: result.status,
+        progress: result.progress,
+        currentStep: result.current_step
+      }
+    } catch (error) {
+      console.error('[WorkflowService] 获取执行状态失败:', error)
+      return {
+        success: false,
+        error: error.message || '获取执行状态失败'
+      }
+    }
+  }
+
+  /**
+   * 暂停执行
+   * @param {string} executionId - 执行ID
+   * @returns {Promise<Object>} 暂停结果
+   */
+  async pauseExecution(executionId) {
+    try {
+      const result = await invoke('pause_execution', { executionId })
+
+      return {
+        success: true,
+        executionId: result.execution_id,
+        status: result.status,
+        message: result.message
+      }
+    } catch (error) {
+      console.error('[WorkflowService] 暂停执行失败:', error)
+      return {
+        success: false,
+        error: error.message || '暂停执行失败'
+      }
+    }
+  }
+
+  /**
+   * 恢复执行
+   * @param {string} executionId - 执行ID
+   * @returns {Promise<Object>} 恢复结果
+   */
+  async resumeExecution(executionId) {
+    try {
+      const result = await invoke('resume_execution', { executionId })
+
+      return {
+        success: true,
+        executionId: result.execution_id,
+        status: result.status,
+        message: result.message
+      }
+    } catch (error) {
+      console.error('[WorkflowService] 恢复执行失败:', error)
+      return {
+        success: false,
+        error: error.message || '恢复执行失败'
+      }
+    }
+  }
+
+  /**
+   * 取消执行
+   * @param {string} executionId - 执行ID
+   * @returns {Promise<Object>} 取消结果
+   */
+  async cancelExecution(executionId) {
+    try {
+      const result = await invoke('cancel_execution', { executionId })
+
+      return {
+        success: true,
+        executionId: result.execution_id,
+        status: result.status,
+        message: result.message
+      }
+    } catch (error) {
+      console.error('[WorkflowService] 取消执行失败:', error)
+      return {
+        success: false,
+        error: error.message || '取消执行失败'
       }
     }
   }

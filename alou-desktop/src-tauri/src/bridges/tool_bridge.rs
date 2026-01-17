@@ -26,8 +26,11 @@ impl ToolBridge {
 
     /// 处理工具调用请求
     pub async fn handle_request(&self, request: ToolCallRequest) -> Result<ToolCallResponse, Box<dyn std::error::Error>> {
-        let mut count = self.request_count.lock().unwrap();
-        *count += 1;
+        // 先增加计数器，避免跨越await点
+        {
+            let mut count = self.request_count.lock().unwrap();
+            *count += 1;
+        }
 
         // 创建执行上下文
         let context = ExecutionContext {
@@ -61,8 +64,8 @@ impl ToolBridge {
     }
 
     /// 注册工具
-    pub async fn register_tool(&mut self, tool: Box<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error>> {
-        self.registry.register(Arc::from(tool)).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    pub async fn register_tool(&mut self, tool: Arc<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error>> {
+        self.registry.register(tool).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
     }
 
     /// 更新配置

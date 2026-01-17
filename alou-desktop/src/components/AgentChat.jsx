@@ -22,6 +22,7 @@ import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
 import SkillsManager from '@/components/SkillsManager'
 import SDKModal from '@/components/SDKModal'
+import WorkflowProgress from '@/components/WorkflowProgress'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
 // Hooks
@@ -435,6 +436,7 @@ const AgentChat = () => {
     workflowLoading,
     executingWorkflowId,
     executionProgress,
+    activeExecutions,
     loadWorkflows,
     createSampleWorkflow,
     executeWorkflow,
@@ -445,6 +447,31 @@ const AgentChat = () => {
     handleWorkflowEvent,
     agentInfo,
   } = workflowState
+
+  // 工作流控制函数
+  const handlePauseExecution = useCallback(async (executionId) => {
+    try {
+      await workflowService.pauseExecution(executionId)
+    } catch (error) {
+      console.error('[AgentChat] 暂停执行失败:', error)
+    }
+  }, [])
+
+  const handleResumeExecution = useCallback(async (executionId) => {
+    try {
+      await workflowService.resumeExecution(executionId)
+    } catch (error) {
+      console.error('[AgentChat] 恢复执行失败:', error)
+    }
+  }, [])
+
+  const handleCancelExecution = useCallback(async (executionId) => {
+    try {
+      await workflowService.cancelExecution(executionId)
+    } catch (error) {
+      console.error('[AgentChat] 取消执行失败:', error)
+    }
+  }, [])
 
   // ==================== 10. Stream Handler ====================
   const { streamStatus, streamEvents } = useAgentStreamHandler({
@@ -672,6 +699,19 @@ const AgentChat = () => {
                 onOpenSkills={() => setShowSkillsPanel(true)}
               />
               {selectedAgent && <AgentProfilePanel agent={selectedAgent} />}
+
+              {/* 工作流进度显示 */}
+              {executingWorkflowId && executionProgress[executingWorkflowId] && (
+                <WorkflowProgress
+                  workflowId={executingWorkflowId}
+                  progress={executionProgress[executingWorkflowId]}
+                  execution={activeExecutions[executionProgress[executingWorkflowId]?.executionId]}
+                  onPause={handlePauseExecution}
+                  onResume={handleResumeExecution}
+                  onCancel={handleCancelExecution}
+                  isDarkMode={isDarkMode}
+                />
+              )}
             </div>
 
             {showDetailPanel && selectedAgent && (

@@ -1,0 +1,310 @@
+.workflow-progress {
+  background: white;
+  border: 1px solid #e1e5e9;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.workflow-progress.dark {
+  background: #2d3748;
+  border-color: #4a5568;
+  color: #e2e8f0;
+}
+
+.workflow-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.workflow-progress-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.workflow-icon {
+  font-size: 16px;
+}
+
+.workflow-id {
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.workflow-progress.dark .workflow-id {
+  color: #a0aec0;
+}
+
+.workflow-progress-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.execution-time {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+}
+
+.workflow-progress.dark .execution-time {
+  color: #a0aec0;
+}
+
+.workflow-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.progress-container {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.workflow-progress.dark .progress-container {
+  background: #4a5568;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  min-width: 32px;
+  text-align: right;
+}
+
+.workflow-progress.dark .progress-text {
+  color: #a0aec0;
+}
+
+.workflow-current-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  margin-bottom: 12px;
+}
+
+.workflow-progress.dark .workflow-current-step {
+  color: #e2e8f0;
+}
+
+.step-label {
+  font-weight: 500;
+}
+
+.step-name {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #1f2937;
+}
+
+.workflow-progress.dark .step-name {
+  background: #4a5568;
+  color: #e2e8f0;
+}
+
+.workflow-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.control-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.control-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.control-btn.pause {
+  background: #ffc107;
+  color: #212529;
+}
+
+.control-btn.pause:hover {
+  background: #e0a800;
+}
+
+.control-btn.resume {
+  background: #28a745;
+  color: white;
+}
+
+.control-btn.resume:hover {
+  background: #218838;
+}
+
+.control-btn.cancel {
+  background: #dc3545;
+  color: white;
+}
+
+.control-btn.cancel:hover {
+  background: #c82333;
+}
+
+.workflow-steps {
+  border-top: 1px solid #e5e7eb;
+  padding-top: 12px;
+}
+
+.workflow-progress.dark .workflow-steps {
+  border-color: #4a5568;
+}
+
+.steps-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.workflow-progress.dark .steps-header {
+  color: #e2e8f0;
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #f9fafb;
+  font-size: 12px;
+}
+
+.workflow-progress.dark .step-item {
+  background: #374151;
+}
+
+.step-icon {
+  font-size: 14px;
+  min-width: 20px;
+}
+
+.step-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.step-name {
+  font-weight: 500;
+  color: #374151;
+}
+
+.workflow-progress.dark .step-name {
+  color: #e2e8f0;
+}
+
+.step-time {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.workflow-progress.dark .step-time {
+  color: #a0aec0;
+}
+
+.step-error {
+  color: #dc3545;
+  cursor: help;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .workflow-progress {
+    padding: 12px;
+    margin: 8px 0;
+  }
+
+  .workflow-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .workflow-progress-status {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .workflow-controls {
+    flex-wrap: wrap;
+  }
+
+  .control-btn {
+    flex: 1;
+    min-width: 80px;
+    justify-content: center;
+  }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.workflow-progress[data-status="running"] .status-badge {
+  animation: pulse 2s infinite;
+}
+
+.workflow-progress[data-status="running"] .progress-fill {
+  animation: pulse 1.5s infinite;
+}

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import { listen } from '@tauri-apps/api/event'
 import workflowService from '@/services/workflowService'
 
 /**
@@ -18,7 +19,11 @@ export const useWorkflow = ({
   const [isLoading, setIsLoading] = useState(false)
   const [executingWorkflowId, setExecutingWorkflowId] = useState(null)
   const [executionProgress, setExecutionProgress] = useState({})
-  
+
+  // 异步执行相关状态
+  const [activeExecutions, setActiveExecutions] = useState({})
+  const [executionPolling, setExecutionPolling] = useState({})
+
   // 添加轮询相关状态
   const pollIntervalRef = useRef(null)
   const [pollingWorkflowId, setPollingWorkflowId] = useState(null)
@@ -295,7 +300,83 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
     }
   }, [clearPolling, onWorkflowMessage])
 
-  // 修改执行工作流函数，添加轮询
+  // 开始执行状态轮询
+  const startExecutionPolling = useCallback((executionId, workflowId) => {
+    if (executionPolling[executionId]) {
+      return // 已经在轮询
+    }
+
+    const pollExecutionStatus = async () => {
+      try {
+        const statusResponse = await workflowService.getExecutionStatus(executionId)
+        if (statusResponse.success) {
+          const execution = statusResponse.execution
+          setActiveExecutions(prev => ({
+            ...prev,
+            [executionId]: execution
+          }))
+
+          setExecutionProgress(prev => ({
+            ...prev,
+            [workflowId]: {
+              status: execution.status,
+              progress: execution.progress,
+              currentStep: execution.current_step,
+              executionId
+            }
+          }))
+
+          // 在对话框中显示进度更新
+          if (execution.current_step) {
+            onWorkflowMessage?.(`⚙️ 当前执行步骤: ${execution.current_step}`)
+          }
+
+          // 检查是否完成
+          if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
+            stopExecutionPolling(executionId)
+
+            if (execution.status === 'completed') {
+              onWorkflowMessage?.(`✅ 工作流执行完成!`)
+            } else if (execution.status === 'failed') {
+              onWorkflowMessage?.(`❌ 工作流执行失败: ${execution.error || '未知错误'}`)
+            } else {
+              onWorkflowMessage?.(`⏹️ 工作流执行已取消`)
+            }
+
+            setExecutingWorkflowId(null)
+          }
+        }
+      } catch (error) {
+        console.error('[useWorkflow] 轮询执行状态异常:', error)
+        stopExecutionPolling(executionId)
+      }
+    }
+
+    // 立即执行一次
+    pollExecutionStatus()
+
+    // 设置定时轮询
+    const intervalId = setInterval(pollExecutionStatus, 2000) // 每2秒轮询一次
+
+    setExecutionPolling(prev => ({
+      ...prev,
+      [executionId]: intervalId
+    }))
+  }, [executionPolling, onWorkflowMessage])
+
+  // 停止执行状态轮询
+  const stopExecutionPolling = useCallback((executionId) => {
+    if (executionPolling[executionId]) {
+      clearInterval(executionPolling[executionId])
+      setExecutionPolling(prev => {
+        const newPolling = { ...prev }
+        delete newPolling[executionId]
+        return newPolling
+      })
+    }
+  }, [executionPolling])
+
+  // 修改执行工作流函数，支持异步执行
   const executeWorkflow = useCallback(async (workflowId) => {
     // 从localStorage获取API密钥（如果没有传入的话）
     const effectiveApiKey = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('claude_api_key') : null)
@@ -303,7 +384,7 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
 
     try {
       setExecutingWorkflowId(workflowId)
-      setExecutionProgress({ [workflowId]: { status: 'running', currentStep: null } })
+      setExecutionProgress({ [workflowId]: { status: 'starting', currentStep: null } })
 
       // 在对话框中显示开始执行的消息
       onWorkflowMessage?.(`🔄 开始执行工作流: ${workflowId}`)
@@ -311,31 +392,22 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
       const response = await workflowService.executeWorkflow(
         workflowId,
         effectiveApiKey,
-        agentInfo,
-        (progress) => {
-          // 处理实时进度更新
-          setExecutionProgress(prev => ({
-            ...prev,
-            [workflowId]: {
-              ...prev[workflowId],
-              ...progress
-            }
-          }))
-
-          // 在对话框中显示进度更新
-          if (progress.currentStep) {
-            onWorkflowMessage?.(`⚙️ 当前执行步骤: ${progress.currentStep}`)
-          }
-        }
+        agentInfo
       )
 
       if (response.success) {
-        // 开始轮询状态
-        startPolling(workflowId)
+        const executionId = response.executionId
+        // 开始轮询执行状态
+        startExecutionPolling(executionId, workflowId)
       } else {
         // 在对话框中显示错误
         onWorkflowMessage?.(`❌ 工作流执行失败: ${response.error}`)
         setExecutingWorkflowId(null)
+        setExecutionProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[workflowId]
+          return newProgress
+        })
       }
 
     } catch (error) {
@@ -348,7 +420,7 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
         return newProgress
       })
     }
-  }, [sessionId, apiKey, agentInfo, executingWorkflowId, onWorkflowMessage, startPolling])
+  }, [sessionId, apiKey, agentInfo, executingWorkflowId, onWorkflowMessage, startExecutionPolling])
 
   // 清理轮询
   useEffect(() => {
@@ -356,6 +428,95 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
       clearPolling()
     }
   }, [clearPolling])
+
+  // 监听工作流执行事件
+  useEffect(() => {
+    let unlisten = null
+
+    const setupEventListener = async () => {
+      try {
+        unlisten = await listen('workflow-execution-event', (event) => {
+          const executionEvent = event.payload
+
+          switch (executionEvent.type) {
+            case 'Started':
+              onWorkflowMessage?.(`🚀 开始执行工作流: ${executionEvent.execution_id}`)
+              break
+
+            case 'StepStarted':
+              onWorkflowMessage?.(`▶️ 开始执行步骤: ${executionEvent.step_id}`)
+              break
+
+            case 'StepCompleted':
+              onWorkflowMessage?.(`✅ 步骤完成: ${executionEvent.step_id}`)
+              break
+
+            case 'StepFailed':
+              onWorkflowMessage?.(`❌ 步骤失败: ${executionEvent.step_id} - ${executionEvent.error || '未知错误'}`)
+              break
+
+            case 'ProgressUpdated':
+              // 更新进度状态
+              setExecutionProgress(prev => ({
+                ...prev,
+                [executionEvent.workflow_id || 'unknown']: {
+                  status: 'running',
+                  progress: executionEvent.progress,
+                  currentStep: executionEvent.current_step,
+                  executionId: executionEvent.execution_id
+                }
+              }))
+              break
+
+            case 'Completed':
+              onWorkflowMessage?.(`🎉 工作流执行完成!`)
+              setExecutingWorkflowId(null)
+              // 停止轮询
+              if (executionEvent.execution_id) {
+                stopExecutionPolling(executionEvent.execution_id)
+              }
+              break
+
+            case 'Failed':
+              onWorkflowMessage?.(`💥 工作流执行失败: ${executionEvent.error}`)
+              setExecutingWorkflowId(null)
+              // 停止轮询
+              if (executionEvent.execution_id) {
+                stopExecutionPolling(executionEvent.execution_id)
+              }
+              break
+
+            case 'Paused':
+              onWorkflowMessage?.(`⏸️ 工作流已暂停`)
+              break
+
+            case 'Resumed':
+              onWorkflowMessage?.(`▶️ 工作流已恢复`)
+              break
+
+            case 'Cancelled':
+              onWorkflowMessage?.(`🚫 工作流已取消`)
+              setExecutingWorkflowId(null)
+              // 停止轮询
+              if (executionEvent.execution_id) {
+                stopExecutionPolling(executionEvent.execution_id)
+              }
+              break
+          }
+        })
+      } catch (error) {
+        console.error('[useWorkflow] Failed to setup event listener:', error)
+      }
+    }
+
+    setupEventListener()
+
+    return () => {
+      if (unlisten) {
+        unlisten()
+      }
+    }
+  }, [onWorkflowMessage, stopExecutionPolling])
 
   // 初始化加载
   useEffect(() => {
@@ -373,6 +534,7 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
     executingWorkflowId,
     executionProgress,
     pollingWorkflowId,
+    activeExecutions,
 
     // 方法
     loadWorkflows,
@@ -384,5 +546,8 @@ ${JSON.stringify(status.data?.result || {}, null, 2)}`)
     resumeWorkflow,
     clearPolling,
     startPolling,
+    // 异步执行相关方法
+    startExecutionPolling,
+    stopExecutionPolling,
   }
 }
