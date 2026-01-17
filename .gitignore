@@ -107,3 +107,19 @@ node_modules
 /.github/
 /.vs/
 /node_modules/
+
+# 敏感文件和秘钥
+*.dar
+.dev.vars
+.env*
+!.env.example
+*secret*
+*key*
+*token*
+*credential*
+
+# 构建日志
+tauri_build*.log
+tauri_debug.log
+test-*.js
+test_*.js
