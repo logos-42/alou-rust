@@ -2,7 +2,8 @@
 //!
 //! 负责任务的执行逻辑、Alarm处理和超时控制
 
-use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, ToolCall};
+use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, ToolCall, TaskStatus};
+use crate::durable_objects::ai_task::AITaskDO;
 use crate::agent::ai_client::{AiClient, AiMessage};
 use crate::durable_objects::ai_task_state::{TaskState, get_state_key, get_request_key, get_result_key, get_pending_tool_calls_key, get_conversation_history_key, get_tool_result_key};
 use crate::durable_objects::ai_task_ai::DefaultAiCaller;

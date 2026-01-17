@@ -102,11 +102,11 @@ impl AiClient {
             )),
             "openai" => Box::new(providers::OpenAiProvider::new(
                 api_key,
-                model.unwrap_or_else(|| "gpt-4".to_string()),
+                model.unwrap_or_else(|| "gpt-5".to_string()),
             )),
             "claude" => Box::new(providers::ClaudeProvider::new(
                 api_key,
-                model.unwrap_or_else(|| "claude-3-5-sonnet-20241022".to_string()),
+                model.unwrap_or_else(|| "claude-4-5-sonnet-20241022".to_string()),
             )),
             "kimi" => Box::new(providers::KimiProvider::new(
                 api_key,

@@ -3,10 +3,11 @@
 //! 负责处理 Alarm 逻辑、状态转换和工作流调度
 
 use crate::compatibility::models::ToolCall;
-use crate::durable_objects::ai_task_state::{TaskState, TaskStatus, get_state_key, get_pending_tool_calls_key, get_tool_result_key};
+use crate::durable_objects::ai_task_state::{TaskState, get_state_key, get_pending_tool_calls_key, get_tool_result_key};
+use crate::compatibility::models::TaskStatus;
 use crate::durable_objects::ai_task_persistence::TaskPersistence;
 use crate::durable_objects::ai_task_execution::TaskExecutionContext;
-use crate::durable_objects::ai_task_workflow::WorkflowDecisionHandler;
+use crate::durable_objects::ai_task_workflow::{WorkflowDecisionHandler, WorkflowDecision};
 use crate::mcp::tools::workflow::Workflow;
 use worker::{Result, console_log, console_error};
 
@@ -205,8 +206,8 @@ impl<'a> AlarmHandler<'a> {
         // 1. 获取工具结果
         let result_key = get_tool_result_key(self.ctx.task_name);
         let tool_result = match self.ctx.storage.get::<serde_json::Value>(&result_key).await {
-            Ok(Some(res)) => res,
-            Ok(None) => {
+            Ok(res) => res,
+            Err(_) => {
                 console_log!("[WORKFLOW-AI] No tool result found");
                 return Ok(());
             }
@@ -245,7 +246,7 @@ impl<'a> AlarmHandler<'a> {
         use crate::durable_objects::ai_task_workflow::{WorkflowAIDecider, WorkflowDecisionHandler};
         let ai_caller = crate::durable_objects::ai_task_ai::DefaultAiCaller;
         let ai_decider = WorkflowAIDecider::new(&ai_caller, self.state, self.ctx.task_name.to_string());
-        let decision = ai_decider.get_ai_decision(&ai_client, &workflow, &tool_result).await;
+        let decision = ai_decider.get_ai_decision(ai_client, &workflow, &tool_result).await;
 
         let decision = match decision {
             Ok(dec) => dec,
@@ -263,7 +264,7 @@ impl<'a> AlarmHandler<'a> {
         console_log!("[WORKFLOW-AI] AI decision: {:?}", decision);
 
         // 6. 使用决策处理器执行 AI 的决策
-        let decision_handler = WorkflowDecisionHandler::new(self.ctx.storage, self.ctx.task_name.to_string());
+        let decision_handler = WorkflowDecisionHandler::new(self.state, self.ctx.task_name.to_string());
         match decision.action.as_str() {
             "continue" => {
                 decision_handler.handle_continue_decision(tool_result, &workflow, decision.next_step_id).await?;

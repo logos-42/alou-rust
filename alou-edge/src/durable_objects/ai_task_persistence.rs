@@ -3,7 +3,8 @@
 //! 负责处理所有与存储相关的操作
 
 use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, ToolCall};
-use crate::durable_objects::ai_task_state::{TaskState, TaskStatus, get_request_key, get_result_key, get_pending_tool_calls_key, get_workflow_key, get_state_key};
+use crate::durable_objects::ai_task_state::{TaskState, get_request_key, get_result_key, get_pending_tool_calls_key, get_workflow_key, get_state_key};
+use crate::compatibility::models::TaskStatus;
 use crate::agent::ai_client::AiMessage;
 use crate::mcp::tools::workflow::Workflow;
 use crate::utils::time::current_timestamp_secs;
@@ -72,11 +73,10 @@ impl TaskPersistence {
         let result = storage.get::<Workflow>(&key).await;
 
         match result {
-            Ok(Some(wf)) => {
+            Ok(wf) => {
                 console_log!("[PERSISTENCE] Loaded workflow with {} steps", wf.steps.len());
                 Ok(Some(wf))
             }
-            Ok(None) => Ok(None),
             Err(e) => {
                 console_log!("[PERSISTENCE] Failed to load workflow: {}", e);
                 Ok(None)
@@ -103,8 +103,8 @@ impl TaskPersistence {
     ) -> Result<bool> {
         let request_key = get_request_key(task_name);
         match storage.get::<CompatibleRequest>(&request_key).await {
-            Ok(Some(req)) => Ok(req.workflow_id.is_some()),
-            _ => Ok(false),
+            Ok(req) => Ok(req.workflow_id.is_some()),
+            Err(_) => Ok(false),
         }
     }
 

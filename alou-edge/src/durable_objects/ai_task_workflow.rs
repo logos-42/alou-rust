@@ -4,7 +4,7 @@
 
 use crate::compatibility::models::CompatibleResponse;
 use crate::durable_objects::{
-    ai_task_state::{get_state_key, get_workflow_key, get_workflow_results_key, get_tool_result_key},
+    ai_task_state::{get_state_key, get_workflow_key, get_workflow_results_key, get_tool_result_key, get_result_key},
 };
 use crate::mcp::tools::workflow::{Workflow, WorkflowStep, StepStatus};
 use crate::agent::ai_client::{AiClient, AiMessage};
@@ -18,12 +18,12 @@ use worker::{console_log, console_error};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowDecision {
     /// 操作类型：continue/retry/skip/terminate
-    action: String,
+    pub action: String,
     /// 决策原因
-    reason: String,
+    pub reason: String,
     /// 下一步骤ID（仅当 action 为 continue 时有效）
     #[serde(skip_serializing_if = "Option::is_none")]
-    next_step_id: Option<String>,
+    pub next_step_id: Option<String>,
 }
 
 /// 工作流执行器 trait
@@ -132,7 +132,7 @@ impl<'a> WorkflowAIDecider<'a> {
     /// 调用 AI 获取决策
     pub async fn get_ai_decision(
         &self,
-        ai_client: &AiClient,
+        ai_client: AiClient,
         workflow: &Workflow,
         tool_result: &Value,
     ) -> worker::Result<WorkflowDecision> {
@@ -155,7 +155,7 @@ impl<'a> WorkflowAIDecider<'a> {
             },
         ];
 
-        match self.ai_caller.call_ai_with_timeout(ai_client.clone(), ai_messages, vec![], &self.task_name).await {
+        match self.ai_caller.call_ai_with_timeout(ai_client, ai_messages, vec![], &self.task_name).await {
             Ok(ai_response) => {
                 let decision = self.parse_ai_decision(&ai_response.content)?;
                 console_log!("[WORKFLOW-AI] AI decision: {:?}", decision);
@@ -300,12 +300,14 @@ impl<'a> WorkflowDecisionHandler<'a> {
         let state_key = get_state_key(&self.task_name);
         let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
 
-        let current_step = state_data
+        let mut current_step = state_data
             .get_mut("current_step")
             .and_then(|s| s.as_str())
-            .unwrap();
+            .unwrap_or("")
+            .to_string();
 
-        *current_step = "重试当前步骤（根据 AI 判断）";
+        current_step = "重试当前步骤（根据 AI 判断）".to_string();
+        state_data["current_step"] = serde_json::Value::String(current_step);
 
         self.state.storage().put(&state_key, &state_data).await?;
 
@@ -384,7 +386,8 @@ impl<'a> WorkflowDecisionHandler<'a> {
 
         // 检查是否有工具结果需要处理
         let tool_result_key = get_tool_result_key(&self.task_name);
-        if let Ok(Some(tool_result)) = self.state.storage().get::<Value>(&tool_result_key).await {
+        let mut updated_workflow = workflow.clone();
+        if let Ok(tool_result) = self.state.storage().get::<Value>(&tool_result_key).await {
             console_log!("[WORKFLOW] Found tool result, updating step status");
 
             // 查找最近执行的步骤并更新状态
@@ -395,7 +398,7 @@ impl<'a> WorkflowDecisionHandler<'a> {
                 if step.status == StepStatus::Pending {
                     // 检查依赖是否都已完成
                     let dependencies_met = step.depends_on.iter().all(|dep_id| {
-                        updated_workflow.steps.iter()
+                        workflow.steps.iter()
                             .any(|s| s.id == *dep_id && s.status == StepStatus::Completed)
                     });
 

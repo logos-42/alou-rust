@@ -2,11 +2,11 @@
 //!
 //! 负责处理所有 HTTP 请求的路由和响应
 
-use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, TaskStatusResponse, TaskStatus, ToolCall};
+use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, TaskStatusResponse, TaskStatus};
 use crate::durable_objects::ai_task_state::{TaskState, get_state_key, get_request_key, get_result_key, get_pending_tool_calls_key, get_conversation_history_key, get_tool_result_key};
 use crate::agent::ai_client::AiMessage;
 use crate::utils::time::current_timestamp_secs;
-use worker::{Headers, Method, Request, Response, Result, console_error, console_log};
+use worker::{Headers, Request, Response, Result, console_error, console_log};
 
 /// AITaskDO HTTP 路由处理器实现
 pub struct AITaskHandlers;
@@ -169,7 +169,7 @@ impl AITaskHandlers {
     pub async fn handle_init_and_start(
         task_name: &str,
         storage: &worker::Storage,
-        mut req: Request,
+        req: Request,
         get_current_timestamp_millis: impl Fn() -> u64,
     ) -> Result<Response> {
         console_log!("[INIT-START] Handling init-and-start for task: {}", task_name);

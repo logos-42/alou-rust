@@ -19,6 +19,7 @@ use crate::durable_objects::{
     ai_task_persistence::TaskPersistence,
     ai_task_alarm::AlarmHandler,
     ai_task_handlers::AITaskHandlers,
+    ai_task_ai::DefaultAiCaller,
 };
 use crate::mcp::tools::workflow::Workflow;
 use crate::compatibility::models::{CompatibleRequest, TaskStatus};
@@ -54,7 +55,7 @@ impl DurableObject for AITaskDO {
         }
     }
 
-    async fn fetch(&self, req: Request) -> Result<Response> {
+    async fn fetch(&self, mut req: Request) -> Result<Response> {
         console_log!("[AITaskDO] fetch called, path: {}", req.path());
 
         let path = req.path();
@@ -103,17 +104,18 @@ impl DurableObject for AITaskDO {
 
         // 使用 AlarmHandler 处理 alarm 逻辑
         let task_name = self.task_name();
+        let storage = self.state.storage();
         let ctx = TaskExecutionContext::new(
-            &self.state.storage(),
+            &storage,
             &task_name,
             &self.env,
         );
         let alarm_handler = AlarmHandler::new(ctx, &self.state);
 
         match alarm_handler.handle_alarm_logic(
-            || async { self.execute_workflow_task().await },
-            || async { self.execute_task().await },
-            || async { self.continue_with_tool_results().await },
+            || { let _ = self.execute_workflow_task(); Ok(()) },
+            || { let _ = self.execute_task(); Ok(()) },
+            || { let _ = self.continue_with_tool_results(); Ok(()) },
         ).await {
             Ok(_) => Response::ok("Alarm handled"),
             Err(e) => {
@@ -197,7 +199,8 @@ impl AITaskDO {
 
         // 创建执行上下文
         let task_name = self.task_name();
-        let ctx = TaskExecutionContext::new(&self.state.storage(), &task_name, &self.env);
+        let storage_ref = self.state.storage();
+        let ctx = TaskExecutionContext::new(&storage_ref, &task_name, &self.env);
         let executor = TaskExecutorImpl::new(ctx);
 
         executor.continue_with_tool_results().await
@@ -213,7 +216,8 @@ impl AITaskDO {
     async fn execute_task(&self) -> Result<()> {
         // 创建执行上下文
         let task_name = self.task_name();
-        let ctx = TaskExecutionContext::new(&self.state.storage(), &task_name, &self.env);
+        let storage_ref = self.state.storage();
+        let ctx = TaskExecutionContext::new(&storage_ref, &task_name, &self.env);
         let executor = TaskExecutorImpl::new(ctx);
 
         executor.execute_full_task().await
