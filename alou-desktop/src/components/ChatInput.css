@@ -57,6 +57,32 @@
   min-height: 28px;
   max-height: 120px;
   padding: 1px 0;
+  overflow-y: auto;
+}
+
+.input-area .message-input::-webkit-scrollbar {
+  width: 4px;
+}
+
+.input-area .message-input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.input-area .message-input::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 2px;
+}
+
+.app-shell.dark-mode .input-area .message-input::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.input-area .message-input::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.app-shell.dark-mode .input-area .message-input::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .input-area .message-input::placeholder {

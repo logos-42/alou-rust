@@ -168,7 +168,7 @@
 }
 
 .app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb {
-  background: #4a5568;
+  background: #9ca3af;
   border: 1px solid #1a202c;
 }
 
@@ -177,7 +177,7 @@
 }
 
 .app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb:hover {
-  background: #718096;
+  background: #cbd5e0;
 }
 
 .messages-area::-webkit-scrollbar-thumb:active {
@@ -185,5 +185,5 @@
 }
 
 .app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb:active {
-  background: #a0aec0;
+  background: #e2e8f0;
 }
