@@ -81,12 +81,32 @@ const MessageList = forwardRef(
   useEffect(() => {
     const container = containerRef.current
     if (container) {
-      // 使用 setTimeout 确保 DOM 完全更新后再滚动，避免被中断
-      setTimeout(() => {
-        container.scrollTop = container.scrollHeight
-      }, 100)
+      // 检查是否已经接近底部（用户可能在手动查看历史消息）
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+
+      // 如果接近底部或者正在加载，则自动滚动到底部
+      if (isNearBottom || isLoading) {
+        // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight
+        })
+      }
     }
   }, [renderedMessages, isLoading])
+
+  // 当新消息到达时，强制滚动到底部（除非用户正在查看历史消息）
+  useEffect(() => {
+    const container = containerRef.current
+    if (container && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && (lastMessage.type === 'assistant' || lastMessage.type === 'user')) {
+        // 对于新消息，总是尝试滚动到底部
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight
+        }, 50)
+      }
+    }
+  }, [messages])
 
   return (
     <div className="messages-area" ref={containerRef}>
