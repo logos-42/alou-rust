@@ -1,7 +1,12 @@
 name = "alou-edge"
 main = "src/worker.ts"
+workers_dev = true
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+head_sampling_rate = 1
 
 [build]
 command = "npm run build"
@@ -14,7 +19,7 @@ globs = ["**/*.wasm"]
 type = "CompiledWasm"
 
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
 AI_PROVIDER = "deepseek"
 AI_MODEL = "deepseek-chat"
 ETH_RPC_URL = "https://eth.llamarpc.com"
@@ -62,10 +67,9 @@ id = "e0f682098b73485b940f1176417f417a"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-# Migrations for Durable Objects (main environment)
-# Durable Objects already exist, no migration needed
+# Migrations for Durable Objects (main environment) - 已存在，注释掉
 # [[migrations]]
-# tag = "v1"
+# tag = "v4_jan18_2026"  # 静态唯一标签
 # new_sqlite_classes = ["AITaskDO"]
 
 
@@ -98,38 +102,38 @@ id = "placeholder-create-with-wrangler"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-# [[env.production.migrations]]
-# tag = "v1"
-# new_sqlite_classes = ["AITaskDO"]
+[[env.production.migrations]]
+tag = "v1_prod"
+new_sqlite_classes = ["AITaskDO"]
 # 注释掉迁移配置，因为 AITaskDO 已经存在
 
 # Staging environment
 [env.staging]
 name = "alou-edge-staging"
-vars = { ENVIRONMENT = "staging" }
+vars = { ENVIRONMENT = "staging", AI_PROVIDER = "deepseek", AI_MODEL = "deepseek-chat", ETH_RPC_URL = "https://eth.llamarpc.com", ETH_TESTNET_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com", SOL_RPC_URL = "https://api.mainnet-beta.solana.com" }
 
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "alou-edge-staging"
-database_id = "placeholder-create-with-wrangler"
+database_id = "11ace301-b1c5-4499-905c-a619029d9699"
 
 [[env.staging.kv_namespaces]]
 binding = "SESSIONS"
-id = "placeholder-create-with-wrangler"
+id = "d605a9d747734a1d8afadd327a518fea"
 
 [[env.staging.kv_namespaces]]
 binding = "CACHE"
-id = "placeholder-create-with-wrangler"
+id = "b3280a945fe3430f8a3acf4c775755dd"
 
 [[env.staging.kv_namespaces]]
 binding = "NONCES"
-id = "placeholder-create-with-wrangler"
+id = "7674f2e343d74ce5a879dd9fe302929f"
 
 [[env.staging.durable_objects.bindings]]
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-# [[env.staging.migrations]]
-# tag = "v1"
-# new_sqlite_classes = ["AITaskDO"]
+[[env.staging.migrations]]
+tag = "v1_staging"
+new_sqlite_classes = ["AITaskDO"]
 # 注释掉迁移配置，因为 AITaskDO 已经存在

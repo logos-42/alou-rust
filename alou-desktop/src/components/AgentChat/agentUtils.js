@@ -1,4 +1,6 @@
 import agentAssetsService from '@/services/agentAssetsService'
+import { SDK_TOOL_CATEGORIES, SDK_AGENT_TOOLS } from '@/services/sdkAgentTools'
+import { getToolCategoriesByMode as getToolCategoriesFromAgentTools, getToolsByCategories as getToolsByCategoriesFromAgentTools } from './utils/agentTools'
 
 export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
 
@@ -208,5 +210,26 @@ export const computeAgentProfile = (selectedAgent) => {
     role,
     avatar,
   }
+}
+
+/**
+ * 根据模式获取工具类别
+ * @param {string} mode - 当前模式: 'agent' 或 'alou'
+ * @param {Object} agentInfo - 智能体信息
+ * @returns {Array<string>} 工具类别数组
+ */
+export function getToolCategoriesByMode(mode, agentInfo) {
+  // 使用 agentTools.js 中的函数获取工具类别
+  return getToolCategoriesFromAgentTools(mode, agentInfo)
+}
+
+/**
+ * 根据类别获取工具列表
+ * @param {Array<string>} categories - 工具类别数组
+ * @returns {Array<Object>} 工具列表
+ */
+export function getToolsByCategories(categories) {
+  // 使用 agentTools.js 中的函数获取工具
+  return getToolsByCategoriesFromAgentTools(categories)
 }
 

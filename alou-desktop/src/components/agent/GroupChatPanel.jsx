@@ -5,6 +5,7 @@ import { useI18n } from '@/hooks/useI18n'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
+import LoadingIcon from '@/assets/加载0.2.png'
 import './GroupChatPanel.css'
 
 /**
@@ -33,7 +34,7 @@ const GroupChatPanel = ({
   // 滚动到底部
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
     }
   }
 
@@ -42,7 +43,7 @@ const GroupChatPanel = ({
     if (isScrolledToBottom) {
       scrollToBottom()
     }
-  }, [messages, isScrolledToBottom])
+  }, [messages, isScrolledToBottom, isLoading])
 
   // 监听滚动事件，判断是否在底部
   const handleScroll = () => {
@@ -128,11 +129,7 @@ const GroupChatPanel = ({
               {isLoading && (
                 <div className="loading-message">
                   <div className="typing-animation">
-                    <div className="typing-dots">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
+                    <img src={LoadingIcon} alt="加载中" className="loading-icon" />
                     <span className="typing-text">{t('agent.groupChat.typing')}</span>
                   </div>
                 </div>

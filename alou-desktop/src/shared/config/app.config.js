@@ -11,7 +11,7 @@ const BASE_CONFIG = {
   
   // 架构信息
   architecture: {
-    version: '0.2.4',
+    version: '0.2.5',
     description: '模块化架构 (渐进式迁移中)',
     modules: {
       agent: 'pending',    // 待迁移
@@ -24,13 +24,13 @@ const BASE_CONFIG = {
 
 // API配置
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8787',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://alou-edge.yuanjieliu65.workers.dev',
   timeout: 30000,
   retryAttempts: 3,
-  
+
   endpoints: {
     session: '/session',
-    agentChat: '/claude-agent/query', // 使用 Claude Agent SDK 兼容端点
+    agentChat: '/ai-task/init-and-start', // 使用 AI 异步任务端点
     agentCreate: '/agent/create',
     // 其他端点...
   },

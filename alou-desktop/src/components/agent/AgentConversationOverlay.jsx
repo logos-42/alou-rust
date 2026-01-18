@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react'
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
 import MessageList from '@/components/MessageList'
 import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -41,6 +41,16 @@ const AgentConversationOverlay = forwardRef(
       }),
       [],
     )
+
+    // 监听消息变化，自动滚动到底部
+    useEffect(() => {
+      if (messageListRef.current) {
+        // 使用 setTimeout 确保 DOM 完全更新后再滚动，避免被中断
+        setTimeout(() => {
+          messageListRef.current.scrollToBottom()
+        }, 100)
+      }
+    }, [messages, isLoading])
 
     const avatarSrc = avatar || DEFAULT_AVATAR
     const avatarAlt = typeof title === 'string' ? title : '智能体'

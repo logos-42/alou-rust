@@ -151,7 +151,7 @@ class ToolService {
     };
 
     try {
-      const response = await apiClient.post('/api/tools/execute', requestData, {
+      const response = await apiClient.post('/tools/execute', requestData, {
         timeout
       });
 
@@ -300,7 +300,7 @@ class ToolService {
    */
   async getRemoteToolList() {
     try {
-      const response = await apiClient.get('/api/tools/list');
+      const response = await apiClient.get('/tools/list');
       return response.data.tools.map(tool => ({
         ...tool,
         executionMode: 'remote'
@@ -443,7 +443,7 @@ class ToolService {
    */
   async getRemoteExecutionHistory(limit = 50) {
     try {
-      const response = await apiClient.get('/api/tools/history', {
+      const response = await apiClient.get('/tools/history', {
         params: { limit }
       });
       return response.data.history || [];

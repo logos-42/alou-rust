@@ -4,6 +4,7 @@
 
 use crate::compatibility::models::{CompatibleRequest, CompatibleResponse, TaskStatusResponse, TaskStatus};
 use crate::durable_objects::ai_task_state::{TaskState, get_state_key, get_request_key, get_result_key, get_pending_tool_calls_key, get_conversation_history_key, get_tool_result_key};
+use crate::durable_objects::ai_task_persistence::TaskPersistence;
 use crate::agent::ai_client::AiMessage;
 use crate::utils::time::current_timestamp_secs;
 use worker::{Headers, Request, Response, Result, console_error, console_log};
@@ -47,6 +48,9 @@ impl AITaskHandlers {
             console_error!("[STATUS] Failed to load state: {}", e);
             e
         })?;
+
+        console_log!("[STATUS] Task {} state: status={}, progress={}, step='{}', error={:?}",
+                     task_name, state.status, state.progress, state.current_step, state.error);
 
         // 如果任务已完成，尝试加载结果
         let result = if state.status == TaskStatus::Completed {
@@ -105,6 +109,27 @@ impl AITaskHandlers {
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
 
+    /// 处理 /pending-tools 端点 - 获取待处理的工具调用
+    pub async fn handle_get_pending_tools(
+        task_name: &str,
+        storage: &worker::Storage,
+    ) -> Result<Response> {
+        console_log!("[PENDING-TOOLS] Getting pending tools for task: {}", task_name);
+
+        // 加载待处理的工具调用
+        let pending_tools = TaskPersistence::load_pending_tool_calls(storage, task_name).await?;
+
+        let response = serde_json::json!({
+            "task_id": task_name,
+            "toolCalls": pending_tools.unwrap_or_default(),
+        });
+
+        let headers = Headers::new();
+        headers.set("Content-Type", "application/json; charset=utf-8")?;
+
+        Ok(Response::from_json(&response)?.with_headers(headers))
+    }
+
     /// 处理 /tool-result 端点
     pub async fn handle_tool_result(
         task_name: &str,
@@ -112,27 +137,75 @@ impl AITaskHandlers {
         mut req: Request,
         get_current_timestamp_millis: impl Fn() -> u64,
     ) -> Result<Response> {
+        console_log!("[TOOL-RESULT] Processing tool results for task: {}", task_name);
+
         let mut state = Self::load_state_from_storage(storage, task_name).await?;
 
         if state.status != TaskStatus::Processing && state.status != TaskStatus::Running {
             return Response::error("Task is not in a state to accept tool results", 400);
         }
 
-        let tool_result: serde_json::Value = req.json().await?;
+        // 解析工具结果 - 期望格式: { results: [{ tool, success, result, error, arguments, timestamp }] }
+        let tool_results_data: serde_json::Value = req.json().await?;
+        let cloned_data = tool_results_data.clone();
+        let tool_results = cloned_data.get("results")
+            .and_then(|r| r.as_array())
+            .ok_or_else(|| worker::Error::RustError("Invalid tool results format".to_string()))?;
 
-        // 保存工具结果到对话历史
+        console_log!("[TOOL-RESULT] Received {} tool results", tool_results.len());
+
+        // 加载待处理的工具调用，用于获取正确的tool_call_id
+        let pending_tool_calls = TaskPersistence::load_pending_tool_calls(storage, task_name).await?
+            .unwrap_or_default();
+
+        // 加载对话历史
         let mut conversation_history = Self::load_conversation_history_from_storage(storage, task_name)
             .await
             .unwrap_or_else(|_| Some(Vec::new()))
             .unwrap_or_default();
 
-        // 添加工具结果消息
-        conversation_history.push(AiMessage {
-            role: "tool".to_string(),
-            content: serde_json::to_string(&tool_result).unwrap_or_else(|_| "{}".to_string()),
-            tool_call_id: Some("tool_result".to_string()),
-            tool_calls: None,
-        });
+        // 为每个工具结果添加消息
+        for tool_result in tool_results {
+            let tool_name = tool_result.get("tool")
+                .and_then(|t| t.as_str())
+                .ok_or_else(|| worker::Error::RustError("Tool name missing".to_string()))?;
+
+            let success = tool_result.get("success")
+                .and_then(|s| s.as_bool())
+                .unwrap_or(false);
+
+            let result_content = if success {
+                tool_result.get("result")
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("工具执行成功")
+            } else {
+                tool_result.get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("工具执行失败")
+            };
+
+            // 查找对应的待处理工具调用ID
+            let tool_call_id = pending_tool_calls.iter()
+                .find(|tc| tc.tool == tool_name)
+                .and_then(|tc| tc.id.clone())
+                .unwrap_or_else(|| {
+                    // 如果找不到匹配的ID，使用工具名和时间戳作为fallback
+                    let timestamp = tool_result.get("timestamp")
+                        .and_then(|t| t.as_u64())
+                        .unwrap_or_else(|| get_current_timestamp_millis());
+                    format!("{}_{}", tool_name, timestamp)
+                });
+
+            console_log!("[TOOL-RESULT] Adding tool result message for {} (success: {}, tool_call_id: {})", tool_name, success, tool_call_id);
+
+            // 添加工具结果消息到对话历史
+            conversation_history.push(AiMessage {
+                role: "tool".to_string(),
+                content: result_content.to_string(),
+                tool_call_id: Some(tool_call_id),
+                tool_calls: None,
+            });
+        }
 
         Self::save_conversation_history_to_storage(storage, task_name, &conversation_history).await?;
 
@@ -142,13 +215,15 @@ impl AITaskHandlers {
 
         // 保存工具结果
         let tool_key = get_tool_result_key(task_name);
-        storage.put(&tool_key, tool_result).await?;
+        storage.put(&tool_key, tool_results_data).await?;
 
         // 更新状态
         state.progress = (state.progress + 0.2).min(0.9);
-        state.current_step = "工具结果已接收，继续执行".to_string();
+        state.current_step = format!("已处理 {} 个工具结果，继续执行", tool_results.len());
         state.updated_at = get_current_timestamp_millis();
         Self::save_state_to_storage(storage, task_name, &state).await?;
+
+        console_log!("[TOOL-RESULT] Tool results processed, setting alarm to continue");
 
         // 设置alarm来继续执行（1秒后，给存储足够时间）
         let now_ms = get_current_timestamp_millis();
@@ -180,8 +255,16 @@ impl AITaskHandlers {
             worker::Error::RustError(format!("Failed to parse request: {}", e))
         })?;
 
+        console_log!("[INIT-START] Request parsed successfully, prompt length: {}, tools: {}", request.prompt.len(), request.tools.len());
+
         // 保存请求和初始状态
         Self::save_request_to_storage(storage, task_name, &request).await?;
+        console_log!("[INIT-START] Request saved to storage");
+
+        // 清除旧的对话历史，确保从干净的状态开始
+        let conversation_history_key = get_conversation_history_key(task_name);
+        storage.delete(&conversation_history_key).await?;
+        console_log!("[INIT-START] Cleared old conversation history");
 
         let now = current_timestamp_secs();
         let initial_state = TaskState {
@@ -193,13 +276,30 @@ impl AITaskHandlers {
             error: None,
         };
         Self::save_state_to_storage(storage, task_name, &initial_state).await?;
+        console_log!("[INIT-START] Initial state saved: status={}, created_at={}", initial_state.status, initial_state.created_at);
 
-        // 设置Alarm - 采用"Fire and Forget"模式，只设置alarm，不直接执行
+        // 设置alarm - 采用"Fire and Forget"模式，只设置alarm，不直接执行
         let now_ms = get_current_timestamp_millis();
-        let scheduled_time = now_ms + 2000; // 2秒后开始执行，给存储足够时间
-        storage.set_alarm(scheduled_time as i64).await?;
-
-        console_log!("[INIT-START] Task scheduled for execution at {}ms", scheduled_time);
+        console_log!("[INIT-START] Current timestamp: {}ms", now_ms);
+        
+        // 确保alarm时间至少是未来100ms，避免立即触发或过去时间
+        let min_scheduled_time = now_ms + 100;
+        let scheduled_time = std::cmp::max(now_ms + 1000, min_scheduled_time);
+        
+        console_log!("[INIT-START] Setting alarm for execution at {}ms (current: {}ms, delay: {}ms)", 
+                     scheduled_time, now_ms, scheduled_time - now_ms);
+        
+        // 记录详细的alarm设置信息
+        console_log!("[INIT-START] Alarm target timestamp: {} (i64: {})", scheduled_time, scheduled_time as i64);
+        
+        // 设置alarm并检查结果
+        match storage.set_alarm(scheduled_time as i64).await {
+            Ok(_) => console_log!("[INIT-START] Alarm set successfully!"),
+            Err(e) => {
+                console_error!("[INIT-START] FAILED to set alarm: {}", e);
+                return Err(e);
+            }
+        }
 
         let response = TaskStatusResponse::new(
             task_name.to_string(),
@@ -209,6 +309,7 @@ impl AITaskHandlers {
         let headers = Headers::new();
         headers.set("Content-Type", "application/json; charset=utf-8")?;
 
+        console_log!("[INIT-START] Init-and-start completed successfully for task: {}", task_name);
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
 
@@ -235,10 +336,28 @@ impl AITaskHandlers {
             TaskStatus::Processing => console_log!("Task is processing"),
         }
 
-        // 设置Alarm - 采用"Fire and Forget"模式，1秒后开始执行
+        // 设置Alarm - 采用"Fire and Forget"模式，5秒后开始执行
         let now_ms = get_current_timestamp_millis();
-        let alarm_at = now_ms + 1000;
-        storage.set_alarm(alarm_at as i64).await?;
+        console_log!("[START] Current timestamp: {}ms", now_ms);
+        
+        // 确保alarm时间至少是未来100ms，避免立即触发或过去时间
+        let min_scheduled_time = now_ms + 100;
+        let alarm_at = std::cmp::max(now_ms + 5000, min_scheduled_time);
+        
+        console_log!("[START] Setting alarm for execution at {}ms (current: {}ms, delay: {}ms)", 
+                     alarm_at, now_ms, alarm_at - now_ms);
+        
+        // 记录详细的alarm设置信息
+        console_log!("[START] Alarm target timestamp: {} (i64: {})", alarm_at, alarm_at as i64);
+        
+        // 设置alarm并检查结果
+        match storage.set_alarm(alarm_at as i64).await {
+            Ok(_) => console_log!("[START] Alarm set successfully!"),
+            Err(e) => {
+                console_error!("[START] FAILED to set alarm: {}", e);
+                return Err(e);
+            }
+        }
 
         let response = TaskStatusResponse::new(
             task_name.to_string(),

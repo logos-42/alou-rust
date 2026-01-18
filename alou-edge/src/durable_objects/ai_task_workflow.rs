@@ -205,6 +205,7 @@ impl<'a> WorkflowStepExecutor<'a> {
         let tool_call = crate::compatibility::models::ToolCall {
             tool: step.tool.clone(),
             arguments: step.args.clone(),
+            id: None, // 工作流步骤没有预定义的 tool_call_id
         };
 
         // 保存待处理的工具调用
@@ -384,6 +385,13 @@ impl<'a> WorkflowDecisionHandler<'a> {
     pub async fn execute_workflow_steps(&self, workflow: &Workflow) -> worker::Result<()> {
         console_log!("[WORKFLOW] Executing {} steps", workflow.steps.len());
 
+        // Ralph Loop: 检查是否需要先进行探索阶段
+        let needs_exploration = self.needs_exploration_phase(workflow).await?;
+        if needs_exploration {
+            console_log!("[RALPH-LOOP] 🚀 Starting exploration phase for complex workflow");
+            self.execute_exploration_phase(workflow).await?;
+        }
+
         // 检查是否有工具结果需要处理
         let tool_result_key = get_tool_result_key(&self.task_name);
         let mut updated_workflow = workflow.clone();
@@ -556,6 +564,161 @@ impl<'a> WorkflowDecisionHandler<'a> {
     async fn load_workflow_results(&self) -> worker::Result<Option<HashMap<String, Value>>> {
         let key = get_workflow_results_key(&self.task_name);
         Ok(self.state.storage().get::<HashMap<String, Value>>(&key).await.ok())
+    }
+
+    /// 检查是否需要探索阶段（Ralph Loop）
+    async fn needs_exploration_phase(&self, workflow: &Workflow) -> worker::Result<bool> {
+        // 检查是否已经进行过探索
+        let exploration_key = format!("{}_exploration_done", &self.task_name);
+        let exploration_done = match self.state.storage().get::<serde_json::Value>(&exploration_key).await {
+            Ok(value) => value.as_bool().unwrap_or(false),
+            _ => false,
+        };
+
+        if exploration_done {
+            console_log!("[RALPH-LOOP] Exploration already completed, proceeding to execution");
+            return Ok(false);
+        }
+
+        // 检查工作流复杂度 - 如果步骤数多于3个或包含复杂工具，则需要探索
+        let is_complex = workflow.steps.len() > 3 ||
+            workflow.steps.iter().any(|step| {
+                // 检查是否使用了复杂工具
+                matches!(step.tool.as_str(), "web_search" | "web_fetch" | "plan" | "subagents")
+            });
+
+        if is_complex {
+            console_log!("[RALPH-LOOP] Complex workflow detected ({} steps), exploration needed", workflow.steps.len());
+            Ok(true)
+        } else {
+            console_log!("[RALPH-LOOP] Simple workflow ({} steps), skipping exploration", workflow.steps.len());
+            // 标记探索已完成，即使跳过了
+            self.state.storage().put(&exploration_key, &true).await?;
+            Ok(false)
+        }
+    }
+
+    /// 执行探索阶段（Ralph Loop）
+    async fn execute_exploration_phase(&self, workflow: &Workflow) -> worker::Result<()> {
+        console_log!("[RALPH-LOOP] 🔍 Executing exploration phase");
+
+        // 创建一个特殊的探索步骤
+        let exploration_step = WorkflowStep {
+            id: "exploration_phase".to_string(),
+            name: "环境探索阶段".to_string(),
+            tool: "bash".to_string(),
+            args: serde_json::json!({
+                "command": "pwd && ls -la && echo '=== Environment Info ===' && which node && which npm && which git",
+                "working_directory": "."
+            }),
+            depends_on: vec![],
+            status: StepStatus::Pending,
+            result: None,
+            error: None,
+        };
+
+        // 执行探索步骤
+        let executor = WorkflowStepExecutor::new(self.state, self.task_name.clone());
+        let exploration_result = executor.execute_workflow_step(&exploration_step).await?;
+
+        console_log!("[RALPH-LOOP] ✅ Exploration phase completed, result: {:?}", exploration_result);
+
+        // 标记探索已完成
+        let exploration_key = format!("{}_exploration_done", &self.task_name);
+        self.state.storage().put(&exploration_key, &true).await?;
+
+        // 现在进入正常的执行阶段 - 直接执行步骤逻辑，不递归调用
+        console_log!("[RALPH-LOOP] 🎯 Transitioning to execution phase");
+
+        // 查找下一个可执行的步骤
+        let executor = WorkflowStepExecutor::new(self.state, self.task_name.clone());
+        let next_step = executor.find_next_executable_step(workflow)?;
+
+        if let Some(step) = next_step {
+            console_log!("[WORKFLOW] Executing step: {}", step.name);
+
+            // 更新状态
+            let state_key = get_state_key(&self.task_name);
+            let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
+            state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(executor.calculate_workflow_progress(workflow) as f64).unwrap());
+            state_data["current_step"] = serde_json::Value::String(format!("执行步骤: {}", step.name));
+            self.state.storage().put(&state_key, &state_data).await?;
+
+            // 执行步骤
+            let step_result = executor.execute_workflow_step(&step).await?;
+
+            // 保存步骤结果
+            let mut results: HashMap<String, Value> = HashMap::new();
+            if let Ok(Some(existing_results)) = self.load_workflow_results().await {
+                results = existing_results;
+            }
+            results.insert(step.id.clone(), step_result);
+            self.save_workflow_results(&results).await?;
+
+            // 更新步骤状态
+            let mut final_workflow = workflow.clone();
+            for s in &mut final_workflow.steps {
+                if s.id == step.id {
+                    s.status = if results.get(&step.id).is_some() {
+                        StepStatus::Completed
+                    } else {
+                        StepStatus::Failed
+                    };
+                    s.result = results.get(&step.id).cloned();
+                    break;
+                }
+            }
+            self.save_workflow(&final_workflow).await?;
+
+            // 检查是否所有步骤都完成
+            if executor.is_workflow_completed(&final_workflow) {
+                console_log!("[WORKFLOW] Workflow completed");
+
+                // 保存最终结果
+                let final_result = CompatibleResponse::success_response(
+                    format!("工作流完成，共执行 {} 个步骤", workflow.steps.len()),
+                    None,
+                );
+
+                let result_key = get_result_key(&self.task_name);
+                self.state.storage().put(&result_key, &final_result).await?;
+
+                // 更新任务状态
+                let state_key = get_state_key(&self.task_name);
+                let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
+                state_data["status"] = serde_json::Value::String("completed".to_string());
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
+                state_data["current_step"] = serde_json::Value::String("工作流完成".to_string());
+                self.state.storage().put(&state_key, &state_data).await?;
+            } else {
+                // 继续执行下一步（设置延迟alarm）
+                let now_ms = self.get_current_timestamp_millis();
+                self.state.storage().set_alarm((now_ms + 1000) as i64).await?;
+                console_log!("[WORKFLOW] Scheduled next step execution");
+            }
+        } else {
+            console_log!("[WORKFLOW] No executable steps found");
+
+            // 检查工作流状态
+            if executor.is_workflow_completed(workflow) {
+                let state_key = get_state_key(&self.task_name);
+                let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
+                state_data["status"] = serde_json::Value::String("completed".to_string());
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
+                state_data["current_step"] = serde_json::Value::String("工作流完成".to_string());
+                self.state.storage().put(&state_key, &state_data).await?;
+            } else {
+                // 工作流卡住了
+                let state_key = get_state_key(&self.task_name);
+                let mut state_data = self.state.storage().get::<Value>(&state_key).await?;
+                state_data["status"] = serde_json::Value::String("failed".to_string());
+                state_data["error"] = serde_json::Value::String("工作流执行失败：无法继续执行".to_string());
+                state_data["progress"] = serde_json::Value::Number(serde_json::Number::from_f64(1.0).unwrap());
+                self.state.storage().put(&state_key, &state_data).await?;
+            }
+        }
+
+        Ok(())
     }
 }
 

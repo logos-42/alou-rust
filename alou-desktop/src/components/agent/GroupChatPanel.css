@@ -232,16 +232,28 @@
 }
 
 .group-chat-messages::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f3f4;
+}
+
+.app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-track {
+  background: #2d3748;
 }
 
 .group-chat-messages::-webkit-scrollbar-thumb {
-  background: var(--border-color, rgba(15, 23, 42, 0.2));
+  background: #9ca3af;
   border-radius: 3px;
 }
 
+.app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
 .group-chat-messages::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary, #475569);
+  background: #6b7280;
+}
+
+.app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 /* 空状态 */

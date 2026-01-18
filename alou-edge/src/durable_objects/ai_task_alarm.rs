@@ -30,11 +30,12 @@ impl<'a> AlarmHandler<'a> {
         continue_with_results: impl Fn() -> Result<()>,
     ) -> Result<()> {
         console_log!("[ALARM-LOGIC] Handling alarm for task: {}", self.ctx.task_name);
+        console_log!("[ALARM-LOGIC] Current timestamp: {}", self.ctx.get_current_timestamp_millis());
 
         // 加载状态
         let state = self.load_state().await?;
-        console_log!("[STATE-TRANSITION] Task {}: status={}, progress={}, step='{}'",
-                     self.ctx.task_name, state.status, state.progress, state.current_step);
+        console_log!("[STATE-TRANSITION] Task {}: status={}, progress={}, step='{}', error={:?}",
+                      self.ctx.task_name, state.status, state.progress, state.current_step, state.error);
 
         match state.status {
             TaskStatus::Processing => {
@@ -97,7 +98,7 @@ impl<'a> AlarmHandler<'a> {
             console_log!("[ALARM-LOGIC] Workflow task waiting for tool execution");
             // 重新设置alarm继续等待
             let now_ms = self.ctx.get_current_timestamp_millis();
-            storage.set_alarm((now_ms + 2000) as i64).await?;
+            storage.set_alarm((now_ms + 5000) as i64).await?;
             return Ok(());
         } else {
             console_log!("[ALARM-LOGIC] Workflow task checking for tool results");
@@ -118,7 +119,7 @@ impl<'a> AlarmHandler<'a> {
             } else {
                 console_log!("[ALARM-LOGIC] Workflow no tool results yet, waiting...");
                 let now_ms = self.ctx.get_current_timestamp_millis();
-                storage.set_alarm((now_ms + 2000) as i64).await?;
+                storage.set_alarm((now_ms + 5000) as i64).await?;
             }
         }
         Ok(())
@@ -132,7 +133,7 @@ impl<'a> AlarmHandler<'a> {
             console_log!("[ALARM-LOGIC] Still waiting for tool results, scheduling next check");
             // 重新设置alarm
             let now_ms = self.ctx.get_current_timestamp_millis();
-            storage.set_alarm((now_ms + 2000) as i64).await?;
+            storage.set_alarm((now_ms + 5000) as i64).await?;
             console_log!("[STATE-TRANSITION] Task {}: staying in Processing state, alarm set for next check", self.ctx.task_name);
         } else {
             console_log!("[ALARM-LOGIC] No pending tool calls, checking for tool results");
@@ -146,7 +147,7 @@ impl<'a> AlarmHandler<'a> {
             } else {
                 console_log!("[ALARM-LOGIC] No tool results yet, waiting...");
                 let now_ms = self.ctx.get_current_timestamp_millis();
-                storage.set_alarm((now_ms + 2000) as i64).await?;
+                storage.set_alarm((now_ms + 5000) as i64).await?;
                 console_log!("[STATE-TRANSITION] Task {}: staying in Processing state, waiting for tool results", self.ctx.task_name);
             }
         }
@@ -156,9 +157,11 @@ impl<'a> AlarmHandler<'a> {
     /// 处理 Queued 状态
     async fn handle_queued_state(&self, state: TaskState, execute_workflow: impl Fn() -> Result<()>, execute_regular: impl Fn() -> Result<()>) -> Result<()> {
         console_log!("[ALARM-LOGIC] Task is queued, starting execution");
+        console_log!("[ALARM-LOGIC] Checking if task {} is a workflow task", self.ctx.task_name);
 
         // 检查是否为工作流任务
         let is_workflow = TaskPersistence::is_workflow_task(self.ctx.storage, self.ctx.task_name).await?;
+        console_log!("[ALARM-LOGIC] Task {} is_workflow: {}", self.ctx.task_name, is_workflow);
 
         if is_workflow {
             console_log!("[ALARM-LOGIC] Workflow task detected, starting workflow execution");
@@ -184,10 +187,18 @@ impl<'a> AlarmHandler<'a> {
         } else {
             console_log!("[ALARM-LOGIC] Regular AI task, starting AI execution");
             console_log!("[STATE-TRANSITION] Task {}: Queued -> Starting execution", self.ctx.task_name);
+            
+            // 更新状态为Running
+            let mut new_state = state;
+            new_state.status = TaskStatus::Running;
+            new_state.progress = 0.1;
+            new_state.current_step = "开始执行".to_string();
+            self.save_state(&new_state).await?;
+            
             // 执行常规任务
             if let Err(e) = execute_regular() {
                 console_error!("[ALARM-LOGIC] Regular task execution failed: {}", e);
-                let mut failed_state = state;
+                let mut failed_state = new_state;
                 failed_state.status = TaskStatus::Failed;
                 failed_state.error = Some(format!("任务执行失败: {}", e));
                 failed_state.progress = 1.0;
@@ -209,10 +220,6 @@ impl<'a> AlarmHandler<'a> {
             Ok(res) => res,
             Err(_) => {
                 console_log!("[WORKFLOW-AI] No tool result found");
-                return Ok(());
-            }
-            Err(_) => {
-                console_log!("[WORKFLOW-AI] Error getting tool result");
                 return Ok(());
             }
         };
@@ -307,7 +314,9 @@ impl<'a> AlarmHandler<'a> {
         });
 
         let state_key = get_state_key(task_name);
+        console_log!("[DEBUG-SAVE] Saving state for task: {}, key: {}, data: {:?}", task_name, state_key, state_data);
         storage.put(&state_key, state_data).await?;
+        console_log!("[DEBUG-SAVE] State saved successfully for task: {}", task_name);
         Ok(())
     }
 }

@@ -2,11 +2,12 @@ import { useCallback, useState, useMemo, useEffect, useRef } from 'react'
 import apiClient from '@/services/api'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
-import { getToolCategoriesByMode, getToolsByCategories } from './utils/agentTools'
+import { getToolCategoriesByMode, getToolsByCategories } from './agentUtils'
 import { getSystemPromptForAgent } from './utils/agentPrompts'
 import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
+import LoadingIcon from '@/assets/加载0.2.png'
 
 /**
  * Hook for managing messages and conversation
@@ -330,12 +331,12 @@ export const useAgentMessages = ({
         maxTokens: agentInfo?.maxTokens || 4096,
         temperature: agentInfo?.temperature || 0.7,
         // 添加其他可选参数
-        taskType: "sync", // 同步任务
+        taskType: "async", // 异步任务 - 强制使用异步模式以支持工具循环
         timeout: 30000, // 30秒超时
       }
 
       const data = await apiClient
-        .post('/claude-agent/query', claudeSdkRequest, {
+        .post('/ai-task/init-and-start', claudeSdkRequest, {
           signal: abortController.signal, // 添加 abort signal 用于终止请求
         })
         .then((response) => response.data)
@@ -347,22 +348,20 @@ export const useAgentMessages = ({
         // 是异步任务，启动轮询
         console.log(`[useAgentMessages] 检测到异步任务: ${taskId}`)
         
-        // 添加"正在执行"状态消息
-        const progressMessage = {
+        // 显示加载消息
+        const loadingMessage = {
           id: `task_${taskId}`,
           type: 'assistant',
-          content: '🔄 任务正在后台执行中...',
+          content: `<img src="${LoadingIcon}" alt="加载中" class="loading-icon" /> 正在处理中...`,
           timestamp: Date.now(),
           source: 'task-progress',
-          taskId: taskId,
           agentId: targetAgentId,
-          progress: 0,
-          status: 'pending'
+          isLoading: true,
         }
-        appendMessage(progressMessage, targetAgentId)
+        appendMessage(loadingMessage, targetAgentId)
         
         // 启动轮询
-        pollAsyncTask(taskId, progressMessage.id, targetAgentId)
+        pollAsyncTask(taskId, loadingMessage.id, targetAgentId)
       } else {
         // 同步任务，直接处理响应
         // 处理 Claude SDK 响应格式

@@ -27,6 +27,8 @@ pub struct Tool {
 pub struct ToolCall {
     pub tool: String,
     pub arguments: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
 }
 
 /// 工具调用结果

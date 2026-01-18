@@ -61,6 +61,11 @@ impl DurableObject for AITaskDO {
         let path = req.path();
         let method = req.method();
 
+        // 在每次访问时检查并执行任务（如果需要）
+        if let Err(e) = self.check_and_execute_pending_task().await {
+            console_error!("[AITaskDO] Failed to check and execute pending task: {}", e);
+        }
+
         match (&method, path.as_str()) {
             (Method::Get, "/status") => {
                 let storage = self.state.storage();
@@ -87,6 +92,10 @@ impl DurableObject for AITaskDO {
                 let storage = self.state.storage();
                 AITaskHandlers::handle_tool_result(&self.task_name(), &storage, req, || self.get_current_timestamp_millis()).await
             }
+            (Method::Get, "/pending-tools") => {
+                let storage = self.state.storage();
+                AITaskHandlers::handle_get_pending_tools(&self.task_name(), &storage).await
+            }
             _ => {
                 console_log!("[AITaskDO] Unknown route: {:?} {}", method, path);
                 Response::error("Not found", 404)
@@ -98,31 +107,64 @@ impl DurableObject for AITaskDO {
         console_error!("!!! ALARM ACTIVE !!! Task: {}", self.task_name());
         console_log!("🚨 AITaskDO ALARM STARTED");
         console_log!("[DEBUG] Current DO ID: {}", self.state.id().to_string());
+        console_log!("[DEBUG] Current timestamp: {}", self.get_current_timestamp_millis());
 
         #[cfg(target_arch = "wasm32")]
         console_error_panic_hook::set_once();
 
-        // 使用 AlarmHandler 处理 alarm 逻辑
+        // 直接处理alarm逻辑
         let task_name = self.task_name();
         let storage = self.state.storage();
-        let ctx = TaskExecutionContext::new(
-            &storage,
-            &task_name,
-            &self.env,
-        );
-        let alarm_handler = AlarmHandler::new(ctx, &self.state);
+        let state = TaskPersistence::load_state(&storage, &task_name).await?;
+        console_log!("[ALARM] Task {} state: status={}, progress={}, step='{}', created_at={}, updated_at={}",
+                      task_name, state.status, state.progress, state.current_step, state.created_at, state.updated_at);
 
-        match alarm_handler.handle_alarm_logic(
-            || { let _ = self.execute_workflow_task(); Ok(()) },
-            || { let _ = self.execute_task(); Ok(()) },
-            || { let _ = self.continue_with_tool_results(); Ok(()) },
-        ).await {
-            Ok(_) => Response::ok("Alarm handled"),
-            Err(e) => {
-                console_error!("Alarm handling failed: {}", e);
-                Response::error(format!("Alarm failed: {}", e), 500)
+        match state.status {
+            TaskStatus::Queued => {
+                console_log!("[ALARM] Task is queued, starting execution");
+                // 检查是否为工作流任务
+                let is_workflow = TaskPersistence::is_workflow_task(&storage, &task_name).await?;
+                console_log!("[ALARM] Task {} is_workflow: {}", task_name, is_workflow);
+
+                if is_workflow {
+                    console_log!("[ALARM] Starting workflow execution");
+                    match self.execute_workflow_task().await {
+                        Ok(_) => console_log!("[ALARM] Workflow execution completed successfully"),
+                        Err(e) => console_error!("[ALARM] Workflow execution failed: {}", e),
+                    }
+                } else {
+                    console_log!("[ALARM] Starting regular task execution");
+                    match self.execute_task().await {
+                        Ok(_) => console_log!("[ALARM] Task execution completed successfully"),
+                        Err(e) => console_error!("[ALARM] Task execution failed: {}", e),
+                    }
+                }
+            }
+            TaskStatus::Processing => {
+                console_log!("[ALARM] Task is processing, checking for tool results");
+                match self.continue_with_tool_results().await {
+                    Ok(_) => console_log!("[ALARM] Continue with tool results completed successfully"),
+                    Err(e) => console_error!("[ALARM] Continue with tool results failed: {}", e),
+                }
+            }
+            _ => {
+                console_log!("[ALARM] Task status {} requires no action", state.status);
             }
         }
+
+        // 检查任务是否仍需继续，如果是则重新设置alarm
+        let new_state = TaskPersistence::load_state(&storage, &task_name).await?;
+        if new_state.status == TaskStatus::Queued || new_state.status == TaskStatus::Processing || new_state.status == TaskStatus::Running {
+            let now_ms = self.get_current_timestamp_millis();
+            let next_alarm = now_ms + 5000; // 5秒后再次检查
+            console_log!("[ALARM] Task still needs processing, setting next alarm at {}ms (current: {}ms)", next_alarm, now_ms);
+            storage.set_alarm(next_alarm as i64).await?;
+        } else {
+            console_log!("[ALARM] Task completed or failed, no further alarm needed");
+        }
+
+        console_log!("🚨 AITaskDO ALARM COMPLETED");
+        Response::ok("Alarm handled")
     }
 }
 
@@ -221,6 +263,67 @@ impl AITaskDO {
         let executor = TaskExecutorImpl::new(ctx);
 
         executor.execute_full_task().await
+    }
+
+    /// 检查并执行待处理的任务（在每次访问时调用）
+    async fn check_and_execute_pending_task(&self) -> Result<()> {
+        console_log!("[CHECK] Checking for pending tasks");
+
+        let task_name = self.task_name();
+        let storage = self.state.storage();
+        let state = TaskPersistence::load_state(&storage, &task_name).await?;
+
+        console_log!("[CHECK] Task {} current status: {}", task_name, state.status);
+
+        match state.status {
+            TaskStatus::Queued => {
+                console_log!("[CHECK] Found queued task, starting execution");
+
+                // 检查是否已经在执行中，避免重复执行
+                if *self.is_executing.borrow() {
+                    console_log!("[CHECK] Task is already executing, skipping");
+                    return Ok(());
+                }
+
+                // 设置执行标志
+                *self.is_executing.borrow_mut() = true;
+
+                // 检查是否为工作流任务
+                let is_workflow = TaskPersistence::is_workflow_task(&storage, &task_name).await?;
+                console_log!("[CHECK] Task {} is_workflow: {}", task_name, is_workflow);
+
+                let execution_result = if is_workflow {
+                    console_log!("[CHECK] Executing workflow task");
+                    self.execute_workflow_task().await
+                } else {
+                    console_log!("[CHECK] Executing regular task");
+                    self.execute_task().await
+                };
+
+                // 清除执行标志
+                *self.is_executing.borrow_mut() = false;
+
+                match execution_result {
+                    Ok(_) => console_log!("[CHECK] Task executed successfully"),
+                    Err(e) => console_error!("[CHECK] Task execution failed: {}", e),
+                }
+            }
+            TaskStatus::Processing => {
+                console_log!("[CHECK] Task is processing, checking for tool results");
+                match self.continue_with_tool_results().await {
+                    Ok(_) => console_log!("[CHECK] Tool results processing completed"),
+                    Err(e) => console_error!("[CHECK] Tool results processing failed: {}", e),
+                }
+            }
+            TaskStatus::Completed | TaskStatus::Failed => {
+                console_log!("[CHECK] Task already {} , no action needed", state.status);
+            }
+            _ => {
+                console_log!("[CHECK] Task status {} requires no action", state.status);
+            }
+        }
+
+        Ok(())
     }
 }
 

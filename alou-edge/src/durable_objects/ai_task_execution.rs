@@ -180,17 +180,19 @@ impl<'a> TaskExecutorImpl<'a> {
 
     /// 执行完整任务
     pub async fn execute_full_task(&self) -> Result<()> {
-        console_log!("[EXECUTE] Starting task execution");
+        console_log!("[EXECUTE] Starting task execution for: {}", self.ctx.task_name);
 
         #[cfg(target_arch = "wasm32")]
         console_error_panic_hook::set_once();
 
         // 1. 更新状态
         let mut state = self.load_state().await?;
+        console_log!("[EXECUTE] Loaded initial state: status={}, progress={}", state.status, state.progress);
         state.progress = 0.2;
         state.current_step = "加载请求数据".to_string();
         state.updated_at = self.ctx.get_current_timestamp();
         self.save_state(&state).await?;
+        console_log!("[EXECUTE] State updated to loading request data");
 
         // 2. 获取请求数据
         let request = match TaskPersistence::get_request(self.ctx.storage, self.ctx.task_name).await? {
@@ -208,12 +210,20 @@ impl<'a> TaskExecutorImpl<'a> {
         state.progress = 0.3;
         state.current_step = "初始化AI客户端".to_string();
         self.save_state(&state).await?;
+        console_log!("[EXECUTE] Initializing AI client");
 
         let ai_api_key = match self.ctx.env.secret("AI_API_KEY") {
-            Ok(key) => key.to_string(),
+            Ok(key) => {
+                console_log!("[EXECUTE] Found AI_API_KEY");
+                key.to_string()
+            },
             Err(_) => match self.ctx.env.secret("DEEPSEEK_API_KEY") {
-                Ok(key) => key.to_string(),
+                Ok(key) => {
+                    console_log!("[EXECUTE] Found DEEPSEEK_API_KEY");
+                    key.to_string()
+                },
                 Err(_) => {
+                    console_error!("[EXECUTE] No AI API key configured");
                     state.status = TaskStatus::Failed;
                     state.error = Some("AI_API_KEY 或 DEEPSEEK_API_KEY 未配置".to_string());
                     state.progress = 1.0;
@@ -223,13 +233,16 @@ impl<'a> TaskExecutorImpl<'a> {
             }
         };
 
+        console_log!("[EXECUTE] Creating AI client with model: {}", &request.model);
         let ai_client = AiClient::new("deepseek", ai_api_key, Some(request.model.clone()))
             .map_err(|e| {
+                console_error!("[EXECUTE] Failed to create AI client: {}", e);
                 state.status = TaskStatus::Failed;
                 state.error = Some(format!("创建AI客户端失败: {}", e));
                 state.progress = 1.0;
                 worker::Error::RustError(format!("Failed to create AI client: {}", e))
             })?;
+        console_log!("[EXECUTE] AI client created successfully");
 
         // 4. 准备消息和工具
         let mut messages = self.ai_caller.convert_to_ai_messages(&request);
@@ -245,6 +258,7 @@ impl<'a> TaskExecutorImpl<'a> {
         state.progress = 0.5;
         state.current_step = "调用AI服务".to_string();
         self.save_state(&state).await?;
+        console_log!("[EXECUTE] Calling AI service with {} messages and {} tools", messages.len(), tools.len());
 
         match self.ai_caller.call_ai_with_timeout(ai_client, messages, tools, self.ctx.task_name).await {
             Ok(ai_response) => {
@@ -262,6 +276,7 @@ impl<'a> TaskExecutorImpl<'a> {
                         ToolCall {
                             tool: tc.name.clone(),
                             arguments: tc.arguments.clone(),
+                            id: Some(tc.id.clone()),
                         }
                     }).collect();
                     TaskPersistence::save_pending_tool_calls(self.ctx.storage, self.ctx.task_name, &tool_calls).await?;
@@ -387,6 +402,7 @@ impl<'a> TaskExecutorImpl<'a> {
                         ToolCall {
                             tool: tc.name.clone(),
                             arguments: tc.arguments.clone(),
+                            id: Some(tc.id.clone()),
                         }
                     }).collect();
                     TaskPersistence::save_pending_tool_calls(self.ctx.storage, self.ctx.task_name, &tool_calls).await?;

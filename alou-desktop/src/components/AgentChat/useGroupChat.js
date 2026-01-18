@@ -185,6 +185,21 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
         return () => {} // 返回空的清理函数
       }
 
+      // 检查是否是集群行动（action_ 开头）还是 AI 任务（task_ 开头）
+      const isClusterAction = actionId.startsWith('action_')
+      const isAiTask = actionId.startsWith('task_')
+
+      if (!isClusterAction && !isAiTask) {
+        console.warn('[useGroupChat] 未知的行动类型:', actionId)
+        return () => {}
+      }
+
+      // 如果是 AI 任务，不在这里轮询（由 useAsyncTaskPolling 处理）
+      if (isAiTask) {
+        console.log('[useGroupChat] AI 任务状态由 useAsyncTaskPolling 处理，跳过群聊轮询:', actionId)
+        return () => {}
+      }
+
       const poll = async () => {
         try {
           const status = await clusterActionService.getActionStatus(actionId)

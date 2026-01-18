@@ -49,8 +49,8 @@ impl WorkflowEventManager {
 pub fn start_workflow_event_listener(app_handle: tauri::AppHandle, executor: AsyncWorkflowExecutor) {
     let event_manager = WorkflowEventManager::new(executor);
 
-    // 在后台任务中运行事件循环
-    tokio::spawn(async move {
+    // 在Tauri的异步运行时中运行事件循环
+    tauri::async_runtime::spawn(async move {
         event_manager.start_event_loop(app_handle).await;
     });
 }

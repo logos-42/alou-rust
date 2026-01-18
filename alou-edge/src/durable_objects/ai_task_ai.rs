@@ -54,23 +54,29 @@ impl DefaultAiCaller {
     ) -> Result<AiResponse> {
         console_log!("=== CALL_AI_WITH_TIMEOUT START ===");
         console_log!("Calling AI service for task: {}", task_name);
-        
+        console_log!("Messages count: {}, Tools count: {}", messages.len(), tools.len());
+
         #[cfg(target_arch = "wasm32")]
         {
+            console_log!("Starting AI call with 55s timeout...");
+            let start_time = worker::Date::now().as_millis();
+
             let ai_future = ai_client.send_message(messages, Some(tools));
             let timeout_future = TimeoutFuture::new(55_000);
-            
+
             match select(Pin::from(Box::pin(ai_future)), Pin::from(Box::pin(timeout_future))).await {
                 Either::Left((Ok(response), _)) => {
-                    console_log!("✅ AI call completed successfully");
+                    let duration = worker::Date::now().as_millis() - start_time;
+                    console_log!("✅ AI call completed successfully in {:.2}ms", duration);
                     Ok(response)
                 }
                 Either::Left((Err(e), _)) => {
-                    console_error!("❌ AI call failed: {}", e);
+                    let duration = worker::Date::now().as_millis() - start_time;
+                    console_error!("❌ AI call failed after {:.2}ms: {}", duration, e);
                     Err(worker::Error::RustError(format!("AI service error: {}", e)))
                 }
                 Either::Right((_, _)) => {
-                    console_error!("⏰ AI call timed out");
+                    console_error!("⏰ AI call timed out after 55 seconds");
                     Err(worker::Error::RustError("AI service call timeout".to_string()))
                 }
             }
@@ -192,6 +198,7 @@ impl DefaultAiCaller {
                     crate::compatibility::models::ToolCall {
                         tool: tc.name,
                         arguments: tc.arguments,
+                        id: Some(tc.id),
                     }
                 }).collect()
             ),

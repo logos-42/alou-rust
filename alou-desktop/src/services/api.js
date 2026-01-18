@@ -7,12 +7,12 @@ import Cookies from 'js-cookie'
 
 // API base URL - 根据环境配置
 // 1. Tauri桌面应用：连接到生产环境 (https://alou-edge.yuanjieliu65.workers.dev)
-// 2. Web开发环境：使用Vite代理（空字符串）
+// 2. Web开发环境：使用Vite代理（空字符串）或自定义 VITE_API_BASE_URL
 // 3. Web生产环境：使用远程Workers
 const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
-const API_BASE_URL = isTauri 
-  ? 'https://alou-edge.yuanjieliu65.workers.dev' 
-  : (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev');
+const API_BASE_URL = isTauri
+  ? 'https://alou-edge.yuanjieliu65.workers.dev'
+  : (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev'));
 
 // Debug logging
 console.log('[API] Environment:', {
@@ -117,7 +117,7 @@ apiClient.interceptors.response.use(
       try {
         const refreshToken = Cookies.get('refresh_token')
         if (refreshToken) {
-        const response = await axios.post(API_BASE_URL ? `${API_BASE_URL}/api/auth/refresh` : '/api/auth/refresh', {
+        const response = await axios.post(API_BASE_URL ? `${API_BASE_URL}/auth/refresh` : '/auth/refresh', {
           refresh_token: refreshToken,
         })
 

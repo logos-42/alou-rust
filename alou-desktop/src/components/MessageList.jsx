@@ -1,6 +1,7 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useEffect } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
+import LoadingIcon from '@/assets/加载0.2.png'
 
 const sourceMap = {
   'wasm-core': 'WASM',
@@ -76,6 +77,17 @@ const MessageList = forwardRef(
     [messages],
   )
 
+  // 自动滚动到底部
+  useEffect(() => {
+    const container = containerRef.current
+    if (container) {
+      // 使用 setTimeout 确保 DOM 完全更新后再滚动，避免被中断
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight
+      }, 100)
+    }
+  }, [renderedMessages, isLoading])
+
   return (
     <div className="messages-area" ref={containerRef}>
       <div>
@@ -130,11 +142,7 @@ const MessageList = forwardRef(
           <div className="message-wrapper assistant">
             <div className="message-bubble loading">
               <div className="typing-animation">
-                <div className="typing-dots">
-                  <span />
-                  <span />
-                  <span />
-                </div>
+                <img src={LoadingIcon} alt="加载中" className="loading-icon" />
                 <span className="typing-text">{t('thinking')}</span>
               </div>
             </div>

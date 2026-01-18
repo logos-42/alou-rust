@@ -307,6 +307,7 @@ impl TaskExecutor {
                     crate::compatibility::models::ToolCall {
                         tool: tc.name,
                         arguments: tc.arguments,
+                        id: Some(tc.id),
                     }
                 }).collect()
             ),

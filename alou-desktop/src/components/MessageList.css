@@ -3,7 +3,6 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-behavior: smooth;
   padding: 0.5rem 0;
 }
 
@@ -105,25 +104,19 @@
   gap: 0.75rem;
 }
 
-.typing-dots {
-  display: flex;
-  gap: 0.25rem;
+.loading-icon {
+  width: 24px;
+  height: 24px;
+  animation: loading-spin 1.5s linear infinite;
 }
 
-.typing-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  animation: typing-dot 1.4s infinite ease-in-out;
-}
-
-.typing-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.typing-dots span:nth-child(3) {
-  animation-delay: 0.4s;
+@keyframes loading-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .typing-text {
@@ -160,10 +153,26 @@
 }
 
 .messages-area::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f3f4;
+}
+
+.app-shell.dark-mode .messages-area::-webkit-scrollbar-track {
+  background: #2d3748;
 }
 
 .messages-area::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: #9ca3af;
   border-radius: 3px;
+}
+
+.app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.messages-area::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }

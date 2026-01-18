@@ -287,6 +287,32 @@ impl Router {
                     .map_err(|e| worker::Error::RustError(e.to_string()))
             }
 
+            // AI 任务路由 - 异步任务创建和执行
+            (Method::Post, "/api/ai-task/init-and-start") => {
+                // 直接调用兼容性处理（使用AITaskDO）
+                self.handle_compatible_chat(req, env).await
+            }
+
+            (Method::Get, path) if path.starts_with("/api/ai-task/") && path.ends_with("/status") => {
+                let task_id = path.trim_start_matches("/api/ai-task/").trim_end_matches("/status");
+                self.handle_task_status(env, task_id).await
+            }
+
+            (Method::Get, path) if path.starts_with("/api/ai-task/") && path.ends_with("/result") => {
+                let task_id = path.trim_start_matches("/api/ai-task/").trim_end_matches("/result");
+                // result 接口返回完整结果（兼容前端AsyncTaskService）
+                use crate::compatibility::router::handle_task_status as handle_status;
+                match handle_status(env, task_id).await {
+                    Ok(response) => Ok(response),
+                    Err(e) => {
+                        let error_response = ErrorResponse {
+                            error: format!("Failed to get task result: {}", e),
+                        };
+                        json_response_with_status(&error_response, 500)
+                    }
+                }
+            }
+
             (Method::Post, "/api/agent/chat") => {
                 // 首先尝试兼容性处理
                 match self.handle_compatible_chat(req, env).await {
