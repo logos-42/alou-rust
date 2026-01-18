@@ -10,6 +10,7 @@ mod ipfs_commands;
 mod ipfs_node;
 mod kubo;
 mod lsp;
+mod memory_manager;  // 新增内存管理模块
 mod spec;
 mod sync;
 mod utils;
@@ -18,11 +19,11 @@ mod workflow;
 mod workflow_types;
 mod workflow_commands;
 mod workflow_ralph_loop;
-mod workflow_history;
 mod workflow_executor;
-mod workflow_storage;
 mod workflow_events;
+mod workflow_history;
 mod workflow_monitor;
+mod workflow_storage;
 mod tools;
 
 use std::path::PathBuf;
@@ -68,6 +69,11 @@ use crate::workflow_events::start_workflow_event_listener;
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
 use crate::tools::initialize_tools;
 use crate::context::create_default_context_manager;
+use crate::memory_manager::{
+    set_memory_item, get_memory_item, remove_memory_item, clear_memory,
+    get_memory_keys, get_memory_stats, cleanup_expired_memory,
+    cleanup_lru_memory, set_memory_expiration, schedule_weekly_cleanup,
+};
 
 // Tool commands
 #[tauri::command]
@@ -247,7 +253,18 @@ fn main() {
             execute_tool,
             get_tool_list,
             cancel_tool_execution,
-            get_execution_history
+            get_execution_history,
+            // Memory management commands
+            set_memory_item,
+            get_memory_item,
+            remove_memory_item,
+            clear_memory,
+            get_memory_keys,
+            get_memory_stats,
+            cleanup_expired_memory,
+            cleanup_lru_memory,
+            set_memory_expiration,
+            schedule_weekly_cleanup
         ])
         .setup(|app| {
             // Set window title

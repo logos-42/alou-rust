@@ -272,9 +272,11 @@ pub async fn create_local_diap_identity(
     info!(target: "diap", "开始创建 DIAP Identity...");
 
     // 使用 DIAP SDK 创建 IPFS 客户端
-    let ipfs_client = IpfsClient::new_with_remote_node(
-        ipfs_api.clone(),
-        gateway.clone(),
+    let ipfs_client = IpfsClient::new(
+        Some(ipfs_api.clone()),
+        Some(gateway.clone()),
+        None,
+        None,
         IPFS_HTTP_TIMEOUT_SECS,
     );
 
@@ -762,9 +764,11 @@ pub async fn get_local_diap_identity(
     info!(target: "diap", "解析 IPNS: {}", ipns_name);
 
     // 使用 DIAP SDK 创建 IPFS 客户端
-    let ipfs_client = IpfsClient::new_with_remote_node(
-        ipfs_api.clone(),
-        gateway.clone(),
+    let ipfs_client = IpfsClient::new(
+        Some(ipfs_api.clone()),
+        Some(gateway.clone()),
+        None,
+        None,
         IPFS_HTTP_TIMEOUT_SECS,
     );
 
@@ -903,9 +907,11 @@ pub async fn update_local_diap_identity(
     info!(target: "diap", "更新 IPNS: key={}, cid={}", ipns_key, cid);
 
     // 使用 DIAP SDK 创建 IPFS 客户端
-    let ipfs_client = IpfsClient::new_with_remote_node(
-        ipfs_api.clone(),
-        gateway.clone(),
+    let ipfs_client = IpfsClient::new(
+        Some(ipfs_api.clone()),
+        Some(gateway.clone()),
+        None,
+        None,
         IPFS_HTTP_TIMEOUT_SECS,
     );
 

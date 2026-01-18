@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import clusterActionService from '@/services/clusterActionService'
 import useClusterActionStore from '@/stores/clusterActionStore'
+import { useDiapGroupChat } from '@/hooks/useDiapGroupChat'
 
 /**
  * 智能体邀请功能 Hook
@@ -10,9 +11,36 @@ export const useAgentInvite = ({
   deleteChannel,
   resolveExistingAgentTarget,
   recordInteraction,
+  localIdentity, // 新增：本地身份参数
 }) => {
   const [isInviteModalOpen, setInviteModalOpen] = useState(false)
   const [inviteTargetChannel, setInviteTargetChannel] = useState(null)
+
+  // DIAP群聊Hook
+  const diapGroupChat = useDiapGroupChat({
+    localIdentity,
+    onGroupCreated: (group, agents) => {
+      console.log('[useAgentInvite] DIAP群聊创建成功:', group.groupName, agents.length, '个智能体')
+      recordInteraction('diap_group_created', {
+        groupId: group.groupId,
+        groupName: group.groupName,
+        agentCount: agents.length
+      })
+    },
+    onAgentJoined: (groupId, agent) => {
+      console.log('[useAgentInvite] 智能体加入群聊:', agent.name, groupId)
+      recordInteraction('agent_joined_group', {
+        groupId,
+        agentName: agent.name
+      })
+    },
+    onError: (error) => {
+      console.error('[useAgentInvite] DIAP群聊错误:', error)
+      recordInteraction('diap_group_error', {
+        error: error.message
+      })
+    }
+  })
 
   // 打开邀请模态框
   const handleInviteToChannel = useCallback((channel) => {
@@ -32,7 +60,7 @@ export const useAgentInvite = ({
     deleteChannel(channel)
   }, [deleteChannel])
 
-  // 处理邀请提交 - 创建群聊并显示
+  // 处理邀请提交 - 优先使用DIAP群聊，降级到原有逻辑
   const handleInviteSubmit = useCallback(async (channel, agents, source) => {
     try {
       if (!channel || !agents || agents.length === 0) {
@@ -45,7 +73,68 @@ export const useAgentInvite = ({
         source,
       })
 
-      // 创建群聊集群行动
+      console.log('[useAgentInvite] 开始处理智能体邀请:', {
+        channel: channel.name,
+        agentsCount: agents.length,
+        hasLocalIdentity: !!localIdentity
+      })
+
+      // 优先尝试使用DIAP群聊创建
+      if (localIdentity) {
+        try {
+          console.log('[useAgentInvite] 使用DIAP群聊创建')
+          
+          const group = await diapGroupChat.createGroupWithAgents({
+            groupName: `${channel.name} 群聊`,
+            description: `频道 "${channel.name}" 的智能体协作群聊`,
+            agents: agents,
+            channel: channel,
+            metadata: {
+              type: 'channel_group_chat',
+              channelId: channel.id,
+              channelName: channel.name,
+              source,
+              isPublic: false,
+              requireAuth: true
+            }
+          })
+
+          console.log('[useAgentInvite] DIAP群聊创建成功:', group.groupId)
+
+          // 触发邀请成功事件
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('agents-invited', {
+                detail: { 
+                  channel, 
+                  agents, 
+                  source, 
+                  actionId: `diap_group_${group.groupId}`,
+                  groupId: group.groupId,
+                  useDiap: true
+                },
+              }),
+            )
+          }
+
+          return // DIAP成功，直接返回
+        } catch (diapError) {
+          console.warn('[useAgentInvite] DIAP群聊创建失败，降级到原有逻辑:', diapError.message)
+          recordInteraction('diap_group_fallback', {
+            error: diapError.message,
+            fallbackReason: 'diap_creation_failed'
+          })
+        }
+      } else {
+        console.warn('[useAgentInvite] 未设置本地身份，跳过DIAP群聊创建')
+        recordInteraction('diap_group_skipped', {
+          reason: 'no_local_identity'
+        })
+      }
+
+      // 降级到原有的本地群聊逻辑
+      console.log('[useAgentInvite] 使用原有本地群聊逻辑')
+      
       const { addAction, setActiveAction } = useClusterActionStore.getState()
       
       // 构建群聊描述
@@ -246,6 +335,9 @@ export const useAgentInvite = ({
     // 状态
     isInviteModalOpen,
     inviteTargetChannel,
+    
+    // DIAP群聊状态
+    diapGroupChat,
     
     // 操作
     handleInviteToChannel,

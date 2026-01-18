@@ -1,9 +1,19 @@
 import { create } from 'zustand'
+import { 
+  setGroupChatData, 
+  getGroupChatData, 
+  setActiveGroupId, 
+  getActiveGroupId,
+  getStorageStats,
+  STORAGE_TYPES,
+  setStorageType,
+  getKeys,
+  removeItem
+} from '../utils/storageAdapter'
 
 /**
  * 集群行动状态管理 Store
- * 使用 Zustand 管理集群行动状态、消息和UI状态
- * 支持群聊的本地持久化
+ * 使用内存存储替代localStorage，解决空间限制问题
  */
 
 // 获取频道相关的存储键名
@@ -17,34 +27,30 @@ const getActiveActionKey = (channelId) => {
   return `cluster_actions_active_id_${channelId}`
 }
 
-// 从 localStorage 加载群聊（按频道）
+// 从内存存储加载群聊（按频道）
 const loadGroupChatsFromStorage = (channelId) => {
   if (typeof window === 'undefined') return []
+  
   try {
-    const key = getStorageKey(channelId)
-    const stored = localStorage.getItem(key)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      const result = Array.isArray(parsed) ? parsed : []
-      if (result.length > 0) {
-        console.log(`[clusterActionStore] 从 localStorage 加载群聊 (频道: ${channelId}):`, result.length, '个群聊', result.map(a => a.action_id))
-      }
-      return result
+    const result = simpleMemoryStore.getGroupChats(channelId)
+    if (result.length > 0) {
+      console.log(`[clusterActionStore] 从内存加载群聊 (频道: ${channelId}):`, result.length, '个群聊', result.map(a => a.action_id))
     }
+    return result
   } catch (error) {
     console.error('[clusterActionStore] 加载群聊失败:', error)
   }
   return []
 }
 
-// 从 localStorage 加载活跃的行动ID（按频道）
+// 从内存存储加载活跃的行动ID（按频道）
 const loadActiveActionIdFromStorage = (channelId) => {
   if (typeof window === 'undefined') return null
+  
   try {
-    const key = getActiveActionKey(channelId)
-    const stored = localStorage.getItem(key)
+    const stored = simpleMemoryStore.getActiveActionId(channelId)
     if (stored) {
-      console.log(`[clusterActionStore] 从 localStorage 加载活跃行动ID (频道: ${channelId}):`, stored)
+      console.log(`[clusterActionStore] 从内存加载活跃行动ID (频道: ${channelId}):`, stored)
     }
     return stored || null
   } catch (error) {
@@ -53,47 +59,50 @@ const loadActiveActionIdFromStorage = (channelId) => {
   return null
 }
 
-// 保存活跃的行动ID到 localStorage（按频道）
+// 保存活跃行动ID到内存存储
 const saveActiveActionIdToStorage = (actionId, channelId) => {
-  if (typeof window === 'undefined') return
   try {
-    const key = getActiveActionKey(channelId)
-    if (actionId) {
-      localStorage.setItem(key, actionId)
-    } else {
-      localStorage.removeItem(key)
-    }
+    setActiveGroupId(channelId, actionId)
   } catch (error) {
     console.error('[clusterActionStore] 保存活跃行动ID失败:', error)
   }
 }
 
-// 保存群聊到 localStorage（按频道分组）
-const saveGroupChatsToStorage = (actions, channelId) => {
-  if (typeof window === 'undefined') return
+// 保存群聊到内存存储（带存储优化）
+const saveGroupChatsToStorage = (groupChats, channelId) => {
   try {
-    if (!channelId) {
-      console.warn('[clusterActionStore] saveGroupChatsToStorage: channelId 为空')
-      return
+    // 存储优化：只保存必要的数据，减少存储占用
+    const optimizedChats = groupChats.map(chat => ({
+      action_id: chat.action_id,
+      description: chat.description,
+      status: chat.status,
+      created_at: chat.created_at,
+      // 只保留前3个智能体的信息，减少数据量
+      agents: chat.agents ? chat.agents.slice(0, 3).map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        avatar: agent.avatar,
+        mode: agent.mode
+      })) : [],
+      // 只保留metadata的关键信息
+      metadata: chat.metadata ? {
+        type: chat.metadata.type,
+        channel_id: chat.metadata.channel_id,
+        channel_name: chat.metadata.channel_name
+      } : {}
+    }))
+    
+    // 保存到内存存储
+    const success = setGroupChatData(channelId, optimizedChats)
+    
+    if (success && optimizedChats.length > 0) {
+      console.log(`[clusterActionStore] 保存群聊到内存存储 (频道: ${channelId}):`, optimizedChats.length, '个群聊（已优化）')
     }
     
-    // 只保存群聊类型的 actions
-    const groupChats = actions.filter(
-      (action) => action.metadata?.type === 'group_chat' || action.action_id?.startsWith('local_group_')
-    )
-    
-    // 直接保存到指定频道的键
-    const key = getStorageKey(channelId)
-    localStorage.setItem(key, JSON.stringify(groupChats))
-    
-    if (groupChats.length > 0) {
-      console.log(`[clusterActionStore] 保存群聊到 localStorage (频道: ${channelId}):`, groupChats.length, '个群聊', groupChats.map(a => a.action_id))
-    }
+    return success
   } catch (error) {
     console.error('[clusterActionStore] 保存群聊失败:', error)
-    if (error.name === 'QuotaExceededError') {
-      console.error('[clusterActionStore] localStorage 存储空间不足！')
-    }
+    return false
   }
 }
 
@@ -439,24 +448,21 @@ const useClusterActionStore = create((set, get) => ({
       actionStatuses: {},
       actionDetails: {},
     })
-    // 清除 localStorage 中的所有群聊（包括所有频道）
-    if (typeof window !== 'undefined') {
-      try {
-        // 清除全局的
-        localStorage.removeItem('cluster_actions_group_chats')
-        localStorage.removeItem('cluster_actions_active_id')
-        // 清除所有频道的（通过遍历所有键）
-        const keysToRemove = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key && (key.startsWith('cluster_actions_group_chats_') || key.startsWith('cluster_actions_active_id_'))) {
-            keysToRemove.push(key)
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key))
-      } catch (error) {
-        console.error('[clusterActionStore] 清除群聊失败:', error)
-      }
+    // 清除内存存储中的所有群聊数据
+    try {
+      const keys = getKeys()
+      const keysToRemove = keys.filter(key => 
+        key.startsWith('cluster_actions_group_chats') || 
+        key.startsWith('cluster_actions_active_id')
+      )
+      
+      keysToRemove.forEach(key => {
+        removeItem(key)
+      })
+      
+      console.log(`[clusterActionStore] 清除了 ${keysToRemove.length} 个群聊存储项`)
+    } catch (error) {
+      console.error('[clusterActionStore] 清除群聊失败:', error)
     }
   },
 }))

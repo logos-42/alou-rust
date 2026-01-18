@@ -3,7 +3,6 @@ import GroupChatMessage from './GroupChatMessage'
 import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
 import { resolveAgentAvatar } from '../AgentChat/agentUtils'
-import useClusterActionStore from '@/stores/clusterActionStore'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -71,14 +70,13 @@ const AgentAvatar = ({ agent, onAgentClick, t }) => {
 }
 
 /**
- * GroupChatPanel - 群聊面板组件
- * 类似微信的群聊界面，显示多智能体协作消息
+ * GroupChatPanel - 基于DIAP PubSub的群聊面板组件
+ * 支持去中心化群聊通信和本地持久化
  */
 const GroupChatPanel = ({
-  actionId,
-  actionDescription,
-  agents = [],
+  activeGroup,
   messages = [],
+  agents = [],
   status,
   onClose,
   onRefresh,
@@ -90,73 +88,34 @@ const GroupChatPanel = ({
   onPanelClick,
   onSelectAgent,
   inputTargetMode,
+  onSendMessage,
+  diapGroupChat,
+  // 新增：DIAP群聊管理器的方法
+  createGroupChat,
+  sendMessage: diapSendMessage,
+  switchGroupChat: diapSwitchGroupChat
 }) => {
   const { t } = useI18n()
-  const { getActiveAction } = useClusterActionStore()
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
   const [isClicked, setIsClicked] = useState(false)
+  const [messageInput, setMessageInput] = useState('')
 
-  // 使用 useMemo 优化 actualAgents 的获取，避免重复计算
+  // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
-    if (!activeChannelId) return []
-    
-    const latestActiveAction = getActiveAction(activeChannelId)
-    console.log('[GroupChatPanel] useMemo 重新计算 - activeChannelId:', activeChannelId)
-    console.log('[GroupChatPanel] useMemo 重新计算 - latestActiveAction:', latestActiveAction)
-    
-    // 确保 agents 是一个数组，并且包含必要的字段
-    let agents = []
-    if (latestActiveAction?.agents?.length > 0) {
-      agents = latestActiveAction.agents.map(agent => ({
-        id: agent.id || agent.agent_id || agent.did,
-        agent_id: agent.agent_id || agent.id || agent.did,
-        did: agent.did,
-        name: agent.name || agent.agent_name,
-        agent_name: agent.agent_name || agent.name,
-        avatar: agent.avatar || agent.avatar_url,
-        avatar_url: agent.avatar_url || agent.avatar,
-        avatar_cid: agent.avatar_cid,
-        mode: agent.mode || 'agent',
-        ipns: agent.ipns,
-        cid: agent.cid
-      }))
-    }
-    
-    console.log('[GroupChatPanel] useMemo 重新计算 - agents:', agents)
-    console.log('[GroupChatPanel] useMemo 重新计算 - agents数量:', agents.length)
-    
-    return agents
-  }, [activeChannelId, getActiveAction]) // 添加 getActiveAction 到依赖项
+    return activeGroup?.agents || agents || []
+  }, [activeGroup, agents])
 
   // 调试信息
   useEffect(() => {
-    console.log('[GroupChatPanel] ========== 调试信息 ==========')
-    console.log('[GroupChatPanel] actionId:', actionId)
+    console.log('[GroupChatPanel] ========== DIAP群聊调试信息 ==========')
+    console.log('[GroupChatPanel] activeGroup:', activeGroup)
     console.log('[GroupChatPanel] actualAgents 数量:', actualAgents.length)
-    console.log('[GroupChatPanel] actualAgents 数据:', actualAgents)
-    console.log('[GroupChatPanel] actionDescription:', actionDescription)
-    console.log('[GroupChatPanel] ================================')
-    
-    // 检查每个智能体的详细信息
-    if (actualAgents.length > 0) {
-      actualAgents.forEach((agent, index) => {
-        console.log(`[GroupChatPanel] 智能体 ${index + 1}:`, {
-          id: agent.id,
-          agent_id: agent.agent_id,
-          did: agent.did,
-          name: agent.name,
-          agent_name: agent.agent_name,
-          avatar: agent.avatar,
-          avatar_url: agent.avatar_url,
-          avatar_cid: agent.avatar_cid,
-          mode: agent.mode
-        })
-      })
-    }
-    console.log('[GroupChatPanel] ================================')
-  }, [actionId, actualAgents.length, actionDescription]) // 只依赖 actualAgents.length 而不是 actualAgents 对象
+    console.log('[GroupChatPanel] messages 数量:', messages.length)
+    console.log('[GroupChatPanel] diapGroupChat 状态:', diapGroupChat?.status)
+    console.log('[GroupChatPanel] =======================================')
+  }, [activeGroup, actualAgents.length, messages.length, diapGroupChat?.status])
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -203,6 +162,38 @@ const GroupChatPanel = ({
     onPanelClick?.()
   }
 
+  // 处理消息发送
+  const handleSendMessage = useCallback(async () => {
+    if (!messageInput.trim() || !activeGroup) {
+      return
+    }
+
+    try {
+      // 优先使用DIAP群聊的发送方法
+      if (diapSendMessage && typeof diapSendMessage === 'function') {
+        await diapSendMessage(activeGroup.groupId, messageInput.trim())
+      } else if (onSendMessage && typeof onSendMessage === 'function') {
+        await onSendMessage(activeGroup.groupId, messageInput.trim())
+      } else {
+        console.warn('[GroupChatPanel] 没有可用的发送方法')
+      }
+      
+      setMessageInput('')
+      console.log('[GroupChatPanel] 消息发送成功:', messageInput.trim())
+    } catch (error) {
+      console.error('[GroupChatPanel] 发送消息失败:', error)
+      // 可以在这里显示错误提示
+    }
+  }, [messageInput, activeGroup, onSendMessage, diapSendMessage])
+
+  // 处理键盘事件
+  const handleKeyPress = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }, [handleSendMessage])
+
   // 状态显示已移除
 
   return (
@@ -222,9 +213,9 @@ const GroupChatPanel = ({
             <img src={GroupIcon} alt="群组" />
           </div>
           <div className="header-info">
-            <div className="group-title">{t('agent.groupChat.title')}</div>
+            <div className="group-title">{activeGroup?.groupName || t('agent.groupChat.title')}</div>
             <div className="group-subtitle">
-              {actionDescription || `${t('agent.groupChat.action')} #${actionId?.slice(-8) || 'N/A'}`}
+              {activeGroup?.description || `${activeGroup?.channelName || t('agent.groupChat.action')} #${activeGroup?.groupId?.slice(-8) || 'N/A'}`}
             </div>
           </div>
         </div>
@@ -320,6 +311,32 @@ const GroupChatPanel = ({
         >
           ↓
         </button>
+      )}
+
+      {/* 消息输入框 */}
+      {activeGroup && (
+        <div className="message-input-container">
+          <div className="message-input-wrapper">
+            <input
+              type="text"
+              className="message-input"
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="输入消息..."
+              disabled={diapGroupChat?.isLoading}
+            />
+            <button
+              type="button"
+              className="send-button"
+              onClick={handleSendMessage}
+              disabled={!messageInput.trim() || diapGroupChat?.isLoading}
+              title="发送消息 (Enter)"
+            >
+              {diapGroupChat?.isLoading ? '...' : '→'}
+            </button>
+          </div>
+        </div>
       )}
     </section>
   )

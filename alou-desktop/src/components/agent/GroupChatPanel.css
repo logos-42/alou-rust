@@ -542,3 +542,98 @@
   box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
 }
 
+/* 消息输入框 */
+.message-input-container {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
+  background: var(--surface, rgba(255, 255, 255, 0.95));
+  flex-shrink: 0;
+}
+
+.message-input-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.message-input {
+  flex: 1;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.15));
+  border-radius: 20px;
+  background: var(--background, #ffffff);
+  font-size: 14px;
+  color: var(--text-primary, #0f172a);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.message-input:focus {
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.message-input::placeholder {
+  color: var(--text-muted, #94a3b8);
+}
+
+.message-input:disabled {
+  background: var(--surface-secondary, #f1f5f9);
+  color: var(--text-muted, #94a3b8);
+  cursor: not-allowed;
+}
+
+.send-button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary-color, #6366f1);
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled) {
+  background: #5558e3;
+  transform: scale(1.05);
+}
+
+.send-button:disabled {
+  background: var(--text-muted, #94a3b8);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 暗色模式下的输入框 */
+.app-shell.dark-mode .message-input-container {
+  background: rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .message-input {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .message-input:focus {
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.app-shell.dark-mode .message-input::placeholder {
+  color: var(--text-muted-dark, #718096);
+}
+
+.app-shell.dark-mode .message-input:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted-dark, #718096);
+}
+

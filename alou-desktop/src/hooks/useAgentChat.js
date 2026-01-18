@@ -278,73 +278,92 @@ export const useToolCallHandler = ({
 }) => {
   return useCallback(
     async (toolCalls = []) => {
+      const results = [];
+      
       for (const toolCall of toolCalls) {
-        const result = toolCall.result
+        const result = toolCall.result || {};
+        let toolResult = {
+          tool_call_id: toolCall.id,
+          role: 'tool',
+          name: toolCall.name,
+          content: '',
+          success: true,
+        };
 
-        if (toolCall.name === 'build_transaction') {
-          await handleTransactionBuild(result)
-          continue
-        }
-
-        if (toolCall.name === 'broadcast_transaction') {
-          await handleTransactionBroadcast(result)
-          continue
-        }
-
-        if (toolCall.name === 'agent_wallet') {
-          await refreshWallet()
-          continue
-        }
-
-        if (toolCall.name === 'wallet_manager' && result) {
-          if (result.instruction) {
-            try {
+        try {
+          if (toolCall.name === 'build_transaction') {
+            await handleTransactionBuild(result);
+            toolResult.content = 'Transaction built successfully';
+          } 
+          else if (toolCall.name === 'broadcast_transaction') {
+            await handleTransactionBroadcast(result);
+            toolResult.content = 'Transaction broadcasted successfully';
+          } 
+          else if (toolCall.name === 'agent_wallet') {
+            await refreshWallet();
+            toolResult.content = 'Wallet refreshed successfully';
+          } 
+          else if (toolCall.name === 'wallet_manager' && result) {
+            if (result.instruction) {
               if (result.action === 'switch_network' && result.network) {
-                const success = await walletService.switchNetwork(result.network)
+                const success = await walletService.switchNetwork(result.network);
                 if (success) {
                   recordInteraction('wallet_instruction', {
                     instruction: 'switch_network',
                     chainId: result.network.chainId,
                     name: result.network.name,
-                  })
+                  });
+                  toolResult.content = `✅ 已成功切换到 ${result.network.name} (${result.network.type})`;
+                  
                   appendMessage({
                     id: `system_${Date.now()}`,
                     type: 'assistant',
-                    content: `✅ 已成功切换到 ${result.network.name} (${result.network.type})`,
+                    content: toolResult.content,
                     timestamp: Date.now(),
                     source: 'system',
-                  })
-                  scrollToBottom()
+                  });
+                  scrollToBottom();
                 }
               } else {
-                await walletService.executeInstruction(result.instruction)
+                await walletService.executeInstruction(result.instruction);
                 recordInteraction('wallet_instruction', {
                   instruction: result.instruction?.method || 'unknown',
-                })
+                });
+                toolResult.content = 'Wallet instruction executed successfully';
               }
-            } catch (error) {
-              console.error('Failed to execute wallet instruction:', error)
-              appendMessage({
-                id: `error_${Date.now()}`,
-                type: 'assistant',
-                content: `❌ 钱包操作失败：${error instanceof Error ? error.message : '未知错误'}`,
-                timestamp: Date.now(),
-                source: 'error',
-              })
-              scrollToBottom()
             }
+          } 
+          else if (toolCall.name === 'ui_resource' || toolCall.name === 'mcp_ui') {
+            const { resource, resources } = result || {};
+            if (Array.isArray(resources) && resources.length > 0) {
+              openUiResource(resources[0], { source: toolCall.name });
+            } else if (resource) {
+              openUiResource(resource, { source: toolCall.name });
+            }
+            toolResult.content = 'UI resource opened successfully';
+          } 
+          else {
+            toolResult.content = JSON.stringify(result) || 'Tool executed successfully';
           }
+        } catch (error) {
+          console.error(`Tool call ${toolCall.name} failed:`, error);
+          toolResult.content = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          toolResult.success = false;
+          
+          appendMessage({
+            id: `error_${Date.now()}`,
+            type: 'assistant',
+            content: `❌ ${toolCall.name} 操作失败：${error instanceof Error ? error.message : '未知错误'}`,
+            timestamp: Date.now(),
+            source: 'error',
+          });
+          scrollToBottom();
         }
-
-        if (toolCall.name === 'ui_resource' || toolCall.name === 'mcp_ui') {
-          const { resource, resources } = result || {}
-          if (Array.isArray(resources) && resources.length > 0) {
-            openUiResource(resources[0], { source: toolCall.name })
-          } else if (resource) {
-            openUiResource(resource, { source: toolCall.name })
-          }
-        }
+        
+        results.push(toolResult);
       }
+      
+      return results;
     },
     [
       appendMessage,
@@ -355,6 +374,6 @@ export const useToolCallHandler = ({
       refreshWallet,
       scrollToBottom,
     ],
-  )
+  );
 }
 

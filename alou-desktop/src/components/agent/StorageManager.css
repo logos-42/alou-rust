@@ -1,0 +1,502 @@
+/* 存储管理器样式 */
+.storage-manager {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* 头部 */
+.manager-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  background: var(--surface-secondary, #f8fafc);
+}
+
+.manager-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: var(--text-secondary, #4a5568);
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: var(--secondary-color, #e2e8f0);
+  color: var(--text-primary, #1a202c);
+}
+
+/* 内容区域 */
+.manager-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 使用情况区域 */
+.usage-section {
+  background: var(--surface, #ffffff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+}
+
+.usage-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.usage-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.usage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  background: var(--surface-secondary, #f8fafc);
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.usage-item .label {
+  font-size: 12px;
+  color: var(--text-secondary, #4a5568);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.usage-item .value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.usage-item .value.normal {
+  color: var(--success-color, #38a169);
+}
+
+.usage-item .value.near {
+  color: var(--warning-color, #d69e2e);
+}
+
+.usage-item .value.over {
+  color: var(--error-color, #e53e3e);
+}
+
+/* 进度条 */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-secondary, #f8fafc);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progress-fill.normal {
+  background: var(--success-color, #38a169);
+}
+
+.progress-fill.near {
+  background: var(--warning-color, #d69e2e);
+}
+
+.progress-fill.over {
+  background: var(--error-color, #e53e3e);
+}
+
+/* 数据分布 */
+.usage-details h4 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: var(--text-secondary, #4a5568);
+}
+
+.detail-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary, #1a202c);
+}
+
+/* 建议区域 */
+.recommendations-section {
+  background: var(--surface, #ffffff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+}
+
+.recommendations-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recommendation-item {
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+}
+
+.recommendation-item.critical {
+  background: #fef5e7;
+  border-color: #f6e05e;
+}
+
+.recommendation-item.warning {
+  background: #fef5e7;
+  border-color: #f59e0b;
+}
+
+.recommendation-item.info {
+  background: #f0f9ff;
+  border-color: #3b82f6;
+}
+
+.recommendation-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.recommendation-icon {
+  font-size: 16px;
+}
+
+.recommendation-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.recommendation-message {
+  font-size: 13px;
+  color: var(--text-secondary, #4a5568);
+  line-height: 1.4;
+}
+
+/* 操作区域 */
+.actions-section {
+  background: var(--surface, #ffffff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+}
+
+.actions-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.action-btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-btn.optimize {
+  background: var(--success-color, #38a169);
+  color: white;
+}
+
+.action-btn.optimize:hover:not(:disabled) {
+  background: #2f855a;
+  transform: translateY(-1px);
+}
+
+.action-btn.cleanup-light {
+  background: var(--warning-color, #d69e2e);
+  color: white;
+}
+
+.action-btn.cleanup-light:hover:not(:disabled) {
+  background: #c0840c;
+  transform: translateY(-1px);
+}
+
+.action-btn.cleanup-deep {
+  background: var(--error-color, #e53e3e);
+  color: white;
+}
+
+.action-btn.cleanup-deep:hover:not(:disabled) {
+  background: #c53030;
+  transform: translateY(-1px);
+}
+
+/* 结果区域 */
+.result-section {
+  background: var(--surface, #ffffff);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  overflow: hidden;
+}
+
+.result-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a202c);
+}
+
+.result {
+  padding: 16px;
+  border-radius: 6px;
+}
+
+.result.success {
+  background: #f0f9ff;
+  border: 1px solid #3b82f6;
+  color: #1e40af;
+}
+
+.result.error {
+  background: #fef5e7;
+  border: 1px solid #f6e05e;
+  color: #c53030;
+}
+
+.result-success {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.result-error {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.error-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  color: #c53030;
+}
+
+.error-list li {
+  margin-bottom: 4px;
+}
+
+/* 刷新区域 */
+.refresh-section {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+}
+
+.refresh-btn {
+  padding: 8px 16px;
+  background: var(--secondary-color, #e2e8f0);
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  color: var(--text-primary, #1a202c);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--primary-color, #3182ce);
+  color: white;
+  border-color: var(--primary-color, #3182ce);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .storage-manager {
+  background: var(--surface-dark, #2d3748);
+  border-color: var(--border-color-dark, #4a5568);
+}
+
+.app-shell.dark-mode .manager-header {
+  background: var(--surface-secondary-dark, #1a202c);
+  border-color: var(--border-color-dark, #4a5568);
+}
+
+.app-shell.dark-mode .manager-header h2 {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .close-btn {
+  color: var(--text-secondary-dark, #a0aec0);
+}
+
+.app-shell.dark-mode .close-btn:hover {
+  background: var(--surface-dark, #2d3748);
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .usage-section,
+.app-shell.dark-mode .recommendations-section,
+.app-shell.dark-mode .actions-section,
+.app-shell.dark-mode .result-section {
+  background: var(--surface-dark, #2d3748);
+  border-color: var(--border-color-dark, #4a5568);
+}
+
+.app-shell.dark-mode .usage-section h3,
+.app-shell.dark-mode .recommendations-section h3,
+.app-shell.dark-mode .actions-section h3,
+.app-shell.dark-mode .result-section h3 {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .usage-item {
+  background: var(--surface-secondary-dark, #1a202c);
+  border-color: var(--border-color-dark, #4a5568);
+}
+
+.app-shell.dark-mode .usage-item .label {
+  color: var(--text-secondary-dark, #a0aec0);
+}
+
+.app-shell.dark-mode .usage-item .value {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .progress-bar {
+  background: var(--surface-secondary-dark, #1a202c);
+}
+
+.app-shell.dark-mode .usage-details h4 {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .detail-item {
+  background: var(--surface-dark, #2d3748);
+  border-color: var(--border-color-dark, #4a5568);
+}
+
+.app-shell.dark-mode .detail-label {
+  color: var(--text-secondary-dark, #a0aec0);
+}
+
+.app-shell.dark-mode .detail-value {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .recommendation-item.info {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+}
+
+.app-shell.dark-mode .recommendation-title {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .recommendation-message {
+  color: var(--text-secondary-dark, #a0aec0);
+}
+
+.app-shell.dark-mode .refresh-btn {
+  background: var(--surface-dark, #2d3748);
+  border-color: var(--border-color-dark, #4a5568);
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .refresh-btn:hover:not(:disabled) {
+  background: var(--primary-color, #3182ce);
+  color: white;
+  border-color: var(--primary-color, #3182ce);
+}

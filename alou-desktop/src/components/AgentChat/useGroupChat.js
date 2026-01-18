@@ -238,7 +238,7 @@ export const useGroupChat = ({ actionId, enabled = true }) => {
         }
       }
     },
-    [updateActionStatus, setActionDetails, isLocalGroupChat, getActiveAction],
+    [updateActionStatus, setActionDetails, isLocalGroupChat, getActiveAction]
   )
 
   // 初始化订阅和轮询
