@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react'
+import React, { useMemo } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './GroupChatMessage.css'
 
@@ -8,7 +8,7 @@ const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
  * GroupChatMessage - 群聊消息组件
  * 类似微信的群聊消息样式，显示发送者信息
  */
-const GroupChatMessage = ({ message, onAgentClick }) => {
+const GroupChatMessage = ({ message }) => {
   const { t, currentLanguage } = useI18n()
   const { id, type, from, fromName, avatar, content, timestamp, metadata } = message
 
@@ -47,18 +47,6 @@ const GroupChatMessage = ({ message, onAgentClick }) => {
 
   const avatarSrc = avatar || DEFAULT_AVATAR
   const displayName = fromName || from || t('agent.groupChat.unknown')
-
-  // 处理智能体头像点击
-  const handleAgentClick = useCallback(() => {
-    if (type === 'agent' && onAgentClick && metadata?.agentId) {
-      onAgentClick(metadata.agentId, {
-        id: from,
-        name: displayName,
-        avatar: avatarSrc,
-        agentId: metadata.agentId
-      })
-    }
-  }, [type, onAgentClick, metadata, from, displayName, avatarSrc])
 
   // 格式化消息内容
   const formatContent = (text) => {
@@ -155,15 +143,8 @@ const GroupChatMessage = ({ message, onAgentClick }) => {
   // 智能体消息保持群聊样式（显示头像和发送者信息）
   return (
     <div className="group-chat-message agent-message">
-      <div 
-        className={`message-avatar ${type === 'agent' && metadata?.agentId ? 'clickable' : ''}`}
-        onClick={handleAgentClick}
-        title={type === 'agent' ? `点击与 ${displayName} 私聊` : ''}
-      >
+      <div className="message-avatar">
         <img src={avatarSrc} alt={displayName} />
-        {type === 'agent' && metadata?.agentId && (
-          <div className="avatar-hint">💬</div>
-        )}
       </div>
       <div className="message-content-wrapper">
         <div className="message-header">

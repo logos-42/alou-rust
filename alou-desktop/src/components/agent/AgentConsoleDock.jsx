@@ -20,6 +20,7 @@ const AgentConsoleDock = forwardRef(
       }
       return t('agent.chat.inputPlaceholder.remote')
     }, [showGroupChat, inputTargetMode, t])
+    
     const chatInputRef = useRef(null)
 
     useImperativeHandle(
@@ -37,6 +38,7 @@ const AgentConsoleDock = forwardRef(
             查看对话
           </button>
         )}
+        
         <div className="console-input">
           <ChatInput
             ref={chatInputRef}

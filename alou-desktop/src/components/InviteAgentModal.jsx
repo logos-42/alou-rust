@@ -78,6 +78,18 @@ const InviteAgentModal = ({
       return
     }
     
+    console.log('[InviteAgentModal] 准备邀请的智能体:', selectedAgents.map(a => ({
+      id: a.id,
+      ipns: a.ipns,
+      cid: a.cid,
+      did: a.did,
+      name: a.name,
+      display_name: a.display_name,
+      avatar: a.avatar,
+      avatar_url: a.avatar_url,
+      avatar_cid: a.avatar_cid
+    })))
+    
     setIsLoading(true)
     setError(null)
     

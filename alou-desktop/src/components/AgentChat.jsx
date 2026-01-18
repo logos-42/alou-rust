@@ -152,56 +152,6 @@ const AgentChat = () => {
     closeDetailPanel,
   } = useAgentModals({ recordInteraction })
 
-  // 处理从群聊选择智能体
-  const handleSelectAgentFromGroupChat = useCallback((agentId, agentInfo) => {
-    console.log('[AgentChat] 从群聊选择智能体:', agentId, agentInfo)
-    
-    // 查找对应的频道
-    const targetChannel = channels.find(ch => 
-      ch.id === agentId || 
-      ch.meta?.did === agentId || 
-      ch.agent_id === agentId
-    )
-    
-    if (targetChannel) {
-      // 选择该智能体频道
-      selectChannel(targetChannel)
-      
-      // 如果群聊面板打开，关闭它以显示主对话
-      if (showGroupChat) {
-        closeGroupChat()
-      }
-      
-      // 确保对话面板打开
-      openConversationPanel()
-      
-      // 记录交互
-      recordInteraction('select_agent_from_groupchat', {
-        agentId,
-        agentInfo,
-        channelId: targetChannel.id
-      })
-    } else {
-      console.warn('[AgentChat] 未找到对应的智能体频道:', agentId)
-    }
-  }, [channels, selectChannel, showGroupChat, closeGroupChat, openConversationPanel, recordInteraction])
-
-  // 监听从群聊选择智能体的事件
-  useEffect(() => {
-    const handleSelectAgent = (event) => {
-      const { agentId, agentInfo, source } = event.detail
-      if (source === 'group-chat') {
-        handleSelectAgentFromGroupChat(agentId, agentInfo)
-      }
-    }
-    
-    window.addEventListener('select-agent-from-groupchat', handleSelectAgent)
-    
-    return () => {
-      window.removeEventListener('select-agent-from-groupchat', handleSelectAgent)
-    }
-  }, [handleSelectAgentFromGroupChat])
-
   // 处理编辑智能体
   const handleEditAgent = useCallback(() => {
     if (selectedAgent) {
@@ -268,7 +218,7 @@ const AgentChat = () => {
     connectionStatus,
     setConnectionStatus,
     connectionStatusLabel,
-      sessionId,
+    sessionId,
     setSessionId,
     isSessionReady,
     setSessionReady,
@@ -359,6 +309,78 @@ const AgentChat = () => {
     handleCreateAgentSubmit,
     handleEarlyChannel,
   } = channelManager
+
+  // 处理从群聊选择智能体
+  const handleSelectAgentFromGroupChat = useCallback((agentId, agentInfo) => {
+    console.log('[AgentChat] 从群聊选择智能体:', agentId, agentInfo)
+    
+    // 查找对应的频道
+    const targetChannel = channels.find(ch => 
+      ch.id === agentId || 
+      ch.meta?.did === agentId || 
+      ch.agent_id === agentId
+    )
+    
+    if (targetChannel) {
+      // 选择该智能体频道
+      selectChannel(targetChannel)
+      
+      // 如果群聊面板打开，关闭它以显示主对话
+      if (showGroupChat) {
+        closeGroupChat()
+      }
+      
+      // 确保对话面板打开
+      openConversationPanel()
+      
+      // 记录交互
+      recordInteraction('select_agent_from_groupchat', {
+        agentId,
+        agentInfo,
+        channelId: targetChannel.id
+      })
+    } else {
+      console.warn('[AgentChat] 未找到对应的智能体频道:', agentId)
+    }
+  }, [channels, selectChannel, showGroupChat, closeGroupChat, openConversationPanel, recordInteraction])
+
+  // 处理从群聊点击智能体头像
+  const handleAgentClickFromGroupChat = useCallback((agent) => {
+    console.log('[AgentChat] 从群聊点击智能体头像:', agent)
+    
+    // 获取智能体ID
+    const agentId = agent.id || agent.agent_id || agent.did
+    
+    // 查找对应的频道
+    const targetChannel = channels.find(ch => 
+      ch.id === agentId || 
+      ch.meta?.did === agentId || 
+      ch.agent_id === agentId
+    )
+    
+    if (targetChannel) {
+      // 选择该智能体频道
+      selectChannel(targetChannel)
+      
+      // 不关闭群聊面板，让用户可以同时看到群聊和智能体对话
+      // 但确保对话面板打开
+      openConversationPanel()
+      
+      // 记录交互
+      recordInteraction('click_agent_avatar_from_groupchat', {
+        agentId,
+        agent,
+        channelId: targetChannel.id
+      })
+      
+      // 切换输入目标到智能体模式
+      window.dispatchEvent(new CustomEvent('switch-input-target', {
+        detail: { target: 'agent' }
+      }))
+    } else {
+      console.warn('[AgentChat] 未找到对应的智能体频道:', agentId)
+    }
+  }, [channels, selectChannel, openConversationPanel, recordInteraction])
 
   // ==================== Tool Call Handler (需要先定义，因为 useAgentMessages 需要它) ====================
   // 注意：这里先创建一个占位函数，实际的 handleToolCalls 会在 messageState 之后更新
@@ -802,18 +824,22 @@ const AgentChat = () => {
                     <GroupChatPanel
                       actionId={activeActionId}
                       actionDescription={activeAction?.description || activeAction?.action?.description}
-                      agents={activeAction?.agents || activeAction?.action?.agents || []}
+                      agents={activeAction?.agents || []}
                       messages={groupChatMessages}
                       status={actionStatus}
                       onClose={closeGroupChatCompletely}
                       onRefresh={() => {
                         // 刷新群聊消息的逻辑已在 useGroupChat 中处理
                       }}
+                      onAgentClick={handleAgentClickFromGroupChat}
                       isLoading={actionStatus === 'Running'}
                       groupChatList={groupChatList}
                       activeChannelId={activeChannelId}
                       onSwitchGroupChat={switchGroupChat}
                       onPanelClick={handleGroupChatPanelClick}
+                      onSelectAgent={handleSelectAgentFromGroupChat}
+                      onResize={setSplitPosition}
+                      inputTargetMode={inputTargetMode}
                     />
                   }
                   defaultPosition={splitPosition}

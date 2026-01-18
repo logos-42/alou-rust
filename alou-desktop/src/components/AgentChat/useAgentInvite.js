@@ -58,6 +58,17 @@ export const useAgentInvite = ({
       const createLocalGroupChatInline = () => {
         const actionId = `local_group_${Date.now()}`
         
+        console.log('[useAgentInvite] 创建群聊开始:', {
+          actionId,
+          groupDescription,
+          agentsCount: agents.length,
+          agents: agents.map(a => ({
+            id: a.id,
+            name: a.name,
+            hasAvatar: !!(a.avatar || a.avatar_url)
+          }))
+        })
+        
         const localAction = {
           action_id: actionId,
           description: groupDescription,
@@ -67,10 +78,18 @@ export const useAgentInvite = ({
             {
               id: channel.meta?.ipns || channel.meta?.cid || channel.meta?.did || channel.id,
               name: channel.name,
+              avatar: channel.avatar || channel.avatar_url,
+              avatar_url: channel.avatar || channel.avatar_url,
+              avatar_cid: channel.avatar_cid,
+              mode: channel.mode || 'agent',
             },
             ...agents.map(a => ({
               id: a.ipns || a.cid || a.did || a.id,
               name: a.display_name || a.name,
+              avatar: a.avatar || a.avatar_url,
+              avatar_url: a.avatar || a.avatar_url,
+              avatar_cid: a.avatar_cid,
+              mode: a.mode || 'agent',
             })),
           ],
           metadata: {
@@ -81,8 +100,26 @@ export const useAgentInvite = ({
           },
         }
         
+        console.log('[useAgentInvite] 准备添加到store的localAction:', localAction)
         addAction(localAction)
         setActiveAction(actionId, channel.id)
+        
+        // 验证添加是否成功
+        setTimeout(() => {
+          const { getActiveAction } = useClusterActionStore.getState()
+          const savedAction = getActiveAction(channel.id)
+          console.log('[useAgentInvite] 验证保存的action:', savedAction)
+          if (savedAction && savedAction.agents) {
+            console.log('[useAgentInvite] 保存的agents数量:', savedAction.agents.length)
+            savedAction.agents.forEach((agent, index) => {
+              console.log(`[useAgentInvite] 保存的智能体 ${index + 1}:`, {
+                id: agent.id,
+                name: agent.name,
+                hasAvatar: !!(agent.avatar || agent.avatar_url)
+              })
+            })
+          }
+        }, 100)
         
         // 触发群聊显示事件
         window.dispatchEvent(
@@ -109,6 +146,10 @@ export const useAgentInvite = ({
             invited_agents: agents.map(a => ({
               id: a.ipns || a.cid || a.did || a.id,
               name: a.display_name || a.name,
+              avatar: a.avatar || a.avatar_url,
+              avatar_url: a.avatar || a.avatar_url,
+              avatar_cid: a.avatar_cid,
+              mode: a.mode || 'agent',
             })),
           },
         )
@@ -116,6 +157,7 @@ export const useAgentInvite = ({
         if (createResult?.action) {
           const action = createResult.action
           actionId = action.action_id
+          
           // 确保后端返回的 action 有正确的 metadata
           if (!action.metadata) {
             action.metadata = {}
@@ -130,6 +172,26 @@ export const useAgentInvite = ({
           if (!action.metadata.channel_name) {
             action.metadata.channel_name = channel.name
           }
+          
+          // 关键修复：确保 agents 数据直接存在于 action 中
+          // 后端可能不会自动设置 agents 字段，所以我们需要手动设置
+          action.agents = agents.map(a => ({
+            id: a.ipns || a.cid || a.did || a.id,
+            agent_id: a.ipns || a.cid || a.did || a.id,
+            did: a.did,
+            name: a.display_name || a.name,
+            agent_name: a.display_name || a.name,
+            avatar: a.avatar || a.avatar_url,
+            avatar_url: a.avatar || a.avatar_url,
+            avatar_cid: a.avatar_cid,
+            mode: a.mode || 'agent',
+            ipns: a.ipns,
+            cid: a.cid,
+          }))
+          
+          console.log('[useAgentInvite] 网络API创建的action - 设置agents后:', action)
+          console.log('[useAgentInvite] 网络API创建的action - agents数量:', action.agents.length)
+          
           addAction(action)
           setActiveAction(actionId, channel.id)
           

@@ -88,7 +88,30 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId }) 
 
   // 群聊相关数据
   const activeAction = useMemo(() => {
-    return activeChannelId ? getActiveAction(activeChannelId) : null
+    const action = activeChannelId ? getActiveAction(activeChannelId) : null
+    console.log('[useGroupChatManager] 获取到的activeAction:', action)
+    console.log('[useGroupChatManager] activeChannelId:', activeChannelId)
+    if (action && action.agents) {
+      console.log('[useGroupChatManager] activeAction中的agents:', action.agents)
+      console.log('[useGroupChatManager] agents数量:', action.agents.length)
+    } else {
+      console.log('[useGroupChatManager] activeAction或agents为空')
+    }
+    
+    // 强制绕过缓存，直接获取最新数据
+    if (activeChannelId && !action?.agents?.length) {
+      console.log('[useGroupChatManager] 尝试绕过缓存，直接获取store状态')
+      const currentState = useClusterActionStore.getState()
+      const allActions = currentState.actionsByChannel[activeChannelId] || []
+      console.log('[useGroupChatManager] 直接获取的actions:', allActions)
+      const foundAction = allActions.find((a) => a.action_id === currentState.activeActionIdByChannel[activeChannelId])
+      if (foundAction && foundAction.agents?.length) {
+        console.log('[useGroupChatManager] 绕过缓存成功，使用新数据:', foundAction)
+        return foundAction
+      }
+    }
+    
+    return action
   }, [activeChannelId, activeActionId, getActiveAction])
   const groupChatMessages = useMemo(
     () => (activeActionId ? getGroupChatMessages(activeActionId) : []),

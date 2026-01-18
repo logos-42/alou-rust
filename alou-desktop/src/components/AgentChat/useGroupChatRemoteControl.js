@@ -34,6 +34,36 @@ export const useGroupChatRemoteControl = ({
     }
   }, [showGroupChat])
 
+  // 监听输入目标切换事件
+  useEffect(() => {
+    const handleSwitchInputTarget = (event) => {
+      const { target } = event.detail
+      console.log('[useGroupChatRemoteControl] 收到切换事件:', {
+        target,
+        currentMode: inputTargetMode,
+        showGroupChat
+      })
+      
+      if (target === 'groupChat' || target === 'agent') {
+        setInputTargetMode(target)
+        console.log('[useGroupChatRemoteControl] 输入目标切换到:', target)
+      } else {
+        console.warn('[useGroupChatRemoteControl] 未知的切换目标:', target)
+      }
+    }
+    
+    // 移除可能存在的旧监听器
+    window.removeEventListener('switch-input-target', handleSwitchInputTarget)
+    // 添加新监听器
+    window.addEventListener('switch-input-target', handleSwitchInputTarget)
+    console.log('[useGroupChatRemoteControl] 事件监听器已设置')
+    
+    return () => {
+      console.log('[useGroupChatRemoteControl] 清理事件监听器')
+      window.removeEventListener('switch-input-target', handleSwitchInputTarget)
+    }
+  }, [inputTargetMode, showGroupChat])
+
   // 发送消息到群聊
   const sendMessageToGroupChat = useCallback(
     async (text, actionId) => {
@@ -155,10 +185,18 @@ export const useGroupChatRemoteControl = ({
 
   // 处理群聊面板点击，切换输入目标模式
   const handleGroupChatPanelClick = useCallback(() => {
+    console.log('[useGroupChatRemoteControl] 群聊面板点击，当前状态:', {
+      showGroupChat,
+      currentMode: inputTargetMode
+    })
+    
     if (showGroupChat) {
+      console.log('[useGroupChatRemoteControl] 设置输入目标为群聊模式')
       setInputTargetMode('groupChat')
+    } else {
+      console.log('[useGroupChatRemoteControl] 群聊面板未显示，忽略点击')
     }
-  }, [showGroupChat])
+  }, [showGroupChat, inputTargetMode, setInputTargetMode])
 
   // 发送消息（整合了遥控功能的逻辑）
   const sendMessage = useCallback(async () => {

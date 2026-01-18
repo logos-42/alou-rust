@@ -199,10 +199,14 @@ const useClusterActionStore = create((set, get) => ({
       if (existingIndex >= 0) {
         newActions = [...channelActions]
         newActions[existingIndex] = action
-        console.log(`[clusterActionStore] 更新群聊: ${action.action_id} (频道: ${channelId})`)
+        console.log(`[clusterActionStore] 更新群聊 - 设置action:`, action)
+        console.log(`[clusterActionStore] 更新群聊 - action.agents:`, action.agents)
+        console.log(`[clusterActionStore] 更新群聊 - 设置后newActions[existingIndex]:`, newActions[existingIndex])
+        console.log(`[clusterActionStore] 更新群聊开始:`, newActions)
       } else {
         newActions = [...channelActions, action]
-        console.log(`[clusterActionStore] 添加群聊: ${action.action_id} (频道: ${channelId})`)
+        console.log(`[clusterActionStore] 添加群聊 - 设置action:`, action)
+        console.log(`[clusterActionStore] 添加群聊 - action.agents:`, action.agents)
       }
       
       // 保存群聊到 localStorage
@@ -347,9 +351,34 @@ const useClusterActionStore = create((set, get) => ({
   // 获取当前活跃的行动（按频道）
   getActiveAction: (channelId) => {
     const activeActionId = get().activeActionIdByChannel[channelId]
-    if (!activeActionId) return null
+    console.log(`[clusterActionStore] getActiveAction - activeActionId: ${activeActionId}, channelId: ${channelId}`)
+    if (!activeActionId) {
+      console.log('[clusterActionStore] getActiveAction - 没有activeActionId，返回null')
+      return null
+    }
     const actions = get().actionsByChannel[channelId] || []
-    return actions.find((a) => a.action_id === activeActionId) || null
+    console.log(`[clusterActionStore] getActiveAction - 该频道的actions:`, actions)
+    console.log(`[clusterActionStore] getActiveAction - actions数量: ${actions.length}`)
+    
+    const foundAction = actions.find((a) => a.action_id === activeActionId)
+    console.log(`[clusterActionStore] getActiveAction - 查找结果:`, foundAction)
+    
+    if (foundAction && foundAction.agents) {
+      console.log(`[clusterActionStore] getActiveAction - 找到的agents数量: ${foundAction.agents.length}`)
+      foundAction.agents.forEach((agent, index) => {
+        console.log(`[clusterActionStore] getActiveAction - agent ${index + 1}:`, {
+          id: agent.id,
+          name: agent.name,
+          hasAvatar: !!(agent.avatar || agent.avatar_url)
+        })
+      })
+    } else if (foundAction) {
+      console.log('[clusterActionStore] getActiveAction - 找到的action没有agents字段')
+    } else {
+      console.log(`[clusterActionStore] getActiveAction - 未找到action_id为 ${activeActionId} 的action`)
+    }
+    
+    return foundAction || null
   },
 
   // 清除行动（完成或取消后）

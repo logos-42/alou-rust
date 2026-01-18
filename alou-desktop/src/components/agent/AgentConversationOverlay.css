@@ -9,6 +9,51 @@
   z-index: 900;
 }
 
+/* 对话面板包装器 */
+.conversation-panel-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+/* 点击动画效果 */
+.conversation-panel-wrapper.clicked {
+  transform: scale(0.98);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
+}
+
+/* 群聊激活时的对话面板样式 */
+.conversation-panel-wrapper.group-chat-active .conversation-panel {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1), var(--shadow);
+}
+
+.conversation-panel-wrapper.group-chat-active .conversation-panel::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background: var(--primary-color, #6366f1);
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+}
+
 .conversation-panel {
   width: 100%;
   height: 100%;
