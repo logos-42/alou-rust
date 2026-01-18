@@ -655,6 +655,94 @@ export const useAgentMessages = ({
   }, [messagesByChannel, activeChannelId, selectedAgent, saveMessagesToIpfs])
   
 
+  // 监听群聊消息事件
+  useEffect(() => {
+    const handleAgentGroupMessage = (event) => {
+      const { agentId, message } = event.detail
+      
+      // 只处理当前选中的智能体的群聊消息
+      if (selectedAgent && selectedAgent.id === agentId) {
+        console.log('[useAgentMessages] 智能体收到群聊消息:', agentId, message)
+        
+        // 将群聊消息转换为智能体消息格式
+        const agentMessage = {
+          id: `group_msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'user', // 群聊用户消息作为用户输入处理
+          content: message.content || message.text || '',
+          timestamp: message.timestamp || Date.now(),
+          source: 'group-chat',
+          metadata: {
+            groupId: message.groupId,
+            fromName: message.fromName,
+            originalMessage: message,
+            isGroupChatMessage: true, // 标记这是群聊消息
+          }
+        }
+        
+        // 添加到智能体的消息列表中
+        appendMessage(agentMessage, agentId)
+        
+        // 触发智能体处理消息（如果智能体处于空闲状态）
+        if (!isAgentLoading(agentId)) {
+          // 延迟一下，确保消息完全添加后再触发处理
+          setTimeout(() => {
+            // 这里可以触发智能体的自动回复逻辑
+            console.log('[useAgentMessages] 触发智能体处理群聊消息:', agentId)
+          }, 100)
+        }
+      }
+    }
+    
+    // 添加事件监听器
+    window.addEventListener('agent-group-message', handleAgentGroupMessage)
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('agent-group-message', handleAgentGroupMessage)
+    }
+  }, [selectedAgent, appendMessage, isAgentLoading])
+
+  // 监听智能体消息变化，如果是群聊消息的回复，则同步到群聊
+  useEffect(() => {
+    if (!selectedAgent || !messages.length) return
+
+    const lastMessage = messages[messages.length - 1]
+    
+    // 检查是否是智能体对群聊消息的回复
+    if (lastMessage && 
+        lastMessage.type === 'assistant' && 
+        lastMessage.metadata?.isGroupChatMessage) {
+      
+      const groupId = lastMessage.metadata.groupId
+      if (groupId) {
+        console.log('[useAgentMessages] 智能体回复群聊消息，同步到群聊:', groupId, lastMessage)
+        
+        // 将智能体回复同步到群聊
+        try {
+          const { addGroupChatMessage } = require('@/stores/clusterActionStore').default.getState()
+          const groupReplyMessage = {
+            id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            type: 'agent',
+            from: selectedAgent.id,
+            fromName: selectedAgent.display_name || selectedAgent.name || '智能体',
+            avatar: selectedAgent.avatar,
+            content: lastMessage.content,
+            timestamp: lastMessage.timestamp,
+            metadata: {
+              agentId: selectedAgent.id,
+              replyTo: lastMessage.metadata.originalMessage,
+              isReply: true
+            }
+          }
+          
+          addGroupChatMessage(groupId, groupReplyMessage)
+        } catch (error) {
+          console.warn('[useAgentMessages] 同步智能体回复到群聊失败:', error)
+        }
+      }
+    }
+  }, [messages, selectedAgent])
+
   
   /**
    * 终止指定智能体的执行

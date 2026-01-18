@@ -25,11 +25,33 @@ const GroupChatPanel = ({
   activeChannelId,
   onSwitchGroupChat,
   onPanelClick,
+  onSelectAgent, // 新增：选择智能体的回调
 }) => {
   const { t } = useI18n()
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
+
+  // 处理智能体头像点击，跳转到session聊天框
+  const handleAgentClick = useCallback((agentId, agentInfo) => {
+    console.log('[GroupChatPanel] 智能体头像点击:', agentId, agentInfo)
+    
+    // 触发选择智能体事件
+    if (window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('select-agent-from-groupchat', {
+        detail: {
+          agentId,
+          agentInfo,
+          source: 'group-chat'
+        }
+      }))
+    }
+    
+    // 调用父组件提供的回调
+    if (onSelectAgent) {
+      onSelectAgent(agentId, agentInfo)
+    }
+  }, [onSelectAgent])
 
   // 滚动到底部
   const scrollToBottom = () => {
@@ -124,7 +146,11 @@ const GroupChatPanel = ({
           ) : (
             <>
               {messages.map((message) => (
-                <GroupChatMessage key={message.id} message={message} />
+                <GroupChatMessage 
+                  key={message.id} 
+                  message={message} 
+                  onAgentClick={handleAgentClick}
+                />
               ))}
               {isLoading && (
                 <div className="loading-message">

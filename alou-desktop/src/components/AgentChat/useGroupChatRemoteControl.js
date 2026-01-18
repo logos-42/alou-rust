@@ -52,19 +52,65 @@ export const useGroupChatRemoteControl = ({
         const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
         const from = walletAddress || userId || 'user'
 
+        // 创建用户消息
+        const userMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'user', // 确保用户消息类型正确
+          from: from,
+          fromName: userName || from,
+          content: text,
+          timestamp: Date.now(),
+        }
+
         if (isLocalGroupChat) {
           // 本地群聊：直接将消息添加到 store
-          const { addGroupChatMessage } = useClusterActionStore.getState()
-          const message = {
-            id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-            type: 'chat',
-            from: from,
-            fromName: userName || from,
-            content: text,
-            timestamp: Date.now(),
-          }
-          addGroupChatMessage(actionId, message)
+          const { addGroupChatMessage, getActiveAction } = useClusterActionStore.getState()
+          addGroupChatMessage(actionId, userMessage)
           console.log('[useGroupChatRemoteControl] 本地群聊消息已添加:', actionId)
+
+          // 关键改进：通知所有智能体处理群聊消息
+          const activeAction = getActiveAction()
+          if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
+            // 广播消息给所有参与群聊的智能体
+            const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
+            
+            // 使用多智能体协调器广播消息
+            try {
+              const { broadcastToAgents } = await import('@/hooks/useMultiAgentChat')
+              if (broadcastToAgents) {
+                await broadcastToAgents({
+                  content: text,
+                  from: from,
+                  fromName: userName || from,
+                  timestamp: Date.now(),
+                  groupId: actionId,
+                  type: 'group_chat_message'
+                }, from) // 排除发送者（用户）
+                console.log('[useGroupChatRemoteControl] 已广播消息给所有智能体:', agentIds)
+              }
+            } catch (error) {
+              console.warn('[useGroupChatRemoteControl] 广播消息失败:', error)
+            }
+
+            // 备用方案：直接调用每个智能体的消息处理
+            for (const agentId of agentIds) {
+              try {
+                // 触发智能体处理消息的事件
+                window.dispatchEvent(new CustomEvent('agent-group-message', {
+                  detail: {
+                    agentId,
+                    message: {
+                      ...userMessage,
+                      groupId: actionId,
+                      type: 'group_chat_message'
+                    }
+                  }
+                }))
+              } catch (error) {
+                console.warn(`[useGroupChatRemoteControl] 通知智能体 ${agentId} 失败:`, error)
+              }
+            }
+          }
         } else {
           // 远程群聊：尝试使用 pubsubService，如果失败则使用后端 API
           try {
@@ -84,7 +130,7 @@ export const useGroupChatRemoteControl = ({
             await apiClient.post('/pubsub/publish', {
               topic,
               message: {
-                id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                id: userMessage.id,
                 msg_type: 'chat',
                 from: from,
                 content: text,

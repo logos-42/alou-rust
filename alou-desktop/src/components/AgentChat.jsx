@@ -152,6 +152,56 @@ const AgentChat = () => {
     closeDetailPanel,
   } = useAgentModals({ recordInteraction })
 
+  // 处理从群聊选择智能体
+  const handleSelectAgentFromGroupChat = useCallback((agentId, agentInfo) => {
+    console.log('[AgentChat] 从群聊选择智能体:', agentId, agentInfo)
+    
+    // 查找对应的频道
+    const targetChannel = channels.find(ch => 
+      ch.id === agentId || 
+      ch.meta?.did === agentId || 
+      ch.agent_id === agentId
+    )
+    
+    if (targetChannel) {
+      // 选择该智能体频道
+      selectChannel(targetChannel)
+      
+      // 如果群聊面板打开，关闭它以显示主对话
+      if (showGroupChat) {
+        closeGroupChat()
+      }
+      
+      // 确保对话面板打开
+      openConversationPanel()
+      
+      // 记录交互
+      recordInteraction('select_agent_from_groupchat', {
+        agentId,
+        agentInfo,
+        channelId: targetChannel.id
+      })
+    } else {
+      console.warn('[AgentChat] 未找到对应的智能体频道:', agentId)
+    }
+  }, [channels, selectChannel, showGroupChat, closeGroupChat, openConversationPanel, recordInteraction])
+
+  // 监听从群聊选择智能体的事件
+  useEffect(() => {
+    const handleSelectAgent = (event) => {
+      const { agentId, agentInfo, source } = event.detail
+      if (source === 'group-chat') {
+        handleSelectAgentFromGroupChat(agentId, agentInfo)
+      }
+    }
+    
+    window.addEventListener('select-agent-from-groupchat', handleSelectAgent)
+    
+    return () => {
+      window.removeEventListener('select-agent-from-groupchat', handleSelectAgent)
+    }
+  }, [handleSelectAgentFromGroupChat])
+
   // 处理编辑智能体
   const handleEditAgent = useCallback(() => {
     if (selectedAgent) {
