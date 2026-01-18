@@ -260,6 +260,50 @@
   min-height: 0;
 }
 
+/* 为对话主体添加滚动条样式，与消息区域保持一致 */
+.conversation-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.conversation-body::-webkit-scrollbar-track {
+  background: #f1f3f4;
+  border-radius: 4px;
+}
+
+.app-shell.dark-mode .conversation-body::-webkit-scrollbar-track {
+  background: #374151; /* 深灰色背景 */
+}
+
+.conversation-body::-webkit-scrollbar-thumb {
+  background: #9ca3af; /* 中灰色滚动条 */
+  border-radius: 4px;
+  border: 1px solid #f1f3f4;
+  transition: background 0.2s ease;
+}
+
+.app-shell.dark-mode .conversation-body::-webkit-scrollbar-thumb {
+  background: #6b7280; /* 暗夜模式下的中灰色 */
+  border: 1px solid #4b5563; /* 边框使用深灰色 */
+}
+
+.conversation-body::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+.app-shell.dark-mode .conversation-body::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af; /* 悬停时变为中灰色 */
+  border: 1px solid #6b7280;
+}
+
+.conversation-body::-webkit-scrollbar-thumb:active {
+  background: #4b5563;
+}
+
+.app-shell.dark-mode .conversation-body::-webkit-scrollbar-thumb:active {
+  background: #d1d5db; /* 激活时变为浅灰色 */
+  border: 1px solid #9ca3af;
+}
+
 .conversation-panel .close-btn,
 .conversation-panel .group-chat-toggle-btn {
   border: none;

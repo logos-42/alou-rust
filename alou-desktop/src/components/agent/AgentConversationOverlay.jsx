@@ -31,26 +31,69 @@ const AgentConversationOverlay = forwardRef(
     ref,
   ) => {
     const messageListRef = useRef(null)
+    const conversationBodyRef = useRef(null)
 
     useImperativeHandle(
       ref,
       () => ({
         scrollToBottom: () => {
+          // 优先滚动 conversation-body 容器
+          const conversationBody = conversationBodyRef.current
+          if (conversationBody) {
+            conversationBody.scrollTop = conversationBody.scrollHeight
+            return
+          }
+          
+          // 备用方案：滚动 messageList 容器
           messageListRef.current?.scrollToBottom?.()
         },
       }),
       [],
     )
 
-    // 监听消息变化，自动滚动到底部
+    // 主要的自动滚动逻辑 - 直接控制 conversation-body
     useEffect(() => {
-      if (messageListRef.current) {
-        // 使用 setTimeout 确保 DOM 完全更新后再滚动，避免被中断
-        setTimeout(() => {
-          messageListRef.current.scrollToBottom()
-        }, 100)
+      const conversationBody = conversationBodyRef.current
+      if (!conversationBody) return
+
+      const scrollToBottom = () => {
+        conversationBody.scrollTop = conversationBody.scrollHeight
       }
+
+      // 立即滚动
+      scrollToBottom()
+      
+      // 延迟滚动，确保内容渲染完成
+      setTimeout(scrollToBottom, 50)
+      
+      // 更长延迟，确保动态内容加载完成
+      setTimeout(scrollToBottom, 150)
+      
+      // 最长延迟，确保所有异步内容加载完成
+      setTimeout(scrollToBottom, 300)
     }, [messages, isLoading])
+
+    // 专门处理新消息的滚动
+    useEffect(() => {
+      const conversationBody = conversationBodyRef.current
+      if (!conversationBody || messages.length === 0) return
+
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage && (lastMessage.type === 'assistant' || lastMessage.type === 'user')) {
+        // 对于新的用户或助手消息，强制滚动到底部
+        const forceScrollToBottom = () => {
+          conversationBody.scrollTop = conversationBody.scrollHeight
+        }
+        
+        // 立即执行
+        forceScrollToBottom()
+        
+        // 延迟执行，确保内容完全渲染
+        setTimeout(forceScrollToBottom, 100)
+        setTimeout(forceScrollToBottom, 250)
+        setTimeout(forceScrollToBottom, 400)
+      }
+    }, [messages.length]) // 只监听消息数量变化
 
     const avatarSrc = avatar || DEFAULT_AVATAR
     const avatarAlt = typeof title === 'string' ? title : '智能体'
@@ -88,7 +131,7 @@ const AgentConversationOverlay = forwardRef(
     )
 
     const body = (
-      <div className="conversation-body">
+      <div className="conversation-body" ref={conversationBodyRef}>
         {messages.length === 0 && !isLoading && emptyState ? (
           emptyState
         ) : (

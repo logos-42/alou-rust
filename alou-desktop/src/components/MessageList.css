@@ -1,9 +1,9 @@
 .messages-area {
   width: 100%;
   flex: 1;
-  overflow-y: auto;
   overflow-x: hidden;
   padding: 0.5rem 0;
+  /* 移除 overflow-y: auto，让父容器控制滚动 */
 }
 
 .message-wrapper {
@@ -148,42 +148,4 @@
   }
 }
 
-.messages-area::-webkit-scrollbar {
-  width: 8px;
-}
-
-.messages-area::-webkit-scrollbar-track {
-  background: #f1f3f4;
-  border-radius: 4px;
-}
-
-.app-shell.dark-mode .messages-area::-webkit-scrollbar-track {
-  background: #1a202c;
-}
-
-.messages-area::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 4px;
-  border: 1px solid #f1f3f4;
-}
-
-.app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border: 1px solid #1a202c;
-}
-
-.messages-area::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
-}
-
-.app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e0;
-}
-
-.messages-area::-webkit-scrollbar-thumb:active {
-  background: #718096;
-}
-
-.app-shell.dark-mode .messages-area::-webkit-scrollbar-thumb:active {
-  background: #e2e8f0;
-}
+/* 滚动条样式已移至 AgentConversationOverlay.css，由 conversation-body 统一控制 */
