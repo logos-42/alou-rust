@@ -9,6 +9,7 @@ mod ipfs_api;
 mod ipfs_commands;
 mod ipfs_node;
 mod kubo;
+mod kv_commands;  // 新增KV存储模块
 mod lsp;
 mod memory_manager;  // 新增内存管理模块
 mod spec;
@@ -44,6 +45,7 @@ use crate::ipfs_commands::{
     ipfs_pubsub_ls,
 };
 use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, stop_ipfs_node};
+use crate::kv_commands::{kv_clear, kv_exists, kv_get, kv_get_batch, kv_keys, kv_remove, kv_set, kv_set_batch, kv_stats, KvState};
 use crate::diap::{
     create_local_diap_identity,
     get_local_diap_identity,
@@ -194,6 +196,7 @@ fn main() {
             process: None,
             data_dir: PathBuf::new(),
         }))
+        .manage(KvState::new())
         .manage(WorkflowState::default())
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
         .manage(create_default_bridge_manager())
@@ -213,6 +216,16 @@ fn main() {
             ipfs_pubsub_subscribe_once,
             ipfs_pubsub_peers,
             ipfs_pubsub_ls,
+            // KV commands
+            kv_set,
+            kv_get,
+            kv_remove,
+            kv_exists,
+            kv_keys,
+            kv_clear,
+            kv_stats,
+            kv_set_batch,
+            kv_get_batch,
             // DIAP commands
             create_local_diap_identity,
             get_local_diap_identity,

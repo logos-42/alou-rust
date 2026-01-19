@@ -186,6 +186,10 @@ const AgentChat = () => {
   const groupChatManager = useGroupChatManager({
     openConversationPanel,
     activeChannelId,
+    localIdentity: {
+      did: userName || 'user',
+      name: userName || '本地用户'
+    }
   })
 
   const {

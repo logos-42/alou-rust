@@ -32,9 +32,17 @@ export const useGroupChatButton = ({
   const handleConversationPanelClick = useCallback((e) => {
     console.log('[ConversationPanelWrapper] 对话面板点击事件触发:', e.target)
     
-    // 避免点击按钮或其他交互元素时触发
+    // 检查是否点击了群聊按钮
+    const isGroupChatButton = e.target.closest('.group-chat-toggle-btn-fixed')
+    if (isGroupChatButton) {
+      console.log('[ConversationPanelWrapper] 点击了群聊按钮，不阻止事件')
+      // 不阻止群聊按钮的点击事件，让它正常处理
+      return
+    }
+    
+    // 避免点击其他按钮时触发
     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-      console.log('[ConversationPanelWrapper] 点击了按钮，忽略面板点击')
+      console.log('[ConversationPanelWrapper] 点击了其他按钮，忽略面板点击')
       return
     }
     
@@ -68,15 +76,14 @@ export const useGroupChatButton = ({
             onClick={handleConversationPanelClick}
           >
             {children}
-            {showConversationPanel && (
-              <button type="button" {...buttonConfig}>
-                <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
-              </button>
-            )}
+            {/* 群聊按钮独立于对话面板显示 */}
+            <button type="button" {...buttonConfig}>
+              <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
+            </button>
           </div>
         )
       },
-    [showConversationPanel, buttonConfig, showGroupChat, t, handleConversationPanelClick],
+    [buttonConfig, showGroupChat, t, handleConversationPanelClick],
   )
 
   return {

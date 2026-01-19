@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import pubsubService from '@/services/pubsubService'
+import localIpfsGroupChatService from '@/services/localIpfsGroupChatService'
 import useClusterActionStore from '@/stores/clusterActionStore'
 
 /**
@@ -29,8 +30,8 @@ export const useGroupChatRemoteControl = ({
     if (!showGroupChat) {
       setInputTargetMode('agent')
     } else {
-      // 群聊面板打开时，默认设置为 'agent' 模式（遥控模式）
-      setInputTargetMode('agent')
+      // 群聊面板打开时，默认设置为 'groupChat' 模式
+      setInputTargetMode('groupChat')
     }
   }, [showGroupChat])
 
@@ -93,10 +94,26 @@ export const useGroupChatRemoteControl = ({
         }
 
         if (isLocalGroupChat) {
-          // 本地群聊：直接将消息添加到 store
-          const { addGroupChatMessage, getActiveAction } = useClusterActionStore.getState()
-          addGroupChatMessage(actionId, userMessage)
-          console.log('[useGroupChatRemoteControl] 本地群聊消息已添加:', actionId)
+          // 本地群聊：优先使用新的本地IPFS群聊服务
+          try {
+            // 检查是否有对应的本地群聊
+            const localGroup = localIpfsGroupChatService.getGroup(actionId)
+            if (localGroup) {
+              // 使用本地IPFS群聊服务发送消息
+              await localIpfsGroupChatService.sendMessage(text, actionId, localGroup.topic)
+              console.log('[useGroupChatRemoteControl] 使用本地IPFS群聊服务发送消息成功')
+            } else {
+              // 降级到原有的store方式
+              const { addGroupChatMessage, getActiveAction } = useClusterActionStore.getState()
+              addGroupChatMessage(actionId, userMessage)
+              console.log('[useGroupChatRemoteControl] 本地群聊消息已添加到store:', actionId)
+            }
+          } catch (localError) {
+            console.warn('[useGroupChatRemoteControl] 本地IPFS群聊服务发送失败，降级到store:', localError)
+            // 降级到原有的store方式
+            const { addGroupChatMessage } = useClusterActionStore.getState()
+            addGroupChatMessage(actionId, userMessage)
+          }
 
           // 关键改进：通知所有智能体处理群聊消息
           const activeAction = getActiveAction()
@@ -191,8 +208,13 @@ export const useGroupChatRemoteControl = ({
     })
     
     if (showGroupChat) {
-      console.log('[useGroupChatRemoteControl] 设置输入目标为群聊模式')
+      console.log('[useGroupChatRemoteControl] 强制设置输入目标为群聊模式')
       setInputTargetMode('groupChat')
+      
+      // 触发切换事件，确保UI同步更新
+      window.dispatchEvent(new CustomEvent('switch-input-target', {
+        detail: { target: 'groupChat' }
+      }))
     } else {
       console.log('[useGroupChatRemoteControl] 群聊面板未显示，忽略点击')
     }

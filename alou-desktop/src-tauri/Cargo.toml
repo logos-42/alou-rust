@@ -54,7 +54,7 @@ toml = "0.8"
 dirs = "5.0"
 whoami = { version = "1.5", features = [] }
 sysinfo = { version = "0.30", features = ["serde"] }
-diap-rs-sdk = { version = "0.2.11", default-features = false, features = ["embedded-noir"] }
+
 flate2 = "1.0"
 which = "4.4"
 

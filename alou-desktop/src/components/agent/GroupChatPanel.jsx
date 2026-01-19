@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react'
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import GroupChatMessage from './GroupChatMessage'
 import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
+import { useLocalIpfsGroupChat } from '@/hooks/useLocalIpfsGroupChat'
 import { resolveAgentAvatar } from '../AgentChat/agentUtils'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
@@ -70,32 +71,52 @@ const AgentAvatar = ({ agent, onAgentClick, t }) => {
 }
 
 /**
- * GroupChatPanel - 基于DIAP PubSub的群聊面板组件
- * 支持去中心化群聊通信和本地持久化
+ * GroupChatPanel - 基于本地IPFS PubSub的群聊面板组件
+ * 使用本地IPFS节点创建pubsub，消息存储在本地内存和KV中
  */
 const GroupChatPanel = ({
-  activeGroup,
-  messages = [],
+  onClose,
+  onAgentClick,
+  onPanelClick,
+  inputTargetMode,
+  // 兼容性参数（保持与原有接口的兼容）
+  externalActiveGroup,
+  externalMessages = [],
   agents = [],
   status,
-  onClose,
   onRefresh,
-  onAgentClick,
-  isLoading = false,
+  externalIsLoading = false,
   groupChatList = [],
   activeChannelId,
   onSwitchGroupChat,
-  onPanelClick,
   onSelectAgent,
-  inputTargetMode,
-  onSendMessage,
-  diapGroupChat,
-  // 新增：DIAP群聊管理器的方法
-  createGroupChat,
-  sendMessage: diapSendMessage,
-  switchGroupChat: diapSwitchGroupChat
+  externalOnSendMessage
 }) => {
   const { t } = useI18n()
+  
+  // 使用本地IPFS群聊Hook
+  const {
+    isInitialized,
+    isIpfsAvailable,
+    localIdentity,
+    groups,
+    activeGroup: localActiveGroup,
+    messages: localMessages,
+    isLoading: localIsLoading,
+    error,
+    createGroup,
+    joinGroup,
+    switchToGroup,
+    sendMessage,
+    leaveGroup,
+    refreshGroups,
+    clearError
+  } = useLocalIpfsGroupChat()
+
+  // 优先使用外部传入的数据，否则使用本地数据
+  const activeGroup = externalActiveGroup || localActiveGroup
+  const messages = externalMessages.length > 0 ? externalMessages : localMessages
+  const isLoading = externalIsLoading || localIsLoading
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
@@ -109,13 +130,35 @@ const GroupChatPanel = ({
 
   // 调试信息
   useEffect(() => {
-    console.log('[GroupChatPanel] ========== DIAP群聊调试信息 ==========')
+    console.log('[GroupChatPanel] ========== 本地IPFS群聊调试信息 ==========')
+    console.log('[GroupChatPanel] isInitialized:', isInitialized)
+    console.log('[GroupChatPanel] isIpfsAvailable:', isIpfsAvailable)
+    console.log('[GroupChatPanel] localIdentity:', localIdentity?.did)
     console.log('[GroupChatPanel] activeGroup:', activeGroup)
     console.log('[GroupChatPanel] actualAgents 数量:', actualAgents.length)
     console.log('[GroupChatPanel] messages 数量:', messages.length)
-    console.log('[GroupChatPanel] diapGroupChat 状态:', diapGroupChat?.status)
+    console.log('[GroupChatPanel] error:', error)
     console.log('[GroupChatPanel] =======================================')
-  }, [activeGroup, actualAgents.length, messages.length, diapGroupChat?.status])
+  }, [isInitialized, isIpfsAvailable, localIdentity, activeGroup, actualAgents.length, messages.length, error])
+
+  // 错误处理
+  useEffect(() => {
+    if (error) {
+      console.error('[GroupChatPanel] 群聊服务错误:', error)
+      // 可以在这里显示错误提示
+    }
+  }, [error])
+
+  // 刷新群聊列表
+  const handleRefresh = useCallback(async () => {
+    try {
+      clearError()
+      await refreshGroups()
+      onRefresh?.() // 调用外部刷新回调
+    } catch (error) {
+      console.error('[GroupChatPanel] 刷新失败:', error)
+    }
+  }, [refreshGroups, onRefresh, clearError])
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -160,6 +203,11 @@ const GroupChatPanel = ({
     
     console.log('[GroupChatPanel] 调用 onPanelClick')
     onPanelClick?.()
+    
+    // 直接触发切换事件，确保状态同步
+    window.dispatchEvent(new CustomEvent('switch-input-target', {
+      detail: { target: 'groupChat' }
+    }))
   }
 
   // 处理消息发送
@@ -169,13 +217,17 @@ const GroupChatPanel = ({
     }
 
     try {
-      // 优先使用DIAP群聊的发送方法
-      if (diapSendMessage && typeof diapSendMessage === 'function') {
-        await diapSendMessage(activeGroup.groupId, messageInput.trim())
-      } else if (onSendMessage && typeof onSendMessage === 'function') {
-        await onSendMessage(activeGroup.groupId, messageInput.trim())
+      clearError()
+      
+      // 优先使用本地IPFS群聊服务发送消息
+      if (isInitialized && isIpfsAvailable) {
+        await sendMessage(messageInput.trim())
+      } else if (externalOnSendMessage && typeof externalOnSendMessage === 'function') {
+        // 降级到外部回调
+        await externalOnSendMessage(activeGroup.groupId, messageInput.trim())
       } else {
         console.warn('[GroupChatPanel] 没有可用的发送方法')
+        return
       }
       
       setMessageInput('')
@@ -184,7 +236,7 @@ const GroupChatPanel = ({
       console.error('[GroupChatPanel] 发送消息失败:', error)
       // 可以在这里显示错误提示
     }
-  }, [messageInput, activeGroup, onSendMessage, diapSendMessage])
+  }, [messageInput, activeGroup, isInitialized, isIpfsAvailable, sendMessage, externalOnSendMessage, clearError])
 
   // 处理键盘事件
   const handleKeyPress = useCallback((e) => {
@@ -286,11 +338,11 @@ const GroupChatPanel = ({
       </div>
 
       {/* 刷新按钮 - 固定在右下角 */}
-      {onRefresh && (
+      {(onRefresh || isInitialized) && (
         <button
           type="button"
           className="refresh-btn-fixed"
-          onClick={onRefresh}
+          onClick={handleRefresh}
           title={t('agent.groupChat.refresh')}
           aria-label={t('agent.groupChat.refresh')}
         >
@@ -324,16 +376,16 @@ const GroupChatPanel = ({
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="输入消息..."
-              disabled={diapGroupChat?.isLoading}
+              disabled={isInitialized && isLoading}
             />
             <button
               type="button"
               className="send-button"
               onClick={handleSendMessage}
-              disabled={!messageInput.trim() || diapGroupChat?.isLoading}
+              disabled={!messageInput.trim() || (isInitialized && isLoading)}
               title="发送消息 (Enter)"
             >
-              {diapGroupChat?.isLoading ? '...' : '→'}
+              {(isInitialized && isLoading) ? '...' : '→'}
             </button>
           </div>
         </div>

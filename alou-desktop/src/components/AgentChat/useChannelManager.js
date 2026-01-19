@@ -1,9 +1,66 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import agentService from '@/services/agentService'
 import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
+import useClusterActionStore from '@/stores/clusterActionStore'
 import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from './agentUtils'
 import { resolveBackendChain } from '@/hooks/useAgentChat'
 import { isIpns, isCid } from '@/services/utils/ipnsUtils'
+
+/**
+ * 迁移群聊数据到新频道
+ */
+const migrateGroupChatData = (oldChannelId, newChannelId) => {
+  if (!oldChannelId || !newChannelId || oldChannelId === newChannelId) {
+    return
+  }
+  
+  console.log(`[useChannelManager] 开始迁移群聊数据: ${oldChannelId} -> ${newChannelId}`)
+  
+  const { 
+    getActions, 
+    getActiveActionId, 
+    setActiveAction,
+    getGroupChatMessages,
+    actionsByChannel,
+    activeActionIdByChannel,
+    groupChatMessages
+  } = useClusterActionStore.getState()
+  
+  // 获取旧频道的群聊数据
+  const oldActions = getActions(oldChannelId) || []
+  const oldActiveActionId = getActiveActionId(oldChannelId)
+  const oldMessages = {}
+  
+  // 收集旧频道的所有群聊消息
+  oldActions.forEach(action => {
+    if (action.action_id) {
+      oldMessages[action.action_id] = getGroupChatMessages(action.action_id) || []
+    }
+  })
+  
+  if (oldActions.length > 0) {
+    console.log(`[useChannelManager] 迁移 ${oldActions.length} 个群聊到新频道`)
+    
+    // 将群聊数据迁移到新频道
+    useClusterActionStore.getState().setActions(oldActions, newChannelId)
+    
+    // 如果有活跃的群聊，设置为新频道的活跃群聊
+    if (oldActiveActionId) {
+      setActiveAction(oldActiveActionId, newChannelId)
+      console.log(`[useChannelManager] 设置新频道活跃群聊: ${oldActiveActionId}`)
+    }
+    
+    // 迁移群聊消息
+    Object.keys(oldMessages).forEach(actionId => {
+      if (oldMessages[actionId].length > 0) {
+        useClusterActionStore.getState().setGroupChatMessages(actionId, oldMessages[actionId])
+        console.log(`[useChannelManager] 迁移群聊消息: ${actionId} (${oldMessages[actionId].length} 条)`)
+      }
+    })
+    
+    console.log(`[useChannelManager] 群聊数据迁移完成`)
+  }
+}
 
 export const useChannelManager = ({
   sessionId,
@@ -212,7 +269,11 @@ export const useChannelManager = ({
             setChannels(mapped)
             // 优先选择本地匹配的频道，如果没有则选择第一个
             const preferredChannel = localMatches.length > 0 ? localMatches[0] : mapped[0]
+            
+            // 检查频道ID是否发生变化，如果是则迁移群聊数据
             if (!mapped.some((channel) => channel.id === activeChannelId)) {
+              console.log(`[useChannelManager] 频道ID发生变化: ${activeChannelId} -> ${preferredChannel.id}`)
+              migrateGroupChatData(activeChannelId, preferredChannel.id)
               setActiveChannelId(preferredChannel.id)
               setSelectedAgent(preferredChannel.meta)
             }
