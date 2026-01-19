@@ -370,6 +370,112 @@ export const getActiveGroupId = (channelId, defaultValue = null) => {
 }
 
 /**
+ * DIAP身份专用存储函数（增强版本）
+ */
+export const setDiapIdentity = (sessionId, identity, options = {}) => {
+  const key = `diap_identity_${sessionId}`
+  
+  // 验证身份数据的完整性
+  if (typeof identity === 'string') {
+    try {
+      identity = JSON.parse(identity)
+    } catch (e) {
+      console.error('[MemoryStorage] DIAP身份数据解析失败:', e)
+      return false
+    }
+  }
+  
+  // 验证必要字段
+  if (!identity || !identity.did || !identity.cid || !identity.ipns) {
+    console.error('[MemoryStorage] DIAP身份数据不完整:', identity)
+    return false
+  }
+  
+  // 添加时间戳
+  const identityWithTimestamp = {
+    ...identity,
+    stored_at: Date.now(),
+    session_id: sessionId
+  }
+  
+  console.log('[MemoryStorage] 保存DIAP身份:', {
+    sessionId,
+    did: identity.did,
+    cid: identity.cid,
+    ipns: identity.ipns
+  })
+  
+  return setMemoryItem(key, identityWithTimestamp, { persist: true, ttl: 7 * 24 * 60 * 60 * 1000, ...options }) // 7天过期
+}
+
+export const getDiapIdentity = (sessionId, defaultValue = null) => {
+  const key = `diap_identity_${sessionId}`
+  const identity = getMemoryItem(key, defaultValue)
+  
+  if (identity) {
+    console.log('[MemoryStorage] 获取DIAP身份成功:', {
+      sessionId,
+      did: identity.did,
+      stored_at: identity.stored_at ? new Date(identity.stored_at).toISOString() : 'unknown'
+    })
+  } else {
+    console.log('[MemoryStorage] DIAP身份不存在:', sessionId)
+  }
+  
+  return identity
+}
+
+export const removeDiapIdentity = (sessionId) => {
+  const key = `diap_identity_${sessionId}`
+  console.log('[MemoryStorage] 删除DIAP身份:', sessionId)
+  return removeMemoryItem(key)
+}
+
+export const hasDiapIdentity = (sessionId) => {
+  const key = `diap_identity_${sessionId}`
+  const exists = hasMemoryItem(key)
+  console.log('[MemoryStorage] 检查DIAP身份存在性:', { sessionId, exists })
+  return exists
+}
+
+export const getAllDiapIdentities = () => {
+  const allKeys = getMemoryKeys()
+  const diapKeys = allKeys.filter(key => key.startsWith('diap_identity_'))
+  const identities = {}
+  
+  console.log('[MemoryStorage] 获取所有DIAP身份，找到', diapKeys.length, '个')
+  
+  diapKeys.forEach(key => {
+    const sessionId = key.replace('diap_identity_', '')
+    const identity = getMemoryItem(key)
+    if (identity) {
+      identities[sessionId] = identity
+    }
+  })
+  
+  return identities
+}
+
+export const cleanupExpiredDiapIdentities = () => {
+  const allKeys = getMemoryKeys()
+  const diapKeys = allKeys.filter(key => key.startsWith('diap_identity_'))
+  let cleanedCount = 0
+  
+  diapKeys.forEach(key => {
+    const identity = getMemoryItem(key)
+    if (!identity) {
+      cleanedCount++
+    }
+  })
+  
+  console.log('[MemoryStorage] 清理过期DIAP身份，清理了', cleanedCount, '个')
+  return cleanedCount
+}
+  
+  return cleanedCount
+}
+
+/**
  * 钱包数据专用存储函数
  */
 export const setWalletData = (address, walletType, chainId) => {
@@ -410,6 +516,12 @@ if (typeof window !== 'undefined') {
     getActiveGroup: getActiveGroupId,
     setWallet: setWalletData,
     getWallet: getWalletData,
+    setDiapIdentity: setDiapIdentity,
+    getDiapIdentity: getDiapIdentity,
+    removeDiapIdentity: removeDiapIdentity,
+    hasDiapIdentity: hasDiapIdentity,
+    getAllDiapIdentities: getAllDiapIdentities,
+    cleanupDiapIdentities: cleanupExpiredDiapIdentities,
     
     // 帮助
     help: () => {
@@ -433,6 +545,14 @@ if (typeof window !== 'undefined') {
       console.log('  AlouMemoryStorage.getActiveGroup(channelId) - 获取活跃群聊')
       console.log('  AlouMemoryStorage.setWallet(address, type, chainId) - 设置钱包数据')
       console.log('  AlouMemoryStorage.getWallet() - 获取钱包数据')
+      console.log('')
+      console.log('DIAP身份管理:')
+      console.log('  AlouMemoryStorage.setDiapIdentity(sessionId, identity) - 设置DIAP身份')
+      console.log('  AlouMemoryStorage.getDiapIdentity(sessionId) - 获取DIAP身份')
+      console.log('  AlouMemoryStorage.removeDiapIdentity(sessionId) - 删除DIAP身份')
+      console.log('  AlouMemoryStorage.hasDiapIdentity(sessionId) - 检查DIAP身份是否存在')
+      console.log('  AlouMemoryStorage.getAllDiapIdentities() - 获取所有DIAP身份')
+      console.log('  AlouMemoryStorage.cleanupDiapIdentities() - 清理过期DIAP身份')
       console.groupEnd()
     }
   }

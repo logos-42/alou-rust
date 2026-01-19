@@ -125,7 +125,7 @@ export function parseDidDocumentToAgent(didDocument, additionalInfo = {}) {
     agent_type: serviceEndpoint.agent_type || 
                serviceEndpoint.agentType ||
                metadata.agent_type ||
-               'claude_agent_sdk',
+               'ai_agent_sdk',
     customPrompt: serviceEndpoint.custom_prompt || 
                  serviceEndpoint.customPrompt ||
                  metadata.custom_prompt ||

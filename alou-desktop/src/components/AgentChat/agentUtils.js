@@ -19,7 +19,7 @@ export const resolveAgentAvatar = (agent) => {
   }
   if (agent.avatar_url && agent.avatar_url.startsWith('http')) return agent.avatar_url
   
-  // 2. IPFS CID（支持多种格式）
+  // 2. IPFS CID（支持多种格式）- 只从当前智能体获取
   const avatarCid = agent.avatarCid || agent.avatar_cid
   if (avatarCid) {
     // 如果已经是完整 URL
@@ -30,14 +30,18 @@ export const resolveAgentAvatar = (agent) => {
     }
   }
   
-  // 3. 从 diapIdentity 中获取
-  if (agent.diapIdentity?.avatar_cid) {
+  // 3. 从当前智能体的 diapIdentity 中获取（避免跨智能体获取）
+  // 只有当 diapIdentity 属于当前智能体时才使用
+  if (agent.diapIdentity?.avatar_cid && 
+      (agent.diapIdentity.did === agent.did || 
+       agent.diapIdentity.ipns === agent.ipns || 
+       agent.diapIdentity.cid === agent.cid)) {
     const cid = agent.diapIdentity.avatar_cid
     if (cid.startsWith('http')) return cid
     return agentAssetsService.resolveIpfsUri(cid)
   }
   
-  // 4. 从 serviceEndpoint 中获取（远程智能体 DID 文档）
+  // 4. 从 serviceEndpoint 中获取（当前智能体的服务端点）
   if (agent.serviceEndpoint?.avatar_cid) {
     const cid = agent.serviceEndpoint.avatar_cid
     if (cid.startsWith('http')) return cid
@@ -47,10 +51,13 @@ export const resolveAgentAvatar = (agent) => {
   // 5. 从 meta 对象中获取（频道数据结构）
   if (agent.meta) {
     const metaAvatar = resolveAgentAvatar(agent.meta)
-    if (metaAvatar !== fallbackAvatar) return metaAvatar
+    // 只有当 meta 头像不属于其他智能体时才使用
+    if (metaAvatar !== fallbackAvatar && agent.meta.id === agent.id) {
+      return metaAvatar
+    }
   }
   
-  // 6. 从 did_document 的 service 中提取（完整 DID 文档）
+  // 6. 从 did_document 的 service 中提取（当前智能体的 DID 文档）
   if (agent.did_document?.service) {
     const services = agent.did_document.service
     for (const svc of services) {

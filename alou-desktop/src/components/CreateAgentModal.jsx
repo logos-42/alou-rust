@@ -1,15 +1,20 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
-import diapService from '@/services/diapService'
 import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
+import { setDiapIdentitySafe, hasDiapIdentitySafe } from '@/utils/diapIdentityManager'
+import { setDiapIdentity } from '@/utils/memoryStorage'
 import CloseIcon from '@/assets/关闭0.3.png'
+import CopyIcon from '@/assets/复制.png'
 import './CreateAgentModal.css'
 
 const DEFAULT_MCP_CODE = `{
   "ports": []
 }`
+
+const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
+const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
 
 function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel }) {
   const { t } = useI18n()
@@ -149,160 +154,123 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
 
     const fallbackName = name.trim() || 'agent'
     const finalRoleDescription = roleDescription.trim() || t('agent.create.role.default')
-    const tempId = `temp_${Date.now()}`
 
     try {
-      // 1. 立即显示频道（快速反馈，使用临时标识）
-      if (onEarlyChannel) {
-        const earlyMetadata = {
-          display_name: fallbackName,
-          name: fallbackName,
-          role_description: finalRoleDescription,
-          avatar_cid: null,
-          avatar_url: avatarPreview, // 使用本地预览图
-          agent_type: 'claude_agent_sdk',
-          cid: tempId,
-          did: null,
-          ipns: null,
-          diapIdentity: null,
-          sessionId,
-          status: 'creating', // 标记为创建中
+      // 检查 IPFS 节点是否运行
+      let isRunning = await ipfsService.isNodeRunning()
+      if (!isRunning) {
+        const startResult = await ipfsService.startNode(true)
+        if (!startResult.success) {
+          setError(t('agent.create.error.ipfsNotRunning'))
+          setIsLoading(false)
+          return
         }
-        console.log('[CreateAgentModal] 立即显示频道（临时）:', tempId)
-        onEarlyChannel(earlyMetadata)
+        console.log('[IPFS] 节点已自动启动，等待 API 就绪...')
       }
 
-      // 2. 立即关闭模态框，让用户看到频道
+      // 等待 IPFS API 完全就绪（最多等待 15 秒）
+      const apiReady = await ipfsService.waitForApiReady(15, 1000)
+      if (!apiReady.success) {
+        setError(
+          apiReady.error ||
+            'IPFS API 未就绪。请确保 IPFS 节点正常运行，然后重试。'
+        )
+        setIsLoading(false)
+        return
+      }
+      console.log(`[IPFS] API 已就绪 (尝试 ${apiReady.attempts} 次)`)
+
+      // 1. 创建 DIAP Identity（核心步骤）
+      let diapIdentity = null
+      try {
+        console.log('[CreateAgentModal] 开始创建 DIAP Identity...')
+        
+        // 使用新的DiapIntegrationService
+        const { default: diapIntegrationService } = await import('../services/diapIntegrationService')
+        
+        const result = await diapIntegrationService.createDiapIdentity(sessionId, {
+          agentName: fallbackName,
+          agentDescription: finalRoleDescription,
+        })
+        
+        diapIdentity = result.identity
+        console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
+        
+      } catch (err) {
+        console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
+        // DIAP 创建失败时显示错误但继续（允许用户创建没有 DIAP 的智能体）
+        console.warn('[CreateAgentModal] 将创建没有 DIAP Identity 的智能体')
+      }
+
+      // 2. 上传头像
+      let avatarCid = null
+      if (avatarFile) {
+        try {
+          console.log('[CreateAgentModal] 开始上传头像...')
+          const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
+          avatarCid = uploaded?.cid || null
+          console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
+        } catch (err) {
+          console.error('[CreateAgentModal] 头像上传失败:', err)
+          // 头像上传失败不阻塞创建
+        }
+      }
+
+      // 3. 解析并上传 MCP 配置
+      let mcpConfigCid = null
+      let filteredPorts = []
+      
+      if (mcpCode.trim()) {
+        try {
+          console.log('[CreateAgentModal] 解析 MCP 配置...')
+          const { ports } = parseMcpCode(mcpCode)
+          filteredPorts = ports.filter((port) => port.label?.trim() || port.endpoint?.trim())
+          
+          if (filteredPorts.length > 0) {
+            console.log('[CreateAgentModal] 开始上传 MCP 配置...')
+            const uploadedConfig = await agentAssetsService.uploadMcpConfig(
+              {
+                ports: filteredPorts,
+                generatedAt: Date.now(),
+              },
+              { sessionId },
+            )
+            mcpConfigCid = uploadedConfig?.cid || null
+            console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
+          }
+        } catch (err) {
+          console.error('[CreateAgentModal] MCP 配置处理失败:', err)
+          // 不阻塞创建流程
+        }
+      }
+
+      // 4. 构建完整的智能体数据（只调用一次onSubmit）
+      const agentData = {
+        name: fallbackName,
+        roleDescription: finalRoleDescription,
+        avatarCid,
+        mcpConfigCid,
+        mcpPorts: filteredPorts,
+        diapIdentity,
+        sessionId,
+        // 添加标识，表明这是完整的智能体数据
+        isComplete: true,
+      }
+
+      console.log('[CreateAgentModal] 提交完整智能体数据:', {
+        name: agentData.name,
+        hasAvatar: !!avatarCid,
+        hasMcp: !!mcpConfigCid,
+        hasDiap: !!diapIdentity,
+        sessionId
+      })
+
+      // 5. 提交完整的智能体信息（只调用一次）
+      await onSubmit(agentData)
+
+      // 6. 关闭模态框
       setIsLoading(false)
       onClose()
-
-      // 3. 在后台异步完成剩余工作
-      void (async () => {
-        try {
-          // 检查 IPFS 节点
-          let isRunning = await ipfsService.isNodeRunning()
-          if (!isRunning) {
-            const startResult = await ipfsService.startNode(true)
-            if (!startResult.success) {
-              console.error('[CreateAgentModal] IPFS 节点启动失败')
-              return
-            }
-          }
-
-          // 等待 IPFS API 就绪
-          const apiReady = await ipfsService.waitForApiReady(15, 1000)
-          if (!apiReady.success) {
-            console.error('[CreateAgentModal] IPFS API 未就绪:', apiReady.error)
-            return
-          }
-
-          // 上传头像（优先上传，完成后立即更新频道）
-          let avatarCid = null
-          if (avatarFile) {
-            try {
-              console.log('[CreateAgentModal] 后台上传头像...')
-              const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
-              avatarCid = uploaded?.cid || null
-              console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
-              
-              // 头像上传成功后，立即更新频道显示
-              if (avatarCid && onEarlyChannel) {
-                const earlyMetadata = {
-                  display_name: fallbackName,
-                  name: fallbackName,
-                  role_description: finalRoleDescription,
-                  avatar_cid: avatarCid,
-                  avatar_url: null, // 清除本地预览，使用 CID
-                  agent_type: 'claude_agent_sdk',
-                  cid: tempId,
-                  did: null,
-                  ipns: null,
-                  diapIdentity: null,
-                  sessionId,
-                  status: 'creating',
-                }
-                console.log('[CreateAgentModal] 头像上传完成，立即更新频道:', tempId)
-                onEarlyChannel(earlyMetadata)
-              }
-            } catch (err) {
-              console.error('[CreateAgentModal] 头像上传失败:', err)
-            }
-          }
-
-          // 解析并上传 MCP 配置
-          const { ports: parsedPorts } = parseMcpCode(mcpCode)
-          const filteredPorts = parsedPorts
-            .filter((port) => port && (port.label?.trim() || port.endpoint?.trim()))
-            .map((port) => ({
-              label: port.label || '',
-              endpoint: port.endpoint || '',
-              port: port.port ? Number(port.port) : undefined,
-              description: port.description || '',
-              protocol: port.protocol || 'http',
-            }))
-
-          let mcpConfigCid = null
-          if (filteredPorts.length > 0) {
-            try {
-              console.log('[CreateAgentModal] 后台上传 MCP 配置...')
-              const uploadedConfig = await agentAssetsService.uploadMcpConfig(
-                { ports: filteredPorts, generatedAt: Date.now() },
-                { sessionId },
-              )
-              mcpConfigCid = uploadedConfig?.cid || null
-              console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
-            } catch (err) {
-              console.error('[CreateAgentModal] MCP 配置上传失败:', err)
-            }
-          }
-
-          // 创建 DIAP Identity
-          let diapIdentity = null
-          try {
-            console.log('[CreateAgentModal] 后台创建 DIAP Identity...')
-            diapIdentity = await diapService.createLocalIdentity({
-              name: fallbackName,
-              description: finalRoleDescription,
-              sessionId,
-              avatarCid,
-              mcpConfigCid,
-            })
-            console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
-
-            // 保存到 localStorage
-            if (diapIdentity && sessionId && typeof window !== 'undefined') {
-              localStorage.setItem(
-                `diap_identity_${sessionId}`,
-                JSON.stringify({
-                  ipns: diapIdentity.ipns,
-                  did: diapIdentity.did,
-                  cid: diapIdentity.cid,
-                  public_key: diapIdentity.public_key,
-                  created_at: Date.now(),
-                })
-              )
-            }
-          } catch (err) {
-            console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
-          }
-
-          // 提交完整信息，更新频道
-          console.log('[CreateAgentModal] 后台提交完整智能体信息...')
-          await onSubmit({
-            name: fallbackName,
-            roleDescription: finalRoleDescription,
-            avatarCid,
-            mcpConfigCid,
-            mcpPorts: filteredPorts,
-            diapIdentity,
-            tempId, // 传递临时 ID 用于匹配更新
-          })
-          console.log('[CreateAgentModal] 智能体创建完成！')
-
-        } catch (err) {
-          console.error('[CreateAgentModal] 后台创建失败:', err)
-        }
-      })()
 
     } catch (err) {
       console.error('[CreateAgentModal] 创建智能体失败', err)

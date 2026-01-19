@@ -350,11 +350,23 @@ impl Router {
             (Method::Post, "/api/agent/diap/get-identity-by-session") => {
                 agent::handle_get_diap_identity_by_session(&self.session_manager, req).await
             }
+            (Method::Post, "/api/agent/diap/create-identity") => {
+                agent::handle_create_diap_identity(&self.session_manager, &env, req).await
+            }
+            (Method::Post, "/api/agent/diap/save-complete-identity") => {
+                agent::handle_update_diap_identity(&self.session_manager, req).await
+            }
+            (Method::Post, "/api/agent/diap/update-identity") => {
+                agent::handle_update_diap_identity(&self.session_manager, req).await
+            }
             (Method::Post, "/api/agent/parse-creation-command") => {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/create-from-command") => {
                 agent::handle_create_agent_from_command(&self.session_manager, &env, req).await
+            }
+            (Method::Post, "/api/agent/create_agent") => {
+                agent::handle_create_agent(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/batch-create") => {
                 agent::handle_batch_create_agent(&self.session_manager, req, &env).await
@@ -560,6 +572,20 @@ impl Router {
                 self.handle_tool_result(env, task_id, req).await
             }
 
+            // KV 存储管理端点
+            (Method::Get, "/api/kv/keys") => {
+                self.handle_kv_list_keys(req, env).await
+            }
+            (Method::Get, "/api/kv/get") => {
+                self.handle_kv_get(req, env).await
+            }
+            (Method::Post, "/api/kv/put") => {
+                self.handle_kv_put(req, env).await
+            }
+            (Method::Delete, "/api/kv/delete") => {
+                self.handle_kv_delete(req, env).await
+            }
+
             _ => {
                 console_log!("Route not found: {} {}", method.to_string(), path);
                 let error_response = ErrorResponse {
@@ -580,7 +606,21 @@ impl Router {
                 "status": "/api/status",
                 "session": "/api/session",
                 "agent": "/api/agent/chat",
-                "blockchain": "/api/blockchain/*"
+                "blockchain": "/api/blockchain/*",
+                "kv": {
+                    "keys": "/api/kv/keys",
+                    "get": "/api/kv/get",
+                    "put": "/api/kv/put",
+                    "delete": "/api/kv/delete"
+                },
+                "diap": {
+                    "get_identity": "/api/agent/diap/get-identity",
+                    "get_identity_by_session": "/api/agent/diap/get-identity-by-session",
+                    "create_identity": "/api/agent/diap/create-identity",
+                    "save_complete_identity": "/api/agent/diap/save-complete-identity",
+                    "update_identity": "/api/agent/diap/update-identity",
+                    "register_onchain": "/api/agent/diap/register-onchain"
+                }
             }
         });
         json_response(&response)
@@ -775,6 +815,157 @@ impl Router {
     async fn handle_tool_result(&self, env: &Env, task_id: &str, req: &mut Request) -> Result<Response> {
         use crate::compatibility::router::handle_tool_result as handle_tool;
         handle_tool(env, task_id, req).await
+    }
+
+    /// KV 存储管理方法
+    async fn handle_kv_list_keys(&self, req: &mut Request, _env: &Env) -> Result<Response> {
+        let url = req.url()?;
+        let prefix = url
+            .query_pairs()
+            .find(|(key, _)| key == "prefix")
+            .map(|(_, value)| value.to_string())
+            .unwrap_or_default();
+        
+        console_log!("[KV] Listing keys with prefix: {}", prefix);
+        
+        match self.kv.list(&prefix, Some(1000)).await {
+            Ok(keys) => {
+                let response = serde_json::json!({
+                    "success": true,
+                    "keys": keys,
+                    "count": keys.len()
+                });
+                json_response(&response)
+            }
+            Err(e) => {
+                console_error!("[KV] Failed to list keys: {}", e);
+                let response = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to list keys: {}", e)
+                });
+                json_response_with_status(&response, 500)
+            }
+        }
+    }
+
+    async fn handle_kv_get(&self, req: &mut Request, _env: &Env) -> Result<Response> {
+        let url = req.url()?;
+        let key = url
+            .query_pairs()
+            .find(|(key, _)| key == "key")
+            .map(|(_, value)| value.to_string())
+            .ok_or_else(|| {
+                worker::Error::RustError("Missing 'key' parameter".to_string())
+            })?;
+        
+        console_log!("[KV] Getting key: {}", key);
+        
+        match self.kv.get::<String>(&key).await {
+            Ok(Some(value)) => {
+                let response = serde_json::json!({
+                    "success": true,
+                    "value": value,
+                    "key": key
+                });
+                json_response(&response)
+            }
+            Ok(None) => {
+                let response = serde_json::json!({
+                    "success": false,
+                    "error": "Key not found",
+                    "key": key
+                });
+                json_response_with_status(&response, 404)
+            }
+            Err(e) => {
+                console_error!("[KV] Failed to get key {}: {}", key, e);
+                let response = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to get key: {}", e),
+                    "key": key
+                });
+                json_response_with_status(&response, 500)
+            }
+        }
+    }
+
+    async fn handle_kv_put(&self, req: &mut Request, _env: &Env) -> Result<Response> {
+        let url = req.url()?;
+        let key = url
+            .query_pairs()
+            .find(|(key, _)| key == "key")
+            .map(|(_, value)| value.to_string())
+            .ok_or_else(|| {
+                worker::Error::RustError("Missing 'key' parameter".to_string())
+            })?;
+        
+        let body: serde_json::Value = req.json().await.map_err(|e| {
+            worker::Error::RustError(format!("Failed to parse request body: {}", e))
+        })?;
+        
+        let value = body.get("value").ok_or_else(|| {
+            worker::Error::RustError("Missing 'value' field in request body".to_string())
+        })?;
+        
+        let ttl = url
+            .query_pairs()
+            .find(|(key, _)| key == "ttl")
+            .and_then(|(_, value)| value.parse::<u64>().ok());
+        
+        console_log!("[KV] Putting key: {} (TTL: {:?})", key, ttl);
+        
+        match self.kv.put(&key, &value, ttl).await {
+            Ok(()) => {
+                let response = serde_json::json!({
+                    "success": true,
+                    "message": "Key stored successfully",
+                    "key": key
+                });
+                json_response(&response)
+            }
+            Err(e) => {
+                console_error!("[KV] Failed to put key {}: {}", key, e);
+                let response = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to store key: {}", e),
+                    "key": key
+                });
+                json_response_with_status(&response, 500)
+            }
+        }
+    }
+
+    async fn handle_kv_delete(&self, req: &mut Request, _env: &Env) -> Result<Response> {
+        let url = req.url()?;
+        let key = url
+            .query_pairs()
+            .find(|(key, _)| key == "key")
+            .map(|(_, value)| value.to_string())
+            .ok_or_else(|| {
+                worker::Error::RustError("Missing 'key' parameter".to_string())
+            })?;
+        
+        console_log!("[KV] Deleting key: {}", key);
+        
+        match self.kv.delete(&key).await {
+            Ok(()) => {
+                let response = serde_json::json!({
+                    "success": true,
+                    "message": "Key deleted successfully",
+                    "key": key
+                });
+                json_response(&response)
+            }
+            Err(e) => {
+                console_error!("[KV] Failed to delete key {}: {}", key, e);
+                let response = serde_json::json!({
+                    "success": false,
+                    "error": format!("Failed to delete key: {}", e),
+                    "key": key
+                });
+                json_response_with_status(&response, 500)
+            }
+        }
     }
 }
 

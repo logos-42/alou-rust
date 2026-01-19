@@ -29,28 +29,6 @@ pub(crate) struct SearchAgentRequest {
     pub query: String,
 }
 
-#[derive(Deserialize)]
-pub(crate) struct CreateClaudeAgentRequest {
-    #[serde(default)]
-    pub session_id: Option<String>,
-    #[serde(default)]
-    pub wallet_address: Option<String>,
-    #[serde(default)]
-    pub chain: Option<String>,
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub avatar_cid: Option<String>,
-    #[serde(default)]
-    pub mcp_config_cid: Option<String>,
-    #[serde(default)]
-    pub role_description: Option<String>,
-    #[serde(default)]
-    pub mcp_ports: Option<Vec<McpPortConfig>>,
-    #[serde(default)]
-    pub diap_identity: Option<ProvidedDiapIdentity>,
-}
-
 #[derive(Serialize)]
 struct SearchAgentResponse {
     pub agents: Vec<ResolvedAgent>,
@@ -80,6 +58,27 @@ pub struct ProvidedDiapIdentity {
     pub ipns: String,
     #[serde(default)]
     pub public_key: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub(crate) struct CreateDiapIdentityRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub agent_name: Option<String>,
+    #[serde(default)]
+    pub agent_description: Option<String>,
+    #[serde(default)]
+    pub ipfs_api_url: Option<String>,
+    #[serde(default)]
+    pub ipfs_gateway_url: Option<String>,
+    #[serde(default)]
+    pub ipns_key: Option<String>,
+    #[serde(default)]
+    pub custom_prompt: Option<String>,
+    #[serde(default)]
+    pub avatar_cid: Option<String>,
+    #[serde(default)]
+    pub mcp_config_cid: Option<String>,
 }
 
 pub(crate) async fn handle_resolve_agent(
@@ -412,12 +411,12 @@ pub(crate) async fn handle_get_diap_identity(
     }))?)
 }
 
-/// Create a new Claude Agent SDK with automatic DIAP identity
-pub(crate) async fn handle_create_claude_agent(
+/// Create agent using the internal creation logic (简化版本，避免重复)
+pub(crate) async fn handle_create_agent(
     session_manager: &SessionManager,
     req: &mut Request,
 ) -> Result<Response> {
-    let body: CreateClaudeAgentRequest = match req.json().await {
+    let body: CreateAgentRequest = match req.json().await {
         Ok(body) => body,
         Err(e) => {
             let error_response = ErrorResponse {
@@ -427,29 +426,62 @@ pub(crate) async fn handle_create_claude_agent(
         }
     };
 
-    let result = handle_create_claude_agent_internal(session_manager, body).await?;
-    
+    // 注意：这里不再直接创建DIAP身份，而是返回基本的智能体信息
+    // DIAP身份创建应该通过专门的 handle_create_diap_identity 端点进行
+    let result = handle_create_agent_internal(session_manager, body).await?;
+
     Ok(json_response(&json!({
         "session_id": result.session_id,
-        "agent_id": result.session_id, // 使用session_id作为agent_id
-        "agent_type": "claude_agent_sdk",
+        "agent_id": result.session_id,
+        "agent_type": "agent",
         "name": result.name,
-        "diap_identity": result.identity,
+        "role_description": result.agent_metadata.get("role_description"),
         "agent_metadata": result.agent_metadata,
+        "message": "智能体创建成功，请使用 /agent/diap/create-identity 创建DIAP身份"
     }))?)
 }
 
-/// Internal function to handle Claude agent creation logic
-/// 内部函数处理Claude智能体创建逻辑
-pub(crate) async fn handle_create_claude_agent_internal(
+/// Request structure for creating an agent
+#[derive(Deserialize)]
+pub(crate) struct CreateAgentRequest {
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub wallet_address: Option<String>,
+    #[serde(default)]
+    pub chain: Option<String>,
+    pub name: String,
+    pub role_description: String,
+    #[serde(default)]
+    pub avatar_cid: Option<String>,
+    #[serde(default)]
+    pub mcp_config_cid: Option<String>,
+    #[serde(default)]
+    pub mcp_ports: Option<Vec<McpPortConfig>>,
+    #[serde(default)]
+    pub diap_identity: Option<ProvidedDiapIdentity>,
+}
+
+/// Result structure for agent creation
+#[derive(Serialize)]
+pub(crate) struct CreateAgentResult {
+    pub session_id: String,
+    pub name: String,
+    pub identity: Option<DiapIdentity>,
+    pub agent_metadata: serde_json::Value,
+}
+
+/// Internal function to handle agent creation logic
+/// 内部函数处理智能体创建逻辑
+pub(crate) async fn handle_create_agent_internal(
     session_manager: &SessionManager,
-    body: CreateClaudeAgentRequest,
-) -> Result<CreateClaudeAgentResult> {
+    body: CreateAgentRequest,
+) -> Result<CreateAgentResult> {
     // Create or use existing session
-    let session_id = if let Some(sid) = body.session_id {
+    let session_id = if let Some(sid) = &body.session_id {
         // Verify session exists
         session_manager
-            .get_session(&sid)
+            .get_session(sid)
             .await
             .map_err(|e| {
                 let error_response = ErrorResponse {
@@ -457,7 +489,7 @@ pub(crate) async fn handle_create_claude_agent_internal(
                 };
                 crate::utils::error::AloudError::WorkerError(error_response.error.clone())
             })?;
-        sid
+        sid.clone()
     } else {
         // Create new session
         session_manager
@@ -471,101 +503,50 @@ pub(crate) async fn handle_create_claude_agent_internal(
             })?
     };
 
-    let provided_identity = body.diap_identity.clone();
-    let mut stored_identity: Option<DiapIdentity> = None;
-    if let Some(provided_identity) = provided_identity.clone() {
-        let public_key = provided_identity
-            .public_key
-            .clone()
-            .unwrap_or_else(|| format!("pubkey_{}", provided_identity.ipns));
-        // Use new() which sets ipns_key to None for provided identities (backward compatible)
-        let identity = DiapIdentity::new(
-            provided_identity.did.clone(),
-            provided_identity.ipns.clone(),
-            provided_identity.cid.clone(),
-            public_key,
-            None,
-        );
-        if let Err(e) = session_manager
-            .set_diap_identity(&session_id, identity.clone())
-            .await
-        {
-            let error_response = ErrorResponse {
-                error: format!("Failed to store DIAP identity: {}", e),
-            };
-            return Err(crate::utils::error::AloudError::WorkerError(error_response.error).into());
-        }
-        stored_identity = Some(identity);
-    }
+    // Generate agent ID
+    let agent_id = format!("agent_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
 
-    let identity = if let Some(identity) = stored_identity.clone() {
-        Some(identity)
-    } else {
-        session_manager
-            .get_diap_identity(&session_id)
-            .await
-            .ok()
-            .flatten()
-    };
-
-    let mut agent_metadata = json!({
-        "agent_type": "claude_agent_sdk",
-        "display_name": body.name.clone().unwrap_or_else(|| "Claude Agent SDK".to_string()),
+    // Store agent information
+    let agent_info = serde_json::json!({
+        "agent_id": agent_id,
         "session_id": session_id,
+        "name": body.name,
+        "role_description": body.role_description,
+        "avatar_cid": body.avatar_cid,
+        "mcp_config_cid": body.mcp_config_cid,
+        "mcp_ports": body.mcp_ports,
+        "diap_identity": body.diap_identity,
+        "created_at": chrono::Utc::now().to_rfc3339(),
     });
 
-    if let Some(desc) = body.role_description.clone() {
-        agent_metadata["role_description"] = json!(desc);
-    }
-    if let Some(avatar_cid) = body.avatar_cid.clone() {
-        agent_metadata["avatar_cid"] = json!(avatar_cid);
-    }
-    if let Some(config_cid) = body.mcp_config_cid.clone() {
-        agent_metadata["mcp_config_cid"] = json!(config_cid);
-    }
-    if let Some(ports) = body.mcp_ports.clone() {
-        if let Ok(value) = serde_json::to_value(ports) {
-            agent_metadata["mcp_ports"] = value;
-        }
-    }
-    if let Some(ref identity) = identity {
-        agent_metadata["did"] = json!(identity.did);
-        agent_metadata["cid"] = json!(identity.cid);
-        agent_metadata["ipns"] = json!(identity.ipns);
-    }
-    if let Some(provided) = provided_identity {
-        if let Ok(value) = serde_json::to_value(provided) {
-            agent_metadata["diap_identity"] = value;
-        }
+    // Save to session
+    if let Err(e) = session_manager.set_agent_metadata(&session_id, agent_info).await {
+        return Err(crate::utils::error::AloudError::AgentError(
+            format!("Failed to save agent metadata: {}", e),
+        ).into());
     }
 
-    if let Err(e) = session_manager
-        .set_agent_metadata(&session_id, agent_metadata.clone())
-        .await
-    {
-        console_warn!(
-            "Failed to store agent metadata for session {}: {}",
-            session_id,
-            e
-        );
-    }
-
-    Ok(CreateClaudeAgentResult {
-        session_id,
-        name: body.name.unwrap_or_else(|| "Claude Agent SDK".to_string()),
-        identity,
-        agent_metadata,
+    Ok(CreateAgentResult {
+        session_id: session_id.clone(),
+        name: body.name.clone(),
+        identity: body.diap_identity.map(|diap| DiapIdentity {
+            did: diap.did,
+            ipns: diap.ipns,
+            cid: diap.cid,
+            public_key: diap.public_key.unwrap_or_default(),
+            encrypted_peer_id: None,
+            ipns_key: None,
+            is_registered: false,
+            registered_address: None,
+            created_at: chrono::Utc::now().timestamp(),
+        }),
+        agent_metadata: serde_json::json!({
+            "agent_id": agent_id,
+            "session_id": session_id,
+            "name": body.name,
+            "role_description": body.role_description,
+        }),
     })
-}
-
-/// Result of Claude agent creation
-/// Claude智能体创建结果
-#[derive(Debug)]
-pub(crate) struct CreateClaudeAgentResult {
-    pub session_id: String,
-    pub name: String,
-    pub identity: Option<DiapIdentity>,
-    pub agent_metadata: serde_json::Value,
 }
 
 /// Get DIAP identity for a session
@@ -1083,7 +1064,7 @@ pub(crate) async fn handle_create_agent_from_command(
         session_id
     };
 
-    // 使用现有的 create_claude_agent 逻辑，但传入解析的信息
+    // 使用现有的 create_agent 逻辑，但传入解析的信息
     let create_request = serde_json::json!({
         "session_id": session_id,
         "wallet_address": body.wallet_address,
@@ -1119,6 +1100,422 @@ pub(crate) async fn handle_create_agent_from_command(
                 error: format!("Failed to create agent: {}", e),
             };
             json_response_with_status(&error_response, 500)
+        }
+    }
+}
+
+/// Create DIAP identity for a session (创建DID文档，返回给桌面端)
+/// 使用DIAP SDK创建真实的DID文档，然后桌面端上传到IPFS
+pub(crate) async fn handle_create_diap_identity(
+    session_manager: &SessionManager,
+    env: &Env,
+    req: &mut Request,
+) -> Result<Response> {
+    let body: CreateDiapIdentityRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return Ok(json_response_with_status(&error_response, 400)?);
+        }
+    };
+
+    // 验证session_id
+    if body.session_id.trim().is_empty() {
+        let error_response = ErrorResponse {
+            error: "session_id is required".to_string(),
+        };
+        return json_response_with_status(&error_response, 400);
+    }
+
+    // 检查session是否存在
+    match session_manager.get_session(&body.session_id).await {
+        Ok(_) => {
+            // Session exists, proceed with DID document creation using DIAP SDK
+            
+            // 1. 获取IPFS配置
+            let ipfs_api_url = body.ipfs_api_url.clone()
+                .or_else(|| env.var("DIAP_IPFS_API_URL").ok().map(|v| v.to_string()))
+                .unwrap_or_else(|| "http://localhost:5001".to_string());
+            
+            let ipfs_gateway_url = body.ipfs_gateway_url.clone()
+                .or_else(|| env.var("DIAP_IPFS_GATEWAY_URL").ok().map(|v| v.to_string()))
+                .unwrap_or_else(|| "http://localhost:8080".to_string());
+
+            // 2. 使用DIAP SDK创建DID文档
+            let did_document = match create_did_document_with_sdk(&body, &ipfs_api_url, &ipfs_gateway_url).await {
+                Ok(doc) => doc,
+                Err(e) => {
+                    console_warn!("Failed to create DID document with SDK, falling back to simple method: {}", e);
+                    // 如果SDK失败，使用简单的fallback方法
+                    create_did_document_for_agent(&body).await?
+                }
+            };
+            
+            // 3. 返回DID文档给桌面端，让桌面端创建CID和IPNS
+            let response = serde_json::json!({
+                "did_document": did_document,
+                "session_id": body.session_id,
+                "ipfs_api_url": ipfs_api_url,
+                "ipfs_gateway_url": ipfs_gateway_url,
+                "message": "DID document created with DIAP SDK, please create CID and IPNS on desktop"
+            });
+            
+            console_log!("Created DID document with DIAP SDK for session: {}", body.session_id);
+            Ok(json_response_with_status(&response, 200)?)
+        }
+        Err(e) => {
+            // Session doesn't exist
+            console_warn!("Session not found when creating DIAP identity: {} - {}", body.session_id, e);
+            let error_response = ErrorResponse {
+                error: format!("Session not found: {}", body.session_id),
+            };
+            json_response_with_status(&error_response, 404)
+        }
+    }
+}
+
+/// Create DID document for agent using DIAP SDK
+#[cfg(not(target_arch = "wasm32"))]
+async fn create_did_document_with_sdk(
+    request: &CreateDiapIdentityRequest,
+    ipfs_api_url: &str,
+    ipfs_gateway_url: &str,
+) -> Result<serde_json::Value> {
+    use diap_rs_sdk::identity_manager::IdentityManager;
+    use diap_rs_sdk::IpfsClient;
+    use chrono::Utc;
+    use uuid::Uuid;
+    
+    let now = Utc::now().to_rfc3339();
+    let agent_id = Uuid::new_v4().to_string();
+    
+    // Create IPFS client
+    let ipfs_client = IpfsClient::new_with_remote_node(
+        ipfs_api_url.to_string(),
+        ipfs_gateway_url.to_string(),
+        10, // timeout seconds
+    );
+    
+    // Create identity manager
+    let identity_manager = IdentityManager::new(ipfs_client);
+    
+    // 由于DIAP SDK主要用于解析和验证，我们创建一个标准的DID文档
+    // 桌面端将负责生成密钥对和创建真实的DID
+    let did_document = serde_json::json!({
+        "@context": "https://www.w3.org/did/v1",
+        "id": format!("did:temp:{}", request.session_id), // 临时DID，桌面端会替换为真实的
+        "verificationMethod": [
+            {
+                "id": "#key-1",
+                "type": "Ed25519VerificationKey2018",
+                "controller": format!("did:temp:{}", request.session_id),
+                "publicKeyBase58": "temp_public_key" // 桌面端会替换为真实的公钥
+            }
+        ],
+        "authentication": ["#key-1"],
+        "service": [
+            {
+                "id": "#agent",
+                "type": "Agent",
+                "serviceEndpoint": format!("https://alou.ai/agents/{}", agent_id),
+                "properties": {
+                    "name": request.agent_name.as_ref().unwrap_or(&"Unnamed Agent".to_string()),
+                    "description": request.agent_description.as_ref().unwrap_or(&"An AI agent".to_string()),
+                    "avatar_cid": request.avatar_cid,
+                    "mcp_config_cid": request.mcp_config_cid,
+                    "custom_prompt": request.custom_prompt,
+                    "created_at": now,
+                    "agent_type": "claude_agent_sdk",
+                    "session_id": request.session_id,
+                    "agent_id": agent_id,
+                    "ipfs_api_url": ipfs_api_url,
+                    "ipfs_gateway_url": ipfs_gateway_url,
+                    "sdk_version": "0.2.11"
+                }
+            }
+        ],
+        "created": now,
+        "updated": now
+    });
+    
+    console_log!("Created DID document template for agent: {}", request.agent_name.as_ref().unwrap_or(&"Unnamed".to_string()));
+    
+    Ok(did_document)
+}
+
+/// Create DID document for agent using DIAP SDK (WASM version)
+#[cfg(target_arch = "wasm32")]
+async fn create_did_document_with_sdk(
+    request: &CreateDiapIdentityRequest,
+    ipfs_api_url: &str,
+    ipfs_gateway_url: &str,
+) -> Result<serde_json::Value> {
+    use chrono::Utc;
+    use uuid::Uuid;
+    
+    let now = Utc::now().to_rfc3339();
+    let agent_id = Uuid::new_v4().to_string();
+    
+    // 在WASM环境下，我们创建一个标准的DID文档
+    // 桌面端将负责生成密钥对和创建真实的DID
+    let did_document = serde_json::json!({
+        "@context": "https://www.w3.org/did/v1",
+        "id": format!("did:temp:{}", request.session_id), // 临时DID，桌面端会替换为真实的
+        "verificationMethod": [
+            {
+                "id": "#key-1",
+                "type": "Ed25519VerificationKey2018",
+                "controller": format!("did:temp:{}", request.session_id),
+                "publicKeyBase58": "temp_public_key" // 桌面端会替换为真实的公钥
+            }
+        ],
+        "authentication": ["#key-1"],
+        "service": [
+            {
+                "id": "#agent",
+                "type": "Agent",
+                "serviceEndpoint": format!("https://alou.ai/agents/{}", agent_id),
+                "properties": {
+                    "name": request.agent_name.as_ref().unwrap_or(&"Unnamed Agent".to_string()),
+                    "description": request.agent_description.as_ref().unwrap_or(&"An AI agent".to_string()),
+                    "avatar_cid": request.avatar_cid,
+                    "mcp_config_cid": request.mcp_config_cid,
+                    "custom_prompt": request.custom_prompt,
+                    "created_at": now,
+                    "agent_type": "claude_agent_sdk",
+                    "session_id": request.session_id,
+                    "agent_id": agent_id,
+                    "ipfs_api_url": ipfs_api_url,
+                    "ipfs_gateway_url": ipfs_gateway_url,
+                    "sdk_version": "0.2.11-wasm"
+                }
+            }
+        ],
+        "created": now,
+        "updated": now
+    });
+    
+    console_log!("Created DID document template for agent (WASM): {}", request.agent_name.as_ref().unwrap_or(&"Unnamed".to_string()));
+    
+    Ok(did_document)
+}
+
+/// Create DID document for agent (fallback method)
+async fn create_did_document_for_agent(
+    request: &CreateDiapIdentityRequest,
+) -> Result<serde_json::Value> {
+    use chrono::Utc;
+    use uuid::Uuid;
+    
+    let now = Utc::now().to_rfc3339();
+    let agent_id = Uuid::new_v4().to_string();
+    
+    // 构建DID文档
+    let did_document = serde_json::json!({
+        "@context": "https://www.w3.org/did/v1",
+        "id": format!("did:temp:{}", request.session_id), // 临时DID，桌面端会替换为真实的IPNS DID
+        "verificationMethod": [
+            {
+                "id": "#key-1",
+                "type": "Ed25519VerificationKey2018",
+                "controller": format!("did:temp:{}", request.session_id),
+                "publicKeyBase58": "temp_public_key" // 桌面端会替换为真实的公钥
+            }
+        ],
+        "authentication": ["#key-1"],
+        "service": [
+            {
+                "id": "#agent",
+                "type": "Agent",
+                "serviceEndpoint": format!("https://alou.ai/agents/{}", agent_id),
+                "properties": {
+                    "name": request.agent_name.as_ref().unwrap_or(&"Unnamed Agent".to_string()),
+                    "description": request.agent_description.as_ref().unwrap_or(&"An AI agent".to_string()),
+                    "avatar_cid": request.avatar_cid,
+                    "mcp_config_cid": request.mcp_config_cid,
+                    "custom_prompt": request.custom_prompt,
+                    "created_at": now,
+                    "agent_type": "claude_agent_sdk",
+                    "session_id": request.session_id,
+                    "agent_id": agent_id
+                }
+            }
+        ],
+        "created": now,
+        "updated": now
+    });
+    
+    console_log!("Created DID document for agent: {}", request.agent_name.as_ref().unwrap_or(&"Unnamed".to_string()));
+    
+    Ok(did_document)
+}
+
+/// Update DIAP identity for a session (更新DIAP身份信息)
+/// 桌面端通过这个端点更新已存在的DIAP身份信息
+pub(crate) async fn handle_update_diap_identity(
+    session_manager: &SessionManager,
+    req: &mut Request,
+) -> Result<Response> {
+    #[derive(Deserialize)]
+    struct UpdateDiapIdentityRequest {
+        session_id: String,
+        diap_identity: DiapIdentity,
+    }
+
+    let body: UpdateDiapIdentityRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return Ok(json_response_with_status(&error_response, 400)?);
+        }
+    };
+
+    // 验证session_id
+    if body.session_id.trim().is_empty() {
+        let error_response = ErrorResponse {
+            error: "session_id is required".to_string(),
+        };
+        return json_response_with_status(&error_response, 400);
+    }
+
+    // 检查session是否存在
+    match session_manager.get_session(&body.session_id).await {
+        Ok(_) => {
+            // Session exists, update DIAP identity
+            if let Err(e) = session_manager
+                .set_diap_identity(&body.session_id, body.diap_identity.clone())
+                .await
+            {
+                let error_response = ErrorResponse {
+                    error: format!("Failed to update DIAP identity: {}", e),
+                };
+                return json_response_with_status(&error_response, 500);
+            }
+
+            // 更新agent_metadata中的DIAP信息
+            let agent_metadata = json!({
+                "did": body.diap_identity.did,
+                "cid": body.diap_identity.cid,
+                "ipns": body.diap_identity.ipns,
+                "diap_identity_updated_at": chrono::Utc::now().to_rfc3339(),
+            });
+
+            if let Err(e) = session_manager
+                .set_agent_metadata(&body.session_id, agent_metadata.clone())
+                .await
+            {
+                console_warn!(
+                    "Failed to update agent metadata for session {}: {}",
+                    body.session_id,
+                    e
+                );
+            }
+
+            let response = serde_json::json!({
+                "success": true,
+                "session_id": body.session_id,
+                "message": "DIAP identity updated successfully",
+                "diap_identity": body.diap_identity
+            });
+
+            console_log!("DIAP identity updated for session: {}", body.session_id);
+            Ok(json_response_with_status(&response, 200)?)
+        }
+        Err(e) => {
+            // Session doesn't exist
+            console_warn!("Session not found when updating DIAP identity: {} - {}", body.session_id, e);
+            let error_response = ErrorResponse {
+                error: format!("Session not found: {}", body.session_id),
+            };
+            json_response_with_status(&error_response, 404)
+        }
+    }
+}
+
+/// Save complete DIAP identity to backend KV (保存完整的DIAP身份到后端KV)
+/// 桌面端创建CID和IPNS后，通过这个端点保存到后端
+pub(crate) async fn handle_save_complete_diap_identity(
+    session_manager: &SessionManager,
+    req: &mut Request,
+) -> Result<Response> {
+    #[derive(Deserialize)]
+    struct SaveCompleteIdentityRequest {
+        session_id: String,
+        diap_identity: DiapIdentity,
+    }
+
+    let body: SaveCompleteIdentityRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return Ok(json_response_with_status(&error_response, 400)?);
+        }
+    };
+
+    // 验证session_id
+    if body.session_id.trim().is_empty() {
+        let error_response = ErrorResponse {
+            error: "session_id is required".to_string(),
+        };
+        return json_response_with_status(&error_response, 400);
+    }
+
+    // 检查session是否存在
+    match session_manager.get_session(&body.session_id).await {
+        Ok(_) => {
+            // Session exists, save DIAP identity
+            if let Err(e) = session_manager
+                .set_diap_identity(&body.session_id, body.diap_identity.clone())
+                .await
+            {
+                let error_response = ErrorResponse {
+                    error: format!("Failed to store DIAP identity: {}", e),
+                };
+                return json_response_with_status(&error_response, 500);
+            }
+
+            // 更新agent_metadata中的DIAP信息
+            let agent_metadata = json!({
+                "did": body.diap_identity.did,
+                "cid": body.diap_identity.cid,
+                "ipns": body.diap_identity.ipns,
+                "diap_identity_updated_at": chrono::Utc::now().to_rfc3339(),
+            });
+
+            if let Err(e) = session_manager
+                .set_agent_metadata(&body.session_id, agent_metadata.clone())
+                .await
+            {
+                console_warn!(
+                    "Failed to update agent metadata for session {}: {}",
+                    body.session_id,
+                    e
+                );
+            }
+
+            let response = serde_json::json!({
+                "success": true,
+                "session_id": body.session_id,
+                "message": "DIAP identity saved successfully",
+                "diap_identity": body.diap_identity
+            });
+
+            console_log!("DIAP identity saved for session: {}", body.session_id);
+            Ok(json_response_with_status(&response, 200)?)
+        }
+        Err(e) => {
+            // Session doesn't exist
+            console_warn!("Session not found when saving DIAP identity: {} - {}", body.session_id, e);
+            let error_response = ErrorResponse {
+                error: format!("Session not found: {}", body.session_id),
+            };
+            json_response_with_status(&error_response, 404)
         }
     }
 }

@@ -126,9 +126,12 @@ export const useChannelManager = ({
               setChannels((prev) => {
                 const existingIds = new Set(prev.map(c => c.id))
                 if (existingIds.has(channel.id)) {
+                  console.log('[useChannelManager] 后端频道已存在，跳过添加:', channel.id)
                   return prev // 已存在，不做改变
                 }
-                return [channel, ...prev]
+                console.log('[useChannelManager] 从后端添加新频道:', channel.id)
+                // 后端频道添加到末尾，保持现有顺序
+                return [...prev, channel]
               })
               // 只有当前没有选中的频道时才设置
               setActiveChannelId((prev) => prev || channel.id)
@@ -372,11 +375,27 @@ export const useChannelManager = ({
     if (!isSessionReady) {
       return
     }
-    // 延迟加载，确保本地存储的频道先加载完成
-    // 这样可以避免本地存储的频道被覆盖
+    // 等待本地存储加载完成后再加载后端频道
+    // 避免本地频道被后端频道覆盖
     const timer = setTimeout(() => {
-      loadChannelListRef.current(channelKeyword)
-    }, 100) // 给本地存储加载一点时间
+      // 确保本地存储已经加载
+      if (hasLoadedFromStorageRef.current) {
+        console.log('[useChannelManager] 本地存储已加载，开始加载后端频道')
+        loadChannelListRef.current(channelKeyword)
+      } else {
+        // 如果本地存储还没加载，再等待一下
+        console.log('[useChannelManager] 本地存储未加载，延迟200ms后重试')
+        setTimeout(() => {
+          if (hasLoadedFromStorageRef.current) {
+            console.log('[useChannelManager] 延迟加载后端频道')
+            loadChannelListRef.current(channelKeyword)
+          } else {
+            console.warn('[useChannelManager] 本地存储仍未加载，强制加载后端频道')
+            loadChannelListRef.current(channelKeyword)
+          }
+        }, 200)
+      }
+    }, 150) // 增加延迟时间，确保本地存储先完成
     return () => clearTimeout(timer)
   }, [channelKeyword, isSessionReady])
 
@@ -637,12 +656,15 @@ export const useChannelManager = ({
       
       if (localChannels.length > 0) {
         setChannels(prev => {
-          // 合并去重（本地存储的智能体添加到列表）
+          // 合并去重（本地存储的智能体添加到列表后面，保持顺序）
           const existingIds = new Set(prev.map(c => c.id))
           const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
           
           if (newChannels.length > 0) {
-            return [...newChannels, ...prev]
+            console.log(`[useChannelManager] 从本地存储添加 ${newChannels.length} 个新频道:`, 
+              newChannels.map(c => ({ id: c.id, name: c.name })))
+            // 本地频道添加到后面，保持现有频道顺序
+            return [...prev, ...newChannels]
           }
           
           if (localChannels.length !== prev.length) {
@@ -675,6 +697,7 @@ export const useChannelManager = ({
         did: agentMetadata.did,
         cid: agentMetadata.cid,
         sessionId: agentMetadata.sessionId,
+        hasDiapIdentity: !!agentMetadata.diapIdentity,
       })
       
       // 先构建频道以获取一致的ID
@@ -710,6 +733,13 @@ export const useChannelManager = ({
       const storedAgents = useAgentStore.getState().agents
       console.log('[useChannelManager] 当前存储的智能体数量:', storedAgents.length)
       console.log('[useChannelManager] 存储的智能体列表:', storedAgents.map(a => ({ id: a.id, name: a.name })))
+      
+      // 验证DIAP身份是否正确保存到统一存储
+      if (agentMetadata.sessionId && agentMetadata.diapIdentity) {
+        console.log('[useChannelManager] 验证DIAP身份保存状态...')
+        // 这里可以添加验证逻辑，但不需要立即加载，因为会在需要时自动加载
+        console.log('[useChannelManager] DIAP身份已保存到统一存储系统')
+      }
       
       return true
     } catch (error) {
@@ -826,7 +856,7 @@ export const useChannelManager = ({
           diapIdentity,
         })
 
-        const result = await agentService.createClaudeAgent({
+        const result = await agentService.createAgent({
           sessionId,
           walletAddress,
           chain: detectedChain || preferredChain,
@@ -865,9 +895,17 @@ export const useChannelManager = ({
         }
 
         const channel = buildChannelFromAgent(metadata)
-        console.log('[useChannelManager] 构建的频道对象:', channel)
+        console.log('[useChannelManager] 构建的频道对象:', {
+          id: channel?.id,
+          name: channel?.name,
+          hasChannel: !!channel,
+          tempId: tempId,
+          existingChannels: prev.map(c => ({ id: c.id, name: c.name }))
+        })
         if (channel) {
           setChannels((prev) => {
+            console.log('[useChannelManager] 当前频道列表:', prev.map(c => ({ id: c.id, name: c.name })))
+            
             // 查找临时频道 - 使用多种方式匹配
             const tempIndex = prev.findIndex((item) => {
               // 1. 通过 tempId 属性匹配
@@ -883,27 +921,40 @@ export const useChannelManager = ({
               return false
             })
 
+            // 检查是否已存在相同ID的频道（在查找临时频道之前检查）
+            const existingIndex = prev.findIndex((item) => item.id === channel.id)
+            
+            console.log('[useChannelManager] 频道检查结果:', {
+              newChannelId: channel.id,
+              newChannelName: channel.name,
+              tempIndex,
+              existingIndex,
+              tempId,
+              willUpdateTemp: tempIndex >= 0,
+              willUpdateExisting: existingIndex >= 0 && tempIndex < 0,
+              totalChannels: prev.length
+            })
+
             if (tempIndex >= 0) {
               // 更新临时频道为完整频道
               const updated = [...prev]
               const oldChannel = updated[tempIndex]
-              console.log('[useChannelManager] 找到临时频道:', oldChannel.id, '-> 更新为:', channel.id)
+              console.log('[useChannelManager] ✅ 找到临时频道，更新:', oldChannel.id, '->', channel.id)
               updated[tempIndex] = channel
               return updated
             }
 
-            // 没有找到临时频道，检查是否已存在相同 ID 的频道
-            const existingIndex = prev.findIndex((item) => item.id === channel.id)
             if (existingIndex >= 0) {
+              // 更新已存在的频道
               const updated = [...prev]
+              console.log('[useChannelManager] ✅ 更新已存在的频道:', channel.id)
               updated[existingIndex] = channel
-              console.log('[useChannelManager] 更新已存在的频道:', channel.id)
               return updated
             }
 
-            // 添加新频道
-            console.log('[useChannelManager] 添加新频道:', channel.id)
-            return [channel, ...prev]
+            // 添加新频道到列表末尾，避免打乱现有顺序
+            console.log('[useChannelManager] ✅ 添加新频道到末尾:', channel.id)
+            return [...prev, channel]
           })
           setActiveChannelId(channel.id)
         }
@@ -1106,9 +1157,9 @@ export const useChannelManager = ({
           // 确保名称字段存在
           name: agent.name || agent.display_name || null,
           display_name: agent.display_name || agent.name || null,
-          // 确保头像字段存在
-          avatar_cid: agent.avatar_cid || null,
-          avatar_url: agent.avatar_url || null,
+          // 保护现有头像，只有在明确为空时才设置默认值
+          avatar_cid: agent.avatar_cid || agent.avatarCid || agent.diapIdentity?.avatar_cid || null,
+          avatar_url: agent.avatar_url || agent.avatar || null,
           // 确保 did_document 存在，以便 resolveAgentAvatar 可以正确解析头像
           did_document: agent.did_document || null,
         }

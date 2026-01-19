@@ -20,6 +20,69 @@ impl MemoryManager {
         }
     }
 
+    /// 存储DIAP身份（永久存储，不过期）
+    pub async fn store_diap_identity(&self, session_id: String, identity: serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        let key = format!("diap_identity_{}", session_id);
+        let entry = MemoryEntry {
+            key: key.clone(),
+            value: identity,
+            memory_type: MemoryType::DiapIdentity,
+            created_at: chrono::Utc::now().timestamp(),
+            expires_at: i64::MAX, // 永不过期
+        };
+
+        let mut entries = self.entries.lock().unwrap();
+        entries.insert(key, entry);
+        Ok(())
+    }
+
+    /// 获取DIAP身份
+    pub async fn get_diap_identity(&self, session_id: &str) -> Result<Option<serde_json::Value>, Box<dyn std::error::Error>> {
+        let key = format!("diap_identity_{}", session_id);
+        let entries = self.entries.lock().unwrap();
+        
+        if let Some(entry) = entries.get(&key) {
+            if entry.memory_type == MemoryType::DiapIdentity {
+                return Ok(Some(entry.value.clone()));
+            }
+        }
+        Ok(None)
+    }
+
+    /// 删除DIAP身份
+    pub async fn remove_diap_identity(&self, session_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let key = format!("diap_identity_{}", session_id);
+        let mut entries = self.entries.lock().unwrap();
+        Ok(entries.remove(&key).is_some())
+    }
+
+    /// 获取所有DIAP身份
+    pub async fn get_all_diap_identities(&self) -> Result<HashMap<String, serde_json::Value>, Box<dyn std::error::Error>> {
+        let entries = self.entries.lock().unwrap();
+        let mut identities = HashMap::new();
+        
+        for (key, entry) in entries.iter() {
+            if entry.memory_type == MemoryType::DiapIdentity && key.starts_with("diap_identity_") {
+                let session_id = key.strip_prefix("diap_identity_").unwrap_or(key);
+                identities.insert(session_id.to_string(), entry.value.clone());
+            }
+        }
+        
+        Ok(identities)
+    }
+
+    /// 检查DIAP身份是否存在
+    pub async fn has_diap_identity(&self, session_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        let key = format!("diap_identity_{}", session_id);
+        let entries = self.entries.lock().unwrap();
+        
+        if let Some(entry) = entries.get(&key) {
+            Ok(entry.memory_type == MemoryType::DiapIdentity)
+        } else {
+            Ok(false)
+        }
+    }
+
     /// 存储记忆
     pub async fn store(&self, key: String, value: serde_json::Value, memory_type: MemoryType) -> Result<(), Box<dyn std::error::Error>> {
         let entry = MemoryEntry {
@@ -161,6 +224,8 @@ pub enum MemoryType {
     Working,
     /// 上下文记忆
     Contextual,
+    /// DIAP身份记忆
+    DiapIdentity,
 }
 
 #[cfg(test)]

@@ -2,6 +2,9 @@ import React, { useEffect } from 'react'
 import AppRoutes from './routes/AppRoutes'
 import ErrorBoundary from './components/ErrorBoundary'
 import ipfsService from './services/ipfsService'
+import '@/utils/diapIdentityCleanupTool' // 加载DIAP身份清理工具
+import '@/utils/avatarProtectionTool' // 加载头像保护工具
+import '@/utils/agentCreationDiagnosticTool' // 加载智能体创建诊断工具
 
 const App = () => {
   useEffect(() => {

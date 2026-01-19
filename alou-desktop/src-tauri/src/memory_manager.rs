@@ -307,6 +307,67 @@ pub fn cleanup_lru_memory(keep_count: usize) -> usize {
     manager.cleanup_lru(keep_count)
 }
 
+/// Tauri命令：设置DIAP身份
+#[tauri::command]
+pub fn set_diap_identity(session_id: String, identity: String) -> Result<(), String> {
+    let manager = get_memory_manager();
+    let key = format!("diap_identity_{}", session_id);
+    manager.set_item(key, identity)
+}
+
+/// Tauri命令：获取DIAP身份
+#[tauri::command]
+pub fn get_diap_identity(session_id: String) -> Option<String> {
+    let manager = get_memory_manager();
+    let key = format!("diap_identity_{}", session_id);
+    manager.get_item(&key)
+}
+
+/// Tauri命令：删除DIAP身份
+#[tauri::command]
+pub fn remove_diap_identity(session_id: String) -> bool {
+    let manager = get_memory_manager();
+    let key = format!("diap_identity_{}", session_id);
+    manager.remove_item(&key)
+}
+
+/// Tauri命令：获取所有DIAP身份
+#[tauri::command]
+pub fn get_all_diap_identities() -> std::collections::HashMap<String, String> {
+    let manager = get_memory_manager();
+    let keys = manager.get_keys();
+    let mut identities = std::collections::HashMap::new();
+    
+    for key in keys {
+        if key.starts_with("diap_identity_") {
+            if let Some(identity) = manager.get_item(&key) {
+                let session_id = key.replace("diap_identity_", "");
+                identities.insert(session_id, identity);
+            }
+        }
+    }
+    
+    identities
+}
+
+/// Tauri命令：清理过期的DIAP身份
+#[tauri::command]
+pub fn cleanup_expired_diap_identities() -> usize {
+    let manager = get_memory_manager();
+    let keys = manager.get_keys();
+    let mut cleaned_count = 0;
+    
+    for key in keys {
+        if key.starts_with("diap_identity_") {
+            if manager.get_item(&key).is_none() {
+                cleaned_count += 1;
+            }
+        }
+    }
+    
+    cleaned_count
+}
+
 /// Tauri命令：设置过期时间
 #[tauri::command]
 pub fn set_memory_expiration(key: String, expires_in_seconds: u64) {

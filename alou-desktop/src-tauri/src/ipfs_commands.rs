@@ -1,4 +1,4 @@
-// IPFS commands module
+// IPFS commands module - 专用于DIAP身份创建的IPFS操作
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use reqwest::{multipart::Form, multipart::Part, Client};
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use crate::utils::{default_ipfs_api_url, normalize_base_url};
 fn create_ipfs_client() -> Client {
     Client::builder()
         .http1_only() // 强制使用 HTTP/1.1，因为 IPFS 可能不支持 HTTP/2
-        .timeout(std::time::Duration::from_secs(30)) // 增加超时时间，因为文件上传可能需要更长时间
+        .timeout(std::time::Duration::from_secs(60)) // 增加超时时间，IPNS发布需要更长时间
         .connect_timeout(std::time::Duration::from_secs(10))
         .tcp_keepalive(std::time::Duration::from_secs(60))
         .no_proxy() // 避免通过系统代理访问本地 API
@@ -36,13 +36,191 @@ struct IpfsAddApiResponse {
 }
 
 #[derive(Deserialize)]
-#[allow(dead_code)] // Reserved for future IPNS publishing features
 struct IpnsPublishResponse {
     #[serde(rename = "Name")]
     name: String,
     #[serde(rename = "Value")]
-    #[allow(dead_code)]
-    value: String, // IPNS 响应中的 Value 字段，保留以备将来使用
+    value: String,
+}
+
+/// 专用于DID文档的IPFS上传函数
+pub async fn add_did_document_to_ipfs(
+    api_url: &str,
+    did_document: &serde_json::Value,
+) -> Result<IpfsAddResult, String> {
+    let endpoint = format!("{}/api/v0/add", normalize_base_url(api_url));
+    
+    // 序列化DID文档为JSON字符串
+    let json_str = serde_json::to_string_pretty(did_document)
+        .map_err(|e| format!("序列化DID文档失败: {}", e))?;
+    
+    let bytes = json_str.as_bytes().to_vec();
+    let file_name = format!("did_document_{}.json", Uuid::new_v4());
+    
+    let part = Part::bytes(bytes)
+        .file_name(file_name.clone())
+        .mime_str("application/json")
+        .map_err(|e| format!("创建文件部分失败: {}", e))?;
+    
+    let form = Form::new().part("file", part);
+
+    let client = create_ipfs_client();
+    let response = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .query(&[("pin", "true"), ("wrap-with-directory", "false")])
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| {
+            format!(
+                "IPFS DID文档上传请求失败: {}. 请确保 IPFS 节点正在运行 (API: {})",
+                e, api_url
+            )
+        })?;
+
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("IPFS DID文档上传响应错误: {}", e))?;
+
+    if !status.is_success() {
+        let status_code = status.as_u16();
+        let error_msg = if text.is_empty() {
+            "响应为空".to_string()
+        } else {
+            text.trim().to_string()
+        };
+        
+        if status_code == 502 {
+            return Err(format!(
+                "IPFS API 服务尚未就绪 (502 Bad Gateway). IPFS 节点正在启动中，请等待几秒钟后重试。"
+            ));
+        }
+        
+        return Err(format!(
+            "IPFS DID文档上传失败，状态码 {}: {}. 请检查 IPFS 节点 (API: {})",
+            status_code,
+            error_msg,
+            api_url
+        ));
+    }
+
+    if text.trim().is_empty() {
+        return Err(format!(
+            "IPFS DID文档上传响应为空. 请检查 IPFS 节点 (API: {})",
+            api_url
+        ));
+    }
+
+    // 解析IPFS响应（可能是多行JSON）
+    let last_line = text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .last()
+        .ok_or_else(|| {
+            format!(
+                "IPFS DID文档上传响应中没有有效内容. 原始响应: {}",
+                if text.len() > 200 {
+                    format!("{}...", &text[..200])
+                } else {
+                    text.clone()
+                }
+            )
+        })?;
+
+    let parsed: IpfsAddApiResponse = serde_json::from_str(last_line)
+        .map_err(|e| {
+            format!(
+                "无法解析 IPFS DID文档上传响应: {}. 响应内容: {}",
+                e,
+                if last_line.len() > 200 {
+                    format!("{}...", &last_line[..200])
+                } else {
+                    last_line.to_string()
+                }
+            )
+        })?;
+
+    println!("✅ DID文档已上传到IPFS: CID = {}, 大小 = {}", parsed.hash, parsed.size);
+
+    Ok(IpfsAddResult {
+        cid: parsed.hash,
+        size: Some(parsed.size),
+        name: Some(parsed.name),
+    })
+}
+
+/// 专用于DIAP身份的IPNS发布函数
+pub async fn publish_diap_identity_to_ipns(
+    api_url: &str,
+    cid: &str,
+    ipns_key_name: &str,
+) -> Result<String, String> {
+    let endpoint = format!("{}/api/v0/name/publish", normalize_base_url(api_url));
+    
+    let client = create_ipfs_client();
+    
+    // 构建请求参数
+    let params = [
+        ("arg", cid),
+        ("key", ipns_key_name),
+        ("lifetime", "24h"), // 24小时生命周期
+        ("ttl", "1h"),       // 1小时TTL
+        ("resolve", "true"), // 立即解析验证
+    ];
+    
+    println!("🚀 开始发布DIAP身份到IPNS: CID={}, Key={}", cid, ipns_key_name);
+    
+    let response = client
+        .post(&endpoint)
+        .form(&params)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("IPNS发布请求失败: {}", e))?;
+
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("IPNS发布响应错误: {}", e))?;
+
+    if !status.is_success() {
+        let status_code = status.as_u16();
+        let error_msg = if text.is_empty() {
+            "响应为空".to_string()
+        } else {
+            text.trim().to_string()
+        };
+        
+        return Err(format!(
+            "IPNS发布失败，状态码 {}: {}. 请检查IPNS密钥是否存在 (API: {})",
+            status_code,
+            error_msg,
+            api_url
+        ));
+    }
+
+    let parsed: IpnsPublishResponse = serde_json::from_str(&text)
+        .map_err(|e| {
+            format!(
+                "无法解析IPNS发布响应: {}. 响应内容: {}",
+                e,
+                if text.len() > 200 {
+                    format!("{}...", &text[..200])
+                } else {
+                    text.clone()
+                }
+            )
+        })?;
+
+    let ipns_name = format!("/ipns/{}", parsed.name);
+    
+    println!("✅ DIAP身份已发布到IPNS: {} -> {}", ipns_name, parsed.value);
+
+    Ok(ipns_name)
 }
 
 pub async fn add_bytes_to_ipfs(

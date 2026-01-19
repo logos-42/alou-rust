@@ -548,21 +548,85 @@ export class AgentService {
   }
 
   /**
-   * Create DIAP identity for a session (using local Tauri command)
+   * Create agent using backend API
+   * 使用后端API创建智能体
+   * 
+   * @param {Object} options - 创建选项
+   * @param {string} options.sessionId - 会话ID
+   * @param {string} [options.walletAddress] - 钱包地址（可选）
+   * @param {string} [options.chain] - 链名称（可选）
+   * @param {string} [options.name] - 智能体名称（可选）
+   * @param {string} [options.roleDescription] - 角色描述（可选）
+   * @param {string} [options.avatarCid] - 头像CID（可选）
+   * @param {string} [options.mcpConfigCid] - MCP配置CID（可选）
+   * @param {Array} [options.mcpPorts] - MCP端口配置（可选）
+   * @param {Object} [options.diapIdentity] - DIAP身份信息（可选）
+   * @returns {Promise<Object>} 创建结果
+   */
+  async createAgent({
+    sessionId,
+    walletAddress,
+    chain,
+    name,
+    roleDescription,
+    avatarCid,
+    mcpConfigCid,
+    mcpPorts,
+    diapIdentity,
+  }) {
+    console.log('[AgentService] 开始创建智能体:', {
+      sessionId,
+      walletAddress,
+      chain,
+      name,
+      roleDescription,
+      avatarCid,
+      mcpConfigCid,
+      mcpPorts,
+      diapIdentity,
+    })
+
+    try {
+      const response = await apiClient.post('/agent/create_agent', {
+        session_id: sessionId,
+        wallet_address: walletAddress,
+        chain: chain,
+        name: name,
+        role_description: roleDescription,
+        avatar_cid: avatarCid,
+        mcp_config_cid: mcpConfigCid,
+        mcp_ports: mcpPorts,
+        diap_identity: diapIdentity,
+      })
+
+      console.log('[AgentService] 智能体创建成功:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('[AgentService] 智能体创建失败:', error)
+      throw new Error(`创建智能体失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * Create DIAP identity for a session (统一入口，避免重复)
+   * 使用新的DiapIntegrationService统一处理
    */
   async createDiapIdentity(sessionId, params = {}) {
-    const { invoke } = await import('@tauri-apps/api/core')
-    const response = await invoke('create_local_diap_identity', {
-      params: {
-        session_id: sessionId,
-        agent_name: params.agentName,
-        agent_description: params.agentDescription,
-        ipfs_api_url: params.ipfsApiUrl,
-        ipfs_gateway_url: params.ipfsGatewayUrl,
-        ipns_key: params.ipnsKey,
-      },
-    })
-    return { identity: response }
+    console.log('[AgentService] 使用统一的DIAP身份创建服务:', { sessionId, params })
+    
+    try {
+      // 导入并使用DiapIntegrationService
+      const { default: diapIntegrationService } = await import('./diapIntegrationService')
+      
+      const result = await diapIntegrationService.createDiapIdentity(sessionId, params)
+      
+      console.log('[AgentService] DIAP身份创建完成')
+      return result
+      
+    } catch (error) {
+      console.error('[AgentService] DIAP身份创建失败:', error)
+      throw new Error(`DIAP身份创建失败: ${error.message}`)
+    }
   }
 
   /**

@@ -106,10 +106,13 @@ class AvatarManager {
 
     return channels.map(channel => {
       if (channel.meta?.id === updatedAgent.id) {
+        // 使用 resolveAgentAvatar 确保头像正确解析
+        const resolvedAvatar = this.resolveAvatar(updatedAgent)
+        
         const updatedChannel = {
           ...channel,
           meta: updatedAgent,
-          avatar: updatedAgent.avatar || channel.avatar,
+          avatar: resolvedAvatar, // 使用解析后的头像，避免同化
           name: updatedAgent.display_name || updatedAgent.name || channel.name,
           display_name: updatedAgent.display_name || channel.display_name
         }
@@ -118,7 +121,8 @@ class AvatarManager {
           oldAvatar: channel.avatar,
           newAvatar: updatedChannel.avatar,
           oldName: channel.name,
-          newName: updatedChannel.name
+          newName: updatedChannel.name,
+          hasNewAvatar: !!updatedAgent.avatar || !!updatedAgent.avatar_cid || !!updatedAgent.avatar_url
         })
         return updatedChannel
       }

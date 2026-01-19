@@ -48,6 +48,7 @@ use crate::ipfs_node::{get_ipfs_daemon_status, get_ipfs_info, start_ipfs_node, s
 use crate::kv_commands::{kv_clear, kv_exists, kv_get, kv_get_batch, kv_keys, kv_remove, kv_set, kv_set_batch, kv_stats, KvState};
 use crate::diap::{
     create_local_diap_identity,
+    create_diap_identity_from_did_document,
     get_local_diap_identity,
     update_local_diap_identity,
     test_ipns_on_public_gateway,
@@ -75,6 +76,8 @@ use crate::memory_manager::{
     set_memory_item, get_memory_item, remove_memory_item, clear_memory,
     get_memory_keys, get_memory_stats, cleanup_expired_memory,
     cleanup_lru_memory, set_memory_expiration, schedule_weekly_cleanup,
+    set_diap_identity, get_diap_identity, remove_diap_identity,
+    get_all_diap_identities, cleanup_expired_diap_identities,
 };
 
 // Tool commands
@@ -228,6 +231,7 @@ fn main() {
             kv_get_batch,
             // DIAP commands
             create_local_diap_identity,
+            create_diap_identity_from_did_document,
             get_local_diap_identity,
             update_local_diap_identity,
             test_ipns_on_public_gateway,
@@ -277,7 +281,13 @@ fn main() {
             cleanup_expired_memory,
             cleanup_lru_memory,
             set_memory_expiration,
-            schedule_weekly_cleanup
+            schedule_weekly_cleanup,
+            // DIAP identity management commands
+            set_diap_identity,
+            get_diap_identity,
+            remove_diap_identity,
+            get_all_diap_identities,
+            cleanup_expired_diap_identities
         ])
         .setup(|app| {
             // Set window title

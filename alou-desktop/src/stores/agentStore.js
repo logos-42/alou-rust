@@ -48,7 +48,7 @@ const useAgentStore = create(
         // 1. 如果传入的 id 已经存在，优先使用它（通常是 channel.id）
         // 2. 否则，按照 buildChannelFromAgent 的逻辑生成：ipns || did || cid || timestamp
         // 注意：需要过滤 mock IPNS（与 buildChannelFromAgent 保持一致）
-        const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'
+        const mockIpns = 'k51qzi5uq'
         let ipnsValue = agentData.ipns || agentData.diapIdentity?.ipns || null
         const isMockIpns = ipnsValue && (
           ipnsValue.includes(mockIpns) ||
@@ -76,11 +76,11 @@ const useAgentStore = create(
           avatar_url: agentData.avatar_url || agentData.avatar || null,
           mcp_config_cid: agentData.mcp_config_cid || null,
           mcp_ports: agentData.mcp_ports || [],
-          agent_type: agentData.agent_type || 'claude_agent_sdk',
+          agent_type: agentData.agent_type || 'ai_agent_sdk',
           ipns: ipnsValue, // 使用过滤后的 IPNS
           cid: agentData.cid || agentData.diapIdentity?.cid || null,
           did: agentData.did || agentData.diapIdentity?.did || null,
-          diapIdentity: agentData.diapIdentity || null,
+          diapIdentity: null, // 不在这里存储DIAP身份，只存储引用信息
           customPrompt: agentData.customPrompt || null,
           messages_cid: agentData.messages_cid || null, // 消息历史的 IPFS CID
           created_at: agentData.created_at || now,
@@ -94,12 +94,16 @@ const useAgentStore = create(
         
         let updatedAgents
         if (existingIndex >= 0) {
-          // 更新现有智能体
+          // 更新现有智能体 - 保护现有头像
           updatedAgents = [...agents]
+          const existingAgent = updatedAgents[existingIndex]
           updatedAgents[existingIndex] = {
-            ...updatedAgents[existingIndex],
+            ...existingAgent,
             ...newAgent,
-            created_at: updatedAgents[existingIndex].created_at, // 保留原始创建时间
+            // 保护现有头像，只有在新数据中明确提供时才更新
+            avatar_cid: newAgent.avatar_cid || existingAgent.avatar_cid,
+            avatar_url: newAgent.avatar_url || existingAgent.avatar_url,
+            created_at: existingAgent.created_at, // 保留原始创建时间
           }
         } else {
           // 添加新智能体
@@ -123,9 +127,13 @@ const useAgentStore = create(
         }
         
         const updatedAgents = [...agents]
+        const existingAgent = updatedAgents[index]
         updatedAgents[index] = {
-          ...updatedAgents[index],
+          ...existingAgent,
           ...updates,
+          // 保护现有头像，只有在新数据中明确提供时才更新
+          avatar_cid: updates.avatar_cid || existingAgent.avatar_cid,
+          avatar_url: updates.avatar_url || existingAgent.avatar_url,
           updated_at: Date.now(),
         }
         
