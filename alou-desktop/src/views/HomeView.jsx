@@ -2,7 +2,11 @@ import React from 'react'
 import AgentChat from '@/components/AgentChat'
 
 const HomeView = () => {
-  return <AgentChat />
+  return (
+    <div>
+      <AgentChat />
+    </div>
+  )
 }
 
 export default HomeView

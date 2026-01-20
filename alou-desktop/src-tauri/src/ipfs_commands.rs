@@ -598,3 +598,93 @@ pub async fn ipfs_pubsub_ls(
         Ok(vec![])
     }
 }
+
+/// 添加JSON数据到IPFS
+pub async fn add_json_to_ipfs(
+    json_data: &serde_json::Value,
+    file_name: &str,
+    api_url: &str,
+) -> Result<String, String> {
+    let client = create_ipfs_client();
+    
+    // 将JSON序列化为字符串
+    let json_str = serde_json::to_string(json_data)
+        .map_err(|e| format!("序列化JSON失败: {}", e))?;
+    
+    // 创建multipart表单
+    let file_part = Part::bytes(json_str.as_bytes().to_vec())
+        .file_name(file_name.to_string())
+        .mime_str("application/json")
+        .map_err(|e| format!("创建文件部分失败: {}", e))?;
+    
+    let form = Form::new().part("file", file_part);
+    
+    let url = format!("{}/api/v0/add", normalize_base_url(api_url));
+    
+    let response = client
+        .post(&url)
+        .multipart(form)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("IPFS添加请求失败: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("IPFS添加失败: {} - {}", status, text));
+    }
+    
+    let result: serde_json::Value = response.json().await
+        .map_err(|e| format!("解析IPFS响应失败: {}", e))?;
+    
+    let cid = result.get("Hash")
+        .and_then(|h| h.as_str())
+        .ok_or("IPFS响应中缺少Hash字段")?
+        .to_string();
+    
+    Ok(cid)
+}
+
+/// 简单的IPNS发布函数
+pub async fn publish_to_ipns_simple(
+    cid: &str,
+    ipns_key: &str,
+    api_url: &str,
+) -> Result<String, String> {
+    let client = create_ipfs_client();
+    
+    let url = format!("{}/api/v0/name/publish", normalize_base_url(api_url));
+    
+    // 构建请求参数
+    let params = [
+        ("arg", cid),
+        ("key", ipns_key),
+        ("lifetime", "24h"),
+        ("ttl", "1h"),
+    ];
+    
+    let response = client
+        .post(&url)
+        .form(&params)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .send()
+        .await
+        .map_err(|e| format!("IPNS发布请求失败: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("IPNS发布失败: {} - {}", status, text));
+    }
+    
+    let result: serde_json::Value = response.json().await
+        .map_err(|e| format!("解析IPNS响应失败: {}", e))?;
+    
+    let ipns_name = result.get("Name")
+        .and_then(|n| n.as_str())
+        .ok_or("IPNS响应中缺少Name字段")?
+        .to_string();
+    
+    Ok(ipns_name)
+}

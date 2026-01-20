@@ -8,6 +8,7 @@ import InviteIcon from '@/assets/创建.png'
 import DeleteIcon from '@/assets/删除3.png'
 import CloseIcon from '@/assets/关闭0.3.png'
 import { useI18n } from '@/hooks/useI18n'
+import imageProxyService from '@/services/imageProxyService'
 import './AgentSidebarLeft.css'
 
 const formatDate = (timestamp) => {
@@ -17,6 +18,97 @@ const formatDate = (timestamp) => {
     month: '2-digit',
     day: '2-digit',
   })
+}
+
+// 头像组件 - 使用imageProxyService处理Tauri环境
+const ChannelAvatar = ({ channel }) => {
+  const [avatarSrc, setAvatarSrc] = useState(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    const loadAvatar = async () => {
+      console.log('[ChannelAvatar] 开始加载头像:', {
+        channelId: channel.id,
+        channelName: channel.name,
+        hasAvatar: !!channel.avatar,
+        avatar: channel.avatar?.substring(0, 100)
+      })
+      
+      if (!channel.avatar) {
+        console.log('[ChannelAvatar] 没有头像数据，使用fallback')
+        setAvatarSrc(null)
+        setHasError(true)
+        return
+      }
+
+      // 如果已经是data URL，直接使用
+      if (channel.avatar.startsWith('data:')) {
+        console.log('[ChannelAvatar] 使用data URL头像')
+        setAvatarSrc(channel.avatar)
+        setHasError(false)
+        setIsLoading(false)
+        return
+      }
+
+      // 使用imageProxyService处理外部URL
+      setIsLoading(true)
+      setHasError(false)
+      
+      try {
+        console.log('[ChannelAvatar] 通过imageProxyService加载头像:', channel.avatar)
+        const dataUrl = await imageProxyService.getImageDataUrl(channel.avatar)
+        
+        if (dataUrl) {
+          console.log('[ChannelAvatar] imageProxyService加载成功')
+          setAvatarSrc(dataUrl)
+        } else {
+          console.log('[ChannelAvatar] imageProxyService返回空数据')
+          setHasError(true)
+        }
+      } catch (error) {
+        console.error('[ChannelAvatar] imageProxyService加载失败:', error)
+        setHasError(true)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadAvatar()
+  }, [channel.avatar]) // 只依赖avatar，避免重复加载
+
+  if (isLoading) {
+    return (
+      <div className="channel-icon" style={{ background: channel.color }}>
+        <span className="fallback-icon">⏳</span>
+        <span className={`status-indicator ${channel.status}`} />
+      </div>
+    )
+  }
+
+  if (hasError || !avatarSrc) {
+    return (
+      <div className="channel-icon" style={{ background: channel.color }}>
+        <span className="fallback-icon">
+          {channel.icon || channel.name?.charAt(0) || '🤖'}
+        </span>
+        <span className={`status-indicator ${channel.status}`} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="channel-icon" style={{ background: channel.color }}>
+      <img 
+        src={avatarSrc} 
+        alt={channel.name}
+        onError={(e) => {
+          setHasError(true)
+        }}
+      />
+      <span className={`status-indicator ${channel.status}`} />
+    </div>
+  )
 }
 
 // 模式类型：Agent 模式（自定义智能体）和 Alou 模式（平台模式）
@@ -223,7 +315,8 @@ const AgentSidebarLeft = ({
             {t('agent.sidebar.empty')}
           </div>
         )}
-        {channels.map((channel) => (
+        {channels.map((channel) => {
+          return (
           <div
             key={channel.id}
             className={`channel-item${channel.id === activeChannelId ? ' active' : ''}`}
@@ -237,28 +330,7 @@ const AgentSidebarLeft = ({
               }
             }}
           >
-            <div className="channel-icon" style={{ background: channel.color }}>
-              {channel.avatar ? (
-                <img 
-                  src={channel.avatar} 
-                  alt={channel.name}
-                  onError={(e) => {
-                    // 图片加载失败时隐藏图片，显示默认图标
-                    e.target.style.display = 'none'
-                    const parent = e.target.parentElement
-                    if (parent && !parent.querySelector('.fallback-icon')) {
-                      const fallback = document.createElement('span')
-                      fallback.className = 'fallback-icon'
-                      fallback.textContent = channel.icon || channel.name?.charAt(0) || '🤖'
-                      parent.insertBefore(fallback, e.target)
-                    }
-                  }}
-                />
-              ) : (
-                channel.icon || channel.name?.charAt(0) || '🤖'
-              )}
-              <span className={`status-indicator ${channel.status}`} />
-            </div>
+            <ChannelAvatar channel={channel} />
             {!isCollapsed && (
               <>
                 <div className="channel-info">
@@ -352,7 +424,8 @@ const AgentSidebarLeft = ({
               </>
             )}
           </div>
-        ))}
+        )
+        })}
       </div>
 
       {modelMenuState.visible && (

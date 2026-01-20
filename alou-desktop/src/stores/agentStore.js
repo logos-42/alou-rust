@@ -28,6 +28,24 @@ const STORAGE_KEY = 'alou_agents'
 const useAgentStore = create(
   persist(
     (set, get) => ({
+      // IPFS URL 解析辅助方法
+      resolveIpfsUrl: (cid) => {
+        if (!cid) return null
+        
+        // 如果已经是完整的 URL，直接返回
+        if (cid.startsWith('http')) return cid
+        
+        // 解析 IPFS CID 为 URL
+        // 使用 agentAssetsService
+        try {
+          // 动态导入以避免循环依赖
+          const agentAssetsService = require('@/services/agentAssetsService').default
+          return agentAssetsService.resolveIpfsUri(cid)
+        } catch (error) {
+          console.warn('[AgentStore] IPFS URL 解析失败:', error)
+          return null
+        }
+      },
       // 智能体列表
       agents: [],
       
@@ -66,6 +84,16 @@ const useAgentStore = create(
                             agentData.cid || 
                             `agent_${Date.now()}`
         
+        // 处理头像URL
+        const avatarUrl = agentData.avatar_cid ? get().resolveIpfsUrl(agentData.avatar_cid) : (agentData.avatar_url || agentData.avatar || null)
+        
+        console.log('[AgentStore] 创建/更新智能体头像信息:', {
+          name: agentData.name,
+          hasAvatarCid: !!agentData.avatar_cid,
+          avatar_cid: agentData.avatar_cid,
+          resolvedAvatarUrl: avatarUrl?.substring(0, 100)
+        })
+        
         const newAgent = {
           id: generatedId, // 使用一致的ID生成逻辑
           sessionId: agentData.sessionId,
@@ -73,7 +101,8 @@ const useAgentStore = create(
           display_name: agentData.display_name || agentData.name || '未命名智能体',
           role_description: agentData.role_description || '',
           avatar_cid: agentData.avatar_cid || null,
-          avatar_url: agentData.avatar_url || agentData.avatar || null,
+          // 修复：始终设置 avatar_url，如果是 avatar_cid，转换为 IPFS URL
+          avatar_url: avatarUrl,
           mcp_config_cid: agentData.mcp_config_cid || null,
           mcp_ports: agentData.mcp_ports || [],
           agent_type: agentData.agent_type || 'ai_agent_sdk',
@@ -128,12 +157,19 @@ const useAgentStore = create(
         
         const updatedAgents = [...agents]
         const existingAgent = updatedAgents[index]
+        
+        // 处理头像更新：如果提供了 avatar_cid，需要重新解析为 URL
+        let finalAvatarUrl = updates.avatar_url || existingAgent.avatar_url
+        if (updates.avatar_cid) {
+          finalAvatarUrl = get().resolveIpfsUrl(updates.avatar_cid)
+        }
+        
         updatedAgents[index] = {
           ...existingAgent,
           ...updates,
           // 保护现有头像，只有在新数据中明确提供时才更新
           avatar_cid: updates.avatar_cid || existingAgent.avatar_cid,
-          avatar_url: updates.avatar_url || existingAgent.avatar_url,
+          avatar_url: finalAvatarUrl,
           updated_at: Date.now(),
         }
         

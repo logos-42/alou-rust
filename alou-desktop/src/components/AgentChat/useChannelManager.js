@@ -129,9 +129,7 @@ export const useChannelManager = ({
                   console.log('[useChannelManager] 后端频道已存在，跳过添加:', channel.id)
                   return prev // 已存在，不做改变
                 }
-                console.log('[useChannelManager] 从后端添加新频道:', channel.id)
-                // 后端频道添加到末尾，保持现有顺序
-                return [...prev, channel]
+              
               })
               // 只有当前没有选中的频道时才设置
               setActiveChannelId((prev) => prev || channel.id)
@@ -663,8 +661,8 @@ export const useChannelManager = ({
           if (newChannels.length > 0) {
             console.log(`[useChannelManager] 从本地存储添加 ${newChannels.length} 个新频道:`, 
               newChannels.map(c => ({ id: c.id, name: c.name })))
-            // 本地频道添加到后面，保持现有频道顺序
-            return [...prev, ...newChannels]
+            // 本地频道添加到前面，保持现有频道顺序
+            return [...newChannels, ...prev]
           }
           
           if (localChannels.length !== prev.length) {
@@ -828,7 +826,7 @@ export const useChannelManager = ({
 
   // 创建智能体
   const handleCreateAgentSubmit = useCallback(
-    async ({ name, roleDescription, avatarCid, mcpConfigCid, mcpPorts, diapIdentity, tempId }) => {
+    async ({ name, roleDescription, avatar_cid, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId }) => {
       // 如果有 tempId，说明是后台更新，不需要显示 loading
       const isBackgroundUpdate = !!tempId
       if (!isBackgroundUpdate) {
@@ -850,10 +848,16 @@ export const useChannelManager = ({
           chain: detectedChain || preferredChain,
           name,
           roleDescription,
-          avatarCid,
-          mcpConfigCid,
-          mcpPorts,
+          avatar_cid,
+          mcp_config_cid,
+          mcp_ports,
           diapIdentity,
+          // 调试：检查传入的avatar数据
+          avatarDataDebug: {
+            hasAvatarCid: !!avatar_cid,
+            avatarCidLength: avatar_cid?.length || 0,
+            avatarCidPreview: avatar_cid?.substring(0, 50) + '...' || 'null'
+          }
         })
 
         const result = await agentService.createAgent({
@@ -862,25 +866,28 @@ export const useChannelManager = ({
           chain: detectedChain || preferredChain,
           name,
           roleDescription,
-          avatarCid,
-          mcpConfigCid,
-          mcpPorts,
+          avatar_cid,
+          mcp_config_cid,
+          mcp_ports,
           diapIdentity,
         })
 
         console.log('[useChannelManager] 智能体创建API响应:', result)
 
-        const metadata = result.agent_metadata || {
-          did: result.diap_identity?.did,
-          cid: result.diap_identity?.cid,
-          ipns: result.diap_identity?.ipns,
-          agent_type: 'claude_agent_sdk',
-          display_name: name,
-          role_description: roleDescription,
-          avatar_cid: avatarCid,
-          mcp_config_cid: mcpConfigCid,
-          mcp_ports: mcpPorts,
-          diap_identity: diapIdentity,
+        // 构建元数据：优先使用返回的数据，但必须包含头像等关键信息
+        const metadata = {
+          // 从返回的数据中提取
+          did: result.diap_identity?.did || result.agent_metadata?.did,
+          cid: result.diap_identity?.cid || result.agent_metadata?.cid,
+          ipns: result.diap_identity?.ipns || result.agent_metadata?.ipns,
+          agent_type: result.agent_metadata?.agent_type || 'claude_agent_sdk',
+          display_name: result.agent_metadata?.display_name || name,
+          role_description: result.agent_metadata?.role_description || roleDescription,
+          // 关键：必须包含我们上传的头像和配置
+          avatar_cid: avatar_cid || result.agent_metadata?.avatar_cid,  // 优先使用我们上传的
+          mcp_config_cid: mcp_config_cid || result.agent_metadata?.mcp_config_cid,
+          mcp_ports: mcp_ports || result.agent_metadata?.mcp_ports,
+          diap_identity: diapIdentity || result.agent_metadata?.diap_identity,
           sessionId,
         }
 
@@ -900,7 +907,7 @@ export const useChannelManager = ({
           name: channel?.name,
           hasChannel: !!channel,
           tempId: tempId,
-          existingChannels: prev.map(c => ({ id: c.id, name: c.name }))
+          existingChannelsCount: channels.length
         })
         if (channel) {
           setChannels((prev) => {
@@ -952,9 +959,9 @@ export const useChannelManager = ({
               return updated
             }
 
-            // 添加新频道到列表末尾，避免打乱现有顺序
-            console.log('[useChannelManager] ✅ 添加新频道到末尾:', channel.id)
-            return [...prev, channel]
+            // 添加新频道到列表开头，避免打乱现有顺序
+            console.log('[useChannelManager] ✅ 添加新频道到开头:', channel.id)
+            return [channel, ...prev]
           })
           setActiveChannelId(channel.id)
         }

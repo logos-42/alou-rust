@@ -1,5 +1,6 @@
 import { resolveAgentAvatar } from './agentUtils'
 import useAgentStore from '@/stores/agentStore'
+import imageProxyService from '@/services/imageProxyService'
 
 /**
  * 头像管理模块
@@ -16,7 +17,45 @@ class AvatarManager {
    * @param {Object} agent - 智能体对象
    * @returns {string} 头像URL
    */
-  resolveAvatar(agent) {
+  async resolveAvatar(agent) {
+    if (!agent) {
+      return this.getFallbackAvatar()
+    }
+
+    // 检查缓存
+    const cacheKey = this.getCacheKey(agent)
+    if (this.avatarCache.has(cacheKey)) {
+      return this.avatarCache.get(cacheKey)
+    }
+
+    // 解析头像
+    let avatar = resolveAgentAvatar(agent)
+    
+    // 在Tauri环境中，如果是外部URL，转换为data URL
+    if (typeof window !== 'undefined' && window.__TAURI__ && avatar && avatar.startsWith('http')) {
+      try {
+        const dataUrl = await imageProxyService.getImageDataUrl(avatar)
+        if (dataUrl) {
+          avatar = dataUrl
+        }
+      } catch (error) {
+        console.warn('[AvatarManager] 转换头像为data URL失败:', error)
+        // 保持原始URL作为fallback
+      }
+    }
+    
+    // 缓存结果
+    this.avatarCache.set(cacheKey, avatar)
+    
+    return avatar
+  }
+
+  /**
+   * 同步解析智能体头像（不进行异步转换）
+   * @param {Object} agent - 智能体对象
+   * @returns {string} 头像URL
+   */
+  resolveAvatarSync(agent) {
     if (!agent) {
       return this.getFallbackAvatar()
     }
@@ -44,22 +83,23 @@ class AvatarManager {
    * @returns {Object} 更新后的智能体
    */
   updateAvatar(agentId, avatar, name = null) {
-    console.log('[AvatarManager] 更新头像和名称:', { agentId, avatar, name })
-    
     try {
-      // 检查是否是data URL，如果是则记录警告
-      if (avatar && avatar.startsWith('data:image/')) {
-        console.warn('[AvatarManager] 检测到data URL头像，建议使用IPFS存储:', avatar.length)
-        // 对于data URL，我们仍然存储，但会尝试压缩
-        avatar = this.compressAvatarIfNeeded(avatar)
-      }
-      
       // 准备更新数据
       const updates = {
-        avatar: avatar, // 存储实际头像
-        avatar_url: avatar, // 保持兼容性
-        avatar_cid: this.extractCidFromUrl(avatar), // 提取CID
         updated_at: Date.now()
+      }
+      
+      // 根据头像类型设置不同的字段
+      if (avatar && avatar.startsWith('data:image/')) {
+        // 处理 base64 data URL
+        updates.avatar = avatar // 直接存储 base64 数据
+        updates.avatar_url = avatar // 保持兼容性
+        updates.avatar_cid = null // base64 数据不需要 CID
+      } else {
+        // 处理 URL 或 CID
+        updates.avatar = avatar // 存储实际头像
+        updates.avatar_url = avatar // 保持兼容性
+        updates.avatar_cid = this.extractCidFromUrl(avatar) // 提取CID
       }
       
       // 如果提供了名称，也更新名称
@@ -73,7 +113,6 @@ class AvatarManager {
       const updatedAgent = updateAgent(agentId, updates)
 
       if (!updatedAgent) {
-        console.warn('[AvatarManager] 更新失败：智能体不存在', agentId)
         return null
       }
 
@@ -88,7 +127,6 @@ class AvatarManager {
       
       return updatedAgent
     } catch (error) {
-      console.error('[AvatarManager] 更新头像失败:', error)
       return null
     }
   }
@@ -155,7 +193,7 @@ class AvatarManager {
       try {
         listener(updatedAgent)
       } catch (error) {
-        console.error('[AvatarManager] 监听器错误:', error)
+        // 静默处理错误
       }
     })
   }
@@ -319,13 +357,7 @@ class AvatarManager {
       return dataUrl
     }
     
-    console.warn('[AvatarManager] 头像数据过大，尝试压缩或使用占位符:', dataUrl.length)
-    
-    // 方案1：压缩图片（这里简化处理，实际应该使用canvas压缩）
-    // 方案2：使用占位符或缩略图
-    // 方案3：存储到IndexedDB而不是localStorage
-    
-    // 暂时返回一个占位符，避免存储错误
+    // 返回占位符，避免存储过大
     return this.getFallbackAvatar()
   }
 

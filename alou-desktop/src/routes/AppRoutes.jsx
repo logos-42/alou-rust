@@ -10,6 +10,7 @@ import WalletView from '@/views/WalletView'
 import AboutView from '@/views/AboutView'
 import SubscriptionView from '@/views/SubscriptionView'
 import SdkExampleView from '@/routes/SdkExample.jsx'
+import AvatarTest from '@/components/AvatarTest'
 
 // 钱包同步监听组件
 const WalletSyncListener = () => {
@@ -247,6 +248,7 @@ const AppRoutes = () => (
         </ProtectedRoute>
       }
     />
+    <Route path="/avatar-test" element={<AvatarTest />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </>

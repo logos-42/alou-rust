@@ -471,9 +471,6 @@ export const cleanupExpiredDiapIdentities = () => {
   console.log('[MemoryStorage] 清理过期DIAP身份，清理了', cleanedCount, '个')
   return cleanedCount
 }
-  
-  return cleanedCount
-}
 
 /**
  * 钱包数据专用存储函数

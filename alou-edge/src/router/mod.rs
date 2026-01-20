@@ -344,21 +344,6 @@ impl Router {
             (Method::Post, "/api/agent/search") => {
                 agent::handle_search_agents(self.agent_discovery.as_ref(), req).await
             }
-            (Method::Post, "/api/agent/diap/get-identity") => {
-                agent::handle_get_diap_identity(&self.session_manager, &env, req).await
-            }
-            (Method::Post, "/api/agent/diap/get-identity-by-session") => {
-                agent::handle_get_diap_identity_by_session(&self.session_manager, req).await
-            }
-            (Method::Post, "/api/agent/diap/create-identity") => {
-                agent::handle_create_diap_identity(&self.session_manager, &env, req).await
-            }
-            (Method::Post, "/api/agent/diap/save-complete-identity") => {
-                agent::handle_update_diap_identity(&self.session_manager, req).await
-            }
-            (Method::Post, "/api/agent/diap/update-identity") => {
-                agent::handle_update_diap_identity(&self.session_manager, req).await
-            }
             (Method::Post, "/api/agent/parse-creation-command") => {
                 agent::handle_parse_creation_command(&self.session_manager, req).await
             }
@@ -376,9 +361,6 @@ impl Router {
             }
             (Method::Get, path) if path.starts_with("/api/agent/batch-create/sessions/") => {
                 agent::handle_get_batch_agent_sessions(&self.session_manager, req, &env).await
-            }
-            (Method::Post, "/api/agent/diap/register-onchain") => {
-                agent::handle_register_agent_onchain(&self.session_manager, &env, req).await
             }
             (Method::Get, "/api/agent/progress") => self.handle_agent_progress(req).await,
 
@@ -554,23 +536,7 @@ impl Router {
                 }
             }
 
-            // 兼容性路由 - 任务状态查询
-            (Method::Get, path) if path.starts_with("/api/tasks/") => {
-                let task_id = path.trim_start_matches("/api/tasks/");
-                self.handle_task_status(env, task_id).await
-            }
-
-            // 兼容性路由 - 任务取消
-            (Method::Post, path) if path.starts_with("/api/tasks/") && path.ends_with("/cancel") => {
-                let task_id = path.trim_start_matches("/api/tasks/").trim_end_matches("/cancel");
-                self.handle_task_cancel(env, task_id).await
-            }
-
-            // 兼容性路由 - 工具结果提交
-            (Method::Post, path) if path.starts_with("/api/tasks/") && path.ends_with("/tool-result") => {
-                let task_id = path.trim_start_matches("/api/tasks/").trim_end_matches("/tool-result");
-                self.handle_tool_result(env, task_id, req).await
-            }
+            // 任务状态查询已迁移到 /api/ai-task/{task_id}/status
 
             // KV 存储管理端点
             (Method::Get, "/api/kv/keys") => {

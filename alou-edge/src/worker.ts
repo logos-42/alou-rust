@@ -496,8 +496,8 @@ export default {
       });
     }
     
-    // 如果是 /api/agent/chat 或 /api/claude-agent/query，检查是否需要使用 TypeScript SDK
-    if ((url.pathname === '/api/agent/chat' || url.pathname === '/api/claude-agent/query') && request.method === 'POST') {
+    // 如果是 /api/agent/chat，检查是否需要使用 TypeScript SDK
+    if (url.pathname === '/api/agent/chat' && request.method === 'POST') {
       try {
         // 克隆请求以读取 body
         const body = await request.clone().json() as {

@@ -112,7 +112,7 @@ impl SystemTool {
             total_swap: (*system).total_swap(),
             used_swap: (*system).used_swap(),
             cpu_count: (*system).cpus().len(),
-            cpu_usage: (*system).global_cpu_info().cpu_usage(),
+            cpu_usage: (*system).global_cpu_usage(),
         };
 
         let output = format!("System: {} {}", info.name, info.os_version);
@@ -130,15 +130,19 @@ impl SystemTool {
     /// 列出进程
     async fn list_processes(&self) -> Result<ToolResult, ToolError> {
         let mut system = self.system.lock().unwrap();
-        system.refresh_processes();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
 
         let processes: Vec<ProcessInfo> = (*system).processes()
             .iter()
             .take(100) // 限制数量避免输出过大
             .map(|(pid, process)| ProcessInfo {
                 pid: pid.as_u32(),
-                name: process.name().to_string(),
-                cmd: process.cmd().join(" "),
+                name: process.name().to_string_lossy().to_string(),
+                cmd: process.cmd()
+                    .iter()
+                    .map(|arg| arg.to_string_lossy().to_string())
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 cpu_usage: process.cpu_usage(),
                 memory: process.memory(),
                 status: format!("{:?}", process.status()),
@@ -164,7 +168,7 @@ impl SystemTool {
     /// 获取 CPU 信息
     async fn get_cpu_info(&self) -> Result<ToolResult, ToolError> {
         let mut system = self.system.lock().unwrap();
-        system.refresh_cpu();
+        system.refresh_cpu_all();
 
         let cpus: Vec<CpuInfo> = (*system).cpus()
             .iter()
@@ -179,21 +183,20 @@ impl SystemTool {
             })
             .collect();
 
-        let global_cpu = (*system).global_cpu_info();
+        let global_cpu_usage = (*system).global_cpu_usage();
 
         Ok(ToolResult {
             success: true,
             data: serde_json::json!({
                 "global": {
-                    "name": global_cpu.name(),
-                    "usage": global_cpu.cpu_usage()
+                    "usage": global_cpu_usage
                 },
                 "cpus": cpus,
                 "count": cpus.len()
             }),
             error: None,
             execution_time_ms: 0,
-            output: Some(format!("CPU usage: {:.1}%", global_cpu.cpu_usage())),
+            output: Some(format!("CPU usage: {:.1}%", global_cpu_usage)),
             warnings: vec![],
             context: None,
         })

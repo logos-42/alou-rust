@@ -389,19 +389,14 @@ pub fn schedule_weekly_cleanup() -> Result<String, String> {
 
 /// 获取全局内存管理器实例
 fn get_memory_manager() -> &'static MemoryManager {
-    use std::sync::Once;
+    use std::sync::OnceLock;
     
-    static INIT: Once = Once::new();
-    static mut MANAGER: Option<MemoryManager> = None;
+    static MANAGER: OnceLock<MemoryManager> = OnceLock::new();
     
-    INIT.call_once(|| {
-        unsafe {
-            MANAGER = Some(MemoryManager::new(
-                1000,  // 最大1000个项目
-                50    // 最大50MB
-            ));
-        }
-    });
-    
-    unsafe { MANAGER.as_ref().unwrap() }
+    MANAGER.get_or_init(|| {
+        MemoryManager::new(
+            1000,  // 最大1000个项目
+            50    // 最大50MB
+        )
+    })
 }

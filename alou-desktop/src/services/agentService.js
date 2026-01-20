@@ -588,7 +588,7 @@ export class AgentService {
 
     try {
       const response = await apiClient.post('/agent/create_agent', {
-        session_id: sessionId,
+        // session_id: sessionId, // 让后端自动创建session
         wallet_address: walletAddress,
         chain: chain,
         name: name,
@@ -600,6 +600,19 @@ export class AgentService {
       })
 
       console.log('[AgentService] 智能体创建成功:', response.data)
+      
+      // 调试：检查后端返回的avatar相关字段
+      if (response.data) {
+        console.log('[AgentService] 后端返回的avatar数据:', {
+          avatar_cid: response.data.avatar_cid,
+          avatar_url: response.data.avatar_url,
+          avatar: response.data.avatar,
+          hasAvatarCid: !!response.data.avatar_cid,
+          hasAvatarUrl: !!response.data.avatar_url,
+          hasAvatar: !!response.data.avatar
+        })
+      }
+      
       return response.data
     } catch (error) {
       console.error('[AgentService] 智能体创建失败:', error)

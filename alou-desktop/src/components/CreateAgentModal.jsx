@@ -48,12 +48,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         // 修复可能被破坏的 URL（如果 :// 被分割）
         .replace(/"endpoint"\s*:\s*"([^"]*):\s*\/\/([^"]*)"/g, '"endpoint": "$1://$2"')
       
-      // 调试：输出清理后的代码
-      console.log('清理后的代码:', cleanedCode)
-      console.log('代码长度:', cleanedCode.length)
-      console.log('前50个字符:', cleanedCode.substring(0, 50))
-      console.log('字符代码（前20个）:', Array.from(cleanedCode.substring(0, 20)).map(c => c.charCodeAt(0)))
-      
       if (!cleanedCode) {
         throw new Error('MCP 配置不能为空')
       }
@@ -63,21 +57,17 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       // 尝试多种解析方式
       try {
         // 首先尝试作为 JSON 解析
-        console.log('尝试 JSON 解析...')
         config = JSON.parse(cleanedCode)
-        console.log('JSON 解析成功')
       } catch (jsonError) {
         console.log('JSON 解析失败:', jsonError.message)
         console.log('失败位置:', jsonError)
         
         // 如果 JSON 解析失败，尝试作为 JavaScript 对象解析
         try {
-          console.log('尝试 JavaScript 解析...')
           // 确保代码以有效的 JavaScript 对象开始
           const jsCode = cleanedCode.trim()
           // 如果代码不以 { 开头，添加它
           const finalCode = jsCode.startsWith('{') ? jsCode : `{${jsCode}}`
-          console.log('JavaScript 代码:', finalCode.substring(0, 50))
           // 使用 Function 构造器来安全执行代码
           config = new Function('return ' + finalCode)()
           console.log('JavaScript 解析成功')
@@ -188,7 +178,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         // 使用新的DiapIntegrationService
         const { default: diapIntegrationService } = await import('../services/diapIntegrationService')
         
-        const result = await diapIntegrationService.createDiapIdentity(sessionId, {
+        const result = await diapIntegrationService.createCompleteDiapIdentity(sessionId, {
           agentName: fallbackName,
           agentDescription: finalRoleDescription,
         })
@@ -248,10 +238,15 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       const agentData = {
         name: fallbackName,
         roleDescription: finalRoleDescription,
-        avatarCid,
-        mcpConfigCid,
-        mcpPorts: filteredPorts,
-        diapIdentity,
+        avatar_cid: avatarCid, // 修复：使用下划线命名与agentStore保持一致
+        mcp_config_cid: mcpConfigCid, // 修复：使用下划线命名与agentStore保持一致
+        mcp_ports: filteredPorts, // 修复：使用下划线命名与agentStore保持一致
+        diapIdentity: diapIdentity ? {
+          did: diapIdentity.did,
+          cid: diapIdentity.cid,
+          ipns: diapIdentity.ipns || '',
+          public_key: diapIdentity.public_key
+        } : null,
         sessionId,
         // 添加标识，表明这是完整的智能体数据
         isComplete: true,

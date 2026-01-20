@@ -13,6 +13,10 @@ mod storage;
 mod utils;
 mod web3;
 
+// 导出常用工具函数
+pub use utils::time;
+pub use utils::error::{AloudError, Result};
+
 // 导出 Durable Objects（必须在根模块导出才能被 wasm-bindgen 识别）
 pub use durable_objects::ai_task::AITaskDO;
 
@@ -50,7 +54,7 @@ use storage::kv::KvStore;
 /// All errors are caught and logged. The function returns appropriate HTTP responses
 /// based on the error type.
 #[event(fetch)]
-async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
+async fn fetch(req: Request, env: Env, _ctx: Context) -> worker::Result<Response> {
     // Set panic hook for better error messages in WASM
     // This should be called once at the start of the worker
     console_error_panic_hook::set_once();
@@ -104,7 +108,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
 /// Each initialization step includes proper error handling and logging.
 /// If a non-critical service fails to initialize, a warning is logged and
 /// the worker continues with degraded functionality.
-async fn initialize_and_handle(req: Request, env: Env) -> Result<Response> {
+async fn initialize_and_handle(req: Request, env: Env) -> worker::Result<Response> {
     console_log!("=== Starting service initialization ===");
 
     // ========================================
@@ -518,7 +522,7 @@ async fn initialize_mcp_servers(env: &Env, bridge: Arc<McpBridge>) -> Result<()>
 /// This handler processes messages from the agent creation queue.
 /// It runs in a separate worker context and does not block HTTP requests.
 #[event(queue)]
-async fn queue_handler(batch: MessageBatch<BatchCreateTask>, env: Env, _ctx: Context) -> Result<()> {
+async fn queue_handler(batch: MessageBatch<BatchCreateTask>, env: Env, _ctx: Context) -> worker::Result<()> {
     console_log!("=== Processing batch agent creation queue ===");
 
     // Initialize services

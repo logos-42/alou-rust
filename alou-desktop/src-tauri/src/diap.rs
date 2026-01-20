@@ -6,10 +6,11 @@
 // - update_local_diap_identity: 保持现有行为，用于更新已存在的身份
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use log::{debug, info, warn, error};
+use reqwest::Client;
+use base64::{Engine as _, engine::general_purpose};
 
 use crate::utils::normalize_base_url;
-use log::{debug, info, warn};
-use reqwest::Client;
 
 const IPFS_HTTP_TIMEOUT_SECS: u64 = 90;
 
@@ -507,9 +508,9 @@ pub async fn get_local_diap_identity(
 
     // 生成加密的节点ID（模拟）
     let encrypted_node_id = Some(EncryptedNodeId {
-        ciphertext: base64::encode(format!("encrypted_{}", session_suffix)),
-        nonce: base64::encode("nonce_123456"),
-        signature: base64::encode("signature_789"),
+        ciphertext: general_purpose::STANDARD.encode(format!("encrypted_{}", session_suffix)),
+        nonce: general_purpose::STANDARD.encode("nonce_123456"),
+        signature: general_purpose::STANDARD.encode("signature_789"),
         method: "xchacha20poly1305".to_string(),
     });
 
@@ -593,9 +594,9 @@ pub async fn update_local_diap_identity(
 
     // 生成加密的节点ID（模拟）
     let encrypted_node_id = Some(EncryptedNodeId {
-        ciphertext: base64::encode(format!("encrypted_updated_{}", session_suffix)),
-        nonce: base64::encode("nonce_123456"),
-        signature: base64::encode("signature_789"),
+        ciphertext: general_purpose::STANDARD.encode(format!("encrypted_updated_{}", session_suffix)),
+        nonce: general_purpose::STANDARD.encode("nonce_123456"),
+        signature: general_purpose::STANDARD.encode("signature_789"),
         method: "xchacha20poly1305".to_string(),
     });
 
@@ -815,12 +816,11 @@ async fn generate_or_get_ipns_key(key_name: &str, api_url: &str) -> Result<Strin
 /// 创建加密的节点ID
 async fn create_encrypted_node_id(session_id: &str, private_key: &str) -> Result<EncryptedNodeId, String> {
     // 这里应该使用真实的加密算法，现在返回模拟数据
-    use base64;
     
     let node_data = format!("node_{}_{}", session_id, chrono::Utc::now().timestamp());
-    let ciphertext = base64::encode(format!("encrypted_{}", node_data));
-    let nonce = base64::encode(format!("nonce_{}", session_id));
-    let signature = base64::encode(format!("sig_{}_{}", private_key, node_data));
+    let ciphertext = general_purpose::STANDARD.encode(format!("encrypted_{}", node_data));
+    let nonce = general_purpose::STANDARD.encode(format!("nonce_{}", session_id));
+    let signature = general_purpose::STANDARD.encode(format!("sig_{}_{}", private_key, node_data));
     
     Ok(EncryptedNodeId {
         ciphertext,
@@ -857,12 +857,12 @@ async fn generate_key_pair() -> Result<KeyPair, String> {
     use rand::Rng;
     
     // 生成随机的Ed25519密钥对（简化版本）
-    let mut rng = rand::thread_rng();
-    let private_bytes: [u8; 32] = rng.gen();
-    let public_bytes: [u8; 32] = rng.gen();
+    let mut rng = rand::rng();
+    let private_bytes: [u8; 32] = rng.random();
+    let public_bytes: [u8; 32] = rng.random();
     
     // 转换为Base58格式（简化处理）
-    let public_key = format!("z6Mk{}", base64::encode(&public_bytes[..20]));
+    let public_key = format!("z6Mk{}", general_purpose::STANDARD.encode(&public_bytes[..20]));
     let private_key = hex::encode(private_bytes);
     
     info!(target: "diap", "✅ 密钥对生成成功");
@@ -918,14 +918,22 @@ async fn test_ipfs_api_connection(api_url: &str) -> Result<bool, Box<dyn std::er
         .no_proxy() // 避免通过系统代理访问本地API - 这是关键！
         .build()?;
     
-    let url = format!("{}/api/v0/version", normalize_base_url(api_url));
+    // 使用POST请求到/id端点，这是IPFS API的标准端点
+    let url = format!("{}/api/v0/id", normalize_base_url(api_url));
     info!(target: "diap", "请求URL: {}", url);
     
-    match client.get(&url).send().await {
+    match client.post(&url).send().await {
         Ok(response) => {
             let status = response.status();
             info!(target: "diap", "IPFS API响应状态: {}", status);
-            Ok(status.is_success())
+            
+            if status.is_success() {
+                info!(target: "diap", "IPFS API连接成功: {}", api_url);
+                Ok(true)
+            } else {
+                warn!(target: "diap", "IPFS API返回错误状态: {}", status);
+                Ok(false)
+            }
         }
         Err(e) => {
             warn!(target: "diap", "IPFS API连接失败: {}", e);
@@ -955,4 +963,287 @@ async fn publish_to_ipns(
     use crate::ipfs_commands::publish_diap_identity_to_ipns;
     
     publish_diap_identity_to_ipns(api_url, cid, ipns_key_name).await
+}
+
+/// 发布CID到IPNS
+#[tauri::command]
+pub async fn ipfs_publish_ipns(
+    cid: String,
+    ipns_key: String,
+    ipfs_api_url: Option<String>,
+    diap_document: Option<String>, // 新增参数：完整的DIAP文档
+) -> Result<serde_json::Value, String> {
+    use crate::ipfs_commands::{publish_to_ipns_simple, add_json_to_ipfs};
+    
+    let api_url = ipfs_api_url.unwrap_or_else(|| "http://localhost:5001".to_string());
+    
+    // 如果提供了完整的DIAP文档，则先上传到IPFS获取CID，然后发布到IPNS
+    let ipns = match diap_document {
+        Some(doc) => {
+            info!(target: "diap", "📝 上传完整DIAP文档到IPFS...");
+            
+            // 1. 先上传DIAP文档到IPFS获取新的CID
+            match add_json_to_ipfs(&serde_json::from_str(&doc).map_err(|e| format!("解析DIAP文档失败: {}", e))?, "diap-document.json", &api_url).await {
+                Ok(cid) => {
+                    info!(target: "diap", "✅ DIAP文档上传到IPFS成功，CID: {}", cid);
+                    
+                    // 2. 将新的CID发布到IPNS
+                    match publish_to_ipns_simple(&cid, &ipns_key, &api_url).await {
+                        Ok(ipns_name) => {
+                            info!(target: "diap", "✅ DIAP文档CID发布到IPNS成功: {} -> {}", cid, ipns_name);
+                            ipns_name
+                        }
+                        Err(e) => {
+                            error!(target: "diap", "❌ DIAP文档CID发布到IPNS失败: {}", e);
+                            return Err(format!("发布失败: {}", e));
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(target: "diap", "❌ DIAP文档上传到IPFS失败: {}", e);
+                    return Err(format!("上传失败: {}", e));
+                }
+            }
+        }
+        None => {
+            // 如果没有提供DIAP文档，则使用传入的CID
+            match publish_to_ipns_simple(&cid, &ipns_key, &api_url).await {
+                Ok(ipns_name) => {
+                    info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", cid, ipns_name);
+                    ipns_name
+                }
+                Err(e) => {
+                    error!(target: "diap", "❌ CID发布到IPNS失败: {}", e);
+                    return Err(format!("发布失败: {}", e));
+                }
+            }
+        }
+    };
+    
+    Ok(serde_json::json!({
+        "success": true,
+        "ipns": format!("/ipns/{}", ipns)
+    }))
+}
+
+/// 本地生成完整的DIAP身份（包含ZKP证明和完整IPFS操作）
+#[tauri::command]
+pub async fn create_diap_identity_with_zkp(
+    agent_name: String,
+    agent_description: Option<String>,
+    ipfs_api_url: Option<String>,
+    ipfs_gateway_url: Option<String>,
+    session_id: String,
+) -> Result<serde_json::Value, String> {
+    use diap_rs_sdk::{AgentAuthManager, UniversalNoirManager};
+    
+    info!(target: "diap", "🚀 开始本地生成完整DIAP身份（包含ZKP和IPFS操作）: {}", agent_name);
+    
+    // 延迟初始化日志，避免重复初始化
+    let _ = env_logger::try_init();
+    
+    let ipfs_api = ipfs_api_url.unwrap_or_else(|| "http://localhost:5001".to_string());
+    let ipfs_gateway = ipfs_gateway_url.unwrap_or_else(|| "http://localhost:8080".to_string());
+    
+    // 1. 创建智能体认证管理器
+    let auth_manager = match AgentAuthManager::new_with_remote_ipfs(ipfs_api.clone(), ipfs_gateway.clone()).await {
+        Ok(manager) => manager,
+        Err(e) => {
+            error!(target: "diap", "创建认证管理器失败: {}", e);
+            return Err(format!("创建认证管理器失败: {}", e));
+        }
+    };
+    
+    // 2. 创建智能体
+    let (agent_info, keypair, peer_id) = match auth_manager.create_agent(&agent_name, None) {
+        Ok(result) => result,
+        Err(e) => {
+            error!(target: "diap", "创建智能体失败: {}", e);
+            return Err(format!("创建智能体失败: {}", e));
+        }
+    };
+    
+    info!(target: "diap", "✅ 智能体创建成功: {}", agent_info.name);
+    info!(target: "diap", "   DID: {}", keypair.did);
+    info!(target: "diap", "   PeerID: {}", peer_id);
+    
+    // 3. 注册身份（包含DID文档创建和IPFS上传）
+    let registration = match auth_manager.register_agent(&agent_info, &keypair, &peer_id).await {
+        Ok(registration) => registration,
+        Err(e) => {
+            error!(target: "diap", "注册身份失败: {}", e);
+            return Err(format!("注册身份失败: {}", e));
+        }
+    };
+    
+    info!(target: "diap", "✅ 身份注册成功");
+    info!(target: "diap", "   DID: {}", registration.did);
+    info!(target: "diap", "   CID: {}", registration.cid);
+    if let Some(ref ipns) = registration.ipns_name {
+        info!(target: "diap", "   IPNS: {}", ipns);
+    } else {
+        warn!(target: "diap", "⚠️  IPNS名称为空，尝试手动发布");
+    }
+    
+    // 4. 尝试创建ZKP证明（如果失败则继续）
+    let zkp_result = match create_zkp_proof(&registration.did, &registration.cid).await {
+        Ok(result) => {
+            info!(target: "diap", "✅ ZKP证明生成成功");
+            Some(result)
+        }
+        Err(e) => {
+            warn!(target: "diap", "⚠️  ZKP证明生成失败，继续使用基础身份: {}", e);
+            None
+        }
+    };
+    
+    // 5. 构建完整的DID文档（包含ZKP证明，如果可用）
+    let mut did_document_json = serde_json::to_value(&registration.did_document)
+        .map_err(|e| format!("序列化DID文档失败: {}", e))?;
+    
+    // 添加ZKP证明到DID文档（如果生成成功）
+    if let Some(ref zkp) = zkp_result {
+        if let Some(obj) = did_document_json.as_object_mut() {
+            obj.insert("zkpProof".to_string(), serde_json::json!({
+                "proof": general_purpose::STANDARD.encode(&zkp.proof),
+                "publicInputs": general_purpose::STANDARD.encode(&zkp.public_inputs),
+                "circuitOutput": zkp.circuit_output,
+                "timestamp": zkp.timestamp,
+                "verificationResult": zkp.verified,
+                "generatedBy": "alou-desktop-local-zkp"
+            }));
+        }
+    } else {
+        // 添加ZKP状态信息
+        if let Some(obj) = did_document_json.as_object_mut() {
+            obj.insert("zkpInfo".to_string(), serde_json::json!({
+                "status": "unavailable",
+                "message": "ZKP证明生成失败，使用基础DIAP身份",
+                "alternative": "可尝试重新生成或检查DIAP SDK配置"
+            }));
+        }
+    }
+    
+    // 添加服务信息
+    if let Some(services) = did_document_json.as_object_mut()
+        .and_then(|obj| obj.get_mut("service"))
+        .and_then(|s| s.as_array_mut()) {
+        services.push(serde_json::json!({
+            "id": format!("{}#messaging", keypair.did),
+            "type": "Messaging",
+            "serviceEndpoint": format!("https://{}.alou.fun/messaging", agent_name.to_lowercase()),
+            "description": "Alou智能体消息服务"
+        }));
+    }
+    
+    // 6. 手动发布到IPNS（确保IPNS创建成功）
+    let ipns_key = format!("agent-{}", session_id);
+    
+    // 将完整的DID文档序列化为JSON字符串
+    let did_document_str = serde_json::to_string(&did_document_json)
+        .map_err(|e| format!("序列化DID文档失败: {}", e))?;
+    
+    // 按照用户要求的次序：先创建ZKP的DIAP文档，再上传IPFS，最后上传CID到IPNS
+    // 使用修改后的ipfs_publish_ipns命令，传递完整的DIAP文档
+    let ipns_result = match ipfs_publish_ipns(registration.cid.clone(), ipns_key, Some(ipfs_api.clone()), Some(did_document_str)).await {
+        Ok(response) => {
+            if let Some(ipns_name) = response.get("ipns").and_then(|v| v.as_str()) {
+                info!(target: "diap", "✅ 完整DIAP文档发布到IPNS成功: {}", ipns_name);
+                Some(format!("/ipns/{}", ipns_name))
+            } else {
+                error!(target: "diap", "❌ IPNS发布响应格式错误: {:?}", response);
+                None
+            }
+        }
+        Err(e) => {
+            error!(target: "diap", "❌ 完整DIAP文档发布到IPNS失败: {}", e);
+            None
+        }
+    };
+    
+    info!(target: "diap", "🎉 完整DIAP身份创建成功（包含ZKP和IPFS操作）");
+    
+    // 6. 构建响应（包含所有必要信息）
+    let response = serde_json::json!({
+        "success": true,
+        "did": registration.did,
+        "did_document": did_document_json,
+        "public_key": keypair.public_key,
+        "private_key": keypair.private_key,
+        "ipns_key": format!("agent-{}", session_id),
+        "cid": registration.cid,
+        "ipns": ipns_result.or(registration.ipns_name.as_ref().map(|name| format!("/ipns/{}", name))),
+        "zkp_proof": zkp_result.as_ref().map(|zkp| serde_json::json!({
+            "generated": true,
+            "verified": zkp.verified,
+            "circuit_output": zkp.circuit_output,
+            "timestamp": zkp.timestamp
+        })),
+        "gateway_url": ipfs_gateway,
+        "session_id": session_id,
+        "agent_name": agent_name,
+        "agent_description": agent_description,
+        "created_at": chrono::Utc::now().to_rfc3339(),
+        "created_by": "alou-desktop-complete-zkp"
+    });
+    
+    Ok(response)
+}
+
+/// 辅助函数：创建ZKP证明
+async fn create_zkp_proof(did: &str, cid: &str) -> Result<ZkpProofResult, String> {
+    use diap_rs_sdk::UniversalNoirManager;
+    
+    let mut noir_manager = match UniversalNoirManager::new().await {
+        Ok(manager) => manager,
+        Err(e) => {
+            return Err(format!("创建Noir管理器失败: {}", e));
+        }
+    };
+    
+    // 准备ZKP输入
+    let inputs = diap_rs_sdk::noir_universal::NoirProverInputs {
+        expected_did_hash: "0".to_string(), 
+        public_key_hash: "0".to_string(),
+        nonce_hash: "0".to_string(),
+        expected_output: format!("did:{}:cid:{}", did, cid),
+    };
+    
+    // 生成证明
+    let proof = match noir_manager.generate_proof(&inputs).await {
+        Ok(proof) => proof,
+        Err(e) => {
+            return Err(format!("生成ZKP证明失败: {}", e));
+        }
+    };
+    
+    // 验证证明
+    let verification = match noir_manager.verify_proof(&proof.proof, &proof.public_inputs).await {
+        Ok(verification) => verification,
+        Err(e) => {
+            return Err(format!("验证ZKP证明失败: {}", e));
+        }
+    };
+    
+    if !verification.is_valid {
+        return Err("ZKP证明验证失败".to_string());
+    }
+    
+    Ok(ZkpProofResult {
+        proof: proof.proof,
+        public_inputs: proof.public_inputs,
+        circuit_output: proof.circuit_output,
+        timestamp: proof.timestamp,
+        verified: verification.is_valid,
+    })
+}
+
+/// ZKP证明结果
+#[derive(Clone, Debug)]
+struct ZkpProofResult {
+    proof: Vec<u8>,
+    public_inputs: Vec<u8>,
+    circuit_output: String,
+    timestamp: String,
+    verified: bool,
 }

@@ -51,7 +51,9 @@ use crate::diap::{
     create_diap_identity_from_did_document,
     get_local_diap_identity,
     update_local_diap_identity,
+    create_diap_identity_with_zkp,
     test_ipns_on_public_gateway,
+    ipfs_publish_ipns,
 };
 use crate::wallet::{verify_wallet_signature, get_testnet_private_key};
 use crate::browser::{open_browser, test_ipfs_node_connection};
@@ -195,6 +197,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_http::init())
         .manage(tauri::async_runtime::Mutex::new(IpfsState {
             process: None,
             data_dir: PathBuf::new(),
@@ -214,7 +217,6 @@ fn main() {
             test_ipfs_api,
             test_ipfs_api_with_config,
             ipfs_add_base64,
-            // PubSub commands
             ipfs_pubsub_publish,
             ipfs_pubsub_subscribe_once,
             ipfs_pubsub_peers,
@@ -227,13 +229,12 @@ fn main() {
             kv_keys,
             kv_clear,
             kv_stats,
-            kv_set_batch,
-            kv_get_batch,
             // DIAP commands
             create_local_diap_identity,
             create_diap_identity_from_did_document,
             get_local_diap_identity,
             update_local_diap_identity,
+            create_diap_identity_with_zkp,
             test_ipns_on_public_gateway,
             // LSP SDK commands
             execute_lsp,
