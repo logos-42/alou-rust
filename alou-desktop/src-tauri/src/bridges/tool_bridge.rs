@@ -2,8 +2,9 @@
 //!
 //! 提供前端与工具执行器的桥接功能
 
-use super::super::tools::{ToolRegistry, ToolResult, ToolError, ExecutionContext, ToolConfig};
+use super::super::tools::{ToolRegistry, ToolResult, ToolError, ExecutionContext, ToolConfig, initialize_tools};
 use crate::tools::executor::ToolExecutionManager;
+use crate::tools::{FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, SkillsTool};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
@@ -15,13 +16,38 @@ pub struct ToolBridge {
 }
 
 impl ToolBridge {
-    /// 创建新的工具桥接
-    pub fn new(config: ToolBridgeConfig) -> Self {
-        Self {
+    /// 创建新的工具桥接（同步版本，用于Tauri setup）
+    pub fn new_sync(config: ToolBridgeConfig) -> Self {
+        let mut bridge = Self {
             registry: ToolRegistry::new(),
-            execution_manager: ToolExecutionManager::new(config.tool_config),
+            execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: std::sync::Arc::new(std::sync::Mutex::new(0)),
-        }
+        };
+        
+        // 在同步上下文中注册工具
+        // 注意：这里使用blocking_register来避免异步问题
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(async {
+            if let Err(e) = bridge.register_all_tools().await {
+                eprintln!("Failed to register tools: {}", e);
+            }
+        });
+        
+        bridge
+    }
+
+    /// 创建新的工具桥接
+    pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut bridge = Self {
+            registry: ToolRegistry::new(),
+            execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
+            request_count: std::sync::Arc::new(std::sync::Mutex::new(0)),
+        };
+        
+        // 注册所有工具
+        bridge.register_all_tools().await?;
+        
+        Ok(bridge)
     }
 
     /// 处理工具调用请求
@@ -63,9 +89,48 @@ impl ToolBridge {
         Ok(*self.request_count.lock().unwrap())
     }
 
+    /// 注册所有工具
+    async fn register_all_tools(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // 注册文件系统工具
+        let fs_tool = Arc::new(FileSystemTool::new());
+        self.register_tool(fs_tool).await?;
+        
+        // 注册搜索工具
+        let search_tool = Arc::new(SearchTool::new());
+        self.register_tool(search_tool).await?;
+        
+        // 注册Bash工具
+        let bash_tool = Arc::new(BashTool::new());
+        self.register_tool(bash_tool).await?;
+        
+        // 注册计划工具
+        let plan_tool = Arc::new(PlanTool::new());
+        self.register_tool(plan_tool).await?;
+        
+        // 注册待办事项工具
+        let todo_tool = Arc::new(TodoListTool::new());
+        self.register_tool(todo_tool).await?;
+        
+        // 注册Skills工具
+        let skills_tool = Arc::new(SkillsTool::new());
+        self.register_tool(skills_tool).await?;
+        
+        println!("✅ All tools registered successfully in ToolBridge");
+        Ok(())
+    }
+
     /// 注册工具
-    pub async fn register_tool(&mut self, tool: Arc<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error>> {
-        self.registry.register(tool).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    async fn register_tool(&mut self, tool: Arc<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error>> {
+        let tool_id = tool.metadata().id.clone();
+        
+        // 注册到ToolRegistry
+        self.registry.register(tool.clone()).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        
+        // 注册到ToolExecutionManager
+        self.execution_manager.register_executor(tool_id.clone(), tool);
+        
+        println!("✅ Tool '{}' registered successfully", tool_id);
+        Ok(())
     }
 
     /// 更新配置

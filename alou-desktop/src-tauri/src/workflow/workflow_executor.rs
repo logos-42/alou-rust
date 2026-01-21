@@ -2,14 +2,11 @@
 //!
 //! 提供异步工作流执行功能，支持并发步骤执行、实时进度更新和错误处理
 
-pub use crate::workflow_types::*;
-pub use crate::workflow_commands::*;
-pub use crate::workflow_ralph_loop::*;
-pub use crate::workflow_history::*;
+pub use super::*;
 
 use crate::workflow::{Workflow, WorkflowStep};
-use crate::workflow_storage::{WorkflowStorage, StorageConfig};
-use crate::workflow_monitor::WorkflowMonitor;
+use super::{WorkflowStorage, StorageConfig};
+use super::WorkflowMonitor;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -337,7 +334,7 @@ impl AsyncWorkflowExecutor {
 
                     if retry_count <= max_retries {
                         // 计算重试延迟
-                        let delay_ms = self.calculate_retry_delay(retry_count);
+                        let delay_ms = self.calculate_retry_delay(retry_count, self.retry_config.initial_delay_ms);
                         eprintln!("Step '{}' failed (attempt {}/{}), retrying in {}ms: {}",
                                 step.id, retry_count, max_retries + 1, delay_ms, error);
 
@@ -362,14 +359,6 @@ impl AsyncWorkflowExecutor {
         }
     }
 
-    /// 计算重试延迟（指数退避）
-    fn calculate_retry_delay(&self, retry_count: u32) -> u64 {
-        let base_delay = self.retry_config.initial_delay_ms as f64;
-        let multiplier = self.retry_config.backoff_multiplier;
-        let delay = base_delay * multiplier.powi(retry_count.saturating_sub(1) as i32);
-        let capped_delay = delay.min(self.retry_config.max_delay_ms as f64);
-        capped_delay as u64
-    }
 
     /// 执行步骤逻辑（使用真实工具执行）
     pub async fn execute_step_logic(

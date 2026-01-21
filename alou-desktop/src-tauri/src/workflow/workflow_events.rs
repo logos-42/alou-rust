@@ -2,7 +2,7 @@
 //!
 //! 将异步工作流执行器的事件与Tauri事件系统集成
 
-use crate::workflow_executor::{AsyncWorkflowExecutor, ExecutionEvent};
+use super::{AsyncWorkflowExecutor, ExecutionEvent};
 use tauri::{Manager, Emitter};
 
 /// 工作流事件管理器

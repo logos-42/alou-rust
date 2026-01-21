@@ -66,7 +66,7 @@ impl BridgeManager {
     /// 创建新的桥接管理器
     pub fn new(config: BridgeConfig) -> Self {
         Self {
-            tool_bridge: ToolBridge::new(config.tool_bridge.clone()),
+            tool_bridge: ToolBridge::new_sync(config.tool_bridge.clone()),
             context_bridge: ContextBridge::new(config.context_bridge.clone()),
             config,
             statistics: BridgeStatistics {

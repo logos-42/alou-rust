@@ -185,20 +185,20 @@ pub struct RalphLoopConfig {
 impl Default for RalphLoopConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
-            max_iterations: 10,
-            iteration_delay_ms: 1000,
-            completion_checker: None,
-            max_total_time_ms: Some(300000), // 5分钟
-            iteration_timeout_ms: 60000, // 1分钟
-            max_cost: None,
+            enabled: true,  // 默认启用Ralph Loop
+            max_iterations: 50,  // 增加最大迭代次数
+            iteration_delay_ms: 500,  // 减少延迟，更快响应
+            completion_checker: Some("auto".to_string()),  // AI自动判断完成条件
+            max_total_time_ms: Some(1800000), // 30分钟
+            iteration_timeout_ms: 120000, // 2分钟
+            max_cost: Some(10.0),  // 设置成本限制
             enable_history: true,
             smart_retry: SmartRetryStrategy {
                 enabled: true,
                 error_based_retry: std::collections::HashMap::new(),
                 adaptive_retry: true,
-                max_consecutive_failures: 3,
-                learning_period: 5,
+                max_consecutive_failures: 5,  // 增加容忍度
+                learning_period: 3,  // 减少学习周期
             },
         }
     }

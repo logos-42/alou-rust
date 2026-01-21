@@ -8,23 +8,17 @@ mod diap;
 mod ipfs_api;
 mod ipfs_commands;
 mod ipfs_node;
+mod ipfs;
 mod kubo;
 mod kv_commands;  // 新增KV存储模块
 mod lsp;
 mod memory_manager;  // 新增内存管理模块
+mod prompts;        // 新增Prompt管理模块
 mod spec;
 mod sync;
 mod utils;
 mod wallet;
 mod workflow;
-mod workflow_types;
-mod workflow_commands;
-mod workflow_ralph_loop;
-mod workflow_executor;
-mod workflow_events;
-mod workflow_history;
-mod workflow_monitor;
-mod workflow_storage;
 mod tools;
 
 use std::path::PathBuf;
@@ -33,7 +27,7 @@ use tauri::Manager;
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
 use crate::kubo::download_kubo_binary;
 use crate::workflow::WorkflowState;
-use crate::workflow_executor::AsyncWorkflowExecutor;
+use crate::workflow::AsyncWorkflowExecutor;
 use crate::ipfs_api::{
     diagnose_ipfs_api, get_ipfs_api_address, test_ipfs_api, test_ipfs_api_with_config,
 };
@@ -66,11 +60,12 @@ use crate::workflow::{
     create_workflow, execute_workflow, get_workflow_status, list_workflows,
     delete_workflow, retry_workflow_step, pause_workflow, resume_workflow,
 };
-use crate::workflow_executor::{
+use crate::workflow::{
     get_execution_status, pause_execution, resume_execution, cancel_execution,
-    get_execution_logs, get_performance_metrics,
+    get_execution_logs, get_performance_metrics, get_ralph_loop_history,
+    rollback_ralph_loop_execution, cleanup_ralph_loop_histories,
+    start_workflow_event_listener,
 };
-use crate::workflow_events::start_workflow_event_listener;
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
 use crate::tools::initialize_tools;
 use crate::context::create_default_context_manager;
@@ -267,6 +262,10 @@ fn main() {
             // Monitoring commands
             get_execution_logs,
             get_performance_metrics,
+            // Ralph Loop commands
+            get_ralph_loop_history,
+            rollback_ralph_loop_execution,
+            cleanup_ralph_loop_histories,
             // Tool commands
             execute_tool,
             get_tool_list,
@@ -296,10 +295,8 @@ fn main() {
                 window.set_title("Alou").unwrap();
             }
 
-            // Initialize tools (synchronous logging for now)
-            // Note: In Tauri, we can't modify state directly in setup
-            // Tools are registered in the ToolBridge constructor
-            println!("ℹ️  Tool system initialized (tools registered in ToolBridge constructor)");
+            // Tools are now registered synchronously in ToolBridge::new_sync
+            println!("ℹ️  Tool system initialized with all tools registered");
 
             // Start wallet sync server on startup
             let app_handle = app.handle().clone();

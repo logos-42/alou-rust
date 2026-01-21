@@ -2,7 +2,7 @@
 //!
 //! 提供工作流执行的监控、日志记录和性能分析功能
 
-use crate::workflow_executor::{ExecutionStatus, WorkflowExecution, StepResult};
+use super::{ExecutionStatus, WorkflowExecution, StepResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

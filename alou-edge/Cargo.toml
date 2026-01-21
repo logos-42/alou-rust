@@ -40,7 +40,7 @@ tokio = { version = "1.0", default-features = false, features = ["sync", "time"]
 gloo-timers = { version = "0.3", features = ["futures"] }
 
 # HTTP client for Claude API (only for non-WASM testing)
-reqwest = { version = "0.11", default-features = false, features = ["json"], optional = true }
+reqwest = { version = "0.11", default-features = false, features = ["json", "multipart"], optional = true }
 
 # Note: We implement Claude API client directly using worker's fetch
 # because official SDKs don't support WASM/Cloudflare Workers environment
@@ -57,6 +57,9 @@ k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"]
 ed25519-dalek = { version = "2.0", default-features = false, features = ["rand_core", "std"] }
 getrandom = { version = "0.2", features = ["js"] }
 bs58 = "0.5"
+
+# DIAP SDK for ZKP support
+diap-rs-sdk = { version = "0.2.11", default-features = false, features = ["embedded-noir"] }
 
 # Regex for text parsing (WASM-compatible)
 regex = { version = "1.10", default-features = false, features = ["std"] }

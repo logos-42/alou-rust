@@ -2,8 +2,8 @@
 //!
 //! 提供前端与工作流执行器的桥接功能
 
-use crate::workflow_executor::AsyncWorkflowExecutor;
-use crate::workflow_types::*;
+use super::AsyncWorkflowExecutor;
+use super::*;
 
 /// 获取执行状态（Tauri命令）
 #[tauri::command]

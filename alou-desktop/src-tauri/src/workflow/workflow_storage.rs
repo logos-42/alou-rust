@@ -2,7 +2,7 @@
 //!
 //! 提供工作流执行状态的持久化存储功能
 
-use crate::workflow_executor::{WorkflowExecution, ExecutionStatus};
+use super::{WorkflowExecution, ExecutionStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

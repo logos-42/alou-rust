@@ -501,6 +501,62 @@ impl SkillsTool {
         executors.remove(skill_id);
         Ok(())
     }
+
+    /// 搜索技能
+    async fn search_skills(&self, query: &str) -> Vec<serde_json::Value> {
+        let skills = self.list_skills(None).await;
+        let query_lower = query.to_lowercase();
+        
+        let mut matching_skills = Vec::new();
+        
+        for skill in skills {
+            let mut relevance_score = 0;
+            
+            // 检查名称匹配
+            if skill.name.to_lowercase().contains(&query_lower) {
+                relevance_score += 10;
+            }
+            
+            // 检查描述匹配
+            if skill.description.to_lowercase().contains(&query_lower) {
+                relevance_score += 5;
+            }
+            
+            // 检查类别匹配
+            if skill.category.to_lowercase().contains(&query_lower) {
+                relevance_score += 3;
+            }
+            
+            // 检查标签匹配
+            for tag in &skill.tags {
+                if tag.to_lowercase().contains(&query_lower) {
+                    relevance_score += 2;
+                }
+            }
+            
+            // 如果有相关性，添加到结果中
+            if relevance_score > 0 {
+                matching_skills.push(serde_json::json!({
+                    "id": skill.id,
+                    "name": skill.name,
+                    "description": skill.description,
+                    "category": skill.category,
+                    "tags": skill.tags,
+                    "relevance_score": relevance_score,
+                    "version": skill.version
+                }));
+            }
+        }
+        
+        // 按相关性排序
+        matching_skills.sort_by(|a, b| {
+            let score_a = a.get("relevance_score").and_then(|v| v.as_u64()).unwrap_or(0);
+            let score_b = b.get("relevance_score").and_then(|v| v.as_u64()).unwrap_or(0);
+            score_b.cmp(&score_a)
+        });
+        
+        matching_skills
+    }
 }
 
 #[async_trait]
@@ -643,6 +699,28 @@ impl ToolExecutor for SkillsTool {
                 })
             }
 
+            "search" => {
+                let query = args.get("query")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| ToolError::InvalidArguments("Missing 'query' field".to_string()))?;
+
+                let skills = self.search_skills(query).await;
+
+                Ok(ToolResult {
+                    success: true,
+                    data: serde_json::json!({
+                        "query": query,
+                        "skills": skills,
+                        "count": skills.len()
+                    }),
+                    error: None,
+                    execution_time_ms: 0,
+                    output: Some(format!("Found {} skills matching '{}'", skills.len(), query)),
+                    warnings: vec![],
+                    context: None,
+                })
+            }
+
             _ => Err(ToolError::InvalidArguments(format!("Unknown action: {}", action))),
         }
     }
@@ -671,6 +749,7 @@ Actions:
   - list_skills: List all skills (optionally filtered by category)
   - update_skill: Update an existing skill
   - delete_skill: Delete a skill
+  - search: Search skills by query
 
 Examples:
 
@@ -705,6 +784,12 @@ List skills by category:
 {
   "action": "list_skills",
   "category": "text_processing"
+}
+
+Search skills:
+{
+  "action": "search",
+  "query": "text"
 }"#
         .to_string()
     }

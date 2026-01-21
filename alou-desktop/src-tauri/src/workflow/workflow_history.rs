@@ -2,8 +2,8 @@
 //!
 //! 提供执行历史的记录、查询、回滚和清理功能
 
-use crate::workflow_executor::AsyncWorkflowExecutor;
-use crate::workflow_types::*;
+use super::AsyncWorkflowExecutor;
+use super::*;
 
 impl AsyncWorkflowExecutor {
     /// 回滚到指定的历史状态

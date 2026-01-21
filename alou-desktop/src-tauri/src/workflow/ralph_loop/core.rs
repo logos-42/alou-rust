@@ -1,11 +1,17 @@
-//! Ralph Loop 执行逻辑
+//! Ralph Loop 核心执行逻辑
 //!
-//! 实现 Ralph Loop 的核心执行逻辑，包括迭代执行、完成条件检查和智能重试
+//! 实现 Ralph Loop 的主要循环执行逻辑
 
-use crate::workflow_executor::AsyncWorkflowExecutor;
-use crate::workflow_types::*;
+use super::super::AsyncWorkflowExecutor;
+use super::super::*;
 use crate::workflow::{Workflow, WorkflowStep};
+use crate::bridges::BridgeManager;
 use tokio::time::{sleep, Duration};
+
+use super::ai_decision::*;
+use super::research::*;
+use super::learning::*;
+use super::retry_strategy::*;
 
 impl AsyncWorkflowExecutor {
     /// 使用Ralph Loop执行工作流
@@ -106,67 +112,28 @@ impl AsyncWorkflowExecutor {
                 }
             }
 
-            // 检查执行结果
-            match result {
-                Ok(iteration_result) => {
-                    // 更新总成本
-                    total_cost += 0.01;
-
-                    // 检查完成条件
-                    if self.check_completion_condition(&iteration_result, &ralph_config).await {
-                        println!("✅ [RALPH-LOOP] Completion condition met! Terminating loop.");
-
-                        // 更新历史状态
-                        if ralph_config.enable_history {
-                            let mut histories = self.ralph_loop_histories.write().await;
-                            if let Some(history) = histories.get_mut(&execution_id) {
-                                history.completed_at = Some(chrono::Utc::now().timestamp());
-                                history.final_status = Some("completed".to_string());
-                                history.total_execution_time_ms = Some((chrono::Utc::now().timestamp_millis() as u64 - start_time) as u64);
-                            }
-                        }
-
-                        self.complete_execution(&execution_id, ExecutionStatus::Completed).await;
-
-                        // 发送Ralph Loop完成事件
-                        let _ = self.event_sender.send(ExecutionEvent::Completed {
-                            execution_id: execution_id.clone(),
-                            result: serde_json::json!({
-                                "ralph_loop_iterations": iteration,
-                                "total_time_ms": chrono::Utc::now().timestamp_millis() as u64 - start_time,
-                                "total_cost": total_cost,
-                                "final_result": iteration_result
-                            }),
-                        });
-
-                        return Ok(());
-                    } else {
-                        println!("🔄 [RALPH-LOOP] Completion condition not met, continuing loop...");
-                    }
+            // 处理执行结果
+            match self.handle_iteration_result(
+                &execution_id,
+                &workflow,
+                iteration,
+                result,
+                &api_key,
+                &agent_info,
+                &ralph_config,
+                start_time,
+                total_cost,
+            ).await {
+                LoopResult::Continue => {
+                    // 继续下一次迭代
                 }
-                Err(e) => {
-                    eprintln!("❌ [RALPH-LOOP] Iteration {} failed: {}", iteration, e);
-
-                    // 应用智能重试策略
-                    if ralph_config.smart_retry.enabled {
-                        if self.should_retry_with_smart_strategy(&execution_id, &ralph_config, iteration, &e).await {
-                            println!("🔄 [SMART-RETRY] Retrying iteration {} with adjusted strategy", iteration);
-                            continue;
-                        }
-                    }
-
-                    // 更新历史状态为失败
-                    if ralph_config.enable_history {
-                        let mut histories = self.ralph_loop_histories.write().await;
-                        if let Some(history) = histories.get_mut(&execution_id) {
-                            history.completed_at = Some(chrono::Utc::now().timestamp());
-                            history.final_status = Some("failed".to_string());
-                            history.total_execution_time_ms = Some((chrono::Utc::now().timestamp_millis() as u64 - start_time) as u64);
-                        }
-                    }
-
-                    self.complete_execution(&execution_id, ExecutionStatus::Failed).await;
-                    return Err(format!("Ralph Loop iteration {} failed: {}", iteration, e));
+                LoopResult::Completed => {
+                    // 任务完成
+                    return Ok(());
+                }
+                LoopResult::Failed(error) => {
+                    // 执行失败
+                    return Err(error);
                 }
             }
 
@@ -174,6 +141,233 @@ impl AsyncWorkflowExecutor {
             if iteration < ralph_config.max_iterations {
                 println!("⏳ [RALPH-LOOP] Waiting {}ms before next iteration", ralph_config.iteration_delay_ms);
                 sleep(Duration::from_millis(ralph_config.iteration_delay_ms)).await;
+            }
+        }
+    }
+
+    /// 处理迭代结果
+    async fn handle_iteration_result(
+        &self,
+        execution_id: &str,
+        workflow: &Workflow,
+        iteration: u32,
+        result: Result<serde_json::Value, String>,
+        api_key: &str,
+        agent_info: &Option<serde_json::Value>,
+        ralph_config: &RalphLoopConfig,
+        start_time: u64,
+        total_cost: f64,
+    ) -> LoopResult {
+        match result {
+            Ok(iteration_result) => {
+                // 追踪AI学习进度
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    "workflow_execution",
+                    &iteration_result
+                ).await;
+
+                // AI自动决策下一步行动（集成历史和学习进度）
+                let ai_decision = match self.ai_decide_next_action_with_context(
+                    execution_id,
+                    iteration,
+                    &iteration_result,
+                    api_key,
+                ).await {
+                    Ok(decision) => decision,
+                    Err(e) => {
+                        eprintln!("❌ [AI-DECISION] Failed to get AI decision: {}", e);
+                        "CONTINUE".to_string() // 默认继续
+                    }
+                };
+
+                // 根据AI决策执行相应行动
+                match self.execute_ai_decision(
+                    execution_id,
+                    workflow,
+                    iteration,
+                    &iteration_result,
+                    &ai_decision,
+                    api_key,
+                    agent_info,
+                    ralph_config,
+                    start_time,
+                    total_cost,
+                ).await {
+                    DecisionResult::Continue => LoopResult::Continue,
+                    DecisionResult::Completed => LoopResult::Completed,
+                    DecisionResult::Retry => LoopResult::Continue,
+                }
+            }
+            Err(e) => {
+                eprintln!("❌ [RALPH-LOOP] Iteration {} failed: {}", iteration, e);
+
+                // 应用智能重试策略
+                if ralph_config.smart_retry.enabled {
+                    if self.should_retry_with_smart_strategy(execution_id, ralph_config, iteration, &e).await {
+                        println!("🔄 [SMART-RETRY] Retrying iteration {} with adjusted strategy", iteration);
+                        return LoopResult::Continue;
+                    }
+                }
+
+                // 更新历史状态为失败
+                if ralph_config.enable_history {
+                    let mut histories = self.ralph_loop_histories.write().await;
+                    if let Some(history) = histories.get_mut(execution_id) {
+                        history.completed_at = Some(chrono::Utc::now().timestamp());
+                        history.final_status = Some("failed".to_string());
+                        history.total_execution_time_ms = Some((chrono::Utc::now().timestamp_millis() as u64 - start_time) as u64);
+                    }
+                }
+
+                self.complete_execution(execution_id, ExecutionStatus::Failed).await;
+                LoopResult::Failed(format!("Ralph Loop iteration {} failed: {}", iteration, e))
+            }
+        }
+    }
+
+    /// 执行AI决策
+    async fn execute_ai_decision(
+        &self,
+        execution_id: &str,
+        workflow: &Workflow,
+        iteration: u32,
+        iteration_result: &serde_json::Value,
+        ai_decision: &str,
+        api_key: &str,
+        agent_info: &Option<serde_json::Value>,
+        ralph_config: &RalphLoopConfig,
+        start_time: u64,
+        total_cost: f64,
+    ) -> DecisionResult {
+        match ai_decision {
+            "COMPLETED" => {
+                println!("✅ [AI-DECISION] AI determined task is completed");
+                
+                // 记录完成状态
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    "task_completed",
+                    iteration_result
+                ).await;
+                
+                // 更新历史状态
+                if ralph_config.enable_history {
+                    let mut histories = self.ralph_loop_histories.write().await;
+                    if let Some(history) = histories.get_mut(execution_id) {
+                        history.completed_at = Some(chrono::Utc::now().timestamp());
+                        history.final_status = Some("completed".to_string());
+                        history.total_execution_time_ms = Some((chrono::Utc::now().timestamp_millis() as u64 - start_time) as u64);
+                    }
+                }
+
+                self.complete_execution(execution_id, ExecutionStatus::Completed).await;
+
+                // 发送Ralph Loop完成事件
+                let _ = self.event_sender.send(ExecutionEvent::Completed {
+                    execution_id: execution_id.to_string(),
+                    result: serde_json::json!({
+                        "ralph_loop_iterations": iteration,
+                        "total_time_ms": chrono::Utc::now().timestamp_millis() as u64 - start_time,
+                        "total_cost": total_cost,
+                        "final_result": iteration_result,
+                        "ai_decision": ai_decision,
+                        "learning_progress": "completed"
+                    }),
+                });
+
+                DecisionResult::Completed
+            }
+            decision if decision.starts_with("RETRY:") => {
+                let error_desc = decision.strip_prefix("RETRY:").unwrap_or("未知错误");
+                println!("🔄 [AI-DECISION] AI decided to retry: {}", error_desc);
+                
+                // 记录重试决策
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    &format!("retry:{}", error_desc),
+                    iteration_result
+                ).await;
+                
+                DecisionResult::Retry
+            }
+            decision if decision.starts_with("RESEARCH:") => {
+                let research_query = decision.strip_prefix("RESEARCH:").unwrap_or("未知查询");
+                println!("📚 [AI-DECISION] AI decided to research: {}", research_query);
+                
+                // 记录调研决策
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    &format!("research:{}", research_query),
+                    iteration_result
+                ).await;
+                
+                // 执行文档调研
+                match self.research_documentation_with_ai(research_query, api_key).await {
+                    Ok(research_results) => {
+                        println!("📊 [RESEARCH] Research completed, integrating results into loop");
+                        
+                        // 记录调研完成
+                        self.track_ai_learning_progress(
+                            execution_id,
+                            iteration,
+                            "research_completed",
+                            &serde_json::json!({
+                                "research_results": research_results,
+                                "research_summary": self.summarize_research_results(&research_results).await
+                            })
+                        ).await;
+                        
+                        // 记录调研结果到历史
+                        self.record_research_to_history(execution_id, &research_results).await;
+                        
+                        DecisionResult::Continue
+                    }
+                    Err(e) => {
+                        println!("❌ [RESEARCH] Research failed: {}", e);
+                        
+                        // 记录调研失败
+                        self.track_ai_learning_progress(
+                            execution_id,
+                            iteration,
+                            &format!("research_failed:{}", e),
+                            iteration_result
+                        ).await;
+                        
+                        DecisionResult::Continue
+                    }
+                }
+            }
+            decision if decision.starts_with("ADJUST:") => {
+                let adjustment = decision.strip_prefix("ADJUST:").unwrap_or("未知调整");
+                println!("🔧 [AI-DECISION] AI decided to adjust strategy: {}", adjustment);
+                
+                // 记录策略调整
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    &format!("adjust:{}", adjustment),
+                    iteration_result
+                ).await;
+                
+                DecisionResult::Continue
+            }
+            "CONTINUE" | _ => {
+                println!("🔄 [AI-DECISION] AI decided to continue execution");
+                
+                // 记录继续执行
+                self.track_ai_learning_progress(
+                    execution_id,
+                    iteration,
+                    "continue_execution",
+                    iteration_result
+                ).await;
+                
+                DecisionResult::Continue
             }
         }
     }
@@ -358,60 +552,18 @@ impl AsyncWorkflowExecutor {
             }
         }
     }
+}
 
-    /// 智能重试策略判断
-    pub async fn should_retry_with_smart_strategy(
-        &self,
-        execution_id: &str,
-        ralph_config: &RalphLoopConfig,
-        current_iteration: u32,
-        error: &str,
-    ) -> bool {
-        if !ralph_config.smart_retry.enabled {
-            return false;
-        }
+/// 循环结果枚举
+enum LoopResult {
+    Continue,
+    Completed,
+    Failed(String),
+}
 
-        let histories = self.ralph_loop_histories.read().await;
-        let history = match histories.get(execution_id) {
-            Some(h) => h,
-            None => return false,
-        };
-
-        // 检查连续失败次数
-        let recent_failures = history.iterations.iter()
-            .rev()
-            .take(ralph_config.smart_retry.max_consecutive_failures as usize)
-            .filter(|iter| iter.error.is_some())
-            .count();
-
-        if recent_failures >= ralph_config.smart_retry.max_consecutive_failures as usize {
-            println!("🚫 [SMART-RETRY] Too many consecutive failures ({}), not retrying", recent_failures);
-            return false;
-        }
-
-        // 基于错误类型的重试策略
-        if let Some(retry_config) = ralph_config.smart_retry.error_based_retry.get(error) {
-            // 这里可以根据错误类型调整重试参数
-            println!("🔧 [SMART-RETRY] Applying error-specific retry strategy for: {}", error);
-            return current_iteration < retry_config.max_retries;
-        }
-
-        // 自适应重试：根据历史表现调整
-        if ralph_config.smart_retry.adaptive_retry && current_iteration >= ralph_config.smart_retry.learning_period {
-            let success_rate = history.iterations.iter()
-                .filter(|iter| iter.result.is_some())
-                .count() as f64 / history.iterations.len() as f64;
-
-            if success_rate > 0.5 {
-                println!("📈 [SMART-RETRY] Good success rate ({:.2}), continuing retry", success_rate);
-                return true;
-            } else {
-                println!("📉 [SMART-RETRY] Low success rate ({:.2}), reducing retry frequency", success_rate);
-                return false;
-            }
-        }
-
-        // 默认重试逻辑
-        current_iteration < 3
-    }
+/// 决策结果枚举
+enum DecisionResult {
+    Continue,
+    Completed,
+    Retry,
 }
