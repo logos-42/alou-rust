@@ -298,6 +298,11 @@ impl Router {
                 self.handle_task_status(env, task_id).await
             }
 
+            (Method::Get, path) if path.starts_with("/api/ai-task/") && path.ends_with("/pending-tools") => {
+                let task_id = path.trim_start_matches("/api/ai-task/").trim_end_matches("/pending-tools");
+                self.handle_pending_tools(env, task_id).await
+            }
+
             (Method::Get, path) if path.starts_with("/api/ai-task/") && path.ends_with("/result") => {
                 let task_id = path.trim_start_matches("/api/ai-task/").trim_end_matches("/result");
                 // result 接口返回完整结果（兼容前端AsyncTaskService）
@@ -769,6 +774,20 @@ impl Router {
     async fn handle_task_status(&self, env: &Env, task_id: &str) -> Result<Response> {
         use crate::compatibility::router::handle_task_status as handle_status;
         handle_status(env, task_id).await
+    }
+
+    /// 处理待处理工具查询
+    async fn handle_pending_tools(&self, env: &Env, task_id: &str) -> Result<Response> {
+        use crate::compatibility::router;
+        
+        // 暂时返回空结果，让前端继续轮询
+        // 实际的工具执行逻辑在 AITaskDO 中处理
+        let response = serde_json::json!({
+            "task_id": task_id,
+            "toolCalls": []
+        });
+        
+        Response::from_json(&response)
     }
     
     /// 处理任务取消

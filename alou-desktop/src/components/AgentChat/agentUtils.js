@@ -10,48 +10,46 @@ export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?
  */
 export const resolveAgentAvatar = (agent) => {
   if (!agent) return fallbackAvatar
-  
-  // 调试日志
-  console.log('[resolveAgentAvatar] 开始解析头像:', {
-    id: agent.id,
-    name: agent.name || agent.display_name,
-    hasAvatar: !!agent.avatar,
-    hasAvatarUrl: !!agent.avatar_url,
-    hasAvatarCid: !!(agent.avatarCid || agent.avatar_cid),
-    avatarUrl: agent.avatar_url?.substring(0, 100),
-    avatarCid: agent.avatar_cid || agent.avatarCid
-  })
+
+  // 只在启动时输出一次调试日志
+  if (!resolveAgentAvatar.hasLogged) {
+    console.log('[resolveAgentAvatar] 开始解析头像:', {
+      id: agent.id,
+      name: agent.name || agent.display_name,
+      hasAvatar: !!agent.avatar,
+      hasAvatarUrl: !!agent.avatar_url,
+      hasAvatarCid: !!(agent.avatarCid || agent.avatar_cid),
+      avatarUrl: agent.avatar_url?.substring(0, 100),
+      avatarCid: agent.avatar_cid || agent.avatarCid
+    })
+    resolveAgentAvatar.hasLogged = true
+  }
   
   // 1. 优先使用 avatar 字段（包含base64数据）
   if (agent.avatar) {
     // 如果是 data URL（base64），直接返回
     if (agent.avatar.startsWith('data:')) {
-      console.log('[resolveAgentAvatar] 使用 data URL 头像')
       return agent.avatar
     }
     // 如果是 http URL，直接返回
     if (agent.avatar.startsWith('http')) {
-      console.log('[resolveAgentAvatar] 使用 http avatar 头像')
       return agent.avatar
     }
   }
   
   // 2. 使用 avatar_url 字段
   if (agent.avatar_url && agent.avatar_url.startsWith('http')) {
-    console.log('[resolveAgentAvatar] 使用 avatar_url 头像:', agent.avatar_url.substring(0, 100))
     return agent.avatar_url
   }
   
   // 3. IPFS CID（支持多种格式）
   const avatarCid = agent.avatarCid || agent.avatar_cid
   if (avatarCid) {
-    console.log('[resolveAgentAvatar] 发现 avatar_cid:', avatarCid)
     // 如果已经是完整 URL
     if (avatarCid.startsWith('http')) return avatarCid
     // 如果是 IPFS CID 格式
     if (avatarCid.startsWith('Qm') || avatarCid.startsWith('bafy') || avatarCid.startsWith('bafk')) {
       const resolvedUrl = agentAssetsService.resolveIpfsUri(avatarCid)
-      console.log('[resolveAgentAvatar] 解析 IPFS URL:', resolvedUrl)
       return resolvedUrl
     }
   }
@@ -104,17 +102,20 @@ export const buildChannelFromAgent = (agent) => {
     console.error('[buildChannelFromAgent] agent 为 null！')
     return null
   }
-  
-  // 调试日志
-  console.log('[buildChannelFromAgent] 开始构建频道:', {
-    id: agent.id,
-    name: agent.name || agent.display_name,
-    hasAvatar: !!agent.avatar,
-    hasAvatarUrl: !!agent.avatar_url,
-    hasAvatarCid: !!(agent.avatar_cid || agent.avatarCid),
-    hasMeta: !!agent.meta,
-    keys: Object.keys(agent)
-  })
+
+  // 只在启动时输出一次调试日志
+  if (!buildChannelFromAgent.hasLogged) {
+    console.log('[buildChannelFromAgent] 开始构建频道:', {
+      id: agent.id,
+      name: agent.name || agent.display_name,
+      hasAvatar: !!agent.avatar,
+      hasAvatarUrl: !!agent.avatar_url,
+      hasAvatarCid: !!(agent.avatar_cid || agent.avatarCid),
+      hasMeta: !!agent.meta,
+      keys: Object.keys(agent)
+    })
+    buildChannelFromAgent.hasLogged = true
+  }
   
   // 过滤掉 mock IPNS 值
   const mockIpns = 'k51qzi5uqu5dihfll965owckn1s0zsrip0twrzaa4939vs6e0mccc33namyv0s'

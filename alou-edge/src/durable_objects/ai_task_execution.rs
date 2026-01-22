@@ -281,6 +281,18 @@ impl<'a> TaskExecutorImpl<'a> {
                     }).collect();
                     TaskPersistence::save_pending_tool_calls(self.ctx.storage, self.ctx.task_name, &tool_calls).await?;
 
+                    // 为 DeepSeek API 添加占位工具响应消息
+                    // DeepSeek 要求：assistant 消息包含 tool_calls 后必须跟随工具响应消息
+                    for tc in &ai_response.tool_calls {
+                        conversation_history.push(AiMessage {
+                            role: "tool".to_string(),
+                            content: "".to_string(), // 使用空内容作为占位，等待实际工具结果
+                            tool_call_id: Some(tc.id.clone()),
+                            tool_calls: None,
+                        });
+                    }
+                    self.save_conversation_history(&conversation_history).await?;
+
                     // 更新状态为等待工具结果
                     state.status = TaskStatus::Processing;
                     state.progress = 0.7;

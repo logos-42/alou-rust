@@ -60,6 +60,9 @@
       ],
       "dialog": true,
       "pubkey": "YOUR_PUBLIC_KEY_HERE"
+    },
+    "event": {
+      "all": true
     }
   }
 }

@@ -58,9 +58,6 @@ ed25519-dalek = { version = "2.0", default-features = false, features = ["rand_c
 getrandom = { version = "0.2", features = ["js"] }
 bs58 = "0.5"
 
-# DIAP SDK for ZKP support
-diap-rs-sdk = { version = "0.2.11", default-features = false, features = ["embedded-noir"] }
-
 # Regex for text parsing (WASM-compatible)
 regex = { version = "1.10", default-features = false, features = ["std"] }
 # ABI & 工具

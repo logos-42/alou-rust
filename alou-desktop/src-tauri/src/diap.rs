@@ -5,7 +5,6 @@
 // - get_local_diap_identity: 保持现有行为，用于读取已存在的身份
 // - update_local_diap_identity: 保持现有行为，用于更新已存在的身份
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use log::{debug, info, warn, error};
 use reqwest::Client;
 use base64::{Engine as _, engine::general_purpose};

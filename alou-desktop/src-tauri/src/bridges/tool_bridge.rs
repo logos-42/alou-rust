@@ -2,7 +2,7 @@
 //!
 //! 提供前端与工具执行器的桥接功能
 
-use super::super::tools::{ToolRegistry, ToolResult, ToolError, ExecutionContext, ToolConfig, initialize_tools};
+use super::super::tools::{ToolRegistry, ToolResult, ExecutionContext, ToolConfig};
 use crate::tools::executor::ToolExecutionManager;
 use crate::tools::{FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, SkillsTool};
 use std::sync::Arc;
