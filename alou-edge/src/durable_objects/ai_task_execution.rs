@@ -337,6 +337,169 @@ impl<'a> TaskExecutorImpl<'a> {
         }
     }
 
+    /// 处理工具结果
+    async fn process_tool_results(&self, tool_results_data: &str, pending_calls: &[ToolCall]) -> Result<()> {
+        console_log!("[PROCESS] Processing tool results data");
+        
+        let tool_results: serde_json::Value = serde_json::from_str(tool_results_data)
+            .map_err(|e| worker::Error::RustError(format!("Failed to parse tool results: {}", e)))?;
+        
+        let results_array = tool_results.get("results")
+            .and_then(|r| r.as_array())
+            .ok_or_else(|| worker::Error::RustError("Invalid tool results format".to_string()))?;
+        
+        let mut conversation_history = self.load_conversation_history().await?.unwrap_or_default();
+        
+        for (result_index, tool_result) in results_array.iter().enumerate() {
+            let tool_name = tool_result.get("tool")
+                .and_then(|t| t.as_str())
+                .unwrap_or("unknown");
+            
+            let success = tool_result.get("success")
+                .and_then(|s| s.as_bool())
+                .unwrap_or(false);
+            
+            let result_content = if success {
+                tool_result.get("result")
+                    .and_then(|r| r.as_str())
+                    .unwrap_or("工具执行成功")
+            } else {
+                tool_result.get("error")
+                    .and_then(|e| e.as_str())
+                    .unwrap_or("工具执行失败")
+            };
+            
+            // 查找对应的 tool_call_id
+            let tool_call_id = pending_calls.iter()
+                .find(|tc| tc.tool == tool_name)
+                .and_then(|tc| tc.id.clone())
+                .unwrap_or_else(|| format!("{}_{}", tool_name, result_index));
+            
+            console_log!("[PROCESS] Adding tool response for {} (success: {}, tool_call_id: {})", tool_name, success, tool_call_id);
+            
+            // 添加工具响应消息到对话历史
+            conversation_history.push(AiMessage {
+                role: "tool".to_string(),
+                content: result_content.to_string(),
+                tool_call_id: Some(tool_call_id),
+                tool_calls: None,
+            });
+        }
+        
+        console_log!("[PROCESS] Updated conversation history: {} messages", conversation_history.len());
+        self.save_conversation_history(&conversation_history).await?;
+        
+        // 清除工具结果数据
+        let tool_result_key = format!("tool_result_{}", self.ctx.task_name);
+        self.ctx.storage.delete(&tool_result_key).await?;
+        console_log!("[PROCESS] Cleared tool results data");
+        
+        Ok(())
+    }
+
+    /// 继续对话（不处理工具结果）
+    async fn continue_without_tool_results(&self, request: CompatibleRequest, mut state: TaskState) -> Result<()> {
+        console_log!("[CONTINUE] Continuing without tool results");
+        
+        // 初始化AI客户端
+        let ai_api_key = match self.ctx.env.secret("AI_API_KEY") {
+            Ok(key) => key.to_string(),
+            Err(_) => match self.ctx.env.secret("DEEPSEEK_API_KEY") {
+                Ok(key) => key.to_string(),
+                Err(_) => {
+                    state.status = TaskStatus::Failed;
+                    state.error = Some("AI_API_KEY 或 DEEPSEEK_API_KEY 未配置".to_string());
+                    state.progress = 1.0;
+                    self.save_state(&state).await?;
+                    return Err(worker::Error::RustError("AI key not configured".to_string()));
+                }
+            }
+        };
+
+        let ai_client = AiClient::new("deepseek", ai_api_key, Some(request.model.clone()))
+            .map_err(|e| {
+                state.status = TaskStatus::Failed;
+                state.error = Some(format!("创建AI客户端失败: {}", e));
+                state.progress = 1.0;
+                worker::Error::RustError(format!("Failed to create AI client: {}", e))
+            })?;
+
+        // 准备消息
+        let mut messages = self.ai_caller.convert_to_ai_messages(&request);
+        if let Ok(Some(history)) = self.load_conversation_history().await {
+            messages.extend(history);
+        }
+
+        let tools = self.ai_caller.convert_to_ai_tools(&request.tools);
+
+        // 调用AI服务
+        state.progress = 0.9;
+        state.current_step = "进行下一轮AI对话".to_string();
+        self.save_state(&state).await?;
+
+        match self.ai_caller.call_ai_with_timeout(ai_client, messages, tools, self.ctx.task_name).await {
+            Ok(ai_response) => {
+                // 保存对话历史
+                let mut conversation_history = self.load_conversation_history().await.unwrap_or(Some(Vec::new())).unwrap_or_default();
+                conversation_history.push(AiMessage::assistant_with_tools(ai_response.content.clone(), ai_response.tool_calls.clone()));
+                self.save_conversation_history(&conversation_history).await?;
+
+                // 检查是否有新的工具调用
+                if !ai_response.tool_calls.is_empty() {
+                    console_log!("🔄 [CONTINUE] AI requested {} more tool calls", ai_response.tool_calls.len());
+
+                    // 保存新的待处理工具调用
+                    let tool_calls: Vec<ToolCall> = ai_response.tool_calls.iter().map(|tc| {
+                        ToolCall {
+                            tool: tc.name.clone(),
+                            arguments: tc.arguments.clone(),
+                            id: Some(tc.id.clone()),
+                        }
+                    }).collect();
+                    TaskPersistence::save_pending_tool_calls(self.ctx.storage, self.ctx.task_name, &tool_calls).await?;
+
+                    // 保持Processing状态，等待更多工具结果
+                    state.current_step = format!("等待执行 {} 个新工具调用", tool_calls.len());
+                    state.updated_at = self.ctx.get_current_timestamp();
+                    self.save_state(&state).await?;
+
+                    // 设置alarm等待新工具结果
+                    let now_ms = self.ctx.get_current_timestamp_millis();
+                    self.ctx.storage.set_alarm((now_ms + 5000) as i64).await?;
+
+                    console_log!("⏰ [CONTINUE] Set alarm for new tool results");
+                    Ok(())
+                } else {
+                    // 没有更多工具调用，对话完成
+                    let response = self.ai_caller.convert_from_ai_response(ai_response, self.ctx.task_name);
+                    let _ = TaskPersistence::save_result(self.ctx.storage, self.ctx.task_name, &response).await;
+
+                    // 更新状态为完成
+                    state.status = TaskStatus::Completed;
+                    state.progress = 1.0;
+                    state.current_step = "任务完成".to_string();
+                    state.updated_at = self.ctx.get_current_timestamp();
+                    self.save_state(&state).await?;
+
+                    console_log!("✅ [CONTINUE] Conversation completed without further tool calls");
+                    Ok(())
+                }
+            }
+            Err(e) => {
+                // 更新状态为失败
+                state.status = TaskStatus::Failed;
+                state.error = Some(format!("AI服务错误: {}", e));
+                state.progress = 1.0;
+                state.current_step = "任务失败".to_string();
+                state.updated_at = self.ctx.get_current_timestamp();
+                self.save_state(&state).await?;
+
+                console_error!("❌ [CONTINUE] Task failed: {}", e);
+                Err(e)
+            }
+        }
+    }
+
     /// 基于工具结果继续对话
     pub async fn continue_with_tool_results(&self) -> Result<()> {
         console_log!("[CONTINUE] Continuing conversation with tool results");
@@ -348,7 +511,54 @@ impl<'a> TaskExecutorImpl<'a> {
         state.updated_at = self.ctx.get_current_timestamp();
         self.save_state(&state).await?;
 
-        // 2. 获取原始请求和对话历史
+        // 2. 检查并处理待处理的工具结果
+        console_log!("[CONTINUE] Checking for pending tool results to process");
+        let pending_tool_calls = TaskPersistence::load_pending_tool_calls(self.ctx.storage, self.ctx.task_name).await?;
+        
+        // 如果没有待处理的工具调用，直接跳过
+        let pending_calls = match pending_tool_calls {
+            Some(calls) if !calls.is_empty() => calls,
+            _ => {
+                console_log!("[CONTINUE] No pending tool calls found");
+                self.ctx.storage.delete(&format!("pending_tool_calls_{}", self.ctx.task_name)).await?;
+                // 3. 获取原始请求和对话历史
+                let request = match TaskPersistence::get_request(self.ctx.storage, self.ctx.task_name).await? {
+                    Some(req) => req,
+                    None => {
+                        let mut state = self.load_state().await?;
+                        state.status = TaskStatus::Failed;
+                        state.error = Some("请求数据不存在".to_string());
+                        state.progress = 1.0;
+                        self.save_state(&state).await?;
+                        return Err(worker::Error::RustError("Request data not found".to_string()));
+                    }
+                };
+                return self.continue_without_tool_results(request, state).await;
+            }
+        };
+        console_log!("[CONTINUE] Found {} pending tool calls, checking for results", pending_calls.len());
+        
+        // 检查工具结果
+        let tool_result_key = get_tool_result_key(self.ctx.task_name);
+        let tool_results_data: Option<String> = match self.ctx.storage.get::<String>(&tool_result_key).await {
+            Ok(data) => Some(data),
+            Err(_) => {
+                console_log!("[CONTINUE] No tool results found, continuing without them");
+                None
+            }
+        };
+
+        // 处理工具结果
+        if let Some(ref tool_results_data) = tool_results_data {
+            console_log!("[CONTINUE] Processing tool results data");
+            self.process_tool_results(tool_results_data, &pending_calls).await?;
+        }
+
+        // 清除待处理的工具调用
+        self.ctx.storage.delete(&format!("pending_tool_calls_{}", self.ctx.task_name)).await?;
+        console_log!("[CONTINUE] Cleared pending tool calls");
+
+        // 3. 获取原始请求和对话历史
         let request = match TaskPersistence::get_request(self.ctx.storage, self.ctx.task_name).await? {
             Some(req) => req,
             None => {

@@ -49,16 +49,28 @@ impl AITaskHandlers {
             e
         })?;
 
-        console_log!("[STATUS] Task {} state: status={}, progress={}, step='{}', error={:?}",
-                     task_name, state.status, state.progress, state.current_step, state.error);
+        console_log!("[STATUS] Task {} state: status={}, progress={}, step='{}', error={:?}, created_at={}, updated_at={}",
+                     task_name, state.status, state.progress, state.current_step, state.error, state.created_at, state.updated_at);
 
         // 如果任务已完成，尝试加载结果
         let result = if state.status == TaskStatus::Completed {
+            console_log!("[STATUS] Task completed, loading result");
             match Self::load_result_from_storage(storage, task_name).await {
-                Ok(Some(res)) => Some(res),
-                _ => None,
+                Ok(Some(res)) => {
+                    console_log!("[STATUS] Result loaded successfully");
+                    Some(res)
+                }
+                Ok(None) => {
+                    console_log!("[STATUS] No result found for completed task");
+                    None
+                }
+                Err(e) => {
+                    console_error!("[STATUS] Failed to load result: {}", e);
+                    None
+                }
             }
         } else {
+            console_log!("[STATUS] Task not completed, skipping result loading");
             None
         };
 
@@ -72,6 +84,9 @@ impl AITaskHandlers {
             created_at: state.created_at,
             updated_at: state.updated_at,
         };
+
+        console_log!("[STATUS] Response prepared: status={}, progress={:.2}, step='{}', has_result={}", 
+                     response.status, response.progress.unwrap_or(0.0), response.current_step.as_ref().unwrap_or(&"None".to_string()), response.result.is_some());
 
         let headers = Headers::new();
         headers.set("Content-Type", "application/json; charset=utf-8")?;
@@ -137,35 +152,52 @@ impl AITaskHandlers {
         mut req: Request,
         get_current_timestamp_millis: impl Fn() -> u64,
     ) -> Result<Response> {
+        console_log!("[TOOL-RESULT] === START PROCESSING TOOL RESULTS ===");
         console_log!("[TOOL-RESULT] Processing tool results for task: {}", task_name);
 
         let mut state = Self::load_state_from_storage(storage, task_name).await?;
+        console_log!("[TOOL-RESULT] Current task state: status={:?}, progress={}", state.status, state.progress);
 
         if state.status != TaskStatus::Processing && state.status != TaskStatus::Running {
+            console_error!("[TOOL-RESULT] Task is not in a state to accept tool results: {:?}", state.status);
             return Response::error("Task is not in a state to accept tool results", 400);
         }
 
+        console_log!("[TOOL-RESULT] Task state is valid, proceeding to parse tool results");
+
         // 解析工具结果 - 期望格式: { results: [{ tool, success, result, error, arguments, timestamp }] }
         let tool_results_data: serde_json::Value = req.json().await?;
+        console_log!("[TOOL-RESULT] Raw tool results data: {}", serde_json::to_string_pretty(&tool_results_data).unwrap_or_default());
+        
         let cloned_data = tool_results_data.clone();
         let tool_results = cloned_data.get("results")
             .and_then(|r| r.as_array())
-            .ok_or_else(|| worker::Error::RustError("Invalid tool results format".to_string()))?;
+            .ok_or_else(|| {
+                console_error!("[TOOL-RESULT] Invalid tool results format - missing 'results' array");
+                worker::Error::RustError("Invalid tool results format".to_string())
+            })?;
 
         console_log!("[TOOL-RESULT] Received {} tool results", tool_results.len());
 
         // 加载待处理的工具调用，用于获取正确的tool_call_id
         let pending_tool_calls = TaskPersistence::load_pending_tool_calls(storage, task_name).await?
             .unwrap_or_default();
+        console_log!("[TOOL-RESULT] Loaded {} pending tool calls", pending_tool_calls.len());
+        for (i, tc) in pending_tool_calls.iter().enumerate() {
+            console_log!("[TOOL-RESULT] Pending tool call {}: tool={}, id={:?}", i, tc.tool, tc.id);
+        }
 
         // 加载对话历史
         let mut conversation_history = Self::load_conversation_history_from_storage(storage, task_name)
             .await
             .unwrap_or_else(|_| Some(Vec::new()))
             .unwrap_or_default();
+        console_log!("[TOOL-RESULT] Loaded conversation history: {} messages", conversation_history.len());
 
         // 为每个工具结果添加消息
-        for tool_result in tool_results {
+        for (result_index, tool_result) in tool_results.iter().enumerate() {
+            console_log!("[TOOL-RESULT] Processing tool result {}: {:?}", result_index, tool_result);
+            
             let tool_name = tool_result.get("tool")
                 .and_then(|t| t.as_str())
                 .ok_or_else(|| worker::Error::RustError("Tool name missing".to_string()))?;
@@ -205,23 +237,29 @@ impl AITaskHandlers {
                 tool_call_id: Some(tool_call_id),
                 tool_calls: None,
             });
+            
+            console_log!("[TOOL-RESULT] Added tool response message, conversation history now has {} messages", conversation_history.len());
         }
 
         Self::save_conversation_history_to_storage(storage, task_name, &conversation_history).await?;
+        console_log!("[TOOL-RESULT] Saved conversation history with {} messages", conversation_history.len());
 
         // 清除待处理的工具调用
         let pending_key = get_pending_tool_calls_key(task_name);
         storage.delete(&pending_key).await?;
+        console_log!("[TOOL-RESULT] Cleared pending tool calls");
 
         // 保存工具结果
         let tool_key = get_tool_result_key(task_name);
         storage.put(&tool_key, tool_results_data).await?;
+        console_log!("[TOOL-RESULT] Saved tool results");
 
         // 更新状态
         state.progress = (state.progress + 0.2).min(0.9);
         state.current_step = format!("已处理 {} 个工具结果，继续执行", tool_results.len());
         state.updated_at = get_current_timestamp_millis();
         Self::save_state_to_storage(storage, task_name, &state).await?;
+        console_log!("[TOOL-RESULT] Updated task state: progress={}, step='{}'", state.progress, state.current_step);
 
         console_log!("[TOOL-RESULT] Tool results processed, setting alarm to continue");
 

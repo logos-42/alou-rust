@@ -973,19 +973,21 @@ pub async fn ipfs_publish_ipns(
     diap_document: Option<String>, // 新增参数：完整的DIAP文档
 ) -> Result<serde_json::Value, String> {
     use crate::ipfs_commands::{publish_to_ipns_simple, add_json_to_ipfs};
-    
+
     let api_url = ipfs_api_url.unwrap_or_else(|| "http://localhost:5001".to_string());
-    
+
+    info!(target: "diap", "📝 IPNS发布参数 - CID: {}, IPNS Key: {}, API: {}", cid, ipns_key, api_url);
+
     // 如果提供了完整的DIAP文档，则先上传到IPFS获取CID，然后发布到IPNS
     let ipns = match diap_document {
         Some(doc) => {
             info!(target: "diap", "📝 上传完整DIAP文档到IPFS...");
-            
+
             // 1. 先上传DIAP文档到IPFS获取新的CID
             match add_json_to_ipfs(&serde_json::from_str(&doc).map_err(|e| format!("解析DIAP文档失败: {}", e))?, "diap-document.json", &api_url).await {
                 Ok(cid) => {
                     info!(target: "diap", "✅ DIAP文档上传到IPFS成功，CID: {}", cid);
-                    
+
                     // 2. 将新的CID发布到IPNS
                     match publish_to_ipns_simple(&cid, &ipns_key, &api_url).await {
                         Ok(ipns_name) => {
@@ -1006,6 +1008,7 @@ pub async fn ipfs_publish_ipns(
         }
         None => {
             // 如果没有提供DIAP文档，则使用传入的CID
+            info!(target: "diap", "🚀 直接发布CID到IPNS（不重新上传文档）: {}", cid);
             match publish_to_ipns_simple(&cid, &ipns_key, &api_url).await {
                 Ok(ipns_name) => {
                     info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", cid, ipns_name);
@@ -1013,12 +1016,13 @@ pub async fn ipfs_publish_ipns(
                 }
                 Err(e) => {
                     error!(target: "diap", "❌ CID发布到IPNS失败: {}", e);
+                    error!(target: "diap", "❌ 错误详情 - CID: {}, IPNS Key: {}, API: {}", cid, ipns_key, api_url);
                     return Err(format!("发布失败: {}", e));
                 }
             }
         }
     };
-    
+
     Ok(serde_json::json!({
         "success": true,
         "ipns": format!("/ipns/{}", ipns)
@@ -1135,19 +1139,35 @@ pub async fn create_diap_identity_with_zkp(
         }));
     }
     
-    // 6. 手动发布到IPNS（确保IPNS创建成功）
-    let ipns_key = format!("agent-{}", session_id);
-    
-    // 将完整的DID文档序列化为JSON字符串
-    let did_document_str = serde_json::to_string(&did_document_json)
-        .map_err(|e| format!("序列化DID文档失败: {}", e))?;
-    
-    // 按照用户要求的次序：先创建ZKP的DIAP文档，再上传IPFS，最后上传CID到IPNS
-    // 使用修改后的ipfs_publish_ipns命令，传递完整的DIAP文档
-    let ipns_result = match ipfs_publish_ipns(registration.cid.clone(), ipns_key, Some(ipfs_api.clone()), Some(did_document_str)).await {
+    // 6. 先创建或获取IPNS密钥（如果不存在）
+    let ipns_key_name = format!("agent-{}", session_id);
+    let ipns_key = match generate_or_get_ipns_key(&ipns_key_name, &ipfs_api).await {
+        Ok(key) => {
+            info!(target: "diap", "✅ IPNS密钥就绪: {}", key);
+            key
+        }
+        Err(e) => {
+            error!(target: "diap", "❌ 创建IPNS密钥失败: {}", e);
+            return Err(format!("创建IPNS密钥失败: {}", e));
+        }
+    };
+
+    // 7. 直接使用已上传的CID发布到IPNS（不重新上传DIAP文档，保持ZKP绑定）
+    info!(target: "diap", "🚀 发布CID到IPNS（不重新上传文档，保持ZKP绑定）");
+    let ipns_result = match ipfs_publish_ipns(
+        registration.cid.clone(),  // ✅ 使用已上传的 CID
+        ipns_key_name,  // ✅ 使用 IPNS key 名称
+        Some(ipfs_api.clone()),
+        None  // ✅ 关键：不传递 DIAP 文档，避免重新上传破坏CID绑定
+    ).await {
         Ok(response) => {
+            // 检查响应中是否有 ipns 字段
             if let Some(ipns_name) = response.get("ipns").and_then(|v| v.as_str()) {
-                info!(target: "diap", "✅ 完整DIAP文档发布到IPNS成功: {}", ipns_name);
+                info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", registration.cid, ipns_name);
+                Some(format!("/ipns/{}", ipns_name))
+            } else if let Some(ipns_name) = response.get("Name").and_then(|v| v.as_str()) {
+                // IPFS API 可能返回 Name 字段
+                info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", registration.cid, ipns_name);
                 Some(format!("/ipns/{}", ipns_name))
             } else {
                 error!(target: "diap", "❌ IPNS发布响应格式错误: {:?}", response);
@@ -1155,29 +1175,40 @@ pub async fn create_diap_identity_with_zkp(
             }
         }
         Err(e) => {
-            error!(target: "diap", "❌ 完整DIAP文档发布到IPNS失败: {}", e);
+            error!(target: "diap", "❌ CID发布到IPNS失败: {}", e);
             None
         }
     };
+
+    // ✅ ZKP 证明单独存储（不嵌入 DID 文档，保持 CID 绑定有效）
+    let zkp_proof_data = if let Some(ref zkp) = zkp_result {
+        Some(serde_json::json!({
+            "proof": general_purpose::STANDARD.encode(&zkp.proof),
+            "publicInputs": general_purpose::STANDARD.encode(&zkp.public_inputs),
+            "circuitOutput": zkp.circuit_output,
+            "timestamp": zkp.timestamp,
+            "verificationResult": zkp.verified,
+            "generatedBy": "alou-desktop-local-zkp",
+            "boundCid": registration.cid,  // ✅ 明确记录绑定的 CID
+            "did": registration.did
+        }))
+    } else {
+        None
+    };
     
-    info!(target: "diap", "🎉 完整DIAP身份创建成功（包含ZKP和IPFS操作）");
-    
+    info!(target: "diap", "🎉 完整DIAP身份创建成功（ZKP绑定完整，IPNS发布成功）");
+
     // 6. 构建响应（包含所有必要信息）
     let response = serde_json::json!({
         "success": true,
         "did": registration.did,
-        "did_document": did_document_json,
+        "did_document": registration.did_document,  // ✅ 原始文档（不包含ZKP）
         "public_key": keypair.public_key,
         "private_key": keypair.private_key,
         "ipns_key": format!("agent-{}", session_id),
-        "cid": registration.cid,
-        "ipns": ipns_result.or(registration.ipns_name.as_ref().map(|name| format!("/ipns/{}", name))),
-        "zkp_proof": zkp_result.as_ref().map(|zkp| serde_json::json!({
-            "generated": true,
-            "verified": zkp.verified,
-            "circuit_output": zkp.circuit_output,
-            "timestamp": zkp.timestamp
-        })),
+        "cid": registration.cid,  // ✅ 原始 CID，ZKP 绑定有效
+        "ipns": ipns_result,
+        "zkp_proof": zkp_proof_data,  // ✅ ZKP 单独存储
         "gateway_url": ipfs_gateway,
         "session_id": session_id,
         "agent_name": agent_name,

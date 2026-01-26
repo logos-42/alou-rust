@@ -28,7 +28,7 @@ impl StatusManager {
         
         let id = match namespace.id_from_name(task_id) {
             Ok(id) => {
-                console_log!("[StatusManager] Got DO id from name");
+                console_log!("[StatusManager] Got DO id from name: {}", task_id);
                 id
             }
             Err(e) => {
@@ -42,7 +42,7 @@ impl StatusManager {
         
         let stub = match id.get_stub() {
             Ok(stub) => {
-                console_log!("[StatusManager] Got DO stub");
+                console_log!("[StatusManager] Got DO stub for task: {}", task_id);
                 stub
             }
             Err(e) => {
@@ -56,26 +56,27 @@ impl StatusManager {
         
         // 调用Durable Object获取状态
         // 注意：必须使用绝对URL，即使Host是虚拟的
-        console_log!("[StatusManager] Calling DO /status endpoint");
+        console_log!("[StatusManager] Calling DO /status endpoint for task: {}", task_id);
         match stub.fetch_with_str("http://do/status").await {
             Ok(mut response) => {
-                console_log!("[StatusManager] Got DO response, status: {}", response.status_code());
+                console_log!("[StatusManager] Got DO response for task {}, status: {}", task_id, response.status_code());
                 
                 if response.status_code() != 200 {
-                    console_error!("[StatusManager] DO returned non-200 status: {}", response.status_code());
+                    console_error!("[StatusManager] DO returned non-200 status for task {}: {}", task_id, response.status_code());
                     return Ok(TaskStatusResponse::new(
                         task_id.to_string(),
                         "not_found".to_string(),
                     ));
                 }
                 
-                match response.json().await {
+                match response.json::<TaskStatusResponse>().await {
                     Ok(status) => {
-                        console_log!("[StatusManager] Successfully parsed status response");
+                        console_log!("[StatusManager] Successfully parsed status response for task {}: status={}, progress={:.2}", 
+                                     task_id, status.status, status.progress.unwrap_or(0.0));
                         Ok(status)
                     }
                     Err(e) => {
-                        console_error!("[StatusManager] Failed to parse status response: {}", e);
+                        console_error!("[StatusManager] Failed to parse status response for task {}: {}", task_id, e);
                         Ok(TaskStatusResponse::new(
                             task_id.to_string(),
                             "error".to_string(),
@@ -84,7 +85,7 @@ impl StatusManager {
                 }
             }
             Err(e) => {
-                console_error!("[StatusManager] Failed to call DO: {}", e);
+                console_error!("[StatusManager] Failed to call DO for task {}: {}", task_id, e);
                 Ok(TaskStatusResponse::new(
                     task_id.to_string(),
                     "error".to_string(),

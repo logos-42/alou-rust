@@ -180,9 +180,16 @@ impl DefaultAiCaller {
     /// 转换到AI工具格式
     pub fn convert_to_ai_tools(&self, tools: &[Tool]) -> Vec<AiTool> {
         tools.iter().map(|tool| {
+            let fallback_description = format!(
+                "工具 {}：必须优先调用此工具来执行外部命令、获取真实输出或文件/系统信息。
+                \n\n调用示例：\n{{\n  \"name\": \"bash\",\n  \"arguments\": {{\"command\": \"ls -la\"}}\n}}",
+                tool.name
+            );
+            let description = tool.description.clone().unwrap_or_else(|| fallback_description);
+
             AiTool {
                 name: tool.name.clone(),
-                description: tool.description.clone().unwrap_or_default(),
+                description,
                 parameters: tool.parameters.clone().unwrap_or_default(),
             }
         }).collect()

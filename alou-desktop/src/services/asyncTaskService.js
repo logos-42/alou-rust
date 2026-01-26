@@ -35,7 +35,7 @@ export class AsyncTaskService {
 
       const response = await apiClient.post('/ai-task/init-and-start', {
         session_id: sessionId,
-        message,
+        prompt: message,  // 修复字段映射：后端期望 prompt 字段
         wallet_address: walletAddress,
         chain,
         context_events: contextEvents || [],

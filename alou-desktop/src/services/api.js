@@ -11,8 +11,8 @@ import Cookies from 'js-cookie'
 // 3. Web生产环境：使用远程Workers
 const isTauri = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
 const API_BASE_URL = isTauri
-  ? 'https://alou-edge.yuanjieliu65.workers.dev'
-  : (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev'));
+  ? 'http://localhost:8787'  // 临时使用本地服务器测试修复
+  : (import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8787' : 'https://alou-edge.yuanjieliu65.workers.dev'));
 
 // Debug logging
 console.log('[API] Environment:', {

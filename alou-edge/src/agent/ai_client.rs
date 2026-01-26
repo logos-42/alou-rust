@@ -96,6 +96,10 @@ impl AiClient {
                 api_key,
                 model.unwrap_or_else(|| "deepseek-chat".to_string()),
             )),
+            "glm" => Box::new(providers::GlmProvider::new(
+                api_key,
+                model.unwrap_or_else(|| "glm-4.7".to_string()),
+            )),
             "qwen" => Box::new(providers::QwenProvider::new(
                 api_key,
                 model.unwrap_or_else(|| "qwen-max".to_string()),

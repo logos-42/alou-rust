@@ -31,19 +31,17 @@ const useAgentStore = create(
       // IPFS URL 解析辅助方法
       resolveIpfsUrl: (cid) => {
         if (!cid) return null
-        
+
         // 如果已经是完整的 URL，直接返回
         if (cid.startsWith('http')) return cid
-        
+
         // 解析 IPFS CID 为 URL
-        // 使用 agentAssetsService
         try {
-          // 动态导入以避免循环依赖
-          const agentAssetsService = require('@/services/agentAssetsService').default
-          return agentAssetsService.resolveIpfsUri(cid)
+          // 修复：使用公共网关替代 require，避免浏览器环境错误
+          return `https://ipfs.io/ipfs/${cid}`
         } catch (error) {
           console.warn('[AgentStore] IPFS URL 解析失败:', error)
-          return null
+          return `https://ipfs.io/ipfs/${cid}`
         }
       },
       // 智能体列表

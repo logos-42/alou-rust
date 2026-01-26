@@ -318,6 +318,11 @@ impl Router {
                 }
             }
 
+            (Method::Post, path) if path.starts_with("/api/ai-task/") && path.ends_with("/tool-result") => {
+                let task_id = path.trim_start_matches("/api/ai-task/").trim_end_matches("/tool-result");
+                self.handle_tool_result(env, task_id, req).await
+            }
+
             (Method::Post, "/api/agent/chat") => {
                 // 首先尝试兼容性处理
                 match self.handle_compatible_chat(req, env).await {

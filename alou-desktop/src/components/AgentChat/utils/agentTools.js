@@ -42,7 +42,7 @@ export const getToolsByCategories = (categories) => {
       // 核心工具
       bash: {
         name: "bash",
-        description: "运行终端命令、脚本、Git操作等。支持多种Shell（Bash、CMD、PowerShell、Python、Node.js）。",
+        description: "当任务需要执行命令或获得真实终端结果时优先使用。用于运行命令、脚本、Git操作（Bash/CMD/PowerShell/Python/Node）。返回的输出必须作为后续判断依据。",
         parameters: {
           type: "object",
           properties: {
@@ -60,7 +60,7 @@ export const getToolsByCategories = (categories) => {
       // 文件系统工具
       filesystem: {
         name: "filesystem",
-        description: "完整的文件系统操作：读取、写入、编辑、列出、复制、移动、删除文件和目录。",
+        description: "当需要读取/写入/编辑文件或验证文件内容时优先使用。支持读取、写入、编辑、列出、复制、移动、删除文件和目录。",
         parameters: {
           type: "object",
           properties: {
@@ -86,7 +86,7 @@ export const getToolsByCategories = (categories) => {
       // 搜索工具
       search: {
         name: "search",
-        description: "文本搜索、文件模式匹配、高级文件查找功能。",
+        description: "当需要确认项目结构、定位代码或查找关键文本时优先使用。支持文本搜索、文件模式匹配和高级文件查找。",
         parameters: {
           type: "object",
           properties: {
@@ -114,7 +114,7 @@ export const getToolsByCategories = (categories) => {
       // 计划和任务管理工具
       plan: {
         name: "plan",
-        description: "创建和管理任务计划、项目规划和待办事项。",
+        description: "当任务较复杂且需要分步推进时使用。用于创建/调整计划与待办事项，帮助保证执行过程可追踪。",
         parameters: {
           type: "object",
           properties: {
