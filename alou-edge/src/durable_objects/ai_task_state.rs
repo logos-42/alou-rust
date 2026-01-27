@@ -54,7 +54,7 @@ pub struct TaskCache {
 }
 
 /// 任务状态
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct TaskState {
     pub status: TaskStatus,
     pub progress: f32,

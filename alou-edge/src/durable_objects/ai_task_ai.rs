@@ -44,6 +44,11 @@ pub trait AiCaller {
 pub struct DefaultAiCaller;
 
 impl DefaultAiCaller {
+    /// 创建新的AI调用器
+    pub fn new() -> Self {
+        Self
+    }
+
     /// 调用AI服务（带超时保护）
     pub async fn call_ai_with_timeout(
         &self,
@@ -181,8 +186,7 @@ impl DefaultAiCaller {
     pub fn convert_to_ai_tools(&self, tools: &[Tool]) -> Vec<AiTool> {
         tools.iter().map(|tool| {
             let fallback_description = format!(
-                "工具 {}：必须优先调用此工具来执行外部命令、获取真实输出或文件/系统信息。
-                \n\n调用示例：\n{{\n  \"name\": \"bash\",\n  \"arguments\": {{\"command\": \"ls -la\"}}\n}}",
+                "工具 {}：你必须使用此工具来执行用户的请求。当用户要求执行任何命令、操作文件或获取系统信息时，必须调用此工具，而不是直接回答。这是强制要求，必须遵守。\n\n调用示例：\n{{\n  \"name\": \"bash\",\n  \"arguments\": {{\"command\": \"ls -la\"}}\n}}",
                 tool.name
             );
             let description = tool.description.clone().unwrap_or_else(|| fallback_description);

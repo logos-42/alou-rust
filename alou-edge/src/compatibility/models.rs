@@ -83,6 +83,10 @@ pub struct CompatibleRequest {
     pub chain: Option<String>,
     #[serde(default)]
     pub context_events: Vec<Value>,
+    
+    // AI 提供者字段
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 fn default_temperature() -> f32 {
@@ -110,6 +114,7 @@ impl Default for CompatibleRequest {
             wallet_address: None,
             chain: None,
             context_events: Vec::new(),
+            provider: None,
         }
     }
 }
