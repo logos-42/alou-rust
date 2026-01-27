@@ -3,7 +3,7 @@ use crate::utils::error::{AloudError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use worker::{console_log, Fetch, Headers, Method, RequestInit};
+use worker::{console_log, console_error, Fetch, Headers, Method, RequestInit};
 
 const KIMI_API_URL: &str = "https://api.moonshot.cn/v1/chat/completions";
 
@@ -32,6 +32,24 @@ struct KimiRequest {
 struct KimiMessage {
     role: String,
     content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<KimiToolCallInMessage>>,
+}
+
+#[derive(Serialize)]
+struct KimiToolCallInMessage {
+    id: String,
+    #[serde(rename = "type")]
+    call_type: String,
+    function: KimiFunctionCallInMessage,
+}
+
+#[derive(Serialize)]
+struct KimiFunctionCallInMessage {
+    name: String,
+    arguments: String,
 }
 
 #[derive(Serialize)]
@@ -85,13 +103,30 @@ impl AiProvider for KimiProvider {
         messages: Vec<AiMessage>,
         tools: Option<Vec<AiTool>>,
     ) -> Result<AiResponse> {
-        console_log!("Kimi: Sending request to {}", KIMI_API_URL);
+        console_error!("Kimi: ERROR - About to send request to {}", KIMI_API_URL);
 
         let kimi_messages: Vec<KimiMessage> = messages
             .into_iter()
-            .map(|m| KimiMessage {
-                role: m.role,
-                content: m.content,
+            .map(|m| {
+                let tool_calls_in_msg = m.tool_calls.map(|tcs| {
+                    tcs.into_iter()
+                        .map(|tc| KimiToolCallInMessage {
+                            id: tc.id,
+                            call_type: "function".to_string(),
+                            function: KimiFunctionCallInMessage {
+                                name: tc.name,
+                                arguments: serde_json::to_string(&tc.arguments).unwrap_or_default(),
+                            },
+                        })
+                        .collect()
+                });
+
+                KimiMessage {
+                    role: m.role,
+                    content: m.content,
+                    tool_call_id: m.tool_call_id,
+                    tool_calls: tool_calls_in_msg,
+                }
             })
             .collect();
 
@@ -119,6 +154,10 @@ impl AiProvider for KimiProvider {
 
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
+
+        console_error!("Kimi: ERROR - Request body: {}", &body);
+        console_error!("Kimi: ERROR - API Key preview: {}...", &self.api_key[..8.min(self.api_key.len())]);
+        console_error!("Kimi: ERROR - Model: {}", self.model);
 
         let headers = Headers::new();
         headers

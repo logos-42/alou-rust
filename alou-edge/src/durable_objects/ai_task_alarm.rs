@@ -247,7 +247,11 @@ impl<'a> AlarmHandler<'a> {
             }
         };
 
-        let ai_client = crate::agent::ai_client::AiClient::new("deepseek", ai_api_key, Some(request.model.clone()))?;
+        let ai_client = crate::agent::ai_client::AiClient::new(
+            request.provider.as_deref().unwrap_or("deepseek"), 
+            ai_api_key, 
+            Some(request.model.clone())
+        )?;
 
         // 5. 使用工作流 AI 决策器获取决策
         use crate::durable_objects::ai_task_workflow::{WorkflowAIDecider, WorkflowDecisionHandler};

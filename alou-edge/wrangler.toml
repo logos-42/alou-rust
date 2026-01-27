@@ -20,8 +20,7 @@ type = "CompiledWasm"
 
 [vars]
 ENVIRONMENT = "production"
-AI_PROVIDER = "deepseek"
-AI_MODEL = "deepseek-chat"
+# AI_PROVIDER 和 AI_MODEL 不在这里设置，让请求动态指定
 ETH_RPC_URL = "https://eth.llamarpc.com"
 ETH_TESTNET_RPC_URL = "https://ethereum-sepolia-rpc.publicnode.com"
 SOL_RPC_URL = "https://api.mainnet-beta.solana.com"

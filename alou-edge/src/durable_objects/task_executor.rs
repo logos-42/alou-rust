@@ -132,22 +132,36 @@ impl TaskExecutor {
         let tools = Self::convert_to_ai_tools(&request.tools);
         
         // 创建AI客户端
-        let ai_api_key = match env.secret("AI_API_KEY") {
-            Ok(key) => key.to_string(),
-            Err(_) => {
-                // 尝试DEEPSEEK_API_KEY作为备选
-                match env.secret("DEEPSEEK_API_KEY") {
-                    Ok(key) => key.to_string(),
-                    Err(_) => {
-                        return Ok(CompatibleResponse::error_response(
-                            "AI_API_KEY or DEEPSEEK_API_KEY not configured".to_string(),
-                        ));
+        let ai_api_key = match request.provider.as_deref() {
+            Some("kimi") => match env.secret("KIMI_API_KEY") {
+                Ok(key) => key.to_string(),
+                Err(_) => {
+                    return Ok(CompatibleResponse::error_response(
+                        "KIMI_API_KEY not configured".to_string(),
+                    ));
+                }
+            },
+            _ => match env.secret("AI_API_KEY") {
+                Ok(key) => key.to_string(),
+                Err(_) => {
+                    // 尝试DEEPSEEK_API_KEY作为备选
+                    match env.secret("DEEPSEEK_API_KEY") {
+                        Ok(key) => key.to_string(),
+                        Err(_) => {
+                            return Ok(CompatibleResponse::error_response(
+                                "AI_API_KEY or DEEPSEEK_API_KEY not configured".to_string(),
+                            ));
+                        }
                     }
                 }
             }
         };
         
-        let ai_client = match AiClient::new("deepseek", ai_api_key, Some(request.model.clone())) {
+        let ai_client = match AiClient::new(
+            request.provider.as_deref().unwrap_or("deepseek"), 
+            ai_api_key, 
+            Some(request.model.clone())
+        ) {
             Ok(client) => client,
             Err(e) => {
                 return Ok(CompatibleResponse::error_response(
