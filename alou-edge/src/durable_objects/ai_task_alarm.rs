@@ -98,7 +98,7 @@ impl<'a> AlarmHandler<'a> {
             console_log!("[ALARM-LOGIC] Workflow task waiting for tool execution");
             // 重新设置alarm继续等待
             let now_ms = self.ctx.get_current_timestamp_millis();
-            storage.set_alarm((now_ms + 5000) as i64).await?;
+            storage.set_alarm((now_ms + 2000) as i64).await?;
             return Ok(());
         } else {
             console_log!("[ALARM-LOGIC] Workflow task checking for tool results");
@@ -119,7 +119,7 @@ impl<'a> AlarmHandler<'a> {
             } else {
                 console_log!("[ALARM-LOGIC] Workflow no tool results yet, waiting...");
                 let now_ms = self.ctx.get_current_timestamp_millis();
-                storage.set_alarm((now_ms + 5000) as i64).await?;
+                storage.set_alarm((now_ms + 2000) as i64).await?;
             }
         }
         Ok(())
@@ -133,7 +133,7 @@ impl<'a> AlarmHandler<'a> {
             console_log!("[ALARM-LOGIC] Still waiting for tool results, scheduling next check");
             // 重新设置alarm
             let now_ms = self.ctx.get_current_timestamp_millis();
-            storage.set_alarm((now_ms + 5000) as i64).await?;
+            storage.set_alarm((now_ms + 2000) as i64).await?;
             console_log!("[STATE-TRANSITION] Task {}: staying in Processing state, alarm set for next check", self.ctx.task_name);
         } else {
             console_log!("[ALARM-LOGIC] No pending tool calls, checking for tool results");
@@ -147,7 +147,7 @@ impl<'a> AlarmHandler<'a> {
             } else {
                 console_log!("[ALARM-LOGIC] No tool results yet, waiting...");
                 let now_ms = self.ctx.get_current_timestamp_millis();
-                storage.set_alarm((now_ms + 5000) as i64).await?;
+                storage.set_alarm((now_ms + 2000) as i64).await?;
                 console_log!("[STATE-TRANSITION] Task {}: staying in Processing state, waiting for tool results", self.ctx.task_name);
             }
         }

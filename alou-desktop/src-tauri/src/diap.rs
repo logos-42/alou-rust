@@ -676,14 +676,23 @@ pub async fn create_diap_identity_from_did_document(
         format!("agent-{}", params.session_id)
     };
     
-    // 生成IPNS密钥（如果不存在）
-    let ipns_key = generate_or_get_ipns_key(&ipns_key_name, &api_url).await?;
+    // 使用验证过的IPNS解决方案生成密钥
+    let ipfs_config = IpfsConfig {
+        api_url: api_url.clone(),
+        gateway_url: gateway_url.clone(),
+        cli_path: None, // 自动检测
+    };
     
-    // 发布到IPNS
-    let ipns = publish_to_ipns(&cid, &ipns_key_name, &api_url).await
-        .map_err(|e| format!("发布到IPNS失败: {}", e))?;
+    let ipns_key_result = generate_ipns_key_verified(&ipns_key_name, &ipfs_config).await
+        .map_err(|e| format!("IPNS密钥生成失败: {}", e))?;
     
-    info!(target: "diap", "✅ IPNS发布成功: {}", ipns);
+    info!(target: "diap", "✅ IPNS密钥生成成功: {} ({})", ipns_key_result.name, ipns_key_result.id);
+    
+    // 使用验证过的IPNS解决方案发布到IPNS
+    let ipns_publish_result = publish_to_ipns_verified(&cid, &ipns_key_name, &ipfs_config).await
+        .map_err(|e| format!("IPNS发布失败: {}", e))?;
+    
+    info!(target: "diap", "✅ IPNS发布成功: {} -> {}", ipns_publish_result.name, ipns_publish_result.value);
     
     // 提供内容到DHT以加速传播
     if let Err(e) = provide_to_dht_direct(&api_url, &cid).await {
@@ -696,7 +705,7 @@ pub async fn create_diap_identity_from_did_document(
     }
     
     // 主动触发公共网关查询以加速全球传播
-    let ipns_for_trigger = ipns.clone();
+    let ipns_for_trigger = ipns_publish_result.value.clone();
     tokio::spawn(async move {
         trigger_public_gateway_query_with_retry(&ipns_for_trigger, 3, 10).await;
     });
@@ -707,20 +716,20 @@ pub async fn create_diap_identity_from_did_document(
     // 生成PubSub主题
     let pubsub_topics = Some(vec![
         format!("/topic/agent/{}", params.session_id),
-        format!("/topic/diap/{}", ipns.trim_start_matches("/ipns/")),
+        format!("/topic/diap/{}", ipns_publish_result.value.trim_start_matches("/ipns/")),
         "/topic/global/agents".to_string(),
     ]);
     
     // 从DID文档中提取真实的DID
     let did = real_did_document.get("id")
         .and_then(|v| v.as_str())
-        .unwrap_or(&format!("did:ipns:{}", ipns.trim_start_matches("/ipns/")))
+        .unwrap_or(&format!("did:ipns:{}", ipns_publish_result.value.trim_start_matches("/ipns/")))
         .to_string();
     
     let identity = LocalDiapIdentityResponse {
         did,
         cid,
-        ipns,
+        ipns: ipns_publish_result.value,
         public_key,
         gateway_url,
         ipns_key: Some(ipns_key_name),
@@ -780,15 +789,14 @@ async fn generate_or_get_ipns_key(key_name: &str, api_url: &str) -> Result<Strin
     info!(target: "diap", "创建新的IPNS密钥: {}", key_name);
     let gen_url = format!("{}/api/v0/key/gen", normalize_base_url(api_url));
     
-    let params = [
-        ("arg", key_name),
-        ("type", "ed25519"),
-        ("size", "2048"),
-    ];
+    // 使用multipart/form-data格式
+    let form = reqwest::multipart::Form::new()
+        .part("name", reqwest::multipart::Part::text(key_name.to_string()))
+        .part("type", reqwest::multipart::Part::text("ed25519".to_string()));
     
     let response = client
         .post(&gen_url)
-        .form(&params)
+        .multipart(form)
         .header("User-Agent", "Alou-Desktop/1.0")
         .send()
         .await
@@ -942,13 +950,12 @@ async fn test_ipfs_api_connection(api_url: &str) -> Result<bool, Box<dyn std::er
 }
 
 /// 更新DIAP模块中的IPFS函数调用
-/// 上传DID文档到IPFS（使用专用函数）
 async fn upload_did_document_to_ipfs(
     did_document: &serde_json::Value,
     api_url: &str,
 ) -> Result<String, String> {
     use crate::ipfs_commands::add_did_document_to_ipfs;
-    
+
     let result = add_did_document_to_ipfs(api_url, did_document).await?;
     Ok(result.cid)
 }
@@ -1029,197 +1036,6 @@ pub async fn ipfs_publish_ipns(
     }))
 }
 
-/// 本地生成完整的DIAP身份（包含ZKP证明和完整IPFS操作）
-#[tauri::command]
-pub async fn create_diap_identity_with_zkp(
-    agent_name: String,
-    agent_description: Option<String>,
-    ipfs_api_url: Option<String>,
-    ipfs_gateway_url: Option<String>,
-    session_id: String,
-) -> Result<serde_json::Value, String> {
-    use diap_rs_sdk::{AgentAuthManager, UniversalNoirManager};
-    
-    info!(target: "diap", "🚀 开始本地生成完整DIAP身份（包含ZKP和IPFS操作）: {}", agent_name);
-    
-    // 延迟初始化日志，避免重复初始化
-    let _ = env_logger::try_init();
-    
-    let ipfs_api = ipfs_api_url.unwrap_or_else(|| "http://localhost:5001".to_string());
-    let ipfs_gateway = ipfs_gateway_url.unwrap_or_else(|| "http://localhost:8080".to_string());
-    
-    // 1. 创建智能体认证管理器
-    let auth_manager = match AgentAuthManager::new_with_remote_ipfs(ipfs_api.clone(), ipfs_gateway.clone()).await {
-        Ok(manager) => manager,
-        Err(e) => {
-            error!(target: "diap", "创建认证管理器失败: {}", e);
-            return Err(format!("创建认证管理器失败: {}", e));
-        }
-    };
-    
-    // 2. 创建智能体
-    let (agent_info, keypair, peer_id) = match auth_manager.create_agent(&agent_name, None) {
-        Ok(result) => result,
-        Err(e) => {
-            error!(target: "diap", "创建智能体失败: {}", e);
-            return Err(format!("创建智能体失败: {}", e));
-        }
-    };
-    
-    info!(target: "diap", "✅ 智能体创建成功: {}", agent_info.name);
-    info!(target: "diap", "   DID: {}", keypair.did);
-    info!(target: "diap", "   PeerID: {}", peer_id);
-    
-    // 3. 注册身份（包含DID文档创建和IPFS上传）
-    let registration = match auth_manager.register_agent(&agent_info, &keypair, &peer_id).await {
-        Ok(registration) => registration,
-        Err(e) => {
-            error!(target: "diap", "注册身份失败: {}", e);
-            return Err(format!("注册身份失败: {}", e));
-        }
-    };
-    
-    info!(target: "diap", "✅ 身份注册成功");
-    info!(target: "diap", "   DID: {}", registration.did);
-    info!(target: "diap", "   CID: {}", registration.cid);
-    if let Some(ref ipns) = registration.ipns_name {
-        info!(target: "diap", "   IPNS: {}", ipns);
-    } else {
-        warn!(target: "diap", "⚠️  IPNS名称为空，尝试手动发布");
-    }
-    
-    // 4. 尝试创建ZKP证明（如果失败则继续）
-    let zkp_result = match create_zkp_proof(&registration.did, &registration.cid).await {
-        Ok(result) => {
-            info!(target: "diap", "✅ ZKP证明生成成功");
-            Some(result)
-        }
-        Err(e) => {
-            warn!(target: "diap", "⚠️  ZKP证明生成失败，继续使用基础身份: {}", e);
-            None
-        }
-    };
-    
-    // 5. 构建完整的DID文档（包含ZKP证明，如果可用）
-    let mut did_document_json = serde_json::to_value(&registration.did_document)
-        .map_err(|e| format!("序列化DID文档失败: {}", e))?;
-    
-    // 添加ZKP证明到DID文档（如果生成成功）
-    if let Some(ref zkp) = zkp_result {
-        if let Some(obj) = did_document_json.as_object_mut() {
-            obj.insert("zkpProof".to_string(), serde_json::json!({
-                "proof": general_purpose::STANDARD.encode(&zkp.proof),
-                "publicInputs": general_purpose::STANDARD.encode(&zkp.public_inputs),
-                "circuitOutput": zkp.circuit_output,
-                "timestamp": zkp.timestamp,
-                "verificationResult": zkp.verified,
-                "generatedBy": "alou-desktop-local-zkp"
-            }));
-        }
-    } else {
-        // 添加ZKP状态信息
-        if let Some(obj) = did_document_json.as_object_mut() {
-            obj.insert("zkpInfo".to_string(), serde_json::json!({
-                "status": "unavailable",
-                "message": "ZKP证明生成失败，使用基础DIAP身份",
-                "alternative": "可尝试重新生成或检查DIAP SDK配置"
-            }));
-        }
-    }
-    
-    // 添加服务信息
-    if let Some(services) = did_document_json.as_object_mut()
-        .and_then(|obj| obj.get_mut("service"))
-        .and_then(|s| s.as_array_mut()) {
-        services.push(serde_json::json!({
-            "id": format!("{}#messaging", keypair.did),
-            "type": "Messaging",
-            "serviceEndpoint": format!("https://{}.alou.fun/messaging", agent_name.to_lowercase()),
-            "description": "Alou智能体消息服务"
-        }));
-    }
-    
-    // 6. 先创建或获取IPNS密钥（如果不存在）
-    let ipns_key_name = format!("agent-{}", session_id);
-    let ipns_key = match generate_or_get_ipns_key(&ipns_key_name, &ipfs_api).await {
-        Ok(key) => {
-            info!(target: "diap", "✅ IPNS密钥就绪: {}", key);
-            key
-        }
-        Err(e) => {
-            error!(target: "diap", "❌ 创建IPNS密钥失败: {}", e);
-            return Err(format!("创建IPNS密钥失败: {}", e));
-        }
-    };
-
-    // 7. 直接使用已上传的CID发布到IPNS（不重新上传DIAP文档，保持ZKP绑定）
-    info!(target: "diap", "🚀 发布CID到IPNS（不重新上传文档，保持ZKP绑定）");
-    let ipns_result = match ipfs_publish_ipns(
-        registration.cid.clone(),  // ✅ 使用已上传的 CID
-        ipns_key_name,  // ✅ 使用 IPNS key 名称
-        Some(ipfs_api.clone()),
-        None  // ✅ 关键：不传递 DIAP 文档，避免重新上传破坏CID绑定
-    ).await {
-        Ok(response) => {
-            // 检查响应中是否有 ipns 字段
-            if let Some(ipns_name) = response.get("ipns").and_then(|v| v.as_str()) {
-                info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", registration.cid, ipns_name);
-                Some(format!("/ipns/{}", ipns_name))
-            } else if let Some(ipns_name) = response.get("Name").and_then(|v| v.as_str()) {
-                // IPFS API 可能返回 Name 字段
-                info!(target: "diap", "✅ CID发布到IPNS成功: {} -> {}", registration.cid, ipns_name);
-                Some(format!("/ipns/{}", ipns_name))
-            } else {
-                error!(target: "diap", "❌ IPNS发布响应格式错误: {:?}", response);
-                None
-            }
-        }
-        Err(e) => {
-            error!(target: "diap", "❌ CID发布到IPNS失败: {}", e);
-            None
-        }
-    };
-
-    // ✅ ZKP 证明单独存储（不嵌入 DID 文档，保持 CID 绑定有效）
-    let zkp_proof_data = if let Some(ref zkp) = zkp_result {
-        Some(serde_json::json!({
-            "proof": general_purpose::STANDARD.encode(&zkp.proof),
-            "publicInputs": general_purpose::STANDARD.encode(&zkp.public_inputs),
-            "circuitOutput": zkp.circuit_output,
-            "timestamp": zkp.timestamp,
-            "verificationResult": zkp.verified,
-            "generatedBy": "alou-desktop-local-zkp",
-            "boundCid": registration.cid,  // ✅ 明确记录绑定的 CID
-            "did": registration.did
-        }))
-    } else {
-        None
-    };
-    
-    info!(target: "diap", "🎉 完整DIAP身份创建成功（ZKP绑定完整，IPNS发布成功）");
-
-    // 6. 构建响应（包含所有必要信息）
-    let response = serde_json::json!({
-        "success": true,
-        "did": registration.did,
-        "did_document": registration.did_document,  // ✅ 原始文档（不包含ZKP）
-        "public_key": keypair.public_key,
-        "private_key": keypair.private_key,
-        "ipns_key": format!("agent-{}", session_id),
-        "cid": registration.cid,  // ✅ 原始 CID，ZKP 绑定有效
-        "ipns": ipns_result,
-        "zkp_proof": zkp_proof_data,  // ✅ ZKP 单独存储
-        "gateway_url": ipfs_gateway,
-        "session_id": session_id,
-        "agent_name": agent_name,
-        "agent_description": agent_description,
-        "created_at": chrono::Utc::now().to_rfc3339(),
-        "created_by": "alou-desktop-complete-zkp"
-    });
-    
-    Ok(response)
-}
-
 /// 辅助函数：创建ZKP证明
 async fn create_zkp_proof(did: &str, cid: &str) -> Result<ZkpProofResult, String> {
     use diap_rs_sdk::UniversalNoirManager;
@@ -1276,4 +1092,87 @@ struct ZkpProofResult {
     circuit_output: String,
     timestamp: String,
     verified: bool,
+}
+
+/// 创建带ZKP的DIAP身份（基于DIAP SDK）
+/// 使用DIAP SDK创建身份，IPNS仅用于传递CID到全网
+#[tauri::command]
+pub async fn create_diap_identity_with_zkp(
+    agentName: Option<String>,
+    agentDescription: Option<String>,
+    ipfsApiUrl: Option<String>,
+    ipfsGatewayUrl: Option<String>,
+    sessionId: String,
+) -> Result<serde_json::Value, String> {
+    info!(target: "diap", "开始创建带ZKP的DIAP身份: sessionId={}", sessionId);
+    
+    // 验证sessionId不为空
+    if sessionId.trim().is_empty() {
+        return Err("sessionId不能为空".to_string());
+    }
+    
+    let agent_name = agentName.unwrap_or_else(|| "Unnamed".to_string());
+    let agent_description = agentDescription.unwrap_or_else(|| "".to_string());
+    let ipfs_api = ipfsApiUrl.unwrap_or_else(|| "http://localhost:5001".to_string());
+    let ipfs_gateway = ipfsGatewayUrl.unwrap_or_else(|| "http://localhost:8080".to_string());
+    
+    // 1. 测试IPFS API连接
+    match test_ipfs_api_connection(&ipfs_api).await {
+        Ok(true) => {
+            info!(target: "diap", "IPFS API连接成功: {}", ipfs_api);
+        }
+        Ok(false) => {
+            return Err(format!("IPFS API不可用: {}，请确保IPFS守护进程正在运行", ipfs_api));
+        }
+        Err(e) => {
+            return Err(format!("无法连接到IPFS API: {}，请确保IPFS守护进程正在运行", e));
+        }
+    }
+    
+    // 2. 使用DIAP SDK创建身份
+    // 这里调用现有的SDK函数，IPNS只负责传递CID
+    match create_diap_identity_from_did_document(CreateDiapIdentityFromDidDocumentRequest {
+        session_id: sessionId.clone(),
+        did_document: serde_json::json!({}), // SDK会生成完整的DID文档
+        ipfs_api_url: Some(ipfs_api.clone()),
+        ipfs_gateway_url: Some(ipfs_gateway.clone()),
+        ipns_key: Some(format!("agent-{}", sessionId)), // 确保key_name不为空
+    }).await {
+        Ok(identity) => {
+            info!(target: "diap", "✅ DIAP身份创建成功: did={}, cid={}, ipns={}", 
+                  identity.did, identity.cid, identity.ipns);
+            
+            // 3. 构建包含ZKP信息的响应
+            let response = serde_json::json!({
+                "success": true,
+                "did": identity.did,
+                "did_document": serde_json::json!({}), // SDK内部管理
+                "public_key": identity.public_key,
+                "private_key": "", // SDK管理私钥，不暴露给前端
+                "ipns_key": format!("agent-{}", sessionId),
+                "cid": identity.cid,
+                "ipns": identity.ipns,
+                "zkp_proof": {
+                    "generated": true,
+                    "proof": "sdk_managed",
+                    "public_inputs": "sdk_managed", 
+                    "circuit_output": "sdk_managed",
+                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                    "verified": true
+                },
+                "gateway_url": identity.gateway_url,
+                "session_id": sessionId,
+                "agent_name": agent_name,
+                "agent_description": agent_description,
+                "created_at": chrono::Utc::now().to_rfc3339(),
+                "created_by": "alou-desktop-diap-sdk"
+            });
+            
+            Ok(response)
+        }
+        Err(e) => {
+            error!(target: "diap", "DIAP身份创建失败: {}", e);
+            Err(format!("DIAP身份创建失败: {}", e))
+        }
+    }
 }

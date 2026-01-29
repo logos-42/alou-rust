@@ -376,9 +376,9 @@ impl<'a> TaskExecutorImpl<'a> {
 
                         // 设置alarm等待工具结果（较短时间，提高响应速度）
                         let now_ms = self.ctx.get_current_timestamp_millis();
-                        self.ctx.storage.set_alarm((now_ms + 2000) as i64).await?;
+                        self.ctx.storage.set_alarm((now_ms + 500) as i64).await?;
 
-                        console_log!("[RALPH-LOOP] ⏰ Set alarm for tool results, continuing loop");
+                        console_log!("[RALPH-LOOP] ⏰ Set alarm for tool results in 500ms, continuing loop");
                         return Ok(()); // 暂时退出，等待工具结果后继续循环
                     } else {
                         // 没有工具调用，增加连续无工具调用计数

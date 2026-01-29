@@ -10,6 +10,7 @@
 mod agent_discovery;
 mod agent_creation;
 mod agent_batch;
+pub mod agent_diap;
 
 // Re-export public types and handlers
 pub(crate) use agent_creation::{

@@ -80,7 +80,7 @@ export const useAsyncTaskPolling = ({
    */
   const pollAsyncTask = useCallback((taskId, progressMessageId, agentId, options = {}) => {
     const {
-      interval = 2000, // 2秒轮询一次
+      interval = 1000, // 1秒轮询一次，与后端alarm协调
       timeout = 120000, // 120秒超时
     } = options
 
@@ -133,8 +133,9 @@ export const useAsyncTaskPolling = ({
                // 执行工具调用并提交结果
                await executeToolCallsAndSubmitResults(taskId, toolCalls, agentId)
 
-               // 工具结果已提交，继续轮询等待AI继续处理
-               return
+               // 工具结果已提交，立即检查状态而不是等待下次轮询
+               console.log(`[pollAsyncTask] 工具结果已提交，立即进行下次状态检查`)
+               // 不要返回，继续执行状态检查逻辑
              }
            } catch (toolError) {
              // 如果获取工具调用失败，继续正常轮询

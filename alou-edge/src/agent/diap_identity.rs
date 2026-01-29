@@ -114,9 +114,14 @@ impl DiapIdentityManager {
             .build()
             .map_err(|e| AloudError::AgentError(format!("Failed to create HTTP client: {}", e)))?;
 
+        // 在 Cloudflare Workers 环境中使用 fetch API 直接上传
         let file_name = filename.unwrap_or_else(|| "did.json".to_string());
-        let form = reqwest::multipart::Form::new()
-            .part("file", reqwest::multipart::Part::bytes(data.to_vec()).file_name(file_name));
+        
+        let form_data = format!(
+            "--boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{}\"\r\nContent-Type: application/json\r\n\r\n{}\r\n--boundary--",
+            file_name,
+            std::str::from_utf8(data).unwrap_or("{}")
+        );
 
         let api_url = self.config.ipfs_api_url.trim_end_matches('/');
         let add_url = format!("{}/api/v0/add?pin=true", api_url);
@@ -129,7 +134,8 @@ impl DiapIdentityManager {
 
         let response = http_client
             .post(&add_url)
-            .multipart(form)
+            .header("Content-Type", "multipart/form-data; boundary=boundary")
+            .body(form_data)
             .send()
             .await
             .map_err(|e| AloudError::AgentError(format!("Failed to add to IPFS: {}", e)))?;

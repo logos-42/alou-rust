@@ -149,7 +149,7 @@ pub(crate) async fn handle_get_diap_identity_by_session(
     match session_manager.get_session(&body.session_id).await {
         Ok(_) => {
             // 从KV存储获取DIAP身份
-            match get_diap_identity_from_kv(env, &body.session_id).await? {
+            match get_diap_identity_from_kv(env, &body.session_id).await {
                 Ok(Some(identity)) => {
                     worker::console_log!("✅ 从KV获取DIAP身份成功: {}", body.session_id);
                     let response = serde_json::json!({
@@ -193,9 +193,8 @@ async fn save_diap_identity_to_kv(
     use worker::kv::KvStore;
     
     // 获取KV存储
-    let diap_kv = env.kv("DIAP_KV_NAMESPACE")
-        .map_err(|e| AloudError::WorkerError(e.to_string()))?;
-    let kv = KvStore::new(diap_kv);
+    let kv = env.kv("DIAP_KV_NAMESPACE")
+        .map_err(|e| AloudError::WorkerError(format!("KV store access failed: {:?}", e)))?;
     
     // 构建存储键
     let storage_key = format!("diap_identity:{}", session_id);
@@ -205,7 +204,8 @@ async fn save_diap_identity_to_kv(
         .map_err(|e| AloudError::InvalidInput(e.to_string()))?;
     
     // 保存到KV
-    kv.put(&storage_key, &identity_json, Some(86400))?; // 24小时TTL
+    kv.put(&storage_key, identity_json)
+        .map_err(|e| AloudError::WorkerError(format!("KV put failed: {:?}", e)))?;
     
     worker::console_log!("💾 DIAP身份已保存到KV: {} -> {}", session_id, diap_identity.did);
     Ok(())
@@ -216,25 +216,80 @@ async fn get_diap_identity_from_kv(
     env: &worker::Env,
     session_id: &str,
 ) -> Result<Option<CompleteDiapIdentity>, AloudError> {
-    use worker::kv::KvStore;
-    
     // 获取KV存储
-    let diap_kv = env.kv("DIAP_KV_NAMESPACE")
-        .map_err(|e| AloudError::WorkerError(e.to_string()))?;
-    let kv = KvStore::new(diap_kv);
+    let kv = env.kv("DIAP_KV_NAMESPACE")
+        .map_err(|e| AloudError::WorkerError(format!("KV store access failed: {:?}", e)))?;
     
     // 构建存储键
     let storage_key = format!("diap_identity:{}", session_id);
     
     // 从KV获取
-    match kv.get::<CompleteDiapIdentity>(&storage_key).await? {
-        Some(identity) => {
+    let result = kv.get(&storage_key).text().await
+        .map_err(|e| AloudError::WorkerError(format!("KV get failed: {:?}", e)))?;
+    
+    match result {
+        Some(text) => {
+            let identity: CompleteDiapIdentity = serde_json::from_str(&text)
+                .map_err(|e| AloudError::InvalidInput(format!("Failed to deserialize DIAP identity: {}", e)))?;
             worker::console_log!("💾 从KV获取DIAP身份: {} -> {}", session_id, identity.did);
             Ok(Some(identity))
         }
         None => {
             worker::console_log!("💾 KV中未找到DIAP身份: {}", session_id);
             Ok(None)
+        }
+    }
+}
+
+/// Create basic DIAP identity on backend
+pub(crate) async fn handle_create_diap_identity(
+    session_manager: &crate::agent::session::SessionManager,
+    env: &worker::Env,
+    req: &mut worker::Request,
+) -> Result<worker::Response, AloudError> {
+    use serde_json::json;
+    
+    // 解析请求体
+    let request_body: serde_json::Value = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return Ok(worker::Response::from_bytes(serde_json::to_vec(&error_response).unwrap().into())?);
+        }
+    };
+
+    let session_id = request_body.get("session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+
+    if session_id.is_empty() {
+        let error_response = ErrorResponse {
+            error: "session_id is required".to_string(),
+        };
+        return Ok(worker::Response::from_bytes(serde_json::to_vec(&error_response).unwrap().into())?);
+    }
+
+    // 验证会话
+    match session_manager.get_session(session_id).await {
+        Ok(_) => {
+            // 在新架构中，基础身份创建已移至桌面端
+            // 这里只返回一个响应，指示应该使用桌面端创建
+            let response = json!({
+                "success": false,
+                "error": "Basic identity creation is deprecated. Please use desktop端的 createCompleteDiapIdentity instead.",
+                "message": "请使用桌面端的完整DIAP身份创建流程"
+            });
+            
+            Ok(worker::Response::from_json(&response)?)
+        }
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Session not found: {}", e),
+            };
+            Ok(worker::Response::from_bytes(serde_json::to_vec(&error_response).unwrap().into())?)
         }
     }
 }

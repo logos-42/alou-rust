@@ -263,9 +263,9 @@ impl AITaskHandlers {
 
         console_log!("[TOOL-RESULT] Tool results processed, setting alarm to continue");
 
-        // 设置alarm来继续执行（1秒后，给存储足够时间）
+        // 设置alarm来继续执行（500ms后，提高响应速度）
         let now_ms = get_current_timestamp_millis();
-        storage.set_alarm((now_ms + 1000) as i64).await?;
+        storage.set_alarm((now_ms + 500) as i64).await?;
 
         let response = TaskStatusResponse::new(
             task_name.to_string(),

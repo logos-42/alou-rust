@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DIAP创建功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 DIAP创建功能测试</h1>
+    
+    <div class="container">
+        <h2>📋 测试状态</h2>
+        <div id="status" class="status info">准备开始测试...</div>
+        
+        <div class="form-group">
+            <label for="agentName">Agent名称:</label>
+            <input type="text" id="agentName" value="Test Agent" placeholder="输入agent名称">
+        </div>
+        
+        <div class="form-group">
+            <label for="agentDescription">Agent描述:</label>
+            <input type="text" id="agentDescription" value="测试DIAP身份创建" placeholder="输入agent描述">
+        </div>
+        
+        <div class="form-group">
+            <label for="ipfsApiUrl">IPFS API URL:</label>
+            <input type="text" id="ipfsApiUrl" value="http://localhost:5001" placeholder="IPFS API地址">
+        </div>
+        
+        <div class="form-group">
+            <label for="backendUrl">后端API URL:</label>
+            <input type="text" id="backendUrl" value="http://127.0.0.1:8787" placeholder="后端API地址">
+        </div>
+        
+        <button onclick="testBackendHealth()">🔍 测试后端健康状态</button>
+        <button onclick="createSession()">🆔 创建Session</button>
+        <button onclick="testDiapCreation()">🚀 测试DIAP创建</button>
+        <button onclick="testIpfsConnection()">📡 测试IPFS连接</button>
+        <button onclick="clearLog()">🗑️ 清空日志</button>
+    </div>
+    
+    <div class="container">
+        <h2>📝 测试日志</h2>
+        <div id="log" class="log">等待测试开始...</div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}\n`;
+            logElement.textContent += logMessage;
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(message);
+        }
+        
+        function setStatus(message, type = 'info') {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').textContent = '';
+            log('日志已清空');
+        }
+        
+        async function testBackendHealth() {
+            try {
+                setStatus('测试后端健康状态...', 'info');
+                log('🔍 开始测试后端健康状态...');
+                
+                const response = await fetch(document.getElementById('backendUrl').value + '/api/health');
+                const data = await response.json();
+                
+                if (data.status === 'healthy') {
+                    setStatus('✅ 后端健康状态正常', 'success');
+                    log(`✅ 后端健康状态: ${data.status} (${data.timestamp})`);
+                } else {
+                    setStatus('❌ 后端健康状态异常', 'error');
+                    log(`❌ 后端健康状态异常: ${JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                setStatus('❌ 后端连接失败', 'error');
+                log(`❌ 后端连接失败: ${error.message}`);
+            }
+        }
+        
+        async function createSession() {
+            try {
+                setStatus('创建Session...', 'info');
+                log('🆔 开始创建Session...');
+                
+                const response = await fetch(document.getElementById('backendUrl').value + '/api/session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                
+                if (data.session_id) {
+                    currentSessionId = data.session_id;
+                    setStatus(`✅ Session创建成功: ${currentSessionId}`, 'success');
+                    log(`✅ Session创建成功: ${currentSessionId}`);
+                } else {
+                    setStatus('❌ Session创建失败', 'error');
+                    log(`❌ Session创建失败: ${JSON.stringify(data)}`);
+                }
+            } catch (error) {
+                setStatus('❌ Session创建失败', 'error');
+                log(`❌ Session创建失败: ${error.message}`);
+            }
+        }
+        
+        async function testIpfsConnection() {
+            try {
+                setStatus('测试IPFS连接...', 'info');
+                log('📡 开始测试IPFS连接...');
+                
+                const response = await fetch(document.getElementById('ipfsApiUrl').value + '/api/v0/version', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    setStatus('✅ IPFS连接正常', 'success');
+                    log(`✅ IPFS连接正常: ${data.Version} (${data.Commit})`);
+                } else {
+                    setStatus('❌ IPFS连接失败', 'error');
+                    log(`❌ IPFS连接失败: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                setStatus('❌ IPFS连接失败', 'error');
+                log(`❌ IPFS连接失败: ${error.message}`);
+                log('💡 提示: 请确保IPFS守护进程正在运行 (ipfs daemon)');
+            }
+        }
+        
+        async function testDiapCreation() {
+            if (!currentSessionId) {
+                setStatus('❌ 请先创建Session', 'error');
+                log('❌ 请先创建Session');
+                return;
+            }
+            
+            try {
+                setStatus('测试DIAP创建...', 'info');
+                log('🚀 开始测试DIAP创建流程...');
+                
+                // 步骤1: 测试获取身份（应该返回不存在）
+                log('📋 步骤1: 检查现有身份...');
+                const getResponse = await fetch(document.getElementById('backendUrl').value + '/api/agent/diap/get-identity-by-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: currentSessionId
+                    })
+                });
+                
+                const getData = await getResponse.json();
+                if (getData.error && getData.error.includes('not found')) {
+                    log('✅ 确认身份不存在，可以创建新身份');
+                } else {
+                    log(`⚠️ 身份已存在或获取失败: ${JSON.stringify(getData)}`);
+                }
+                
+                // 步骤2: 由于桌面端Tauri不可用，我们模拟测试IPNS密钥生成
+                log('📋 步骤2: 测试IPNS密钥生成...');
+                
+                const ipnsKeyName = `agent-${currentSessionId}`;
+                log(`🔑 生成IPNS密钥名称: ${ipnsKeyName}`);
+                
+                try {
+                    const keyGenResponse = await fetch(document.getElementById('ipfsApiUrl').value + '/api/v0/key/gen', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded'
+                        },
+                        body: `arg=${encodeURIComponent(ipnsKeyName)}&type=ed25519`
+                    });
+                    
+                    if (keyGenResponse.ok) {
+                        const keyData = await keyGenResponse.json();
+                        log(`✅ IPNS密钥生成成功: ${keyData.Name} (${keyData.Id})`);
+                        
+                        // 步骤3: 测试上传到IPFS
+                        log('📋 步骤3: 测试IPFS上传...');
+                        
+                        const testContent = {
+                            did: `did:ipns:${keyData.Id}`,
+                            agentName: document.getElementById('agentName').value,
+                            agentDescription: document.getElementById('agentDescription').value,
+                            sessionId: currentSessionId,
+                            createdAt: new Date().toISOString()
+                        };
+                        
+                        const uploadResponse = await fetch(document.getElementById('ipfsApiUrl').value + '/api/v0/add', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded'
+                            },
+                            body: `arg=${encodeURIComponent(JSON.stringify(testContent))}`
+                        });
+                        
+                        if (uploadResponse.ok) {
+                            const uploadData = await uploadResponse.json();
+                            log(`✅ IPFS上传成功: CID = ${uploadData.Hash}`);
+                            
+                            // 步骤4: 测试IPNS发布
+                            log('📋 步骤4: 测试IPNS发布...');
+                            
+                            const publishResponse = await fetch(document.getElementById('ipfsApiUrl').value + '/api/v0/name/publish', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded'
+                                },
+                                body: `arg=${uploadData.Hash}&key=${encodeURIComponent(ipnsKeyName)}`
+                            });
+                            
+                            if (publishResponse.ok) {
+                                const publishData = await publishResponse.json();
+                                log(`✅ IPNS发布成功: ${publishData.Name} -> ${publishData.Value}`);
+                                
+                                setStatus('🎉 DIAP创建流程测试成功！', 'success');
+                                log('🎉 DIAP创建流程测试成功！');
+                                log(`📊 测试结果:`);
+                                log(`   - Session ID: ${currentSessionId}`);
+                                log(`   - IPNS Key: ${keyData.Name}`);
+                                log(`   - IPFS CID: ${uploadData.Hash}`);
+                                log(`   - IPNS: ${publishData.Value}`);
+                                log(`   - DID: did:ipns:${publishData.Value.replace('/ipns/', '')}`);
+                                
+                            } else {
+                                setStatus('❌ IPNS发布失败', 'error');
+                                log(`❌ IPNS发布失败: ${publishResponse.status} ${publishResponse.statusText}`);
+                            }
+                        } else {
+                            setStatus('❌ IPFS上传失败', 'error');
+                            log(`❌ IPFS上传失败: ${uploadResponse.status} ${uploadResponse.statusText}`);
+                        }
+                    } else {
+                        setStatus('❌ IPNS密钥生成失败', 'error');
+                        log(`❌ IPNS密钥生成失败: ${keyGenResponse.status} ${keyGenResponse.statusText}`);
+                    }
+                } catch (ipfsError) {
+                    setStatus('❌ IPFS操作失败', 'error');
+                    log(`❌ IPFS操作失败: ${ipfsError.message}`);
+                    log('💡 这可能是因为IPFS守护进程未运行或配置问题');
+                }
+                
+            } catch (error) {
+                setStatus('❌ DIAP创建测试失败', 'error');
+                log(`❌ DIAP创建测试失败: ${error.message}`);
+            }
+        }
+        
+        // 页面加载时自动测试后端健康状态
+        window.onload = function() {
+            log('🧪 DIAP创建功能测试页面已加载');
+            testBackendHealth();
+        };
+    </script>
+</body>
+</html>

@@ -480,6 +480,24 @@ impl Router {
             (Method::Post, "/api/diap/timelock") => diap::handle_timelock_request(env, req).await,
             (Method::Post, "/api/diap/account") => diap::handle_account_request(env, req).await,
 
+            // DIAP身份管理路由（基于SDK架构）
+            (Method::Post, "/api/agent/diap/get-identity-by-session") => {
+                crate::router::agent::agent_diap::handle_get_diap_identity_by_session(&self.session_manager, env, req).await
+                    .map_err(|e| worker::Error::RustError(e.to_string()))
+            }
+            (Method::Post, "/api/agent/diap/save-complete-identity") => {
+                crate::router::agent::agent_diap::handle_save_complete_diap_identity(&self.session_manager, env, req).await
+                    .map_err(|e| worker::Error::RustError(e.to_string()))
+            }
+            (Method::Post, "/api/agent/diap/create-identity") => {
+                crate::router::agent::agent_diap::handle_create_diap_identity(&self.session_manager, env, req).await
+                    .map_err(|e| worker::Error::RustError(e.to_string()))
+            }
+            (Method::Post, "/api/agent/diap/register-onchain") => {
+                crate::router::agent::agent_diap::handle_register_agent_onchain(&self.session_manager, env, req).await
+                    .map_err(|e| worker::Error::RustError(e.to_string()))
+            }
+
             // PubSub endpoints for group chat and agent communication
             (Method::Post, "/api/pubsub/publish") => {
                 pubsub::handle_publish(&self.pubsub_manager, req).await
