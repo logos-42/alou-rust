@@ -131,8 +131,20 @@ impl AITaskHandlers {
     ) -> Result<Response> {
         console_log!("[PENDING-TOOLS] Getting pending tools for task: {}", task_name);
 
+        // 添加调试日志
+        let pending_key = get_pending_tool_calls_key(task_name);
+        console_log!("[PENDING-TOOLS] Checking key: {}", pending_key);
+        
         // 加载待处理的工具调用
         let pending_tools = TaskPersistence::load_pending_tool_calls(storage, task_name).await?;
+        
+        console_log!("[PENDING-TOOLS] Loaded pending tools: {:?}", pending_tools.is_some());
+        if let Some(ref tools) = pending_tools {
+            console_log!("[PENDING-TOOLS] Tool count: {}", tools.len());
+            for (i, tool) in tools.iter().enumerate() {
+                console_log!("[PENDING-TOOLS] Tool {}: name={}, id={:?}", i, tool.tool, tool.id);
+            }
+        }
 
         let response = serde_json::json!({
             "task_id": task_name,
@@ -152,121 +164,38 @@ impl AITaskHandlers {
         mut req: Request,
         get_current_timestamp_millis: impl Fn() -> u64,
     ) -> Result<Response> {
-        console_log!("[TOOL-RESULT] === START PROCESSING TOOL RESULTS ===");
-        console_log!("[TOOL-RESULT] Processing tool results for task: {}", task_name);
+        console_log!("[TOOL-RESULT] === PROCESSING TOOL RESULTS ===");
+        console_log!("[TOOL-RESULT] Task: {}", task_name);
 
         let mut state = Self::load_state_from_storage(storage, task_name).await?;
-        console_log!("[TOOL-RESULT] Current task state: status={:?}, progress={}", state.status, state.progress);
 
         if state.status != TaskStatus::Processing && state.status != TaskStatus::Running {
-            console_error!("[TOOL-RESULT] Task is not in a state to accept tool results: {:?}", state.status);
+            console_error!("[TOOL-RESULT] Invalid state: {:?}", state.status);
             return Response::error("Task is not in a state to accept tool results", 400);
         }
 
-        console_log!("[TOOL-RESULT] Task state is valid, proceeding to parse tool results");
-
-        // 解析工具结果 - 期望格式: { results: [{ tool, success, result, error, arguments, timestamp }] }
+        // 解析工具结果
         let tool_results_data: serde_json::Value = req.json().await?;
-        console_log!("[TOOL-RESULT] Raw tool results data: {}", serde_json::to_string_pretty(&tool_results_data).unwrap_or_default());
+        console_log!("[TOOL-RESULT] Received tool results");
         
-        let cloned_data = tool_results_data.clone();
-        let tool_results = cloned_data.get("results")
-            .and_then(|r| r.as_array())
-            .ok_or_else(|| {
-                console_error!("[TOOL-RESULT] Invalid tool results format - missing 'results' array");
-                worker::Error::RustError("Invalid tool results format".to_string())
-            })?;
+        // 保存工具结果到 storage
+        let tool_result_key = get_tool_result_key(task_name);
+        storage.put(&tool_result_key, &tool_results_data).await?;
+        console_log!("[TOOL-RESULT] Saved tool results to storage");
 
-        console_log!("[TOOL-RESULT] Received {} tool results", tool_results.len());
-
-        // 加载待处理的工具调用，用于获取正确的tool_call_id
-        let pending_tool_calls = TaskPersistence::load_pending_tool_calls(storage, task_name).await?
-            .unwrap_or_default();
-        console_log!("[TOOL-RESULT] Loaded {} pending tool calls", pending_tool_calls.len());
-        for (i, tc) in pending_tool_calls.iter().enumerate() {
-            console_log!("[TOOL-RESULT] Pending tool call {}: tool={}, id={:?}", i, tc.tool, tc.id);
-        }
-
-        // 加载对话历史
-        let mut conversation_history = Self::load_conversation_history_from_storage(storage, task_name)
-            .await
-            .unwrap_or_else(|_| Some(Vec::new()))
-            .unwrap_or_default();
-        console_log!("[TOOL-RESULT] Loaded conversation history: {} messages", conversation_history.len());
-
-        // 为每个工具结果添加消息
-        for (result_index, tool_result) in tool_results.iter().enumerate() {
-            console_log!("[TOOL-RESULT] Processing tool result {}: {:?}", result_index, tool_result);
-            
-            let tool_name = tool_result.get("tool")
-                .and_then(|t| t.as_str())
-                .ok_or_else(|| worker::Error::RustError("Tool name missing".to_string()))?;
-
-            let success = tool_result.get("success")
-                .and_then(|s| s.as_bool())
-                .unwrap_or(false);
-
-            let result_content = if success {
-                tool_result.get("result")
-                    .and_then(|r| r.as_str())
-                    .unwrap_or("工具执行成功")
-            } else {
-                tool_result.get("error")
-                    .and_then(|e| e.as_str())
-                    .unwrap_or("工具执行失败")
-            };
-
-            // 查找对应的待处理工具调用ID
-            let tool_call_id = pending_tool_calls.iter()
-                .find(|tc| tc.tool == tool_name)
-                .and_then(|tc| tc.id.clone())
-                .unwrap_or_else(|| {
-                    // 如果找不到匹配的ID，使用工具名和时间戳作为fallback
-                    let timestamp = tool_result.get("timestamp")
-                        .and_then(|t| t.as_u64())
-                        .unwrap_or_else(|| get_current_timestamp_millis());
-                    format!("{}_{}", tool_name, timestamp)
-                });
-
-            console_log!("[TOOL-RESULT] Adding tool result message for {} (success: {}, tool_call_id: {})", tool_name, success, tool_call_id);
-
-            // 添加工具结果消息到对话历史
-            conversation_history.push(AiMessage {
-                role: "tool".to_string(),
-                content: result_content.to_string(),
-                tool_call_id: Some(tool_call_id),
-                tool_calls: None,
-            });
-            
-            console_log!("[TOOL-RESULT] Added tool response message, conversation history now has {} messages", conversation_history.len());
-        }
-
-        Self::save_conversation_history_to_storage(storage, task_name, &conversation_history).await?;
-        console_log!("[TOOL-RESULT] Saved conversation history with {} messages", conversation_history.len());
-
-        // 清除待处理的工具调用
+        // 删除 pending_tool_calls（工具已执行完成）
         let pending_key = get_pending_tool_calls_key(task_name);
         storage.delete(&pending_key).await?;
         console_log!("[TOOL-RESULT] Cleared pending tool calls");
 
-        // 保存工具结果
-        let tool_key = get_tool_result_key(task_name);
-        storage.put(&tool_key, tool_results_data).await?;
-        console_log!("[TOOL-RESULT] Saved tool results");
-
-        // 更新状态
-        state.progress = (state.progress + 0.2).min(0.9);
-        state.current_step = format!("已处理 {} 个工具结果，继续执行", tool_results.len());
+        // 更新状态 - 标记为"准备继续"
+        state.current_step = "工具执行完成，准备继续AI调用".to_string();
         state.updated_at = get_current_timestamp_millis();
         Self::save_state_to_storage(storage, task_name, &state).await?;
-        console_log!("[TOOL-RESULT] Updated task state: progress={}, step='{}'", state.progress, state.current_step);
+        console_log!("[TOOL-RESULT] Updated state");
 
-        console_log!("[TOOL-RESULT] Tool results processed, setting alarm to continue");
-
-        // 设置alarm来继续执行（500ms后，提高响应速度）
-        let now_ms = get_current_timestamp_millis();
-        storage.set_alarm((now_ms + 500) as i64).await?;
-
+        // 返回成功响应
+        // 注意：实际的继续执行会在下一次 /status 轮询时由 check_and_execute_pending_task 触发
         let response = TaskStatusResponse::new(
             task_name.to_string(),
             state.status.to_string(),
@@ -275,6 +204,7 @@ impl AITaskHandlers {
         let headers = Headers::new();
         headers.set("Content-Type", "application/json; charset=utf-8")?;
 
+        console_log!("[TOOL-RESULT] ✅ Tool results accepted, will continue on next status check");
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
 

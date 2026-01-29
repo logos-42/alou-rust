@@ -209,30 +209,48 @@ impl TaskExecutor {
         task_id: &str,
         tool_result: serde_json::Value,
     ) -> Result<bool> {
+        console_error!("[TaskExecutor] Submitting tool result for task: {}", task_id);
+        
         let namespace = env.durable_object("AI_TASKS")?;
         let id = namespace.id_from_name(task_id)?;
         let stub = id.get_stub()?;
         
         let tool_result_json = match serde_json::to_string(&tool_result) {
-            Ok(json) => json,
+            Ok(json) => {
+                console_error!("[TaskExecutor] Serialized tool result: {} bytes", json.len());
+                json
+            }
             Err(e) => {
+                console_error!("[TaskExecutor] Failed to serialize tool result: {}", e);
                 return Err(worker::Error::RustError(
                     format!("Failed to serialize tool result: {}", e)
                 ));
             }
         };
         
+        // 设置 Content-Type 头
+        let headers = worker::Headers::new();
+        if let Err(e) = headers.set("Content-Type", "application/json") {
+            console_error!("[TaskExecutor] Failed to set Content-Type header: {}", e);
+            return Err(e);
+        }
+        
         let mut init = RequestInit::new();
         init.with_method(Method::Post)
+            .with_headers(headers)
             .with_body(Some(tool_result_json.into()));
         
         let tool_request = Request::new_with_init("http://dummy/tool-result", &init)?;
         
+        console_error!("[TaskExecutor] Calling DO /tool-result endpoint");
         let response = stub
             .fetch_with_request(tool_request)
             .await?;
         
-        Ok(response.status_code() == 200)
+        let status = response.status_code();
+        console_error!("[TaskExecutor] DO response status: {}", status);
+        
+        Ok(status == 200)
     }
     
     /// 生成任务ID

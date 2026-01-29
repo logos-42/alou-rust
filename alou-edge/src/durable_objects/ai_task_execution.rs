@@ -137,6 +137,7 @@ impl<'a> TaskExecutorImpl<'a> {
                         }
                     }).collect();
                     TaskPersistence::save_pending_tool_calls(self.ctx.storage, self.ctx.task_name, &tool_calls).await?;
+                    console_log!("[EXECUTE] ✅ Saved {} pending tool calls to storage", tool_calls.len());
 
                     // 为 DeepSeek API 添加占位工具响应消息
                     for tc in &ai_response.tool_calls {
@@ -154,13 +155,17 @@ impl<'a> TaskExecutorImpl<'a> {
                     state.progress = 0.7;
                     state.current_step = format!("等待执行 {} 个工具调用", tool_calls.len());
                     state.updated_at = self.ctx.get_current_timestamp();
+                    console_log!("[EXECUTE] Saving state as Processing: status={}, progress={}, step='{}'", 
+                                 state.status, state.progress, state.current_step);
                     self.save_state(&state).await?;
+                    console_log!("[EXECUTE] State saved successfully as Processing");
+                    console_log!("[EXECUTE] 🔧 Tool calls are now available at /pending-tools endpoint");
 
-                    // 设置alarm等待工具结果（5秒后检查）
-                    let now_ms = self.ctx.get_current_timestamp_millis();
-                    self.ctx.storage.set_alarm((now_ms + 5000) as i64).await?;
+                    // 注意：不设置 alarm，让前端通过轮询 /pending-tools 获取工具调用
+                    // 在本地环境中 alarm 不会触发，所以依赖前端轮询
+                    // 前端执行工具后会调用 /tool-result，然后在 check_and_execute_pending_task 中继续执行
 
-                    console_log!("⏰ Set alarm to wait for tool results");
+                    console_log!("⏰ Waiting for frontend to execute tools (no alarm in local dev)");
                     Ok(())
                 } else {
                     // 没有工具调用，直接完成
@@ -195,64 +200,100 @@ impl<'a> TaskExecutorImpl<'a> {
 
     /// 基于 Ralph Loop 循环调用工具的对话继续
     pub async fn continue_with_tool_results(&self) -> Result<()> {
-        console_log!("[RALPH-LOOP] 🔄 Starting AI-driven Ralph Loop for tool-based conversation");
+        console_log!("[RALPH-LOOP] 🔄 Continuing with tool results");
 
         // 1. 更新状态
         let mut state = self.load_state().await?;
         state.status = TaskStatus::Processing;
         state.progress = 0.8;
-        state.current_step = "Ralph Loop: 基于工具结果继续对话".to_string();
+        state.current_step = "Ralph Loop: 处理工具结果并继续对话".to_string();
         state.updated_at = self.ctx.get_current_timestamp();
         self.save_state(&state).await?;
 
-        // 2. 检查并处理待处理的工具结果
-        console_log!("[RALPH-LOOP] Checking for pending tool results to process");
-        let pending_tool_calls = TaskPersistence::load_pending_tool_calls(self.ctx.storage, self.ctx.task_name).await?;
-        
-        // 如果没有待处理的工具调用，直接跳过
-        let pending_calls = match pending_tool_calls {
-            Some(calls) if !calls.is_empty() => calls,
-            _ => {
-                console_log!("[RALPH-LOOP] No pending tool calls found");
-                self.ctx.storage.delete(&format!("pending_tool_calls_{}", self.ctx.task_name)).await?;
-                // 获取原始请求和对话历史
-                let request = match TaskPersistence::get_request(self.ctx.storage, self.ctx.task_name).await? {
-                    Some(req) => req,
-                    None => {
-                        let mut state = self.load_state().await?;
-                        state.status = TaskStatus::Failed;
-                        state.error = Some("请求数据不存在".to_string());
-                        state.progress = 1.0;
-                        self.save_state(&state).await?;
-                        return Err(Error::RustError("Request data not found".to_string()));
-                    }
-                };
-                return self.continue_without_tool_results(request, state).await;
-            }
-        };
-        console_log!("[RALPH-LOOP] Found {} pending tool calls, checking for results", pending_calls.len());
-        
-        // 检查工具结果
+        // 2. 加载工具结果
         let tool_result_key = get_tool_result_key(self.ctx.task_name);
         let tool_results_data: Option<String> = match self.ctx.storage.get::<String>(&tool_result_key).await {
             Ok(data) => Some(data),
             Err(_) => {
-                console_log!("[RALPH-LOOP] No tool results found, continuing without them");
+                console_log!("[RALPH-LOOP] No tool results found");
                 None
             }
         };
 
-        // 处理工具结果
+        // 3. 处理工具结果（替换对话历史中的占位符）
         if let Some(ref tool_results_data) = tool_results_data {
-            console_log!("[RALPH-LOOP] Processing tool results data");
-            self.process_tool_results(tool_results_data, &pending_calls).await?;
+            console_log!("[RALPH-LOOP] Processing tool results");
+            
+            let tool_results: serde_json::Value = serde_json::from_str(tool_results_data)
+                .map_err(|e| Error::RustError(format!("Failed to parse tool results: {}", e)))?;
+            
+            let results_array = tool_results.get("results")
+                .and_then(|r| r.as_array())
+                .ok_or_else(|| Error::RustError("Invalid tool results format".to_string()))?;
+            
+            let mut conversation_history = self.load_conversation_history().await?.unwrap_or_default();
+            
+            // 替换占位符工具响应为实际结果
+            for tool_result in results_array.iter() {
+                let tool_name = tool_result.get("tool")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("unknown");
+                
+                let success = tool_result.get("success")
+                    .and_then(|s| s.as_bool())
+                    .unwrap_or(false);
+                
+                let result_content = if success {
+                    tool_result.get("result")
+                        .and_then(|r| r.as_str())
+                        .unwrap_or("工具执行成功")
+                } else {
+                    tool_result.get("error")
+                        .and_then(|e| e.as_str())
+                        .unwrap_or("工具执行失败")
+                };
+                
+                let tool_call_id = tool_result.get("tool_call_id")
+                    .and_then(|id| id.as_str())
+                    .unwrap_or(tool_name)
+                    .to_string();
+                
+                console_log!("[RALPH-LOOP] Replacing placeholder for tool_call_id: {} with actual result", tool_call_id);
+                
+                // 查找并替换占位符（空内容的工具响应）
+                let mut found_placeholder = false;
+                for msg in conversation_history.iter_mut() {
+                    if msg.role == "tool" && 
+                       msg.tool_call_id.as_ref() == Some(&tool_call_id) && 
+                       msg.content.is_empty() {
+                        msg.content = result_content.to_string();
+                        found_placeholder = true;
+                        console_log!("[RALPH-LOOP] ✅ Replaced placeholder for {}", tool_name);
+                        break;
+                    }
+                }
+                
+                // 如果没找到占位符，添加新的工具响应
+                if !found_placeholder {
+                    console_log!("[RALPH-LOOP] ⚠️ No placeholder found, adding new tool response for {}", tool_name);
+                    conversation_history.push(AiMessage {
+                        role: "tool".to_string(),
+                        content: result_content.to_string(),
+                        tool_call_id: Some(tool_call_id),
+                        tool_calls: None,
+                    });
+                }
+            }
+            
+            self.save_conversation_history(&conversation_history).await?;
+            console_log!("[RALPH-LOOP] Updated conversation history with {} messages", conversation_history.len());
+            
+            // 清除工具结果
+            self.ctx.storage.delete(&tool_result_key).await?;
+            console_log!("[RALPH-LOOP] Cleared tool results");
         }
 
-        // 清除待处理的工具调用
-        self.ctx.storage.delete(&format!("pending_tool_calls_{}", self.ctx.task_name)).await?;
-        console_log!("[RALPH-LOOP] Cleared pending tool calls");
-
-        // 3. 获取原始请求
+        // 4. 获取原始请求
         let request = match TaskPersistence::get_request(self.ctx.storage, self.ctx.task_name).await? {
             Some(req) => req,
             None => {
@@ -264,7 +305,7 @@ impl<'a> TaskExecutorImpl<'a> {
             }
         };
 
-        // 4. Ralph Loop 核心逻辑：循环进行 AI 对话直到任务完成
+        // 5. 执行 Ralph Loop
         self.execute_ralph_loop(request, state).await
     }
 
@@ -373,12 +414,12 @@ impl<'a> TaskExecutorImpl<'a> {
                         state.current_step = format!("Ralph Loop: 等待执行 {} 个工具调用", tool_calls.len());
                         state.updated_at = self.ctx.get_current_timestamp();
                         self.save_state(&state).await?;
+                        console_log!("[RALPH-LOOP] 🔧 Tool calls are now available at /pending-tools endpoint");
 
-                        // 设置alarm等待工具结果（较短时间，提高响应速度）
-                        let now_ms = self.ctx.get_current_timestamp_millis();
-                        self.ctx.storage.set_alarm((now_ms + 500) as i64).await?;
+                        // 注意：不设置 alarm，让前端通过轮询获取工具调用
+                        // 前端执行工具后会调用 /tool-result，然后在 check_and_execute_pending_task 中继续执行
 
-                        console_log!("[RALPH-LOOP] ⏰ Set alarm for tool results in 500ms, continuing loop");
+                        console_log!("[RALPH-LOOP] ⏰ Waiting for frontend to execute tools (no alarm in local dev)");
                         return Ok(()); // 暂时退出，等待工具结果后继续循环
                     } else {
                         // 没有工具调用，增加连续无工具调用计数
@@ -654,7 +695,11 @@ impl<'a> TaskExecutorImpl<'a> {
     /// 保存状态
     async fn save_state(&self, state: &TaskState) -> Result<()> {
         let state_key = get_state_key(self.ctx.task_name);
-        self.ctx.storage.put(&state_key, state).await
+        console_log!("[SAVE_STATE] Saving state: status={}, progress={}, step='{}'", 
+                     state.status, state.progress, state.current_step);
+        self.ctx.storage.put(&state_key, state).await?;
+        console_log!("[SAVE_STATE] State saved successfully");
+        Ok(())
     }
 
     /// 加载对话历史

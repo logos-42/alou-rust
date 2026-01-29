@@ -90,7 +90,34 @@ impl DurableObject for AITaskDO {
             }
             (Method::Post, "/tool-result") => {
                 let storage = self.state.storage();
-                AITaskHandlers::handle_tool_result(&self.task_name(), &storage, req, || self.get_current_timestamp_millis()).await
+                
+                // 先处理工具结果
+                let result = AITaskHandlers::handle_tool_result(&self.task_name(), &storage, req, || self.get_current_timestamp_millis()).await;
+                
+                // 工具结果已保存，立即触发继续执行（不等待结果返回）
+                console_log!("[AITaskDO] 🚀 Tool results saved, immediately continuing with Ralph Loop");
+                
+                // 检查是否已经在执行中
+                if *self.is_executing.borrow() {
+                    console_log!("[AITaskDO] ⚠️ Already executing, will continue on next check");
+                    return result;
+                }
+                
+                // 设置执行标志
+                *self.is_executing.borrow_mut() = true;
+                
+                // 立即继续执行
+                let continue_result = self.continue_with_tool_results().await;
+                
+                // 清除执行标志
+                *self.is_executing.borrow_mut() = false;
+                
+                match continue_result {
+                    Ok(_) => console_log!("[AITaskDO] ✅ Successfully continued after tool result"),
+                    Err(e) => console_error!("[AITaskDO] ❌ Failed to continue after tool result: {}", e),
+                }
+                
+                result
             }
             (Method::Get, "/pending-tools") => {
                 let storage = self.state.storage();
@@ -456,8 +483,11 @@ impl AITaskDO {
     }
 
     /// 检查并执行待处理的任务（在每次访问时调用）
+    /// 
+    /// 重要：在本地开发环境中，Cloudflare Alarm 不会触发，
+    /// 所以我们需要在这里主动执行 queued 状态的任务
     async fn check_and_execute_pending_task(&self) -> Result<()> {
-        console_log!("[CHECK] Checking for pending tasks");
+        console_log!("[CHECK] 🔍 Checking for pending tasks");
 
         let task_name = self.task_name();
         let storage = self.state.storage();
@@ -467,11 +497,11 @@ impl AITaskDO {
 
         match state.status {
             TaskStatus::Queued => {
-                console_log!("[CHECK] Found queued task, starting execution");
+                console_log!("[CHECK] 🚀 Found queued task, starting execution (LOCAL DEV MODE - bypassing alarm)");
 
                 // 检查是否已经在执行中，避免重复执行
                 if *self.is_executing.borrow() {
-                    console_log!("[CHECK] Task is already executing, skipping");
+                    console_log!("[CHECK] ⚠️ Task is already executing, skipping");
                     return Ok(());
                 }
 
@@ -483,10 +513,10 @@ impl AITaskDO {
                 console_log!("[CHECK] Task {} is_workflow: {}", task_name, is_workflow);
 
                 let execution_result = if is_workflow {
-                    console_log!("[CHECK] Executing workflow task");
+                    console_log!("[CHECK] 📋 Executing workflow task");
                     self.execute_workflow_task().await
                 } else {
-                    console_log!("[CHECK] Executing regular task");
+                    console_log!("[CHECK] 🤖 Executing regular task");
                     self.execute_task().await
                 };
 
@@ -494,44 +524,57 @@ impl AITaskDO {
                 *self.is_executing.borrow_mut() = false;
 
                 match execution_result {
-                    Ok(_) => console_log!("[CHECK] Task executed successfully"),
-                    Err(e) => console_error!("[CHECK] Task execution failed: {}", e),
+                    Ok(_) => console_log!("[CHECK] ✅ Task executed successfully"),
+                    Err(e) => console_error!("[CHECK] ❌ Task execution failed: {}", e),
                 }
             }
             TaskStatus::Processing => {
-                console_log!("[CHECK] Task is processing, checking for tool results");
+                console_log!("[CHECK] ⚙️ Task is processing");
                 
-                // 检查是否有工具结果
+                // 检查是否已经在执行中
+                if *self.is_executing.borrow() {
+                    console_log!("[CHECK] ⚠️ Task is already executing, skipping");
+                    return Ok(());
+                }
+                
+                // 检查是否有工具结果需要处理
                 let tool_result_key = crate::durable_objects::ai_task_state::get_tool_result_key(&task_name);
-                if storage.get::<String>(&tool_result_key).await.is_ok() {
-                    console_log!("[CHECK] Found tool results, processing automatically");
-                    match self.continue_with_tool_results().await {
-                        Ok(_) => console_log!("[CHECK] Tool results processed successfully"),
-                        Err(e) => console_error!("[CHECK] Tool results processing failed: {}", e),
-                    }
-                } else {
-                    console_log!("[CHECK] No tool results found, checking for pending tool calls");
+                let has_tool_results = storage.get::<String>(&tool_result_key).await.is_ok();
+                
+                // 检查是否还有待处理的工具调用
+                let pending_key = crate::durable_objects::ai_task_state::get_pending_tool_calls_key(&task_name);
+                let has_pending_tools = storage.get::<String>(&pending_key).await.is_ok();
+                
+                console_log!("[CHECK] 📊 has_tool_results: {}, has_pending_tools: {}, is_executing: {}", 
+                             has_tool_results, has_pending_tools, *self.is_executing.borrow());
+                
+                if has_tool_results && !has_pending_tools {
+                    // 有工具结果且没有待处理工具 = 前端已提交工具结果，需要继续AI调用
+                    console_log!("[CHECK] ✅ Tool results ready, continuing AI execution");
                     
-                    // 检查是否有待处理的工具调用但没有结果
-                    let pending_key = crate::durable_objects::ai_task_state::get_pending_tool_calls_key(&task_name);
-                    if let Ok(pending_calls) = storage.get::<Vec<crate::compatibility::models::ToolCall>>(&pending_key).await {
-                        console_log!("[CHECK] Found pending tool calls but no results, auto-executing");
-                        
-                        // 自动执行工具
-                        if !pending_calls.is_empty() {
-                            console_log!("[CHECK] Auto-executing {} tools", pending_calls.len());
-                            self.auto_execute_tools_and_continue(pending_calls).await?;
-                        }
-                    } else {
-                        console_log!("[CHECK] No pending tool calls found");
+                    // 设置执行标志
+                    *self.is_executing.borrow_mut() = true;
+                    
+                    let execution_result = self.continue_with_tool_results().await;
+                    
+                    // 清除执行标志
+                    *self.is_executing.borrow_mut() = false;
+                    
+                    match execution_result {
+                        Ok(_) => console_log!("[CHECK] ✅ Continued execution successfully"),
+                        Err(e) => console_error!("[CHECK] ❌ Continue execution failed: {}", e),
                     }
+                } else if has_pending_tools {
+                    console_log!("[CHECK] ⏳ Waiting for frontend to execute tools");
+                } else {
+                    console_log!("[CHECK] ⏳ Waiting for tool results");
                 }
             }
             TaskStatus::Completed | TaskStatus::Failed => {
-                console_log!("[CHECK] Task already {} , no action needed", state.status);
+                console_log!("[CHECK] ✓ Task already {}, no action needed", state.status);
             }
             _ => {
-                console_log!("[CHECK] Task status {} requires no action", state.status);
+                console_log!("[CHECK] ℹ️ Task status {} requires no action", state.status);
             }
         }
 

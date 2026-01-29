@@ -801,16 +801,38 @@ impl Router {
 
     /// 处理待处理工具查询
     async fn handle_pending_tools(&self, env: &Env, task_id: &str) -> Result<Response> {
-        use crate::compatibility::router;
+        console_log!("[Router] 🔍 Forwarding pending-tools request to DO for task: {}", task_id);
         
-        // 暂时返回空结果，让前端继续轮询
-        // 实际的工具执行逻辑在 AITaskDO 中处理
-        let response = serde_json::json!({
-            "task_id": task_id,
-            "toolCalls": []
-        });
+        // 获取 Durable Object stub
+        let namespace = env.durable_object("AI_TASKS")?;
+        let id = namespace.id_from_name(task_id)?;
+        let stub = id.get_stub()?;
         
-        Response::from_json(&response)
+        // 创建请求
+        let mut init = worker::RequestInit::new();
+        init.with_method(Method::Get);
+        
+        let request = worker::Request::new_with_init(
+            "http://dummy/pending-tools",
+            &init
+        )?;
+        
+        // 调用 Durable Object
+        match stub.fetch_with_request(request).await {
+            Ok(response) => {
+                console_log!("[Router] ✅ Got pending tools response from DO");
+                Ok(response)
+            }
+            Err(e) => {
+                console_error!("[Router] ❌ Failed to get pending tools: {}", e);
+                // 返回空数组作为fallback
+                let response = serde_json::json!({
+                    "task_id": task_id,
+                    "toolCalls": []
+                });
+                Response::from_json(&response)
+            }
+        }
     }
     
     /// 处理任务取消
