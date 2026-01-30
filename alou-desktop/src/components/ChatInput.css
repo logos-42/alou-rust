@@ -17,7 +17,7 @@
   display: flex;
   gap: 0.55rem;
   align-items: flex-end;
-  background: rgba(255, 255, 255, 0.92);
+  background: transparent;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 0.85rem;
   padding: 0.35rem 0.75rem;
@@ -26,9 +26,9 @@
   min-height: 38px;
 }
 
-/* 暗夜模式 - 纯黑色输入框 */
+/* 暗夜模式 - 透明输入框 */
 .app-shell.dark-mode .input-area .input-wrapper {
-  background: #000000; /* 纯黑色背景 */
+  background: transparent;
   border-color: rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 22px rgba(255, 255, 255, 0.05);
 }

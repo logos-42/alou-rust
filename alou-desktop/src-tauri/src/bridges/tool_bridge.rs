@@ -4,7 +4,7 @@
 
 use super::super::tools::{ToolRegistry, ToolResult, ExecutionContext, ToolConfig};
 use crate::tools::executor::ToolExecutionManager;
-use crate::tools::{FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, SkillsTool};
+use crate::tools::{FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, AgentSkillsTool};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
@@ -111,8 +111,8 @@ impl ToolBridge {
         let todo_tool = Arc::new(TodoListTool::new());
         self.register_tool(todo_tool).await?;
         
-        // 注册Skills工具
-        let skills_tool = Arc::new(SkillsTool::new());
+        // 注册Agent Skills工具
+        let skills_tool = Arc::new(AgentSkillsTool::new()?);
         self.register_tool(skills_tool).await?;
         
         println!("✅ All tools registered successfully in ToolBridge");

@@ -13,7 +13,7 @@ pub mod network;
 pub mod system;
 pub mod plan;
 pub mod todolist;
-pub mod skills;
+pub mod agent_skills;
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -24,7 +24,7 @@ pub use search::{SearchTool, SearchPattern};
 pub use bash::{BashTool, CommandResult};
 pub use plan::{PlanTool, TaskPlan, PlanStep};
 pub use todolist::{TodoListTool, TodoItem, TodoStatus};
-pub use skills::{SkillsTool, SkillDefinition, SkillExecutionResult};
+pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -181,9 +181,9 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     let todo_tool = Arc::new(TodoListTool::new());
     registry.register(todo_tool).await?;
 
-    // 注册Skills工具
-    let skills_tool = Arc::new(SkillsTool::new());
-    registry.register(skills_tool).await?;
+    // 注册Agent Skills工具（替代旧的Skills工具）
+    let agent_skills_tool = Arc::new(AgentSkillsTool::new()?);
+    registry.register(agent_skills_tool).await?;
 
     Ok(registry)
 }

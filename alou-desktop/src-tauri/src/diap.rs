@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use log::{debug, info, warn, error};
 use reqwest::Client;
 use base64::{Engine as _, engine::general_purpose};
+use crate::ipns_verified::{IpfsConfig, generate_ipns_key_verified, publish_to_ipns_verified};
 
 use crate::utils::normalize_base_url;
 

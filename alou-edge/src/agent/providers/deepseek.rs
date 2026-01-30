@@ -165,9 +165,22 @@ impl AiProvider for DeepSeekProvider {
         let body = serde_json::to_string(&request)
             .map_err(|e| AloudError::AgentError(format!("Serialize error: {}", e)))?;
 
+        // 记录完整请求用于调试
+        console_log!("DeepSeek: Full request body: {}", body);
+        
+        // 特别记录工具信息
+        if let Some(ref tools) = request.tools {
+            console_log!("DeepSeek: Sending {} tools to API", tools.len());
+            for (i, tool) in tools.iter().enumerate() {
+                console_log!("DeepSeek: Tool {}: type={}, function.name={}", i, tool.tool_type, tool.function.name);
+            }
+        } else {
+            console_log!("DeepSeek: No tools in request");
+        }
+
         // 记录请求预览
-        let request_preview = body.chars().take(200).collect::<String>();
-        console_log!("DeepSeek: Request preview: {}", request_preview);
+        let request_preview = body.chars().take(500).collect::<String>();
+        console_log!("DeepSeek: Request preview (500 chars): {}", request_preview);
 
         // 验证 API key 不为空
         if self.api_key.is_empty() {

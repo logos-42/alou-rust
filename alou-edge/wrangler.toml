@@ -66,10 +66,6 @@ id = "e0f682098b73485b940f1176417f417a"
 name = "AI_TASKS"
 class_name = "AITaskDO"
 
-# Migrations for Durable Objects (main environment) - 已存在，注释掉
-# [[migrations]]
-# tag = "v4_jan18_2026"  # 静态唯一标签
-# new_sqlite_classes = ["AITaskDO"]
 
 
   [vars.development]

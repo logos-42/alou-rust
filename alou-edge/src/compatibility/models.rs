@@ -233,7 +233,9 @@ impl TaskStatusResponse {
 }
 
 /// 任务状态枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
     Queued,
     Running,
@@ -270,7 +272,12 @@ pub fn should_use_async(request: &CompatibleRequest) -> bool {
     
     let has_complex_tools = !request.tools.is_empty();
     
-    is_long_model || is_long_prompt || has_complex_tools
+    // 强制使用异步处理进行测试
+    let force_async = request.session_id.as_ref()
+        .map(|id| id.contains("test") || id.contains("async") || id.contains("direct"))
+        .unwrap_or(false);
+    
+    is_long_model || is_long_prompt || has_complex_tools || force_async
 }
 
 /// 估计任务执行时间（秒）

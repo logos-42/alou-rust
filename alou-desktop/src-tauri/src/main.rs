@@ -189,6 +189,67 @@ async fn get_execution_history(
     }))
 }
 
+// Agent Skills command
+#[tauri::command]
+async fn agent_skills(
+    action: String,
+    skill_name: Option<String>,
+    inputs: Option<serde_json::Value>,
+    query: Option<String>,
+    bridge_manager: tauri::State<'_, BridgeManager>,
+) -> Result<serde_json::Value, String> {
+    let args = serde_json::json!({
+        "action": action,
+        "skill_name": skill_name,
+        "inputs": inputs,
+        "query": query
+    });
+    
+    let execution_id = format!("agent_skills_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
+    
+    let request = crate::bridges::ToolCallRequest {
+        session_id: "agent_skills_session".to_string(),
+        user_id: None,
+        tool_id: "agent_skills".to_string(),
+        args: args,
+        working_directory: std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(|s| s.to_string())),
+        environment: std::env::vars().collect(),
+        timeout_seconds: Some(30),
+        permissions: vec!["read".to_string(), "write".to_string(), "execute".to_string()],
+    };
+    
+    let result = bridge_manager.tool_bridge().handle_request(request).await;
+    
+    match result {
+        Ok(response) => {
+            let mut json_result = serde_json::json!({
+                "success": response.success,
+                "execution_id": execution_id
+            });
+            
+            if response.success {
+                if let Some(tool_result) = response.result {
+                    json_result["result"] = tool_result.data;
+                    json_result["execution_time_ms"] = tool_result.execution_time_ms.into();
+                }
+            } else {
+                json_result["error"] = serde_json::Value::String(response.error.unwrap_or_else(|| "Unknown error".to_string()));
+            }
+            
+            Ok(json_result)
+        }
+        Err(e) => {
+            Ok(serde_json::json!({
+                "success": false,
+                "execution_id": execution_id,
+                "error": e.to_string()
+            }))
+        }
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -272,6 +333,8 @@ fn main() {
             get_tool_list,
             cancel_tool_execution,
             get_execution_history,
+            // Agent Skills commands
+            agent_skills,
             // Memory management commands
             set_memory_item,
             get_memory_item,
