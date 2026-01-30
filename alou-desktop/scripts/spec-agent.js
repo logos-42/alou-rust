@@ -430,7 +430,7 @@ function exportAsMarkdown(spec) {
  * 导出为HTML
  */
 function exportAsHtml(spec) {
-  let html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">

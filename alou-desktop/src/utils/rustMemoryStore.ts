@@ -1,0 +1,306 @@
+/**
+ * rustMemoryStore - Rust内存存储接口
+ * 通过Tauri调用Rust内存管理器，提供高性能的内存存储
+ */
+
+// Tauri API扩展
+declare global {
+  interface Window {
+    __TAURI__?: {
+      invoke: <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>
+    }
+  }
+}
+
+/**
+ * Rust内存存储类
+ * 提供与localStorage兼容的API，但数据存储在Rust管理的内存中
+ */
+class RustMemoryStorage {
+  private isReady: boolean
+
+  constructor() {
+    this.isReady = false
+    this.init()
+  }
+
+  async init(): Promise<void> {
+    if (this.isReady) return
+    
+    try {
+      // 检查Tauri API是否可用
+      if (typeof window !== 'undefined' && window.__TAURI__) {
+        // 测试连接
+        await window.__TAURI__.invoke('get_memory_stats')
+        this.isReady = true
+        console.log('[RustMemoryStore] Rust内存存储已初始化')
+      } else {
+        console.warn('[RustMemoryStore] Tauri API不可用，降级到JavaScript内存存储')
+        this.isReady = false
+      }
+    } catch (error) {
+      console.error('[RustMemoryStore] 初始化失败:', error)
+      this.isReady = false
+    }
+  }
+
+  // 等待Rust初始化
+  async waitForReady(): Promise<void> {
+    let attempts = 0
+    while (!this.isReady && attempts < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await this.init()
+      attempts++
+    }
+    
+    if (!this.isReady) {
+      throw new Error('Rust内存存储初始化失败')
+    }
+  }
+
+  // 基础存储API
+  async setItem(key: string, value: string): Promise<void> {
+    await this.waitForReady()
+    try {
+      await window.__TAURI__!.invoke('set_memory_item', { key, value })
+      console.log(`[RustMemoryStore] 存储到Rust内存: ${key}`)
+    } catch (error) {
+      console.error('[RustMemoryStore] 存储失败:', error)
+      throw error
+    }
+  }
+
+  async getItem(key: string): Promise<string | null> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke<string | null>('get_memory_item', { key })
+      console.log(`[RustMemoryStore] 从Rust内存读取: ${key}, 存在: ${!!result}`)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] 读取失败:', error)
+      return null
+    }
+  }
+
+  async removeItem(key: string): Promise<boolean> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke<boolean>('remove_memory_item', { key })
+      console.log(`[RustMemoryStore] 从Rust内存删除: ${key}, 成功: ${result}`)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] 删除失败:', error)
+      return false
+    }
+  }
+
+  async clear(): Promise<void> {
+    await this.waitForReady()
+    try {
+      await window.__TAURI__!.invoke('clear_memory')
+      console.log('[RustMemoryStore] 清空Rust内存')
+    } catch (error) {
+      console.error('[RustMemoryStore] 清空失败:', error)
+      throw error
+    }
+  }
+
+  async getKeys(): Promise<string[]> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke<string[]>('get_memory_keys')
+      console.log(`[RustMemoryStore] 获取Rust内存键列表: ${result.length} 个`)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] 获取键列表失败:', error)
+      return []
+    }
+  }
+
+  async getStats(): Promise<unknown> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke('get_memory_stats')
+      console.log('[RustMemoryStore] 获取统计信息:', result)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] 获取统计失败:', error)
+      return null
+    }
+  }
+
+  // 高级功能
+  async cleanupExpired(): Promise<number> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke<number>('cleanup_expired_memory')
+      console.log(`[RustMemoryStore] 清理过期数据: ${result} 个项目`)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] 清理过期数据失败:', error)
+      return 0
+    }
+  }
+
+  async cleanupLRU(keepCount = 100): Promise<number> {
+    await this.waitForReady()
+    try {
+      const result = await window.__TAURI__!.invoke<number>('cleanup_lru_memory', { keepCount })
+      console.log(`[RustMemoryStore] LRU清理: 保留 ${keepCount} 个，删除 ${result} 个项目`)
+      return result
+    } catch (error) {
+      console.error('[RustMemoryStore] LRU清理失败:', error)
+      return 0
+    }
+  }
+
+  async setExpiration(key: string, expiresInSeconds: number): Promise<void> {
+    await this.waitForReady()
+    try {
+      await window.__TAURI__!.invoke('set_memory_expiration', { key, expiresInSeconds })
+      console.log(`[RustMemoryStore] 设置过期时间: ${key} (${expiresInSeconds} 秒后)`)
+    } catch (error) {
+      console.error('[RustMemoryStore] 设置过期时间失败:', error)
+    }
+  }
+
+  // 批量操作
+  async setItems(items: Record<string, string>): Promise<void> {
+    await this.waitForReady()
+    const promises = Object.entries(items).map(([key, value]) => this.setItem(key, value))
+    await Promise.all(promises)
+  }
+
+  async getItems(keys: string[]): Promise<Record<string, string | null>> {
+    await this.waitForReady()
+    const promises = keys.map(key => this.getItem(key))
+    const results = await Promise.all(promises)
+    
+    const result: Record<string, string | null> = {}
+    keys.forEach((key, index) => {
+      result[key] = results[index]
+    })
+    return result
+  }
+
+  async removeItems(keys: string[]): Promise<void> {
+    await this.waitForReady()
+    const promises = keys.map(key => this.removeItem(key))
+    await Promise.all(promises)
+  }
+}
+
+// 创建全局实例
+const rustMemoryStoreInstance = new RustMemoryStorage()
+
+// 群聊数据类型
+interface GroupChat {
+  action_id: string
+  description?: string
+  status?: string
+  created_at?: number
+  agents?: Array<{ id: string; name?: string; avatar?: string; mode?: string }>
+  metadata?: {
+    type?: string
+    channel_id?: string
+    channel_name?: string
+  }
+}
+
+// DIAP群聊数据类型
+interface DiapGroup {
+  groupId: string
+  [key: string]: unknown
+}
+
+/**
+ * 兼容localStorage的适配器
+ * 可以在Rust内存和JavaScript内存之间切换
+ */
+export const rustMemoryStore = {
+  // 基础API
+  setItem: (key: string, value: string) => rustMemoryStoreInstance.setItem(key, value),
+  getItem: (key: string) => rustMemoryStoreInstance.getItem(key),
+  removeItem: (key: string) => rustMemoryStoreInstance.removeItem(key),
+  clear: () => rustMemoryStoreInstance.clear(),
+  key: (index: number) => rustMemoryStoreInstance.getKeys().then(keys => keys[index] || null),
+  get length() { return rustMemoryStoreInstance.getKeys().then(keys => keys.length) },
+  keys: () => rustMemoryStoreInstance.getKeys(),
+  values: () => rustMemoryStoreInstance.getKeys().then(keys => 
+    Promise.all(keys.map(key => rustMemoryStoreInstance.getItem(key)))
+  ),
+  entries: () => rustMemoryStoreInstance.getKeys().then(keys => 
+    Promise.all(keys.map(key => 
+      rustMemoryStoreInstance.getItem(key).then(value => [key, value])
+    ))
+  ),
+
+  // 群聊专用方法
+  getGroupChats: async (channelId: string): Promise<GroupChat[]> => {
+    const key = `cluster_actions_group_chats_${channelId}`
+    const data = await rustMemoryStoreInstance.getItem(key)
+    return data ? JSON.parse(data) : []
+  },
+
+  setGroupChats: async (channelId: string, chats: GroupChat[]): Promise<void> => {
+    const key = `cluster_actions_group_chats_${channelId}`
+    await rustMemoryStoreInstance.setItem(key, JSON.stringify(chats))
+  },
+
+  getActiveActionId: async (channelId: string): Promise<string | null> => {
+    const key = `cluster_actions_active_id_${channelId}`
+    return await rustMemoryStoreInstance.getItem(key)
+  },
+
+  setActiveActionId: async (channelId: string, actionId: string | null): Promise<void> => {
+    const key = `cluster_actions_active_id_${channelId}`
+    if (actionId) {
+      await rustMemoryStoreInstance.setItem(key, actionId)
+    } else {
+      await rustMemoryStoreInstance.removeItem(key)
+    }
+  },
+
+  // DIAP群聊方法
+  getDiapGroups: async (): Promise<DiapGroup[]> => {
+    const keys = await rustMemoryStoreInstance.getKeys()
+    const groupKeys = keys.filter(key => key.startsWith('diap_group_chat_'))
+    
+    const groups: DiapGroup[] = []
+    for (const key of groupKeys) {
+      const value = await rustMemoryStoreInstance.getItem(key)
+      if (value) {
+        const groupId = key.replace('diap_group_chat_', '')
+        groups.push({ groupId, ...JSON.parse(value) })
+      }
+    }
+    return groups
+  },
+
+  setDiapGroup: async (groupId: string, groupData: DiapGroup): Promise<void> => {
+    const key = `diap_group_chat_${groupId}`
+    await rustMemoryStoreInstance.setItem(key, JSON.stringify(groupData))
+  },
+
+  removeDiapGroup: async (groupId: string): Promise<void> => {
+    const key = `diap_group_chat_${groupId}`
+    await rustMemoryStoreInstance.removeItem(key)
+  },
+
+  // 统计信息
+  getStats: () => rustMemoryStoreInstance.getStats(),
+  
+  // 清理方法
+  cleanup: (options: Record<string, unknown> = {}) => rustMemoryStoreInstance.cleanupExpired(),
+  cleanupLRU: (keepCount?: number) => rustMemoryStoreInstance.cleanupLRU(keepCount),
+  
+  // 等待就绪
+  ready: () => rustMemoryStoreInstance.waitForReady(),
+  
+  // 批量操作
+  setItems: (items: Record<string, string>) => rustMemoryStoreInstance.setItems(items),
+  getItems: (keys: string[]) => rustMemoryStoreInstance.getItems(keys),
+  removeItems: (keys: string[]) => rustMemoryStoreInstance.removeItems(keys)
+}
+
+export default rustMemoryStore

@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
 import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
@@ -147,7 +146,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
 
     try {
       // 检查 IPFS 节点是否运行
-      let isRunning = await ipfsService.isNodeRunning()
+      const isRunning = await ipfsService.isNodeRunning()
       if (!isRunning) {
         const startResult = await ipfsService.startNode(true)
         if (!startResult.success) {

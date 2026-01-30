@@ -9,6 +9,20 @@ declare module '@ui/*';
 declare module '@shared/*';
 declare module '@bridges/*';
 
+// Window 类型扩展
+interface EthereumProvider {
+  request(args: { method: string; params?: any[] }): Promise<any>;
+  on(event: string, callback: (...args: any[]) => void): void;
+  removeListener(event: string, callback: (...args: any[]) => void): void;
+  [key: string]: any;
+}
+
+interface Window {
+  __TAURI__: Record<string, any>;
+  ethereum?: EthereumProvider;
+  __lastApiError?: Record<string, number>;
+}
+
 // 环境变量类型定义
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;

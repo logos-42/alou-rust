@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useSubscription } from '@/hooks/useSubscription'
 import subscriptionService from '@/services/subscriptionService'
 import useAuthStore from '@/stores/authStore'
@@ -13,11 +13,13 @@ const SubscriptionView = () => {
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [paymentStatus, setPaymentStatus] = useState(null)
 
-  useEffect(() => {
-    if (plans.length > 0 && !selectedPlan) {
-      setSelectedPlan(plans[0])
-    }
-  }, [plans, selectedPlan])
+  // 使用 useMemo 来计算默认选中的计划，避免在 useEffect 中调用 setState
+  const defaultSelectedPlan = useMemo(() => {
+    return plans.length > 0 ? plans[0] : null
+  }, [plans])
+
+  // 如果没有选中计划，使用默认计划
+  const currentSelectedPlan = selectedPlan || defaultSelectedPlan
 
   const handleSubscribe = async (plan) => {
     if (!walletAddress) {

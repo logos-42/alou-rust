@@ -36,7 +36,7 @@ function loadConfig() {
     path.join(__dirname, '..', '.env.claude'),
   ];
 
-  let config = {
+  const config = {
     env: {
       // 默认值 - 指向 Workers 生产环境
       // 使用 Claude Agent SDK 兼容端点

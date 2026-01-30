@@ -20,9 +20,21 @@ import type {
 // 从各个模块导入
 export * from './agent';
 export * from './auth';
+export type { 
+  AgentSession, 
+  Channel, 
+  Message,
+  ServiceResponse,
+  WalletInfo,
+  NetworkInfo,
+  TransactionInfo,
+  BlockchainWalletInfo,
+  BlockchainNetworkInfo,
+  BlockchainTransactionInfo
+} from './services';
 
 // 重新导出全局类型
-export {
+export type {
   Nullable,
   Optional,
   Maybe,

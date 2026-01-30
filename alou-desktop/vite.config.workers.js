@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react-swc'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const _filename = fileURLToPath(import.meta.url)
+const _dirname = path.dirname(_filename)
 
 // Workers 生产环境配置
 export default defineConfig({

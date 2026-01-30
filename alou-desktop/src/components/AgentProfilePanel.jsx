@@ -1,4 +1,3 @@
-import agentAssetsService from '@/services/agentAssetsService'
 import './AgentProfilePanel.css'
 
 const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -7,7 +6,13 @@ const resolveAvatar = (agent) => {
   if (!agent) return fallbackAvatar
   if (agent.avatar_url) return agent.avatar_url
   if (agent.avatar || agent.avatarCid || agent.avatar_cid) {
-    return agent.avatar || agentAssetsService.resolveIpfsUri(agent.avatarCid || agent.avatar_cid)
+    const cid = agent.avatarCid || agent.avatar_cid
+    if (agent.avatar && agent.avatar.startsWith('http')) return agent.avatar
+    if (cid && cid.startsWith('http')) return cid
+    if (cid && (cid.startsWith('Qm') || cid.startsWith('bafy') || cid.startsWith('bafk'))) {
+      return `https://ipfs.io/ipfs/${cid}`
+    }
+    return agent.avatar || fallbackAvatar
   }
   return fallbackAvatar
 }

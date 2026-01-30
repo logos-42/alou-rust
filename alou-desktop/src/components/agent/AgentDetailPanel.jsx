@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useI18n } from '@/hooks/useI18n'
-import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
 import avatarManager from '@/components/AgentChat/avatarManager'

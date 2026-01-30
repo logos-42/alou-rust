@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { useI18n } from '../hooks/useI18n';
-import skillsService from '../services/skillsService';
 import agentSkillsStorage from '../services/agentSkillsStorage';
 import skillGenerator from '../services/skillGenerator';
 import ParameterField from './SkillsManager/ParameterField';
