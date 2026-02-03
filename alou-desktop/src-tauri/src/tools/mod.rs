@@ -14,6 +14,8 @@ pub mod system;
 pub mod plan;
 pub mod todolist;
 pub mod agent_skills;
+pub mod agent_collaboration;
+pub mod tool_creation;
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -25,6 +27,8 @@ pub use bash::{BashTool, CommandResult};
 pub use plan::{PlanTool, TaskPlan, PlanStep};
 pub use todolist::{TodoListTool, TodoItem, TodoStatus};
 pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
+pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
+pub use tool_creation::{ToolCreationTool, ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry, DynamicToolExecutor, DynamicToolResult};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -45,6 +49,12 @@ pub enum ToolCategory {
     Todo,
     /// Skills 系统
     Skills,
+    /// 智能体自动化
+    Automation,
+    /// 通信协作
+    Communication,
+    /// 开发工具
+    Development,
     /// 其他
     Other,
 }
@@ -184,6 +194,19 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册Agent Skills工具（替代旧的Skills工具）
     let agent_skills_tool = Arc::new(AgentSkillsTool::new()?);
     registry.register(agent_skills_tool).await?;
+
+    // 注册智能体协作工具（使用 IPFS PubSub）
+    let ipfs_api_url = std::env::var("IPFS_API_URL").unwrap_or_else(|_| "http://127.0.0.1:5001".to_string());
+    let agent_collab_tool = Arc::new(AgentCollaborationTool::new(ipfs_api_url));
+    registry.register(agent_collab_tool).await?;
+
+    // 注册工具创建和记录工具
+    let tool_creation_tool = Arc::new(ToolCreationTool::new());
+    registry.register(tool_creation_tool).await?;
+
+    // 注册动态工具执行器
+    let dynamic_tool_executor = Arc::new(DynamicToolExecutor::new());
+    registry.register(dynamic_tool_executor).await?;
 
     Ok(registry)
 }
