@@ -1,11 +1,14 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
+import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
+import agentDocumentService, { AgentDocuments, DocumentTypes } from '@/services/agentDocumentService'
 import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
 import { setDiapIdentitySafe, hasDiapIdentitySafe } from '@/utils/diapIdentityManager'
 import { setDiapIdentity } from '@/utils/memoryStorage'
 import CloseIcon from '@/assets/关闭0.3.png'
 import CopyIcon from '@/assets/复制.png'
+import AgentDocumentsViewer from './AgentDocumentsViewer'
 import './CreateAgentModal.css'
 
 const DEFAULT_MCP_CODE = `{
@@ -26,6 +29,15 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   const [mcpParseError, setMcpParseError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [avatarUploadError, setAvatarUploadError] = useState(null)
+
+  // 文档化创建相关状态
+  const [useDocumentBasedCreation, setUseDocumentBasedCreation] = useState(true)
+  const [isGeneratingDocuments, setIsGeneratingDocuments] = useState(false)
+  const [documentsGenerated, setDocumentsGenerated] = useState(false)
+  const [agentDocuments, setAgentDocuments] = useState(null)
+  const [documentGenerationProgress, setDocumentGenerationProgress] = useState(null)
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
 
   // 解析 MCP 代码并提取工具名称
   const parseMcpCode = useCallback((code) => {
@@ -136,6 +148,71 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   }
 
 
+  // 生成文档集合
+  const generateDocuments = useCallback(async () => {
+    const fallbackName = name.trim() || 'agent'
+    const finalRoleDescription = roleDescription.trim() || t('agent.create.role.default')
+
+    setIsGeneratingDocuments(true)
+    setDocumentGenerationProgress({ message: '正在生成智能体文档...', stage: 'soul' })
+    setError(null)
+
+    try {
+      // 检查 IPFS 节点
+      let isRunning = await ipfsService.isNodeRunning()
+      if (!isRunning) {
+        const startResult = await ipfsService.startNode(true)
+        if (!startResult.success) {
+          throw new Error('IPFS 节点启动失败')
+        }
+      }
+
+      // 等待 IPFS API 就绪
+      const apiReady = await ipfsService.waitForApiReady(15, 1000)
+      if (!apiReady.success) {
+        throw new Error(apiReady.error || 'IPFS API 未就绪')
+      }
+
+      // 构建用户提示
+      const userPrompt = `创建一个名为"${fallbackName}"的智能体，角色描述：${finalRoleDescription}`
+
+      // 生成完整文档集
+      setDocumentGenerationProgress({ message: '生成性格与哲学文档...', stage: 'soul' })
+      const documents = await agentDocumentService.generateFullDocumentSet(userPrompt, {
+        name: fallbackName,
+        avatar: avatarPreview,
+        emoji: '🤖',
+        mcpTools: mcpTools.filter(t => t.name),
+        memoryConfig: {
+          enableLongTerm: true,
+          enableWorkingMemory: true,
+          memoryLimit: 1000,
+        },
+      })
+
+      setDocumentGenerationProgress({ message: '上传文档到 IPFS...', stage: 'uploading' })
+
+      // 上传文档到 IPFS
+      const documentCids = await agentDocumentService.uploadFullDocumentSet(documents)
+
+      console.log('[CreateAgentModal] 文档上传完成:', documentCids)
+
+      setAgentDocuments(documents)
+      setDocumentsGenerated(true)
+      setIsGeneratingDocuments(false)
+      setDocumentGenerationProgress(null)
+
+      return documentCids
+
+    } catch (err) {
+      console.error('[CreateAgentModal] 文档生成失败:', err)
+      setIsGeneratingDocuments(false)
+      setDocumentGenerationProgress(null)
+      setError(err?.message || '文档生成失败，请检查 API Key 配置')
+      throw err
+    }
+  }, [name, roleDescription, avatarPreview, mcpTools, t])
+
   const handleInternalSubmit = async (event) => {
     event.preventDefault()
     setError(null)
@@ -145,8 +222,28 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
     const finalRoleDescription = roleDescription.trim() || t('agent.create.role.default')
 
     try {
+      // 如果启用了文档化创建，先生成文档
+      let documentCids = {}
+      if (useDocumentBasedCreation && !documentsGenerated) {
+        try {
+          documentCids = await generateDocuments()
+        } catch (docErr) {
+          // 文档生成失败，询问用户是否继续
+          const continueWithoutDocs = confirm(
+            `文档生成失败：${docErr.message}\n\n是否继续创建智能体（不使用文档化配置）？`
+          )
+          if (!continueWithoutDocs) {
+            setIsLoading(false)
+            return
+          }
+        }
+      } else if (useDocumentBasedCreation && documentsGenerated && agentDocuments) {
+        // 已生成文档，使用现有的 CID
+        documentCids = agentDocuments.getAllCids()
+      }
+
       // 检查 IPFS 节点是否运行
-      const isRunning = await ipfsService.isNodeRunning()
+      let isRunning = await ipfsService.isNodeRunning()
       if (!isRunning) {
         const startResult = await ipfsService.startNode(true)
         if (!startResult.success) {
@@ -196,12 +293,15 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       if (avatarFile) {
         try {
           console.log('[CreateAgentModal] 开始上传头像...')
+          setAvatarUploadError(null) // 清除之前的错误
           const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
           avatarCid = uploaded?.cid || null
           console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
         } catch (err) {
           console.error('[CreateAgentModal] 头像上传失败:', err)
-          // 头像上传失败不阻塞创建
+          // 头像上传失败不阻塞创建，但显示警告
+          setAvatarUploadError(err.message || '头像上传失败')
+          // 继续创建流程，但avatarCid为null
         }
       }
 
@@ -247,6 +347,9 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
           public_key: diapIdentity.public_key
         } : null,
         sessionId,
+        // 添加文档化配置
+        useDocumentBasedCreation,
+        documentCids: Object.keys(documentCids).length > 0 ? documentCids : null,
         // 添加标识，表明这是完整的智能体数据
         isComplete: true,
       }
@@ -256,6 +359,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         hasAvatar: !!avatarCid,
         hasMcp: !!mcpConfigCid,
         hasDiap: !!diapIdentity,
+        hasDocuments: !!agentData.documentCids,
         sessionId
       })
 
@@ -301,6 +405,11 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
                 <input type="file" accept="image/*" onChange={handleAvatarChange} />
               </label>
             </div>
+            {avatarUploadError && (
+              <div className="agent-modal__avatar-warning">
+                ⚠️ {avatarUploadError}
+              </div>
+            )}
           </div>
 
           <label className="agent-modal__field">
@@ -322,6 +431,78 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
               placeholder={t('agent.create.role.placeholder')}
             />
           </label>
+
+          {/* 文档化创建选项 */}
+          <div className="agent-modal__field">
+            <span>智能体配置方式</span>
+            <div className="agent-modal__creation-mode">
+              <label className="agent-modal__radio-label">
+                <input
+                  type="radio"
+                  name="creationMode"
+                  checked={useDocumentBasedCreation}
+                  onChange={() => setUseDocumentBasedCreation(true)}
+                />
+                <div className="agent-modal__radio-content">
+                  <strong>文档化配置（推荐）</strong>
+                  <p>使用 AI 生成完整的文档集（SOUL.md, IDENTITY.md 等），创建更有深度的智能体</p>
+                </div>
+              </label>
+              <label className="agent-modal__radio-label">
+                <input
+                  type="radio"
+                  name="creationMode"
+                  checked={!useDocumentBasedCreation}
+                  onChange={() => setUseDocumentBasedCreation(false)}
+                />
+                <div className="agent-modal__radio-content">
+                  <strong>传统配置</strong>
+                  <p>使用简单的 JSON 配置，快速创建智能体</p>
+                </div>
+              </label>
+            </div>
+            {useDocumentBasedCreation && (
+              <div className="agent-modal__document-actions">
+                {!documentsGenerated ? (
+                  <button
+                    type="button"
+                    className="agent-modal__generate-docs-btn"
+                    onClick={generateDocuments}
+                    disabled={isGeneratingDocuments || !name.trim()}
+                  >
+                    {isGeneratingDocuments ? (
+                      <>
+                        <span className="agent-modal__spinner"></span>
+                        {documentGenerationProgress?.message || '生成中...'}
+                      </>
+                    ) : (
+                      '生成智能体文档'
+                    )}
+                  </button>
+                ) : (
+                  <div className="agent-modal__docs-ready">
+                    <span className="agent-modal__docs-ready-icon">✓</span>
+                    文档已生成
+                    <button
+                      type="button"
+                      className="agent-modal__preview-btn"
+                      onClick={() => setShowDocumentPreview(!showDocumentPreview)}
+                    >
+                      {showDocumentPreview ? '隐藏' : '预览'}文档
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 文档预览区域 */}
+          {showDocumentPreview && agentDocuments && (
+            <div className="agent-modal__document-preview">
+              <AgentDocumentsViewer documents={agentDocuments} />
+            </div>
+          )}
+
 
           <div className="agent-modal__field">
             <span>{t('agent.create.mcp.label')}</span>
