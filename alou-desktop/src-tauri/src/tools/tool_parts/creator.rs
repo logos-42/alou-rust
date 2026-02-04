@@ -3,6 +3,7 @@
 //! 负责创建新工具文件和定义文件
 
 use crate::tools::{ToolError, ToolResult, ExecutionContext, ToolMetadata, ToolCategory, ToolStatus, ToolPriority};
+use crate::tools::executor::ToolExecutor;
 use crate::tools::tool_parts::definitions::{ToolDefinition, ToolType, ToolUsageRecord};
 use crate::tools::tool_parts::executor::DynamicToolExecutor;
 use async_trait::async_trait;

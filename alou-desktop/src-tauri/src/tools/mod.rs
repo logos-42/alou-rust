@@ -34,9 +34,10 @@ pub use plan::{PlanTool, TaskPlan, PlanStep};
 pub use todolist::{TodoListTool, TodoItem, TodoStatus};
 pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
 pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
-pub use tool_creation::{ToolCreationTool, DynamicToolExecutor, DynamicToolResult};
-// 从 tool_parts 直接导出定义类型
+pub use tool_creation::ToolCreationTool;
+// 从 tool_parts 直接导出定义类型和执行器
 pub use tool_parts::definitions::{ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
+pub use tool_parts::executor::{DynamicToolExecutor, DynamicToolResult};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
