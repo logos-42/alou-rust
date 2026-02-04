@@ -21,6 +21,8 @@ mod utils;
 mod wallet;
 mod workflow;
 mod tools;
+mod prompt_system;
+mod ai_loop;
 
 use std::path::PathBuf;
 use tauri::Manager;
@@ -69,13 +71,14 @@ use crate::workflow::{
 };
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
 use crate::tools::initialize_tools;
+use crate::prompts::PromptManager;
 use crate::context::create_default_context_manager;
 use crate::memory_manager::{
     set_memory_item, get_memory_item, remove_memory_item, clear_memory,
-    get_memory_keys, get_memory_stats, cleanup_expired_memory,
-    cleanup_lru_memory, set_memory_expiration, schedule_weekly_cleanup,
-    set_diap_identity, get_diap_identity, remove_diap_identity,
-    get_all_diap_identities, cleanup_expired_diap_identities,
+    get_memory_keys, get_memory_stats, archive_to_ipfs, pin_cid, unpin_cid,
+    garbage_collect, pin_item, unpin_item, set_diap_identity, get_diap_identity,
+    remove_diap_identity, get_all_diap_identities, archive_diap_identity_to_ipfs,
+    pin_diap_identity, unpin_diap_identity,
 };
 
 // Tool commands
@@ -342,16 +345,20 @@ fn main() {
             clear_memory,
             get_memory_keys,
             get_memory_stats,
-            cleanup_expired_memory,
-            cleanup_lru_memory,
-            set_memory_expiration,
-            schedule_weekly_cleanup,
+            archive_to_ipfs,
+            pin_cid,
+            unpin_cid,
+            garbage_collect,
+            pin_item,
+            unpin_item,
             // DIAP identity management commands
             set_diap_identity,
             get_diap_identity,
             remove_diap_identity,
             get_all_diap_identities,
-            cleanup_expired_diap_identities
+            archive_diap_identity_to_ipfs,
+            pin_diap_identity,
+            unpin_diap_identity,
         ])
         .setup(|app| {
             // Set window title

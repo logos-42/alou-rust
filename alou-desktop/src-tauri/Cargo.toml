@@ -67,6 +67,17 @@ which = "8.0.0"
 rand = "0.9.2"
 brotli = "8.0.2"
 
+# Iroh P2P networking
+iroh = { version = "0.20", optional = true }
+iroh-net = { version = "0.20", optional = true }
+
+# IPFS client
+ipfs-api-backend-hyper = { version = "0.5", features = ["with-send-sync"] }
+libipld = { version = "0.16", features = ["dag-cbor", "serde-codec"] }
+
+# Required for async traits - already defined above
+# async-trait = "0.1"
+
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem
 # DO NOT REMOVE!!

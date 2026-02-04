@@ -19,11 +19,118 @@ use tokio::sync::RwLock;
 use tokio::process::Command;
 use chrono::Utc;
 
-/// 智能体工具注册表 - 跟踪每个智能体使用的工具
-
-/// 动态工具执行器 - 用于执行AI创建的脚本工具
-pub struct DynamicToolExecutor {
+/// 工具创建和记录工具
+pub struct ToolCreationTool {
     metadata: ToolMetadata,
+    /// 智能体工具注册表
+    agent_tool_registry: Arc<RwLock<HashMap<String, AgentToolRegistry>>>,
+}
+
+/// 工具类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ToolType {
+    Rust,
+    Python,
+    JavaScript,
+    Shell,
+    Custom,
+}
+
+/// 参数定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParameterDef {
+    /// 参数名
+    pub name: String,
+    /// 参数类型
+    pub param_type: String,
+    /// 是否必需
+    pub required: bool,
+    /// 描述
+    pub description: String,
+}
+
+/// 工具定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    /// 工具名称
+    pub name: String,
+    /// 工具描述
+    pub description: String,
+    /// 工具类型 (Rust, Python, JavaScript, Shell)
+    pub tool_type: ToolType,
+    /// 工具代码内容
+    pub content: String,
+    /// 参数定义
+    pub parameters: Vec<ParameterDef>,
+    /// 创建时间
+    pub created_at: i64,
+    /// 更新时间
+    pub updated_at: i64,
+    /// 作者
+    pub author: String,
+    /// 版本
+    pub version: String,
+    /// 依赖项
+    pub dependencies: Vec<String>,
+}
+
+/// 工具使用记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolUsageRecord {
+    /// 记录ID
+    pub id: String,
+    /// 工具名称
+    pub tool_name: String,
+    /// 使用者（智能体ID或用户ID）
+    pub user: String,
+    /// 使用时间
+    pub timestamp: i64,
+    /// 输入参数
+    pub input_params: HashMap<String, serde_json::Value>,
+    /// 执行结果
+    pub result: String,
+    /// 执行耗时（毫秒）
+    pub execution_time_ms: u64,
+}
+
+/// 智能体工具使用记录 - 专门用于跟踪智能体自己使用的工具
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentToolUsageRecord {
+    /// 记录ID
+    pub id: String,
+    /// 智能体ID
+    pub agent_id: String,
+    /// 工具名称
+    pub tool_name: String,
+    /// 调用时间
+    pub timestamp: i64,
+    /// 目的/用途描述
+    pub purpose: String,
+    /// 输入参数
+    pub input_params: HashMap<String, serde_json::Value>,
+    /// 执行结果
+    pub result: String,
+    /// 是否成功
+    pub success: bool,
+    /// 执行耗时（毫秒）
+    pub execution_time_ms: u64,
+}
+
+/// 智能体工具注册信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentToolRegistry {
+    /// 智能体ID
+    pub agent_id: String,
+    /// 智能体名称
+    pub agent_name: String,
+    /// 已使用的工具列表
+    pub used_tools: Vec<String>,
+    /// 工具使用记录
+    pub usage_records: Vec<AgentToolUsageRecord>,
+    /// 注册时间
+    pub registered_at: i64,
+    /// 最后更新
+    pub last_updated: i64,
 }
 
 /// 动态工具执行结果
@@ -39,6 +146,11 @@ pub struct DynamicToolResult {
     pub exit_code: i32,
     /// 执行耗时（毫秒）
     pub execution_time_ms: u64,
+}
+
+/// 动态工具执行器 - 用于执行AI创建的脚本工具（Python、Shell、JavaScript）
+pub struct DynamicToolExecutor {
+    metadata: ToolMetadata,
 }
 
 impl DynamicToolExecutor {
@@ -66,7 +178,7 @@ impl DynamicToolExecutor {
     /// 执行Python脚本
     async fn execute_python(&self, script_path: &Path, args: &HashMap<String, serde_json::Value>) -> Result<DynamicToolResult, ToolError> {
         let start = Utc::now().timestamp_millis();
-        
+
         // 构建命令行参数
         let mut cmd_args: Vec<String> = vec!["python3".to_string(), script_path.to_str().unwrap_or("").to_string()];
         for (key, value) in args {
@@ -78,15 +190,15 @@ impl DynamicToolExecutor {
                 cmd_args.push(value.to_string());
             }
         }
-        
+
         let output = Command::new("python3")
             .args(&cmd_args[1..])
             .output()
             .await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to execute Python script: {}", e)))?;
-        
+
         let execution_time_ms = (Utc::now().timestamp_millis() - start) as u64;
-        
+
         Ok(DynamicToolResult {
             success: output.status.success(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -99,7 +211,7 @@ impl DynamicToolExecutor {
     /// 执行Shell脚本
     async fn execute_shell(&self, script_path: &Path, args: &HashMap<String, serde_json::Value>) -> Result<DynamicToolResult, ToolError> {
         let start = Utc::now().timestamp_millis();
-        
+
         // 构建命令行参数
         let mut cmd_args: Vec<String> = vec!["bash".to_string(), script_path.to_str().unwrap_or("").to_string()];
         for (key, value) in args {
@@ -111,15 +223,15 @@ impl DynamicToolExecutor {
                 cmd_args.push(value.to_string());
             }
         }
-        
+
         let output = Command::new("bash")
             .args(&cmd_args[1..])
             .output()
             .await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to execute shell script: {}", e)))?;
-        
+
         let execution_time_ms = (Utc::now().timestamp_millis() - start) as u64;
-        
+
         Ok(DynamicToolResult {
             success: output.status.success(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -132,7 +244,7 @@ impl DynamicToolExecutor {
     /// 执行JavaScript脚本（使用Node.js）
     async fn execute_javascript(&self, script_path: &Path, args: &HashMap<String, serde_json::Value>) -> Result<DynamicToolResult, ToolError> {
         let start = Utc::now().timestamp_millis();
-        
+
         // 构建命令行参数
         let mut cmd_args: Vec<String> = vec!["node".to_string(), script_path.to_str().unwrap_or("").to_string()];
         for (key, value) in args {
@@ -144,15 +256,15 @@ impl DynamicToolExecutor {
                 cmd_args.push(value.to_string());
             }
         }
-        
+
         let output = Command::new("node")
             .args(&cmd_args[1..])
             .output()
             .await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to execute JavaScript: {}", e)))?;
-        
+
         let execution_time_ms = (Utc::now().timestamp_millis() - start) as u64;
-        
+
         Ok(DynamicToolResult {
             success: output.status.success(),
             stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -184,7 +296,7 @@ impl ToolExecutor for DynamicToolExecutor {
             .unwrap_or_default();
 
         let path = Path::new(script_path);
-        
+
         if !path.exists() {
             return Err(ToolError::InvalidArguments(format!("Script file not found: {}", script_path)));
         }
@@ -268,120 +380,6 @@ Execute a JavaScript script:
     }
 }
 
-/// 工具创建和记录工具
-pub struct ToolCreationTool {
-    metadata: ToolMetadata,
-    /// 智能体工具注册表
-    agent_tool_registry: Arc<RwLock<HashMap<String, AgentToolRegistry>>>,
-}
-
-/// 工具定义
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolDefinition {
-    /// 工具名称
-    pub name: String,
-    /// 工具描述
-    pub description: String,
-    /// 工具类型 (Rust, Python, JavaScript, Shell)
-    pub tool_type: ToolType,
-    /// 工具代码内容
-    pub content: String,
-    /// 参数定义
-    pub parameters: Vec<ParameterDef>,
-    /// 创建时间
-    pub created_at: i64,
-    /// 更新时间
-    pub updated_at: i64,
-    /// 作者
-    pub author: String,
-    /// 版本
-    pub version: String,
-    /// 依赖项
-    pub dependencies: Vec<String>,
-}
-
-/// 工具类型
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ToolType {
-    Rust,
-    Python,
-    JavaScript,
-    Shell,
-    Custom,
-}
-
-/// 参数定义
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParameterDef {
-    /// 参数名
-    pub name: String,
-    /// 参数类型
-    pub param_type: String,
-    /// 是否必需
-    pub required: bool,
-    /// 描述
-    pub description: String,
-}
-
-/// 工具使用记录
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolUsageRecord {
-    /// 记录ID
-    pub id: String,
-    /// 工具名称
-    pub tool_name: String,
-    /// 使用者（智能体ID或用户ID）
-    pub user: String,
-    /// 使用时间
-    pub timestamp: i64,
-    /// 输入参数
-    pub input_params: HashMap<String, serde_json::Value>,
-    /// 执行结果
-    pub result: String,
-    /// 执行耗时（毫秒）
-    pub execution_time_ms: u64,
-}
-
-/// 智能体工具使用记录 - 专门用于跟踪智能体自己使用的工具
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentToolUsageRecord {
-    /// 记录ID
-    pub id: String,
-    /// 智能体ID
-    pub agent_id: String,
-    /// 工具名称
-    pub tool_name: String,
-    /// 调用时间
-    pub timestamp: i64,
-    /// 目的/用途描述
-    pub purpose: String,
-    /// 输入参数
-    pub input_params: HashMap<String, serde_json::Value>,
-    /// 执行结果
-    pub result: String,
-    /// 是否成功
-    pub success: bool,
-    /// 执行耗时（毫秒）
-    pub execution_time_ms: u64,
-}
-
-/// 智能体工具注册信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentToolRegistry {
-    /// 智能体ID
-    pub agent_id: String,
-    /// 智能体名称
-    pub agent_name: String,
-    /// 已使用的工具列表
-    pub used_tools: Vec<String>,
-    /// 工具使用记录
-    pub usage_records: Vec<AgentToolUsageRecord>,
-    /// 注册时间
-    pub registered_at: i64,
-    /// 最后更新
-    pub last_updated: i64,
-}
-
 impl ToolCreationTool {
     /// 创建新的工具创建和记录工具
     pub fn new() -> Self {
@@ -457,7 +455,7 @@ impl ToolCreationTool {
         let mut usage_records: Vec<ToolUsageRecord> = if usage_log_path.exists() {
             let content = fs::read_to_string(&usage_log_path).await
                 .map_err(|e| ToolError::InternalError(format!("Failed to read usage log: {}", e)))?;
-            
+
             serde_json::from_str(&content)
                 .map_err(|e| ToolError::InternalError(format!("Failed to parse usage log: {}", e)))?
         } else {
@@ -492,7 +490,7 @@ impl ToolCreationTool {
         doc_content.push_str(&format!("**类型**: {:?}\n\n", tool_def.tool_type));
         doc_content.push_str(&format!("**作者**: {}\n\n", tool_def.author));
         doc_content.push_str(&format!("**版本**: {}\n\n", tool_def.version));
-        
+
         if !tool_def.dependencies.is_empty() {
             doc_content.push_str("**依赖项**:\n");
             for dep in &tool_def.dependencies {
@@ -534,10 +532,10 @@ impl ToolCreationTool {
 
         // 创建工具文件
         let tool_file_path = self.create_tool_file(&tool_def, target_path).await?;
-        
+
         // 创建工具定义文件
         let def_file_path = self.create_tool_definition_file(&tool_def, target_path).await?;
-        
+
         // 生成文档
         let doc_file_path = self.generate_tool_documentation(&tool_def, docs_path).await?;
 
@@ -555,11 +553,11 @@ impl ToolCreationTool {
     async fn create_and_execute_tool(&self, tool_def: ToolDefinition, target_dir: &str, docs_dir: &str) -> Result<HashMap<String, serde_json::Value>, ToolError> {
         // 先创建工具
         let creation_result = self.create_tool(tool_def.clone(), target_dir, docs_dir).await?;
-        
+
         // 获取工具文件路径
         let tool_file_path = creation_result.get("tool_file").unwrap().to_string();
         let path = Path::new(&tool_file_path);
-        
+
         // 执行工具
         let exec_result = match tool_def.tool_type {
             ToolType::Python => {
@@ -628,11 +626,11 @@ impl ToolCreationTool {
     }
 
     /// 记录工具使用
-    async fn log_tool_usage(&self, 
-                           tool_name: &str, 
-                           user: &str, 
-                           input_params: HashMap<String, serde_json::Value>, 
-                           result: &str, 
+    async fn log_tool_usage(&self,
+                           tool_name: &str,
+                           user: &str,
+                           input_params: HashMap<String, serde_json::Value>,
+                           result: &str,
                            execution_time_ms: u64,
                            docs_dir: &str) -> Result<String, ToolError> {
         let record = ToolUsageRecord {
@@ -656,11 +654,11 @@ impl ToolCreationTool {
     /// 注册智能体（初始化智能体的工具跟踪）
     pub async fn register_agent(&self, agent_id: &str, agent_name: &str) -> Result<(), ToolError> {
         let mut registry = self.agent_tool_registry.write().await;
-        
+
         if registry.contains_key(agent_id) {
             return Ok(()); // 已注册
         }
-        
+
         let agent_registry = AgentToolRegistry {
             agent_id: agent_id.to_string(),
             agent_name: agent_name.to_string(),
@@ -669,7 +667,7 @@ impl ToolCreationTool {
             registered_at: Utc::now().timestamp(),
             last_updated: Utc::now().timestamp(),
         };
-        
+
         registry.insert(agent_id.to_string(), agent_registry);
         Ok(())
     }
@@ -684,7 +682,7 @@ impl ToolCreationTool {
                                    success: bool,
                                    execution_time_ms: u64) -> Result<String, ToolError> {
         let mut registry = self.agent_tool_registry.write().await;
-        
+
         if let Some(agent_registry) = registry.get_mut(agent_id) {
             let record = AgentToolUsageRecord {
                 id: format!("agent_usage_{}", uuid::Uuid::new_v4()),
@@ -697,15 +695,15 @@ impl ToolCreationTool {
                 success,
                 execution_time_ms,
             };
-            
+
             // 如果是新工具，添加到已使用工具列表
             if !agent_registry.used_tools.contains(&tool_name.to_string()) {
                 agent_registry.used_tools.push(tool_name.to_string());
             }
-            
+
             agent_registry.usage_records.push(record.clone());
             agent_registry.last_updated = Utc::now().timestamp();
-            
+
             Ok(record.id)
         } else {
             Err(ToolError::InvalidArguments(format!("Agent '{}' not registered", agent_id)))
@@ -715,7 +713,7 @@ impl ToolCreationTool {
     /// 获取智能体使用的所有工具
     pub async fn get_agent_used_tools(&self, agent_id: &str) -> Result<Vec<String>, ToolError> {
         let registry = self.agent_tool_registry.read().await;
-        
+
         if let Some(agent_registry) = registry.get(agent_id) {
             Ok(agent_registry.used_tools.clone())
         } else {
@@ -726,15 +724,15 @@ impl ToolCreationTool {
     /// 获取智能体的工具使用记录
     async fn get_agent_usage_records(&self, agent_id: &str, limit: Option<usize>) -> Result<Vec<AgentToolUsageRecord>, ToolError> {
         let registry = self.agent_tool_registry.read().await;
-        
+
         if let Some(agent_registry) = registry.get(agent_id) {
             let mut records = agent_registry.usage_records.clone();
-            
+
             if let Some(limit_val) = limit {
                 records = records.into_iter().rev().take(limit_val).collect();
                 records.reverse();
             }
-            
+
             Ok(records)
         } else {
             Err(ToolError::InvalidArguments(format!("Agent '{}' not registered", agent_id)))
@@ -745,14 +743,14 @@ impl ToolCreationTool {
     #[allow(dead_code)]
     async fn generate_agent_tool_report(&self, agent_id: &str, docs_dir: &str) -> Result<String, ToolError> {
         let registry = self.agent_tool_registry.read().await;
-        
+
         let agent_registry = registry.get(agent_id)
             .ok_or_else(|| ToolError::InvalidArguments(format!("Agent '{}' not registered", agent_id)))?;
-        
+
         let docs_path = Path::new(docs_dir);
         fs::create_dir_all(docs_path).await
             .map_err(|e| ToolError::InternalError(format!("Failed to create docs directory: {}", e)))?;
-        
+
         let mut report = format!("# 智能体工具使用报告\n\n");
         report.push_str(&format!("**智能体ID**: {}\n\n", agent_registry.agent_id));
         report.push_str(&format!("**智能体名称**: {}\n\n", agent_registry.agent_name));
@@ -764,7 +762,7 @@ impl ToolCreationTool {
             .unwrap_or_else(|| "未知".to_string())));
         report.push_str(&format!("**已使用工具数量**: {}\n\n", agent_registry.used_tools.len()));
         report.push_str(&format!("**工具调用总次数**: {}\n\n", agent_registry.usage_records.len()));
-        
+
         report.push_str("## 已使用的工具列表\n\n");
         if agent_registry.used_tools.is_empty() {
             report.push_str("*暂无工具使用记录*\n\n");
@@ -774,7 +772,7 @@ impl ToolCreationTool {
             }
             report.push('\n');
         }
-        
+
         report.push_str("## 工具使用详细记录\n\n");
         if agent_registry.usage_records.is_empty() {
             report.push_str("*暂无使用记录*\n\n");
@@ -790,13 +788,13 @@ impl ToolCreationTool {
                 report.push_str(&format!("- **成功**: {}\n\n", if record.success { "是" } else { "否" }));
             }
         }
-        
+
         let filename = format!("agent_{}_tool_report.md", agent_id);
         let filepath = docs_path.join(&filename);
-        
+
         fs::write(&filepath, report).await
             .map_err(|e| ToolError::InternalError(format!("Failed to write agent tool report: {}", e)))?;
-        
+
         Ok(filepath.to_string_lossy().to_string())
     }
 
@@ -804,23 +802,23 @@ impl ToolCreationTool {
     #[allow(dead_code)]
     async fn export_agent_tool_data(&self, agent_id: &str, docs_dir: &str) -> Result<String, ToolError> {
         let registry = self.agent_tool_registry.read().await;
-        
+
         let agent_registry = registry.get(agent_id)
             .ok_or_else(|| ToolError::InvalidArguments(format!("Agent '{}' not registered", agent_id)))?;
-        
+
         let docs_path = Path::new(docs_dir);
         fs::create_dir_all(docs_path).await
             .map_err(|e| ToolError::InternalError(format!("Failed to create docs directory: {}", e)))?;
-        
+
         let data = serde_json::to_string_pretty(agent_registry)
             .map_err(|e| ToolError::InternalError(format!("Failed to serialize agent tool data: {}", e)))?;
-        
+
         let filename = format!("agent_{}_tool_data.json", agent_id);
         let filepath = docs_path.join(&filename);
-        
+
         fs::write(&filepath, data).await
             .map_err(|e| ToolError::InternalError(format!("Failed to export agent tool data: {}", e)))?;
-        
+
         Ok(filepath.to_string_lossy().to_string())
     }
 
@@ -831,26 +829,26 @@ impl ToolCreationTool {
         if !dir_path.exists() {
             return Ok(Vec::new());
         }
-        
+
         let mut tools = Vec::new();
         let mut entries = fs::read_dir(dir_path).await
             .map_err(|e| ToolError::InternalError(format!("Failed to read directory: {}", e)))?;
-        
+
         while let Some(entry) = entries.next_entry().await
             .map_err(|e| ToolError::InternalError(format!("Failed to read directory entry: {}", e)))? {
-            
+
             let path = entry.path();
             if path.is_file() && path.to_string_lossy().ends_with("-def.json") {
                 let content = fs::read_to_string(&path).await
                     .map_err(|e| ToolError::InternalError(format!("Failed to read tool definition: {}", e)))?;
-                
+
                 let tool_def: ToolDefinition = serde_json::from_str(&content)
                     .map_err(|e| ToolError::InternalError(format!("Failed to parse tool definition: {}", e)))?;
-                
+
                 tools.push(tool_def);
             }
         }
-        
+
         Ok(tools)
     }
 
@@ -1318,7 +1316,7 @@ Create new tools, document usage, and track agent tool usage.
       "input_params": {...},
       "result": "Execution result",
       "execution_time_ms": Execution time in milliseconds,
-      "docs_dir": "Directory to store logs (default: ./docs/tools)"
+      "docs_dir": "Directory to store documentation (default: ./docs/tools)"
     }
 
   - create_and_log: Create a tool and log its creation

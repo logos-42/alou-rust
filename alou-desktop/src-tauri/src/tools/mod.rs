@@ -16,6 +16,11 @@ pub mod todolist;
 pub mod agent_skills;
 pub mod agent_collaboration;
 pub mod tool_creation;
+pub mod iroh_tool;
+pub mod message_passing;
+pub mod pubsub_tool;
+pub mod ui_control;
+pub mod browser_tool;
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -28,7 +33,7 @@ pub use plan::{PlanTool, TaskPlan, PlanStep};
 pub use todolist::{TodoListTool, TodoItem, TodoStatus};
 pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
 pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
-pub use tool_creation::{ToolCreationTool, ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry, DynamicToolExecutor, DynamicToolResult};
+pub use tool_creation::{ToolCreationTool, DynamicToolExecutor, DynamicToolResult, ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -207,6 +212,26 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册动态工具执行器
     let dynamic_tool_executor = Arc::new(DynamicToolExecutor::new());
     registry.register(dynamic_tool_executor).await?;
+
+    // 注册 Iroh 工具
+    let iroh_tool = Arc::new(crate::tools::iroh_tool::IrohTool::new());
+    registry.register(iroh_tool).await?;
+
+    // 注册消息传递工具
+    let message_passing_tool = Arc::new(crate::tools::message_passing::MessagePassingTool::new());
+    registry.register(message_passing_tool).await?;
+
+    // 注册 PubSub 工具
+    let pubsub_tool = Arc::new(crate::tools::pubsub_tool::PubSubTool::new());
+    registry.register(pubsub_tool).await?;
+
+    // 注册 UI 控件工具
+    let ui_control_tool = Arc::new(crate::tools::ui_control::UIControlTool::new(None));
+    registry.register(ui_control_tool).await?;
+
+    // 注册浏览器工具
+    let browser_tool = Arc::new(crate::tools::browser_tool::BrowserTool::new());
+    registry.register(browser_tool).await?;
 
     Ok(registry)
 }
