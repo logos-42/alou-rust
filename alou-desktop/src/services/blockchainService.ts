@@ -47,7 +47,7 @@ class BlockchainService {
   private apiBaseUrl: string;
 
   constructor() {
-    this.ethereum = typeof window !== 'undefined' ? (window as any).ethereum : null;
+    this.ethereum = typeof window !== 'undefined' ? window.ethereum ?? null : null;
     this.apiBaseUrl = getApiBaseUrl();
   }
 

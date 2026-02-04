@@ -71,8 +71,8 @@ class DesktopWalletService {
       return false;
     }
 
-    const hasTauriApi = typeof (window as any).__TAURI__ !== 'undefined';
-    const hasTauriIPC = typeof (window as any).__TAURI_IPC__ !== 'undefined';
+    const hasTauriApi = typeof window.__TAURI__ !== 'undefined';
+    const hasTauriIPC = typeof window.__TAURI_IPC__ !== 'undefined';
     const hasTauriEnv = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.TAURI_PLATFORM);
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
     const uaMatchesTauri = /tauri/i.test(userAgent);

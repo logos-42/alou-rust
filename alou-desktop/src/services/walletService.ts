@@ -55,13 +55,13 @@ class WalletService {
 
   isDesktop(): boolean {
     if (typeof window === 'undefined') return false;
-    return (window as any).__TAURI__ !== undefined;
+    return window.__TAURI__ !== undefined;
   }
 
   async getProvider(): Promise<any> {
     try {
       // 如果是桌面环境且没有浏览器钱包，尝试使用桌面钱包服务
-      if (this.isDesktop() && typeof window !== 'undefined' && !(window as any).ethereum) {
+      if (this.isDesktop() && typeof window !== 'undefined' && !window.ethereum) {
         try {
           const desktopService = await this.getDesktopWalletService();
           if (desktopService && desktopService.isConnected && desktopService.isConnected()) {
@@ -77,8 +77,8 @@ class WalletService {
         }
       }
 
-      if (typeof window !== 'undefined' && (window as any).ethereum) {
-        this.ethereum = (window as any).ethereum;
+      if (typeof window !== 'undefined' && window.ethereum) {
+        this.ethereum = window.ethereum;
         return this.ethereum;
       }
     } catch (error) {
@@ -157,7 +157,7 @@ class WalletService {
    */
   isWalletAvailable(): boolean {
     // 检查浏览器钱包
-    if (typeof window !== 'undefined' && (window as any).ethereum) {
+    if (typeof window !== 'undefined' && window.ethereum) {
       return true;
     }
 
@@ -370,7 +370,7 @@ class WalletService {
       });
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('wallet_chain_id', network.chainId);
+        localStorage.setItem('wallet_chain_id', String(network.chainId));
       }
 
       if (typeof window !== 'undefined') {

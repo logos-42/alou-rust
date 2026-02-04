@@ -282,7 +282,7 @@ class ImageProxyService {
    */
   private isTauriEnvironment(): boolean {
     return typeof window !== 'undefined' && 
-           (window as any).__TAURI__ !== undefined;
+           window.__TAURI__ !== undefined;
   }
 
   /**

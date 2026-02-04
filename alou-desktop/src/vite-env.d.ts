@@ -25,5 +25,28 @@ interface ImportMeta {
 declare global {
   interface Window {
     __lastLoadChannelsError?: number
+    // Tauri APIs
+    __TAURI__?: Record<string, unknown>
+    __TAURI_IPC__?: Record<string, unknown>
+    // Ethereum Provider (MetaMask etc.)
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+      on: (event: string, callback: (...args: unknown[]) => void) => void
+      removeListener: (event: string, callback: (...args: unknown[]) => void) => void
+      isMetaMask?: boolean
+      selectedAddress?: string
+      chainId?: string
+    }
+    // Custom memory storage
+    AlouMemoryStorage?: {
+      get: (key: string) => string | null
+      set: (key: string, value: string) => void
+      remove: (key: string) => void
+      keys: () => string[]
+      clear: () => void
+    }
   }
 }
+
+// 确保文件被视为模块
+export {}

@@ -178,7 +178,7 @@ class StorageAdapter {
   static getKeys(): string[] {
     if (currentStorageType === StorageType.MEMORY) {
       // 从内存存储获取
-      const memoryStorage = (window as any).AlouMemoryStorage
+      const memoryStorage = window.AlouMemoryStorage
       return memoryStorage ? memoryStorage.keys() : []
     } else {
       try {
@@ -201,7 +201,7 @@ class StorageAdapter {
    */
   static clear(): void {
     if (currentStorageType === StorageType.MEMORY) {
-      const memoryStorage = (window as any).AlouMemoryStorage
+      const memoryStorage = window.AlouMemoryStorage
       if (memoryStorage) {
         memoryStorage.clear()
       }
