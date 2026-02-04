@@ -37,8 +37,8 @@ export interface AgentWallet {
 // API 基础 URL
 const getApiBaseUrl = (): string => {
   const apiBaseUrl =
-    (import.meta as any).env.VITE_API_BASE_URL ||
-    ((import.meta as any).env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev');
+    import.meta.env.VITE_API_BASE_URL ||
+    (import.meta.env.DEV ? '' : 'https://alou-edge.yuanjieliu65.workers.dev');
   return apiBaseUrl ? `${apiBaseUrl}/api` : '/api';
 };
 

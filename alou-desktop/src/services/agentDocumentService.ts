@@ -3,7 +3,6 @@
  * 使用 Markdown 文件定义智能体的性格、能力、约束等
  */
 
-// @ts-ignore - ipfsService 是 JS 文件
 import ipfsService from './ipfsService'
 
 /**
@@ -210,8 +209,7 @@ If you change this file, tell the user — it's your soul, and they should know.
 请根据用户需求生成完整的 SOUL.md 文档，确保内容符合智能体的职责和特点。`
 
     // 调用 AI 生成文档
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,
@@ -298,8 +296,7 @@ ${emoji ? `表情符号: ${emoji}` : ''}
 
 请根据用户需求生成完整的 IDENTITY.md 文档。`
 
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,
@@ -386,8 +383,7 @@ ${toolsList}
 
 请根据用户需求和已配置的工具生成完整的 CAPABILITIES.md 文档。`
 
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,
@@ -476,8 +472,7 @@ ${toolsList}
 
 请根据用户需求生成完整的 CONSTRAINTS.md 文档，确保智能体的行为受到合理约束。`
 
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,
@@ -569,8 +564,7 @@ ${JSON.stringify(mcpTools, null, 2)}
 
 请根据 MCP 工具配置生成完整的 TOOLS.md 文档。`
 
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,
@@ -742,8 +736,7 @@ Before doing anything else:
 
 请根据用户需求生成完整的 AGENTS.md 文档。`
 
-    // @ts-ignore
-    const agentService = (await import('./agentService')).default
+    const agentService = (await import('./agentService')).default as AgentService
     const result = await agentService.queryClaudeAgentDirect({
       apiKey: typeof window !== 'undefined' ? (localStorage.getItem('claude_api_key') || '') : '',
       prompt,

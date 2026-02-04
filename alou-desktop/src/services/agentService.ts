@@ -63,10 +63,8 @@ interface Message {
   metadata?: Record<string, any>;
 }
 
-// @ts-ignore - Vite 环境变量
-const DEFAULT_IPFS_API = (import.meta as any).env?.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
-// @ts-ignore - Vite 环境变量
-const DEFAULT_IPFS_GATEWAY = (import.meta as any).env?.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
+const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
+const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
 
 // 辅助函数：生成系统提示（使用统一Prompt服务）
 const getSystemPromptForChat = async (agentInfo: AgentInfo, context: Record<string, any> = {}): Promise<string> => {
@@ -563,6 +561,98 @@ class AgentService {
         success: false,
         error: (error as Error).message,
         timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * 上传消息到 IPFS
+   */
+  async uploadMessagesToIpfs(messages: Message[], agentId: string): Promise<string | null> {
+    try {
+      console.log('[AgentService] 上传消息到 IPFS:', { messageCount: messages.length, agentId });
+
+      const response = await apiClient.post('/ipfs/upload', {
+        type: 'messages',
+        data: messages,
+        metadata: {
+          agentId,
+          timestamp: Date.now(),
+        },
+      });
+
+      if (response.success && response.data?.cid) {
+        console.log('[AgentService] 消息上传成功:', response.data.cid);
+        return response.data.cid;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[AgentService] 上传消息到 IPFS 失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 从 IPFS 加载消息
+   */
+  async loadMessagesFromIpfs(cid: string): Promise<{ messages: Message[] } | null> {
+    try {
+      console.log('[AgentService] 从 IPFS 加载消息:', cid);
+
+      const response = await apiClient.get(`/ipfs/content/${cid}`);
+
+      if (response.success && response.data) {
+        console.log('[AgentService] 消息加载成功:', Object.keys(response.data).length);
+        return response.data;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[AgentService] 从 IPFS 加载消息失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 直接查询Claude Agent（用于文档生成等场景）
+   */
+  async queryClaudeAgentDirect(params: {
+    apiKey: string;
+    prompt: string;
+    systemPrompt: string;
+    model: string;
+    maxTokens: number;
+    temperature: number;
+  }): Promise<{ content: string; success: boolean }> {
+    try {
+      console.log('[AgentService] 调用Claude Agent:', params.model);
+
+      const response = await apiClient.post('/claude/query', {
+        apiKey: params.apiKey,
+        prompt: params.prompt,
+        systemPrompt: params.systemPrompt,
+        model: params.model,
+        maxTokens: params.maxTokens,
+        temperature: params.temperature,
+      });
+
+      if (response.success && response.data) {
+        return {
+          content: response.data.content || response.data.response || '',
+          success: true,
+        };
+      }
+
+      return {
+        content: '',
+        success: false,
+      };
+    } catch (error) {
+      console.error('[AgentService] 调用Claude Agent失败:', error);
+      return {
+        content: '',
+        success: false,
       };
     }
   }

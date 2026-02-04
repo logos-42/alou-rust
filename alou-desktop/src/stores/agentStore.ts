@@ -21,6 +21,7 @@ export interface AgentMetadata {
   diapIdentity?: any | null
   customPrompt?: string | null
   messages_cid?: string | null
+  last_saved_at?: number
   created_at: number
   updated_at: number
   imported_at?: number

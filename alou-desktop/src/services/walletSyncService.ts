@@ -22,7 +22,7 @@ function isDesktop(): boolean {
   if (typeof window === 'undefined') return false;
   return typeof (window as any).__TAURI__ !== 'undefined' || 
          typeof (window as any).__TAURI_IPC__ !== 'undefined' ||
-         (typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.TAURI_PLATFORM));
+         (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.TAURI_PLATFORM));
 }
 
 /**

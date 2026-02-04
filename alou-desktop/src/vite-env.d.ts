@@ -9,7 +9,12 @@ interface ImportMetaEnv {
   readonly VITE_ETH_RPC_URL: string
   readonly VITE_SOL_RPC_URL: string
   readonly VITE_TAURI_PLATFORM: string
-  readonly [key: string]: string
+  readonly VITE_DEFAULT_CHAIN_ID: string
+  readonly VITE_WALLET_NETWORKS: string
+  readonly NODE_ENV: string
+  readonly DEV: boolean
+  readonly PROD: boolean
+  readonly [key: string]: string | boolean
 }
 
 interface ImportMeta {

@@ -45,8 +45,7 @@ interface AuthResponse {
 }
 
 class AuthService {
-  // @ts-ignore - Vite 环境变量定义在 vite-env.d.ts 中
-  private readonly API_BASE_URL = (import.meta as any).env.VITE_API_BASE_URL || '/api';
+  private readonly API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
   private readonly TOKEN_KEY = 'auth_tokens';
   private readonly USER_KEY = 'auth_user';
 

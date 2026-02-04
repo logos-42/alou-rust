@@ -144,7 +144,7 @@ export class IpfsService {
 
   async testHttpApi(ipfsApiUrl?: string | null, useConfig = false): Promise<IpfsApiTestResult> {
     try {
-      const apiUrl = ipfsApiUrl || (import.meta as any).env?.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
+      const apiUrl = ipfsApiUrl || import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
       const command = useConfig ? 'test_ipfs_api_with_config' : 'test_ipfs_api';
       const params = { ipfsApiUrl };
       const result = await invoke(command, params);
@@ -159,7 +159,7 @@ export class IpfsService {
   }
 
   async waitForApiReady(maxRetries = 20, delayMs = 1000): Promise<IpfsApiReadyResult> {
-    let apiUrl = (import.meta as any).env?.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
+    let apiUrl = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
     const configAddress = await this.getApiAddressFromConfig();
     if (configAddress.success && configAddress.data) {
       apiUrl = configAddress.data;

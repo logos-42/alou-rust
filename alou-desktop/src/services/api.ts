@@ -34,11 +34,11 @@ interface RequestOptions {
   body?: any;
   params?: Record<string, any>;
   timeout?: number;
+  signal?: AbortSignal;
 }
 
 class ApiService {
-  // @ts-ignore - Vite 环境变量
-  private readonly API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
+  private readonly API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
   private readonly DEFAULT_TIMEOUT = 30000; // 30秒
 
   /**
@@ -48,7 +48,7 @@ class ApiService {
    * @returns API 响应
    */
   async request<T = any>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
     const {
@@ -56,13 +56,14 @@ class ApiService {
       headers = {},
       body,
       params,
-      timeout = this.DEFAULT_TIMEOUT
+      timeout = this.DEFAULT_TIMEOUT,
+      signal: userSignal
     } = options;
 
     try {
       // 构建 URL
       let url = `${this.API_BASE_URL}${endpoint}`;
-      
+
       // 添加查询参数
       if (params && Object.keys(params).length > 0) {
         const searchParams = new URLSearchParams();
@@ -100,6 +101,23 @@ class ApiService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+      // 组合用户提供的signal和内部超时signal
+      const signals = [controller.signal];
+      if (userSignal) {
+        signals.push(userSignal);
+      }
+
+      // 如果任一signal触发，则中止请求
+      let abortReason: AbortSignal | null = null;
+      for (const sig of signals) {
+        sig.addEventListener('abort', () => {
+          if (abortReason === null) {
+            abortReason = sig;
+            controller.abort(sig.reason);
+          }
+        });
+      }
+
       // 发送请求
       const response = await fetch(url, {
         method,
@@ -114,7 +132,7 @@ class ApiService {
       // 处理响应
       let responseData: any;
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType?.includes('application/json')) {
         responseData = await response.json();
       } else {
@@ -133,7 +151,7 @@ class ApiService {
       };
     } catch (error) {
       console.error(`[ApiService] ${method} ${endpoint} 请求失败:`, error);
-      
+
       let errorMessage = '请求失败';
       if (error instanceof Error) {
         if (error.name === 'AbortError') {

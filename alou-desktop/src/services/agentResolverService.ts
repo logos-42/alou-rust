@@ -35,8 +35,8 @@ export interface IpnsIdentity {
   did: string;
 }
 
-const DEFAULT_IPFS_API = (import.meta as any).env?.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
-const DEFAULT_IPFS_GATEWAY = (import.meta as any).env?.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
+const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
+const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
 
 export class AgentResolverService {
   /**

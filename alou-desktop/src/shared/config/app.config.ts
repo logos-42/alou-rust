@@ -7,7 +7,7 @@
 const BASE_CONFIG = {
   appName: 'Alou Desktop',
   version: '0.1.7',
-  environment: ((import.meta as any).env?.NODE_ENV as string) || 'development',
+  environment: (import.meta.env.NODE_ENV as string) || 'development',
   
   // 架构信息
   architecture: {
@@ -24,7 +24,7 @@ const BASE_CONFIG = {
 
 // API配置
 const API_CONFIG = {
-  baseURL: ((import.meta as any).env?.VITE_API_BASE_URL as string) || 'https://alou-edge.yuanjieliu65.workers.dev',
+  baseURL: (import.meta.env.VITE_API_BASE_URL as string) || 'https://alou-edge.yuanjieliu65.workers.dev',
   timeout: 30000,
   retryAttempts: 3,
 
@@ -38,16 +38,16 @@ const API_CONFIG = {
 
 // IPFS配置
 const IPFS_CONFIG = {
-  apiUrl: ((import.meta as any).env?.VITE_IPFS_API_URL as string) || 'http://127.0.0.1:5001',
-  gatewayUrl: ((import.meta as any).env?.VITE_IPFS_GATEWAY_URL as string) || 'http://127.0.0.1:8080',
+  apiUrl: (import.meta.env.VITE_IPFS_API_URL as string) || 'http://127.0.0.1:5001',
+  gatewayUrl: (import.meta.env.VITE_IPFS_GATEWAY_URL as string) || 'http://127.0.0.1:8080',
   autoStart: true,
   dataDir: 'ipfs-data',
 };
 
 // 钱包配置
 const WALLET_CONFIG = {
-  defaultChainId: parseInt(((import.meta as any).env?.VITE_DEFAULT_CHAIN_ID as string) || '1'),
-  networks: JSON.parse(((import.meta as any).env?.VITE_WALLET_NETWORKS as string) || '[]'),
+  defaultChainId: parseInt((import.meta.env.VITE_DEFAULT_CHAIN_ID as string) || '1'),
+  networks: JSON.parse((import.meta.env.VITE_WALLET_NETWORKS as string) || '[]'),
   autoConnect: true,
 };
 
