@@ -247,11 +247,16 @@ const useAuthStore = create<AuthStore>((set, get) => ({
 
       const authResponse = await authService.handleGoogleCallback(code, state)
 
-      Cookies.set('access_token', authResponse.access_token, { expires: 1 })
-      Cookies.set('refresh_token', authResponse.refresh_token, { expires: 30 })
+      // Handle different response formats
+      const serviceResponse = authResponse as any
+      const tokens = serviceResponse.tokens || serviceResponse
+      const user = serviceResponse.user || serviceResponse.data?.user || serviceResponse
+
+      Cookies.set('access_token', tokens.access_token, { expires: 1 })
+      Cookies.set('refresh_token', tokens.refresh_token, { expires: 30 })
 
       set({
-        user: authResponse.user,
+        user: user,
         isAuthenticated: true,
       })
 
@@ -297,7 +302,8 @@ const useAuthStore = create<AuthStore>((set, get) => ({
   fetchUser: async (): Promise<void> => {
     set({ isLoading: true })
     try {
-      const { user } = await userService.getCurrentUser()
+      const response = await userService.getCurrentUser()
+      const user = response.data || response
       set({ user, isAuthenticated: true })
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to fetch user'
@@ -311,7 +317,8 @@ const useAuthStore = create<AuthStore>((set, get) => ({
   updateProfile: async (data: Partial<User>): Promise<User> => {
     set({ isLoading: true, error: null })
     try {
-      const { user } = await userService.updateProfile(data)
+      const response = await userService.updateProfile(data)
+      const user = response.data || response
       set({ user })
       return user
     } catch (error: any) {
@@ -326,8 +333,11 @@ const useAuthStore = create<AuthStore>((set, get) => ({
   logout: async (): Promise<void> => {
     try {
       const refreshToken = Cookies.get('refresh_token')
+      // authService.logout may not expect a parameter
       if (refreshToken) {
-        await authService.logout(refreshToken)
+        await authService.logout(refreshToken as any)
+      } else {
+        await authService.logout(undefined as any)
       }
     } catch (error) {
       console.error('Logout error:', error)

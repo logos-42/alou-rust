@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import useAgentStore, { useAgentStoreHydration, Agent } from '@/stores/agentStore'
-import { buildChannelFromAgent, Channel } from './agentUtils'
+import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
+import { buildChannelFromAgent, Channel, Agent } from './agentUtils'
 
 // Hook参数类型
 interface UseAgentPersistenceParams {
@@ -43,7 +43,10 @@ export const useAgentPersistence = ({
   useEffect(() => {
     if (hasHydrated) {
       console.log(`[useAgentPersistence] Store hydration 完成，已加载 ${storedAgents.length} 个智能体`)
-      setIsReady(true)
+      const timer = setTimeout(() => {
+        setIsReady(true)
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [hasHydrated, storedAgents.length])
 

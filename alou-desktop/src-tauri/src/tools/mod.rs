@@ -16,6 +16,7 @@ pub mod todolist;
 pub mod agent_skills;
 pub mod agent_collaboration;
 pub mod tool_creation;
+pub mod tool_parts;
 pub mod iroh_tool;
 pub mod message_passing;
 pub mod pubsub_tool;
@@ -33,7 +34,9 @@ pub use plan::{PlanTool, TaskPlan, PlanStep};
 pub use todolist::{TodoListTool, TodoItem, TodoStatus};
 pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
 pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
-pub use tool_creation::{ToolCreationTool, DynamicToolExecutor, DynamicToolResult, ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
+pub use tool_creation::{ToolCreationTool, DynamicToolExecutor, DynamicToolResult};
+// 从 tool_parts 直接导出定义类型
+pub use tool_parts::definitions::{ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

@@ -69,18 +69,32 @@ const DEFAULT_IPFS_API = (import.meta as any).env?.VITE_IPFS_API_URL || 'http://
 const DEFAULT_IPFS_GATEWAY = (import.meta as any).env?.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
 
 // 辅助函数：生成系统提示（使用统一Prompt服务）
-const getSystemPromptForChat = (agentInfo: AgentInfo, context: Record<string, any> = {}): string => {
+const getSystemPromptForChat = async (agentInfo: AgentInfo, context: Record<string, any> = {}): Promise<string> => {
   console.log('[getSystemPromptForChat] 使用统一Prompt服务:', { agentInfo, context });
-  
+
   try {
+    // 获取可用工具列表
+    const { default: toolService } = await import('./toolService');
+    const tools = await toolService.getToolList();
+
+    // 转换为 promptService 期望的格式
+    const formattedTools = tools.map(tool => {
+      // 优先使用工具服务提供的信息，否则使用注册表中的默认信息
+      const toolId = tool.id || tool.name;
+      return {
+        name: toolId,
+        description: tool.description || tool.desc || `${tool.name || toolId} - ${tool.category || '通用'} 工具`
+      };
+    }).filter(tool => tool.name); // 确保工具名称不为空
+
     // 使用PromptService生成动态Prompt
-    const prompt = promptService.generateCustomAgentPrompt(agentInfo, context);
-    
+    const prompt = promptService.generateCustomAgentPrompt(agentInfo, context, {}, formattedTools);
+
     console.log('[getSystemPromptForChat] 生成Prompt成功，长度:', prompt.length);
     return prompt;
   } catch (error) {
     console.error('[getSystemPromptForChat] 生成Prompt失败:', error);
-    
+
     // 降级处理：使用基础Prompt
     const mode = agentInfo?.mode || 'agent';
     const basePrompt = promptService.getBasePrompt(mode as any);
@@ -93,12 +107,12 @@ class AgentService {
    * 发送消息给智能体
    */
   async sendMessage(
-    agentInfo: AgentInfo, 
-    message: string, 
+    agentInfo: AgentInfo,
+    message: string,
     options: SendMessageOptions = {}
   ): Promise<ApiResponse<any>> {
     try {
-      const systemPrompt = getSystemPromptForChat(agentInfo, {
+      const systemPrompt = await getSystemPromptForChat(agentInfo, {
         ...options,
         message,
         timestamp: Date.now(),

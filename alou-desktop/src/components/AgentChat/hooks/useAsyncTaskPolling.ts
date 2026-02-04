@@ -70,7 +70,7 @@ export const useAsyncTaskPolling = ({
   /**
    * 执行工具调用并提交结果
    */
-  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], agentId: string) => {
+  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], _agentId: string) => {
     console.log(`[pollAsyncTask] 执行 ${toolCalls.length} 个工具调用`, toolCalls)
 
     try {
@@ -188,11 +188,15 @@ export const useAsyncTaskPolling = ({
         // 更新进度消息
         setMessagesByChannel((prev) => {
           const channelMessages = prev[agentId] || []
-          const messageIndex = channelMessages.findIndex((msg: { id: string }) => msg.id === progressMessageId)
+          const messageIndex = channelMessages.findIndex((msg: unknown) => 
+            typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+          )
 
           if (messageIndex !== -1) {
             const updatedMessages = [...channelMessages]
-            const progressMessage = { ...updatedMessages[messageIndex] }
+            const progressMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
+              ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
+              : {}
 
             progressMessage.progress = progress
             progressMessage.status = status
@@ -236,21 +240,25 @@ export const useAsyncTaskPolling = ({
              if (progressMessageId) {
                setMessagesByChannel((prev) => {
                  const channelMessages = prev[agentId] || []
-                 const messageIndex = channelMessages.findIndex((msg: { id: string }) => msg.id === progressMessageId)
-                 
+                 const messageIndex = channelMessages.findIndex((msg: unknown) =>
+                   typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+                 )
+
                  if (messageIndex !== -1 && current_step) {
                    const updatedMessages = [...channelMessages]
-                   const progressMessage = { ...updatedMessages[messageIndex] }
-                   
+                   const progressMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
+                     ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                     : {}
+
                    progressMessage.content = `🔄 ${current_step}${progress > 0 ? ` (${Math.round(progress * 100)}%)` : ''}`
-                   
+
                    updatedMessages[messageIndex] = progressMessage
                    return {
                      ...prev,
                      [agentId]: updatedMessages,
                    }
                  }
-                 
+
                  return prev
                })
              }
@@ -266,11 +274,15 @@ export const useAsyncTaskPolling = ({
             if (progressMessageId && taskResponse) {
               setMessagesByChannel((prev) => {
                 const channelMessages = prev[agentId] || []
-                const messageIndex = channelMessages.findIndex((msg: { id: string }) => msg.id === progressMessageId)
+                const messageIndex = channelMessages.findIndex((msg: unknown) =>
+                  typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+                )
 
                 if (messageIndex !== -1) {
                   const updatedMessages = [...channelMessages]
-                  const completedMessage = { ...updatedMessages[messageIndex] }
+                  const completedMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
+                    ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                    : {}
 
                   completedMessage.content = String(taskResponse)
                   completedMessage.progress = 1
@@ -312,11 +324,15 @@ export const useAsyncTaskPolling = ({
             if (progressMessageId) {
               setMessagesByChannel((prev) => {
                 const channelMessages = prev[agentId] || []
-                const messageIndex = channelMessages.findIndex((msg: { id: string }) => msg.id === progressMessageId)
+                const messageIndex = channelMessages.findIndex((msg: unknown) =>
+                  typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+                )
 
                 if (messageIndex !== -1) {
                   const updatedMessages = [...channelMessages]
-                  const failedMessage = { ...updatedMessages[messageIndex] }
+                  const failedMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
+                    ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                    : {}
 
                   failedMessage.content = `❌ 任务执行失败: ${error || '未知错误'}`
                   failedMessage.progress = 1
@@ -360,11 +376,15 @@ export const useAsyncTaskPolling = ({
         if (progressMessageId) {
           setMessagesByChannel((prev) => {
             const channelMessages = prev[agentId] || []
-            const messageIndex = channelMessages.findIndex((msg: { id: string }) => msg.id === progressMessageId)
+            const messageIndex = channelMessages.findIndex((msg: unknown) =>
+              typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+            )
 
             if (messageIndex !== -1) {
               const updatedMessages = [...channelMessages]
-              const errorMessage = { ...updatedMessages[messageIndex] }
+              const errorMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
+                ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                : {}
 
               errorMessage.content = `❌ 任务执行出错: ${(error as Error).message}`
               errorMessage.progress = 1

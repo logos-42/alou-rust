@@ -30,7 +30,7 @@ export interface InteractionLogEntry {
   action: string
   label: string
   timestamp: number
-  detail?: any
+  detail?: Record<string, unknown>
 }
 
 /**
@@ -38,7 +38,7 @@ export interface InteractionLogEntry {
  */
 export interface ContextEvent {
   action: string
-  detail?: any
+  detail?: Record<string, unknown>
   timestamp: number
 }
 
@@ -50,7 +50,7 @@ export interface Message {
   type?: string
   content?: string
   timestamp?: number
-  [key: string]: any
+  [key: string]: unknown
 }
 
 /**
@@ -71,7 +71,7 @@ export interface UseAgentInteractionReturn {
   contextEvents: ContextEvent[]
   isConversationVisible: boolean
   hasConversation: boolean
-  recordInteraction: (action: string, detail?: any, label?: string) => void
+  recordInteraction: (action: string, detail?: Record<string, unknown>, label?: string) => void
   appendMessage: (message: Message) => void
   flushContextEvents: () => ContextEvent[]
   openConversation: () => void
@@ -118,7 +118,7 @@ export const useAgentInteraction = (options?: UseAgentInteractionOptions): UseAg
    * 记录交互
    */
   const recordInteraction = useCallback(
-    (action: string, detail?: any, label?: string) => {
+    (action: string, detail?: Record<string, unknown>, label?: string) => {
       const timestamp = Date.now()
       const entry: InteractionLogEntry = {
         id: `log_${timestamp}_${Math.random().toString(36).slice(2, 6)}`,

@@ -143,6 +143,63 @@ export interface WorkflowControlResult {
 export type ProgressCallback = (progress: number, message?: string) => void
 
 export class WorkflowService {
+  private currentMode: WorkflowMode = WorkflowMode.SMART
+  private executionCount: number = 0
+  private successCount: number = 0
+  private failureCount: number = 0
+  private lastExecutionTime: number = 0
+
+  /**
+   * 切换工作流模式
+   * @param mode - 新的工作流模式
+   * @returns 切换结果
+   */
+  async switchMode(mode: WorkflowMode): Promise<{ success: boolean; message?: string }> {
+    try {
+      this.currentMode = mode
+      return {
+        success: true,
+        message: `已切换到 ${mode} 模式`
+      }
+    } catch (error) {
+      console.error('[WorkflowService] 切换模式失败:', error)
+      return {
+        success: false,
+        message: (error as Error).message || '切换模式失败'
+      }
+    }
+  }
+
+  /**
+   * 获取工作流统计信息
+   * @returns 统计信息
+   */
+  getStats(): {
+    totalExecutions: number
+    successCount: number
+    failureCount: number
+    currentMode: WorkflowMode
+    lastExecutionTime: number
+  } {
+    return {
+      totalExecutions: this.executionCount,
+      successCount: this.successCount,
+      failureCount: this.failureCount,
+      currentMode: this.currentMode,
+      lastExecutionTime: this.lastExecutionTime
+    }
+  }
+
+  /**
+   * 重置工作流状态
+   */
+  reset(): void {
+    this.executionCount = 0
+    this.successCount = 0
+    this.failureCount = 0
+    this.lastExecutionTime = 0
+  }
+
   /**
    * 创建工作流
    * @param workflow - 工作流定义
@@ -154,6 +211,7 @@ export class WorkflowService {
     agentInfo: AgentInfo = {}
   ): Promise<CreateWorkflowResult> {
     try {
+      this.executionCount++
       const result = await invoke<{ workflow_id: string }>('create_workflow', {
         workflow: {
           name: workflow.name,
@@ -169,6 +227,8 @@ export class WorkflowService {
         agentInfo
       })
 
+      this.successCount++
+      this.lastExecutionTime = Date.now()
       return {
         success: true,
         workflowId: result.workflow_id,
@@ -176,6 +236,8 @@ export class WorkflowService {
       }
     } catch (error) {
       console.error('[WorkflowService] 创建工作流失败:', error)
+      this.failureCount++
+      this.lastExecutionTime = Date.now()
       return {
         success: false,
         error: (error as Error).message || '创建工作流失败'

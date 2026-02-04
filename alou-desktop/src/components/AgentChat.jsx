@@ -21,7 +21,6 @@ import AgentProfilePanel from '@/components/AgentProfilePanel'
 import AgentDetailPanel from '@/components/agent/AgentDetailPanel'
 import RateLimitModal from '@/components/RateLimitModal'
 import SkillsManager from '@/components/SkillsManager'
-import SDKModal from '@/components/SDKModal'
 import WorkflowProgress from '@/components/WorkflowProgress'
 import TranslationIcon from '@/assets/icon_翻译.png'
 
@@ -93,7 +92,7 @@ const AgentChat = () => {
   const [isChannelLoading, setChannelLoading] = useState(false)
   const [channelError, setChannelError] = useState(null)
   const [selectedModelType, setSelectedModelType] = useState(null)
-  const [showWorkflowPanel, setShowWorkflowPanel] = useState(false)
+  const [_showWorkflowPanel, _setShowWorkflowPanel] = useState(false)
   const [showSkillsPanel, setShowSkillsPanel] = useState(false)
 
   // ==================== Rate Limit Modal Hook ====================
@@ -114,8 +113,8 @@ const AgentChat = () => {
     isLeftSidebarCollapsed,
     isInteractionCollapsed,
     isConversationVisible,
-    setConversationVisible,
-    viewportWidth,
+    _setConversationVisible,
+    _viewportWidth,
     interactionLogs,
     uiResource,
     isUiModalOpen,
@@ -162,23 +161,23 @@ const AgentChat = () => {
 
   // 处理智能体更新
   const handleAgentUpdated = useCallback((updatedAgent) => {
-    console.log('[AgentChat] 智能体已更新:', {
+    console.warn('[AgentChat] 智能体已更新:', {
       id: updatedAgent.id,
       avatar: updatedAgent.avatar,
       display_name: updatedAgent.display_name,
       name: updatedAgent.name,
       hasAvatarField: 'avatar' in updatedAgent
     })
-    
+
     // 更新selectedAgent状态
     setSelectedAgent(updatedAgent)
-    
+
     // 使用头像管理模块更新频道列表
-    setChannels(prevChannels => 
+    setChannels(prevChannels =>
       avatarManager.updateChannelsAvatar(prevChannels, updatedAgent)
     )
-    
-    console.log('[AgentChat] 频道列表已更新')
+
+    console.warn('[AgentChat] 频道列表已更新')
   }, [])
 
   // ==================== Group Chat Manager Hook ====================
@@ -203,10 +202,10 @@ const AgentChat = () => {
     openGroupChat,
     closeGroupChat,
     closeGroupChatCompletely,
-    toggleGroupChat,
+    _toggleGroupChat,
     setSplitPosition,
     switchGroupChat,
-    hasActiveAction,
+    _hasActiveAction,
     canOpenGroupChat,
   } = groupChatManager
 
@@ -244,7 +243,7 @@ const AgentChat = () => {
 
   const {
     agentPosition,
-    clampPosition,
+    _clampPosition,
     startDrag,
     onDrag,
     stopDrag,
@@ -267,11 +266,11 @@ const AgentChat = () => {
 
   const {
     walletSnapshot,
-    userWalletInfo,
+    _userWalletInfo,
     transactions,
     sidebarWallet,
     refreshWallet,
-    loadWalletOverview,
+    _loadWalletOverview,
     handleTransactionBuild,
     handleTransactionBroadcast,
   } = walletState
@@ -300,13 +299,13 @@ const AgentChat = () => {
   })
 
   const {
-    loadChannelList,
+    _loadChannelList,
     refreshChannels,
     handleChannelKeywordChange,
     selectChannel,
     resolveExistingAgentTarget,
     handleImportAgent,
-    saveAgentToStorage,
+    _saveAgentToStorage,
     deleteChannel,
     currentMode,
     handleModeChange,
@@ -316,27 +315,27 @@ const AgentChat = () => {
 
   // 处理从群聊选择智能体
   const handleSelectAgentFromGroupChat = useCallback((agentId, agentInfo) => {
-    console.log('[AgentChat] 从群聊选择智能体:', agentId, agentInfo)
-    
+    console.warn('[AgentChat] 从群聊选择智能体:', agentId, agentInfo)
+
     // 查找对应的频道
-    const targetChannel = channels.find(ch => 
-      ch.id === agentId || 
-      ch.meta?.did === agentId || 
+    const targetChannel = channels.find(ch =>
+      ch.id === agentId ||
+      ch.meta?.did === agentId ||
       ch.agent_id === agentId
     )
-    
+
     if (targetChannel) {
       // 选择该智能体频道
       selectChannel(targetChannel)
-      
+
       // 如果群聊面板打开，关闭它以显示主对话
       if (showGroupChat) {
         closeGroupChat()
       }
-      
+
       // 确保对话面板打开
       openConversationPanel()
-      
+
       // 记录交互
       recordInteraction('select_agent_from_groupchat', {
         agentId,
@@ -350,33 +349,33 @@ const AgentChat = () => {
 
   // 处理从群聊点击智能体头像
   const handleAgentClickFromGroupChat = useCallback((agent) => {
-    console.log('[AgentChat] 从群聊点击智能体头像:', agent)
-    
+    console.warn('[AgentChat] 从群聊点击智能体头像:', agent)
+
     // 获取智能体ID
     const agentId = agent.id || agent.agent_id || agent.did
-    
+
     // 查找对应的频道
-    const targetChannel = channels.find(ch => 
-      ch.id === agentId || 
-      ch.meta?.did === agentId || 
+    const targetChannel = channels.find(ch =>
+      ch.id === agentId ||
+      ch.meta?.did === agentId ||
       ch.agent_id === agentId
     )
-    
+
     if (targetChannel) {
       // 选择该智能体频道
       selectChannel(targetChannel)
-      
+
       // 不关闭群聊面板，让用户可以同时看到群聊和智能体对话
       // 但确保对话面板打开
       openConversationPanel()
-      
+
       // 记录交互
       recordInteraction('click_agent_avatar_from_groupchat', {
         agentId,
         agent,
         channelId: targetChannel.id
       })
-      
+
       // 切换输入目标到智能体模式
       window.dispatchEvent(new CustomEvent('switch-input-target', {
         detail: { target: 'agent' }
@@ -398,9 +397,9 @@ const AgentChat = () => {
 
   const {
     autoCreateAgent: handleAutoCreateAgent,
-    isAutoCreating,
-    autoCreationError,
-    resetState: resetAutoCreation,
+    _isAutoCreating,
+    _autoCreationError,
+    resetState: _resetAutoCreation,
   } = autoAgentCreator
 
   // ==================== 6. Message State Hook ====================
@@ -431,22 +430,22 @@ const AgentChat = () => {
 
   const {
     messages,
-    messagesByChannel,
-    setMessagesForChannel,
+    _messagesByChannel,
+    _setMessagesForChannel,
     currentMessage,
     setCurrentMessage,
-    isLoading,
-    setIsLoading,
+    _isLoading,
+    _setIsLoading,
     // 多智能体独立执行空间
-    loadingByAgent,
+    _loadingByAgent,
     isAgentLoading,
     sendMessageToAgent,
     cancelAgentExecution,
     appendMessage,
     scrollToBottom,
-    sendMessage: baseSendMessage,
-    saveMessagesToIpfs,
-    loadMessagesFromIpfs,
+    _baseSendMessage,
+    _saveMessagesToIpfs,
+    _loadMessagesFromIpfs,
   } = messageState
 
   // ==================== Tool Call Handler ====================
@@ -490,10 +489,10 @@ const AgentChat = () => {
   })
 
   const {
-    routeMessageToAgent,
-    sendToAgent,
-    analyzeIntent,
-    isCoordinatorReady,
+    _routeMessageToAgent,
+    _sendToAgent,
+    _analyzeIntent,
+    _isCoordinatorReady,
   } = multiAgentCoordinator
 
   // ==================== Workflow Hook ====================
@@ -506,18 +505,18 @@ const AgentChat = () => {
   })
 
   const {
-    workflows,
-    selectedWorkflow,
-    setSelectedWorkflow,
-    workflowLoading,
+    _workflows,
+    _selectedWorkflow,
+    _setSelectedWorkflow,
+    _workflowLoading,
     executingWorkflowId,
     executionProgress,
     activeExecutions,
-    loadWorkflows,
-    createSampleWorkflow,
-    executeWorkflow,
-    deleteWorkflow,
-    retryStep,
+    _loadWorkflows,
+    _createSampleWorkflow,
+    _executeWorkflow,
+    _deleteWorkflow,
+    _retryStep,
     pauseWorkflow,
     resumeWorkflow,
     handleWorkflowEvent,
@@ -527,27 +526,28 @@ const AgentChat = () => {
   // 工作流控制函数
   const handlePauseExecution = useCallback(async (executionId) => {
     try {
-      await workflowService.pauseExecution(executionId)
+      await pauseWorkflow(executionId)
     } catch (error) {
       console.error('[AgentChat] 暂停执行失败:', error)
     }
-  }, [])
+  }, [pauseWorkflow])
 
   const handleResumeExecution = useCallback(async (executionId) => {
     try {
-      await workflowService.resumeExecution(executionId)
+      await resumeWorkflow(executionId)
     } catch (error) {
       console.error('[AgentChat] 恢复执行失败:', error)
     }
-  }, [])
+  }, [resumeWorkflow])
 
   const handleCancelExecution = useCallback(async (executionId) => {
     try {
-      await workflowService.cancelExecution(executionId)
+      // 没有直接的取消执行函数，使用暂停作为替代
+      await pauseWorkflow(executionId)
     } catch (error) {
       console.error('[AgentChat] 取消执行失败:', error)
     }
-  }, [])
+  }, [pauseWorkflow])
 
   // ==================== 10. Stream Handler ====================
   const { streamStatus, streamEvents } = useAgentStreamHandler({

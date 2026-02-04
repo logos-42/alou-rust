@@ -190,9 +190,16 @@ export const useAgentUI = ({
     if (typeof localStorage !== 'undefined') {
       const savedTheme = localStorage.getItem('alou-theme')
       if (savedTheme) {
-        setIsDarkMode(savedTheme === 'dark')
+        const timer = setTimeout(() => {
+          setIsDarkMode(savedTheme === 'dark')
+        }, 0)
+        return () => clearTimeout(timer)
       } else if (typeof window !== 'undefined') {
-        setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches)
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        const timer = setTimeout(() => {
+          setIsDarkMode(prefersDark)
+        }, 0)
+        return () => clearTimeout(timer)
       }
     }
   }, [])

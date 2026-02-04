@@ -30,12 +30,12 @@ export interface Transaction {
   status: 'pending' | 'confirmed' | 'failed' | 'submitted' | 'success' | 'online'
   statusLabel: string
   timestamp: number
-  raw?: any
+  raw?: Record<string, unknown>
 }
 
 // 工具调用结果接口
 export interface ToolCallResult {
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // 工具调用接口
@@ -56,7 +56,7 @@ export interface ToolCallHandlerResult {
 
 // UI资源接口
 export interface UIResource {
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // 工具调用处理器配置
@@ -64,8 +64,8 @@ export interface ToolCallHandlerConfig {
   handleTransactionBuild: (result: ToolCallResult) => Promise<void>
   handleTransactionBroadcast: (result: ToolCallResult) => Promise<void>
   refreshWallet: () => Promise<void>
-  recordInteraction: (type: string, data?: any) => void
-  appendMessage: (message: any) => void
+  recordInteraction: (type: string, data?: Record<string, unknown>) => void
+  appendMessage: (message: { id: string; type: string; content: string; timestamp: number; source: string }) => void
   scrollToBottom: () => void
   openUiResource: (resource: UIResource, options?: { source?: string }) => void
 }
@@ -239,7 +239,26 @@ export const estimateFiatValue = (balance: string | number, token: string = 'ETH
   return '--'
 }
 
-export const normalizeTransaction = (tx: any, fallbackToken: string = 'ETH'): Transaction | null => {
+interface RawTransaction {
+  hash?: string;
+  id?: string;
+  direction?: 'in' | 'out';
+  type?: string;
+  amount?: number | string;
+  value?: number | string;
+  quantity?: number | string;
+  displayValue?: number | string;
+  token?: string;
+  counterparty?: string;
+  to?: string;
+  from?: string;
+  status?: 'pending' | 'confirmed' | 'failed' | 'submitted' | 'success' | 'online';
+  timestamp?: number;
+  updatedAt?: number;
+  [key: string]: unknown;
+}
+
+export const normalizeTransaction = (tx: RawTransaction, fallbackToken: string = 'ETH'): Transaction | null => {
   if (!tx) return null
 
   const hash = tx.hash || tx.id || `tx_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -413,9 +432,9 @@ export const useToolCallHandler = ({
           else {
             toolResult.content = JSON.stringify(result) || 'Tool executed successfully';
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(`Tool call ${toolCall.name} failed:`, error);
-          toolResult.content = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          toolResult.content = `Error: ${(error instanceof Error ? error.message : 'Unknown error')}`;
           toolResult.success = false;
           
           appendMessage({

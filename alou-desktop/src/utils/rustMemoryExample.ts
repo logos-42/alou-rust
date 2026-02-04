@@ -74,8 +74,6 @@ export interface UseRustMemoryStoreReturn {
   setDiapGroup: typeof rustMemoryStore.setDiapGroup
   removeDiapGroup: typeof rustMemoryStore.removeDiapGroup
   getStats: typeof rustMemoryStore.getStats
-  cleanup: typeof rustMemoryStore.cleanupExpired
-  cleanupLRU: typeof rustMemoryStore.cleanupLRU
   ready: typeof rustMemoryStore.ready
   setItems: typeof rustMemoryStore.setItems
   getItems: typeof rustMemoryStore.getItems
@@ -102,8 +100,6 @@ export const useRustMemoryStore = (): UseRustMemoryStoreReturn => {
     setDiapGroup: rustMemoryStore.setDiapGroup,
     removeDiapGroup: rustMemoryStore.removeDiapGroup,
     getStats: rustMemoryStore.getStats,
-    cleanup: rustMemoryStore.cleanupExpired,
-    cleanupLRU: rustMemoryStore.cleanupLRU,
     ready: rustMemoryStore.ready,
     setItems: rustMemoryStore.setItems,
     getItems: rustMemoryStore.getItems,

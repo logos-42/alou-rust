@@ -88,7 +88,7 @@ class AvatarProtectionTool {
       this.protectionResults.checkedAgents = agents.length
       
       const avatarStatus = agents.map(agent => {
-        const status = this.analyzeAvatarStatus(agent)
+        const status = this.analyzeAvatarStatus(agent as Agent)
         return {
           id: agent.id,
           name: agent.display_name || agent.name,
@@ -115,14 +115,14 @@ class AvatarProtectionTool {
    */
   analyzeAvatarStatus(agent: Agent): AvatarStatus {
     const avatarSources: AvatarSources = {
-      avatar_cid: agent.avatar_cid,
-      avatar_url: agent.avatar_url,
+      avatar_cid: agent.avatar_cid || undefined,
+      avatar_url: agent.avatar_url || undefined,
       avatar: agent.avatar,
-      avatarCid: agent.avatarCid,
+      avatarCid: agent.avatarCid || undefined,
       diapIdentity: agent.diapIdentity?.avatar_cid,
       serviceEndpoint: agent.serviceEndpoint?.avatar_cid,
       didDocument: agent.did_document?.service?.find((s: { serviceEndpoint?: { avatar_cid?: string } }) => s.serviceEndpoint?.avatar_cid)?.serviceEndpoint?.avatar_cid,
-      meta: agent.meta ? this.checkMetaAvatar(agent.meta) : null
+      meta: agent.meta ? this.checkMetaAvatar(agent.meta as Record<string, unknown>) : null
     }
 
     const hasAnyAvatar = Object.values(avatarSources).some(source => source !== null && source !== undefined)
@@ -214,7 +214,7 @@ class AvatarProtectionTool {
       let fixedCount = 0
       
       for (const agent of agents) {
-        const status = this.analyzeAvatarStatus(agent)
+        const status = this.analyzeAvatarStatus(agent as Agent)
         
         if (status.isCorrupted) {
           console.log(`[AvatarProtection] 修复智能体头像: ${agent.name || agent.id}`)
@@ -222,11 +222,12 @@ class AvatarProtectionTool {
           // 清理损坏的头像字段
           const updates: Record<string, string | null> = {}
           const avatarFields = ['avatar_cid', 'avatar_url', 'avatar', 'avatarCid']
-          
+
           for (const field of avatarFields) {
-            const value = agent[field as keyof Agent]
-            if (value && typeof value === 'string') {
-              if (value.includes('undefined') || value.includes('null') || value.includes('[object Object]')) {
+            const value = agent as unknown as Record<string, unknown>
+            const fieldValue = value[field] as string | undefined
+            if (fieldValue && typeof fieldValue === 'string') {
+              if (fieldValue.includes('undefined') || fieldValue.includes('null') || fieldValue.includes('[object Object]')) {
                 updates[field] = null
               }
             }
@@ -261,20 +262,20 @@ class AvatarProtectionTool {
    */
   backupAvatarData(): AvatarBackup[] {
     console.log('💾 开始备份头像数据...')
-    
+
     try {
       const agents = useAgentStore.getState().agents
       const avatarBackup: AvatarBackup[] = agents.map(agent => ({
         id: agent.id,
         name: agent.display_name || agent.name || '',
         avatarData: {
-          avatar_cid: agent.avatar_cid,
-          avatar_url: agent.avatar_url,
-          avatar: agent.avatar,
-          avatarCid: agent.avatarCid,
+          avatar_cid: agent.avatar_cid || undefined,
+          avatar_url: agent.avatar_url || undefined,
+          avatar: undefined,
+          avatarCid: agent.avatar_cid || undefined,
           diapIdentity: agent.diapIdentity?.avatar_cid,
-          serviceEndpoint: agent.serviceEndpoint?.avatar_cid,
-          didDocument: agent.did_document?.service?.find((s: { serviceEndpoint?: { avatar_cid?: string } }) => s.serviceEndpoint?.avatar_cid)?.serviceEndpoint?.avatar_cid
+          serviceEndpoint: undefined,
+          didDocument: undefined
         },
         timestamp: Date.now()
       }))
@@ -309,10 +310,10 @@ class AvatarProtectionTool {
       
       for (const backup of avatarBackup) {
         const currentAgent = useAgentStore.getState().agents.find(a => a.id === backup.id)
-        
+
         if (currentAgent) {
           const updates: Record<string, string | undefined> = {}
-          
+
           // 只恢复缺失的头像字段
           if (!currentAgent.avatar_cid && backup.avatarData.avatar_cid) {
             updates.avatar_cid = backup.avatarData.avatar_cid
@@ -320,9 +321,10 @@ class AvatarProtectionTool {
           if (!currentAgent.avatar_url && backup.avatarData.avatar_url) {
             updates.avatar_url = backup.avatarData.avatar_url
           }
-          if (!currentAgent.avatar && backup.avatarData.avatar) {
-            updates.avatar = backup.avatarData.avatar
-          }
+          // Skip avatar field restoration as it doesn't exist in AgentMetadata
+          // if (!currentAgent.avatar && backup.avatarData.avatar) {
+          //   updates.avatar = backup.avatarData.avatar
+          // }
           
           if (Object.keys(updates).length > 0) {
             updateAgent(backup.id, updates)

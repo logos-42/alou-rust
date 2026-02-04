@@ -14,6 +14,8 @@ export interface GroupConfig {
   groupName: string
   description?: string
   members?: string[]
+  agents?: any[]
+  channel?: any
   isPublic?: boolean
   maxMembers?: number
   metadata?: Record<string, any>

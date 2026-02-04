@@ -270,40 +270,70 @@ export const useDiapGroupChatManager = ({
 
   // 初始化时加载本地群聊
   useEffect(() => {
-    loadPersistentGroups()
+    const timer = setTimeout(() => {
+      loadPersistentGroups()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [loadPersistentGroups])
 
   // 监听频道变化，加载对应群聊
   useEffect(() => {
     if (activeChannelId && loadedChannelRef.current !== activeChannelId) {
       loadedChannelRef.current = activeChannelId
-      setIsLoading(true)
-      
-      // 加载频道的群聊（从本地存储）
-      setTimeout(() => {
-        const channelGroups = persistentGroups.filter(g => g.channelId === activeChannelId)
-        console.log('[useDiapGroupChatManager] 频道群聊:', activeChannelId, channelGroups.length)
-        
-        // 如果频道有群聊，恢复第一个为活跃
-        if (channelGroups.length > 0) {
-          const firstGroup = channelGroups[0]
-          setActiveGroupIdState(firstGroup.groupId)
-          
-          // 检查是否应该显示面板
-          const savedShowPanel = localStorage.getItem(`${STORAGE_KEYS.SHOW_PANEL}_${activeChannelId}`)
-          if (savedShowPanel === 'true') {
-            setShowGroupChat(true)
-            openConversationPanelRef.current?.()
+      const loadingTimer = setTimeout(() => {
+        setIsLoading(true)
+
+        // 加载频道的群聊（从本地存储）
+        setTimeout(() => {
+          const channelGroups = persistentGroups.filter(g => g.channelId === activeChannelId)
+          console.log('[useDiapGroupChatManager] 频道群聊:', activeChannelId, channelGroups.length)
+
+          // 如果频道有群聊，恢复第一个为活跃
+          if (channelGroups.length > 0) {
+            const firstGroup = channelGroups[0]
+
+            const setActiveTimer = setTimeout(() => {
+              setActiveGroupIdState(firstGroup.groupId)
+            }, 0)
+
+            // 检查是否应该显示面板
+            const savedShowPanel = localStorage.getItem(`${STORAGE_KEYS.SHOW_PANEL}_${activeChannelId}`)
+            if (savedShowPanel === 'true') {
+              const setShowTimer = setTimeout(() => {
+                setShowGroupChat(true)
+              }, 0)
+
+              setTimeout(() => {
+                openConversationPanelRef.current?.()
+              }, 0)
+            } else {
+              const setShowTimer = setTimeout(() => {
+                setShowGroupChat(false)
+              }, 0)
+            }
+          } else {
+            const setShowTimer = setTimeout(() => {
+              setShowGroupChat(false)
+            }, 0)
           }
-        } else {
-          setShowGroupChat(false)
-        }
-        
-        setIsLoading(false)
+
+          const setLoadingTimer = setTimeout(() => {
+            setIsLoading(false)
+          }, 0)
+        }, 0)
       }, 0)
+
+      return () => {
+        clearTimeout(loadingTimer)
+      }
     } else if (!activeChannelId) {
       loadedChannelRef.current = null
-      setShowGroupChat(false)
+
+      const timer = setTimeout(() => {
+        setShowGroupChat(false)
+      }, 0)
+
+      return () => clearTimeout(timer)
     }
   }, [activeChannelId, persistentGroups, openConversationPanel])
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import AppRoutes from './routes/AppRoutes'
 import ErrorBoundary from './components/ErrorBoundary'
 import ipfsService from './services/ipfsService'
@@ -34,7 +34,7 @@ const App = () => {
         <AppRoutes />
       </div>
 
-      <style jsx>{`
+      <style>{`
         .app-container {
           position: relative;
           width: 100%;

@@ -2,6 +2,7 @@
  * Prompt Service - 统一管理动态Prompt生成
  * 解决自定义智能体和系统Prompt的统一管理
  */
+import { getToolDescription } from './toolDescriptions';
 
 // 本地类型定义
 interface AgentInfo {
@@ -155,12 +156,14 @@ Alou 的个性与价值观：
    * @param agentInfo - 智能体信息
    * @param context - 上下文信息
    * @param options - 生成选项
+   * @param tools - 可用工具列表
    * @returns 自定义Prompt
    */
   generateCustomAgentPrompt(
-    agentInfo: AgentInfo, 
+    agentInfo: AgentInfo,
     context: PromptContext = {},
-    options: CustomPromptOptions = {}
+    options: CustomPromptOptions = {},
+    tools: Array<{name: string, description: string}> = []
   ): string {
     const {
       includeCapabilities = true,
@@ -174,7 +177,7 @@ Alou 的个性与价值观：
     // 1. 基础身份描述
     const name = agentInfo.display_name || agentInfo.name || 'AI助手';
     const description = agentInfo.description || agentInfo.role_description || '';
-    
+
     parts.push(`你是${name}。${description}`);
 
     // 2. 能力描述
@@ -182,7 +185,13 @@ Alou 的个性与价值观：
       parts.push(`\n核心能力：\n${agentInfo.role_description}`);
     }
 
-    // 3. 个性特征
+    // 3. 工具能力描述
+    const toolCapabilityPrompt = this.generateToolCapabilityPrompt(tools);
+    if (toolCapabilityPrompt) {
+      parts.push(`\n${toolCapabilityPrompt}`);
+    }
+
+    // 4. 个性特征
     if (includePersonality) {
       const personality = this.generatePersonalityPrompt(agentInfo);
       if (personality) {
@@ -190,13 +199,13 @@ Alou 的个性与价值观：
       }
     }
 
-    // 4. 工作方式
+    // 5. 工作方式
     const workStyle = this.generateWorkStylePrompt(agentInfo);
     if (workStyle) {
       parts.push(`\n工作方式：\n${workStyle}`);
     }
 
-    // 5. 约束条件
+    // 6. 约束条件
     if (includeConstraints) {
       const constraints = this.generateConstraintsPrompt(agentInfo);
       if (constraints) {
@@ -204,7 +213,7 @@ Alou 的个性与价值观：
       }
     }
 
-    // 6. 上下文信息
+    // 7. 上下文信息
     if (context && Object.keys(context).length > 0) {
       const contextPrompt = this.generateContextPrompt(context);
       if (contextPrompt) {
@@ -212,8 +221,8 @@ Alou 的个性与价值观：
       }
     }
 
-    // 7. 最终指令
-    parts.push('\n请根据以上信息，以符合你身份的方式与用户互动。');
+    // 8. 最终指令
+    parts.push('\n请根据以上信息，以符合你身份的方式与用户互动。当需要执行具体操作时，请调用相应的工具。');
 
     return parts.join('\n');
   }
@@ -223,26 +232,28 @@ Alou 的个性与价值观：
    * @param agentInfo - 智能体信息
    * @param message - 用户消息
    * @param context - 上下文
+   * @param tools - 可用工具列表
    * @returns 动态系统Prompt
    */
   generateDynamicSystemPrompt(
     agentInfo: AgentInfo,
     message: string,
-    context: PromptContext = {}
+    context: PromptContext = {},
+    tools: Array<{name: string, description: string}> = []
   ): string {
-    const basePrompt = this.generateCustomAgentPrompt(agentInfo, context);
-    
+    const basePrompt = this.generateCustomAgentPrompt(agentInfo, context, {}, tools);
+
     // 分析消息内容，添加动态指导
     const messageAnalysis = this.analyzeMessage(message);
-    
+
     const dynamicParts: string[] = [basePrompt];
 
     if (messageAnalysis.isQuestion) {
-      dynamicParts.push('\n用户正在提问，请提供清晰、准确的答案。');
+      dynamicParts.push('\n用户正在提问，请提供清晰、准确的答案。如果需要额外信息或执行操作，请使用适当的工具。');
     }
 
     if (messageAnalysis.needsHelp) {
-      dynamicParts.push('\n用户需要帮助，请主动提供协助和指导。');
+      dynamicParts.push('\n用户需要帮助，请主动提供协助和指导。根据具体情况调用适当的工具来完成任务。');
     }
 
     if (messageAnalysis.isCreative) {
@@ -250,7 +261,13 @@ Alou 的个性与价值观：
     }
 
     if (messageAnalysis.isTechnical) {
-      dynamicParts.push('\n用户询问技术问题，请提供专业、详细的技术解答。');
+      dynamicParts.push('\n用户询问技术问题，请提供专业、详细的技术解答。如有需要，可使用工具进行验证或演示。');
+    }
+
+    // 根据消息内容推断可能需要的工具
+    const suggestedTools = this.suggestToolsFromMessage(message, tools);
+    if (suggestedTools.length > 0) {
+      dynamicParts.push(`\n根据用户请求，可能需要使用以下工具：${suggestedTools.join(', ')}。`);
     }
 
     return dynamicParts.join('\n');
@@ -261,14 +278,16 @@ Alou 的个性与价值观：
    * @param workflowType - 工作流类型
    * @param agentInfo - 智能体信息
    * @param context - 上下文
+   * @param tools - 可用工具列表
    * @returns 工作流Prompt
    */
   generateWorkflowPrompt(
     workflowType: 'interactive' | 'auto' | 'parallel',
     agentInfo: AgentInfo,
-    context: PromptContext = {}
+    context: PromptContext = {},
+    tools: Array<{name: string, description: string}> = []
   ): string {
-    const basePrompt = this.generateCustomAgentPrompt(agentInfo, context);
+    const basePrompt = this.generateCustomAgentPrompt(agentInfo, context, {}, tools);
 
     const workflowInstructions = {
       interactive: `
@@ -276,21 +295,24 @@ Alou 的个性与价值观：
 - 逐步引导用户完成任务
 - 每个步骤都等待用户确认
 - 提供清晰的进度反馈
-- 允许用户随时调整方向`,
+- 允许用户随时调整方向
+- 在每个步骤中，根据需要调用适当的工具来完成任务`,
 
       auto: `
 工作流模式：自动
 - 自动分析任务需求
 - 独立执行所有步骤
 - 在关键节点向用户汇报
-- 遇到问题时主动寻求解决方案`,
+- 遇到问题时主动寻求解决方案
+- 优先使用工具来获取信息和执行操作，而不是猜测`,
 
       parallel: `
 工作流模式：并行
 - 将大任务拆分为子任务
 - 同时处理多个子任务
 - 协调各子任务的执行
-- 汇总最终结果`,
+- 汇总最终结果
+- 每个子任务都可以独立使用工具来完成其目标`,
     };
 
     return `${basePrompt}\n${workflowInstructions[workflowType]}`;
@@ -321,6 +343,46 @@ Alou 的个性与价值观：
     }
 
     return traits.join('、');
+  }
+
+  /**
+   * 生成工具能力Prompt
+   * @param tools - 可用工具列表
+   * @returns 工具能力描述
+   */
+  generateToolCapabilityPrompt(tools: Array<{name: string, description: string}> = []): string {
+    if (!tools || tools.length === 0) {
+      return `当前AI助手可以使用所有可用的工具来完成任务。`;
+    }
+
+    // 生成详细的工具描述
+    const detailedToolDescriptions = tools.map(tool => {
+      const toolDesc = getToolDescription(tool.name);
+      return `- **${tool.name}**: ${toolDesc.description || tool.description}\n  - 用途: ${toolDesc.usage?.join(', ') || '通用功能'}`;
+    }).join('\n');
+
+    return `## 工具能力
+
+当前AI助手可以使用以下工具来完成任务：
+
+${detailedToolDescriptions}
+
+### 工具使用指导：
+1. **分析任务需求**：首先分析用户请求，确定需要使用哪些工具
+2. **选择合适工具**：根据任务类型选择最合适的工具
+3. **构建工具参数**：构造正确的工具调用参数
+4. **执行工具调用**：执行工具并等待结果
+5. **处理结果**：根据工具返回结果进行相应处理
+
+### 工具分类：
+- **网络通信类**：iroh、message_passing、pubsub - 用于P2P网络通信和消息传递
+- **界面控制类**：ui_control - 用于控制桌面应用程序界面
+- **浏览器类**：browser - 用于网页浏览和自动化操作
+- **系统类**：filesystem、bash、search - 用于文件系统和系统操作
+- **钱包类**：wallet_manager、agent_wallet - 用于钱包管理
+- **AI类**：skills - 用于扩展AI能力
+
+当需要执行具体操作时，请调用相应的工具。`;
   }
 
   /**
@@ -407,6 +469,58 @@ Alou 的个性与价值观：
   }
 
   /**
+   * 根据消息内容建议可能需要的工具
+   */
+  private suggestToolsFromMessage(message: string, tools: Array<{name: string, description: string}> = []): string[] {
+    const lowerMessage = message.toLowerCase();
+    const suggestedTools: string[] = [];
+
+    // 根据关键词匹配可能需要的工具
+    for (const tool of tools) {
+      // 检查工具名称和描述中是否包含相关关键词
+      const toolInfo = `${tool.name} ${tool.description}`.toLowerCase();
+
+      // 网络通信相关
+      if ((lowerMessage.includes('网络') || lowerMessage.includes('p2p') || lowerMessage.includes('peer') || lowerMessage.includes('message')) &&
+          (toolInfo.includes('iroh') || toolInfo.includes('message') || toolInfo.includes('pubsub'))) {
+        suggestedTools.push(tool.name);
+      }
+      // 界面控制相关
+      else if ((lowerMessage.includes('界面') || lowerMessage.includes('按钮') || lowerMessage.includes('点击') || lowerMessage.includes('ui')) &&
+               toolInfo.includes('control')) {
+        suggestedTools.push(tool.name);
+      }
+      // 浏览器相关
+      else if ((lowerMessage.includes('浏览') || lowerMessage.includes('网页') || lowerMessage.includes('网站') || lowerMessage.includes('browser')) &&
+               toolInfo.includes('browser')) {
+        suggestedTools.push(tool.name);
+      }
+      // 文件系统相关
+      else if ((lowerMessage.includes('文件') || lowerMessage.includes('目录') || lowerMessage.includes('filesystem')) &&
+               (toolInfo.includes('filesystem') || toolInfo.includes('file'))) {
+        suggestedTools.push(tool.name);
+      }
+      // 搜索相关
+      else if ((lowerMessage.includes('搜索') || lowerMessage.includes('查找') || lowerMessage.includes('search')) &&
+               toolInfo.includes('search')) {
+        suggestedTools.push(tool.name);
+      }
+      // 终端相关
+      else if ((lowerMessage.includes('命令') || lowerMessage.includes('terminal') || lowerMessage.includes('bash')) &&
+               toolInfo.includes('bash')) {
+        suggestedTools.push(tool.name);
+      }
+      // 钱包相关
+      else if ((lowerMessage.includes('钱包') || lowerMessage.includes('wallet') || lowerMessage.includes('balance')) &&
+               (toolInfo.includes('wallet') || toolInfo.includes('balance'))) {
+        suggestedTools.push(tool.name);
+      }
+    }
+
+    return suggestedTools;
+  }
+
+  /**
    * 验证Prompt质量
    */
   validatePrompt(prompt: string): {
@@ -480,9 +594,9 @@ const promptService = new PromptService();
 
 export default promptService;
 export { PromptService };
-export type { 
-  PromptConfig, 
+export type {
+  PromptConfig,
   CustomPromptOptions,
-  AgentInfo, 
-  PromptContext 
+  AgentInfo,
+  PromptContext
 };

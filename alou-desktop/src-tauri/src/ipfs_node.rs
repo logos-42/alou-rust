@@ -166,9 +166,17 @@ pub async fn launch_ipfs_node(
             // 如果我们的进程不存在或已退出，说明是其他实例
             let mut is_our_instance = false;
             if let Some(ref mut proc) = ipfs_state.process {
-                if let Ok(None) = proc.try_wait() {
-                    // 我们的进程还在运行
-                    is_our_instance = true;
+                match proc.try_wait() {
+                    Ok(status) => {
+                        if status.is_none() {
+                            // 我们的进程还在运行
+                            is_our_instance = true;
+                        }
+                    }
+                    Err(_) => {
+                        // 如果无法检查进程状态，假设它仍在运行
+                        is_our_instance = true;
+                    }
                 }
             }
             

@@ -1,12 +1,15 @@
 import { create } from 'zustand'
-import { 
-  setGroupChatData, 
-  getGroupChatData, 
-  setActiveGroupId, 
+import {
+  setGroupChatData,
+  getGroupChatData,
+  setActiveGroupId,
   getActiveGroupId,
   getKeys,
   removeItem
 } from '../utils/storageAdapter'
+
+// Export the store type for use elsewhere
+export type { ClusterActionStore } from './clusterActionStore.types'
 
 /**
  * 集群行动状态管理 Store
@@ -495,6 +498,11 @@ const useClusterActionStore = create<ClusterActionStore>((set, get) => ({
         actionDetails,
       }
     })
+    },
+
+  // 获取当前状态（供外部使用）
+  getState: (): ClusterActionState => {
+    return get()
   },
 
   // 清除所有数据

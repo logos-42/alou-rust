@@ -14,7 +14,7 @@ interface AgentInfo {
 interface ToolCategory {
   name: string;
   description?: string;
-  tools?: any[];
+  tools?: unknown[];
 }
 
 export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -84,7 +84,7 @@ export const resolveAgentAvatar = (agent: Agent | null | undefined): string => {
 
   // 只在启动时输出一次调试日志
   if (!resolveAgentAvatar.hasLogged) {
-    console.log('[resolveAgentAvatar] 开始解析头像:', {
+    console.warn('[resolveAgentAvatar] 开始解析头像:', {
       id: agent.id,
       name: agent.name || agent.display_name,
       hasAvatar: !!agent.avatar,
@@ -175,7 +175,7 @@ export const buildChannelFromAgent = (agent: Agent | null): Channel | null => {
 
   // 只在启动时输出一次调试日志
   if (!buildChannelFromAgent.hasLogged) {
-    console.log('[buildChannelFromAgent] 开始构建频道:', {
+    console.warn('[buildChannelFromAgent] 开始构建频道:', {
       id: agent.id,
       name: agent.name || agent.display_name,
       hasAvatar: !!agent.avatar,

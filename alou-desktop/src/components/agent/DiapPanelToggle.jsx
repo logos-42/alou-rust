@@ -6,22 +6,18 @@ import './DiapPanelToggle.css'
 function DiapPanelToggle({
   sessionId,
   selectedAgent,
-  isSidebarCollapsed,
+  _isSidebarCollapsed,
   isDarkMode,
   showPanel,
   onToggle,
   onClosePanel,
 }) {
-  if (!sessionId) {
-    return null
-  }
-
   const toggleButtonRef = useRef(null)
   const panelRef = useRef(null)
 
   useEffect(() => {
-    if (!showPanel) {
-      return undefined
+    if (!sessionId || !showPanel) {
+      return
     }
 
     const handlePointerDown = (event) => {
@@ -50,7 +46,11 @@ function DiapPanelToggle({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showPanel, onClosePanel])
+  }, [sessionId, showPanel, onClosePanel])
+
+  if (!sessionId) {
+    return null
+  }
 
   return (
     <>

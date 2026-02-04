@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import clusterActionService from '@/services/clusterActionService'
 import useClusterActionStore from '@/stores/clusterActionStore'
 import { useDiapGroupChat } from '@/hooks/useDiapGroupChat'
-import { Channel, Agent } from '@/shared/types'
+import type { Channel, Agent } from './agentUtils'
 
 interface UseAgentInviteOptions {
   deleteChannel: (channel: Channel) => void
@@ -38,7 +38,7 @@ export const useAgentInvite = ({
   // DIAP群聊Hook
   const diapGroupChat = useDiapGroupChat({
     localIdentity,
-    onGroupCreated: (group, agents) => {
+    onGroupCreated: (group: { groupName: string; groupId: string }, agents: Agent[]) => {
       console.log('[useAgentInvite] DIAP群聊创建成功:', group.groupName, agents.length, '个智能体')
       recordInteraction('diap_group_created', {
         groupId: group.groupId,
@@ -46,14 +46,14 @@ export const useAgentInvite = ({
         agentCount: agents.length
       })
     },
-    onAgentJoined: (groupId, agent) => {
+    onAgentJoined: (groupId: string, agent: Agent) => {
       console.log('[useAgentInvite] 智能体加入群聊:', agent.name, groupId)
       recordInteraction('agent_joined_group', {
         groupId,
         agentName: agent.name
       })
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('[useAgentInvite] DIAP群聊错误:', error)
       recordInteraction('diap_group_error', {
         error: error.message
@@ -184,14 +184,14 @@ export const useAgentInvite = ({
             {
               id: (channel.meta?.ipns || channel.meta?.cid || channel.meta?.did || channel.id) as string,
               name: channel.name,
-              avatar: channel.avatar || channel.avatar_url,
-              avatar_url: channel.avatar || channel.avatar_url,
-              avatar_cid: channel.avatar_cid,
-              mode: channel.mode || 'agent',
+              avatar: channel.avatar || (channel as any).avatar_url,
+              avatar_url: channel.avatar || (channel as any).avatar_url,
+              avatar_cid: (channel as any).avatar_cid,
+              mode: (channel as any).mode || 'agent',
             },
             ...agents.map(a => ({
               id: (a.ipns || a.cid || a.did || a.id) as string,
-              name: a.display_name || a.name,
+              name: a.display_name || a.name || '',
               avatar: a.avatar || a.avatar_url,
               avatar_url: a.avatar || a.avatar_url,
               avatar_cid: a.avatar_cid,
@@ -265,23 +265,22 @@ export const useAgentInvite = ({
           actionId = action.action_id
           
           // 确保后端返回的 action 有正确的 metadata
-          if (!action.metadata) {
-            action.metadata = {}
-          }
-          if (!action.metadata.type) {
-            action.metadata.type = 'group_chat'
+          const metadata = (action as any).metadata || {}
+          if (!metadata.type) {
+            metadata.type = 'group_chat'
           }
           // 确保有 channel_id
-          if (!action.metadata.channel_id) {
-            action.metadata.channel_id = channel.id
+          if (!metadata.channel_id) {
+            metadata.channel_id = channel.id
           }
-          if (!action.metadata.channel_name) {
-            action.metadata.channel_name = channel.name
+          if (!metadata.channel_name) {
+            metadata.channel_name = channel.name
           }
+          ;(action as any).metadata = metadata
           
           // 关键修复：确保 agents 数据直接存在于 action 中
           // 后端可能不会自动设置 agents 字段，所以我们需要手动设置
-          action.agents = agents.map(a => ({
+          ;(action as any).agents = agents.map(a => ({
             id: (a.ipns || a.cid || a.did || a.id) as string,
             agent_id: (a.ipns || a.cid || a.did || a.id) as string,
             did: a.did,
@@ -303,15 +302,13 @@ export const useAgentInvite = ({
           
           // 创建集群行动后立即执行，以创建 pubsub topic
           try {
-            const walletAddress =
-              typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-            const chain =
-              typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') : null
-            
+            const walletAddress = (typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : '') || ''
+            const chain = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') || undefined : undefined
+
             // 执行集群行动（这会创建 pubsub topic）
             await clusterActionService.executeClusterAction(
               actionId,
-              walletAddress,
+              walletAddress || '',
               chain || undefined,
             )
           } catch (executeError) {

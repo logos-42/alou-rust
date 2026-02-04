@@ -345,13 +345,13 @@ export class WorkflowSkill {
 
     return {
       success: true,
-      execution_result: result.result,
-      steps: result.steps,
+      execution_result: (result as any).result || undefined,
+      steps: (result as any).steps || undefined,
       message: result.message,
       details: {
         workflow_id,
-        status: (result.result as Record<string, unknown>)?.status || 'unknown',
-        step_count: result.steps?.length || 0
+        status: (result as Record<string, unknown>)?.result?.status || 'unknown',
+        step_count: (result as any).steps?.length || 0
       }
     };
   }
@@ -406,9 +406,9 @@ export class WorkflowSkill {
   /**
    * 删除工作流
    */
-  async deleteWorkflow(params: DeleteWorkflowParams): Promise<OperationResult> {
-    const { workflow_id } = params;
-    
+  async deleteWorkflow(params: Record<string, unknown>): Promise<OperationResult> {
+    const workflow_id = (params as any).workflow_id || '';
+
     const result = await workflowService.deleteWorkflow(workflow_id);
 
     if (!result.success) {
@@ -457,9 +457,9 @@ export class WorkflowSkill {
   /**
    * 暂停工作流
    */
-  async pauseWorkflow(params: PauseWorkflowParams): Promise<OperationResult> {
-    const { workflow_id } = params;
-    
+  async pauseWorkflow(params: Record<string, unknown>): Promise<OperationResult> {
+    const workflow_id = (params as any).workflow_id || '';
+
     const result = await workflowService.pauseWorkflow(workflow_id);
 
     if (!result.success) {
@@ -481,7 +481,7 @@ export class WorkflowSkill {
    */
   async resumeWorkflow(params: ResumeWorkflowParams): Promise<OperationResult> {
     const { workflow_id, api_key = '', agent_info = {} } = params;
-    
+
     const result = await workflowService.resumeWorkflow(
       workflow_id,
       api_key,

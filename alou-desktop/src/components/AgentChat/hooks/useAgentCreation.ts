@@ -136,6 +136,12 @@ export const useAgentCreation = ({
         const newAgent = result.data;
         console.log('[useAgentCreation] 智能体创建成功:', newAgent);
 
+        // 确保mode属性类型正确
+        const typedAgent: AgentInfo = {
+          ...newAgent,
+          mode: (newAgent.mode as 'agent' | 'alou') || 'agent',
+        };
+
         // 添加成功消息
         const successMessage: Message = {
           id: `msg_${Date.now()}`,
@@ -145,7 +151,7 @@ export const useAgentCreation = ({
         };
         appendMessage(successMessage);
 
-        return newAgent;
+        return typedAgent;
       } else {
         throw new Error(result.error || '创建智能体失败');
       }

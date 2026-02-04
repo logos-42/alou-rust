@@ -50,7 +50,6 @@ interface UseAlouWorkflowParams {
   sendMessage: (message: string, options?: any) => Promise<any>;
   handleToolCalls: (toolCalls: ToolCall[], options?: any) => Promise<void>;
   appendMessage: (message: string | Message) => void;
-  scrollToBottom: () => void;
   options?: WorkflowOptions;
 }
 
@@ -58,8 +57,7 @@ export function useAlouWorkflow({
   sendMessage,
   handleToolCalls,
   appendMessage,
-  scrollToBottom,
-  options = {}
+  options: _options = {}
 }: UseAlouWorkflowParams) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentMode, setCurrentMode] = useState(WorkflowMode.SMART);
@@ -72,15 +70,10 @@ export function useAlouWorkflow({
   // 初始化工作流服务
   useEffect(() => {
     if (!workflowServiceRef.current) {
-      workflowServiceRef.current = new WorkflowService({
-        mode: options.mode || WorkflowMode.SMART,
-        autoAnalyze: options.autoAnalyze !== false,
-        maxSteps: options.maxSteps || 10,
-        timeout: options.timeout || 30000,
-      });
+      workflowServiceRef.current = new WorkflowService();
       setIsInitialized(true);
     }
-  }, [options.mode, options.autoAnalyze, options.maxSteps, options.timeout]);
+  }, []);
 
   // 切换工作流模式
   const switchMode = useCallback(async (mode: WorkflowMode) => {
@@ -128,23 +121,23 @@ export function useAlouWorkflow({
       // 根据复杂度和当前模式选择最佳工作流
       let targetMode = currentMode;
       if (currentMode === WorkflowMode.SMART) {
-        targetMode = complexity.recommendedMode;
+        targetMode = complexity.recommendedMode as WorkflowMode;
       }
 
       // 生成系统提示
       let systemPrompt: string;
       switch (targetMode) {
         case WorkflowMode.INTERACTIVE:
-          systemPrompt = generateInteractiveSystemPrompt(complexity);
+          systemPrompt = generateInteractiveSystemPrompt();
           break;
         case WorkflowMode.AUTO:
-          systemPrompt = generateAutoSystemPrompt(complexity);
+          systemPrompt = generateAutoSystemPrompt();
           break;
         case WorkflowMode.PARALLEL:
-          systemPrompt = generateParallelSystemPrompt(complexity);
+          systemPrompt = generateParallelSystemPrompt();
           break;
         default:
-          systemPrompt = generateAutoSystemPrompt(complexity);
+          systemPrompt = generateAutoSystemPrompt();
       }
 
       // 发送消息给 AI

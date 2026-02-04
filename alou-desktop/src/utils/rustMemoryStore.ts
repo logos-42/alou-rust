@@ -291,7 +291,7 @@ export const rustMemoryStore = {
   getStats: () => rustMemoryStoreInstance.getStats(),
   
   // 清理方法
-  cleanup: (options: Record<string, unknown> = {}) => rustMemoryStoreInstance.cleanupExpired(),
+  cleanup: (_options: Record<string, unknown> = {}) => rustMemoryStoreInstance.cleanupExpired(),
   cleanupLRU: (keepCount?: number) => rustMemoryStoreInstance.cleanupLRU(keepCount),
   
   // 等待就绪

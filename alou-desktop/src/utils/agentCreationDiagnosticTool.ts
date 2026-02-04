@@ -3,7 +3,10 @@
  * 用于诊断DIAP身份创建失败和头像同化问题
  */
 
-import { getDiapIdentitySafe, hasDiapIdentitySafe, DiapIdentity } from '@/utils/diapIdentityManager'
+import { getDiapIdentitySafe, hasDiapIdentitySafe } from '@/utils/diapIdentityManager'
+
+// Suppress unused import warning
+// type DiapIdentity = import('@/utils/diapIdentityManager').DiapIdentity
 import useAgentStore from '@/stores/agentStore'
 import { resolveAgentAvatar, Agent } from '@/components/AgentChat/agentUtils'
 
@@ -124,37 +127,38 @@ class AgentCreationDiagnosticTool {
    */
   async checkAvatarStatus(sessionId: string): Promise<void> {
     console.log('🔍 检查头像状态...')
-    
+
     try {
       // 获取智能体信息
       const agents = useAgentStore.getState().agents
-      const agent = agents.find((a: Agent) => a.sessionId === sessionId)
-      
+      const agent = agents.find((a) => a.sessionId === sessionId)
+
       if (!agent) {
         console.log('❌ 未找到对应的智能体')
         this.diagnosticResults.errors.push('未找到对应的智能体')
         return
       }
-      
-      // 分析头像源
+
+      // 分析头像源（使用类型断言来处理AgentMetadata）
+      const agentData = agent as Agent
       this.diagnosticResults.avatarSources = {
-        avatar: agent.avatar,
-        avatar_url: agent.avatar_url,
-        avatar_cid: agent.avatar_cid,
-        avatarCid: agent.avatarCid,
-        diapIdentity: agent.diapIdentity?.avatar_cid,
-        serviceEndpoint: agent.serviceEndpoint?.avatar_cid,
-        didDocument: agent.did_document?.service?.find((s: { serviceEndpoint?: { avatar_cid?: string } }) => s.serviceEndpoint?.avatar_cid)?.serviceEndpoint?.avatar_cid
+        avatar: agentData.avatar || undefined,
+        avatar_url: agentData.avatar_url || undefined,
+        avatar_cid: agentData.avatar_cid,
+        avatarCid: agentData.avatarCid || undefined,
+        diapIdentity: agentData.diapIdentity?.avatar_cid,
+        serviceEndpoint: agentData.serviceEndpoint?.avatar_cid,
+        didDocument: agentData.did_document?.service?.find((s: { serviceEndpoint?: { avatar_cid?: string } }) => s.serviceEndpoint?.avatar_cid)?.serviceEndpoint?.avatar_cid
       }
-      
+
       // 解析头像
-      const resolvedAvatar = resolveAgentAvatar(agent)
+      const resolvedAvatar = resolveAgentAvatar(agentData)
       console.log('📊 头像解析结果:', {
         resolvedAvatar,
         sources: this.diagnosticResults.avatarSources,
         isFallback: resolvedAvatar === this.getFallbackAvatar()
       })
-      
+
       // 检查头像是否正确
       this.diagnosticResults.avatarCorrect = resolvedAvatar !== this.getFallbackAvatar()
       
@@ -176,11 +180,11 @@ class AgentCreationDiagnosticTool {
    */
   async checkDataStorage(sessionId: string): Promise<void> {
     console.log('🔍 检查数据存储状态...')
-    
+
     try {
       // 检查agentStore中的数据
       const agents = useAgentStore.getState().agents
-      const agent = agents.find((a: Agent) => a.sessionId === sessionId)
+      const agent = agents.find((a) => a.sessionId === sessionId)
       
       if (agent) {
         console.log('📊 AgentStore数据:', {
