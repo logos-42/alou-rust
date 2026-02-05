@@ -131,14 +131,14 @@ const addCorsHeaders = (response: Response, headers: Record<string, string> = {}
   const corsHeaders = new Headers(response.headers);
   corsHeaders.set('Access-Control-Allow-Origin', '*');
   corsHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  corsHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  corsHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, signal');
   corsHeaders.set('Access-Control-Max-Age', '86400');
-  
+
   // 合并额外的 headers
   Object.entries(headers).forEach(([key, value]) => {
     corsHeaders.set(key, value);
   });
-  
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -490,7 +490,7 @@ export default {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization, signal',
           'Access-Control-Max-Age': '86400',
         },
       });

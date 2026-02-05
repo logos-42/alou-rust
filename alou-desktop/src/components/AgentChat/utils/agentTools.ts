@@ -6,7 +6,7 @@
  * @param {object} agentInfo - 智能体信息
  * @returns {string[]} 工具类别数组
  */
-export const getToolCategoriesByMode = (mode, agentInfo) => {
+export const getToolCategoriesByMode = (mode: string, agentInfo: any) => {
   console.log('[getToolCategoriesByMode] 参数:', { mode, hasAgentInfo: !!agentInfo });
 
   switch (mode) {
@@ -16,7 +16,7 @@ export const getToolCategoriesByMode = (mode, agentInfo) => {
 
     case 'agent':
       // Agent模式：通用智能体，支持文件操作、终端、网络、搜索、计划管理等
-      return ['CORE', 'NETWORK', 'CONTROL_FLOW', 'FILESYSTEM', 'SEARCH', 'PLANNING'];
+      return ['CORE', 'NETWORK', 'CONTROL_FLOW', 'FILESYSTEM', 'SEARCH', 'PLANNING', 'AGENT', 'DEVELOPMENT'];
 
     case 'group_chat':
       // 群聊模式：简化工具集，避免复杂操作
@@ -33,7 +33,7 @@ export const getToolCategoriesByMode = (mode, agentInfo) => {
  * @param {string[]} categories - 工具类别数组
  * @returns {object[]} 工具对象数组
  */
-export const getToolsByCategories = (categories) => {
+export const getToolsByCategories = (categories: string[]) => {
   console.log('[getToolsByCategories] 请求的类别:', categories);
 
   try {
@@ -111,6 +111,59 @@ export const getToolsByCategories = (categories) => {
         }
       },
 
+      // Git助手工具
+      git_helper: {
+        name: "git_helper",
+        description: "Git版本控制操作助手。支持提交、分支、合并、远程操作等Git功能。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "Git操作类型", enum: ["status", "add", "commit", "push", "pull", "branch", "merge", "checkout", "log", "diff"] },
+            files: { type: "array", description: "文件列表（add操作需要）", items: { type: "string" } },
+            message: { type: "string", description: "提交消息（commit操作需要）" },
+            branch_name: { type: "string", description: "分支名称（branch/checkout操作需要）" },
+            remote: { type: "string", description: "远程仓库名称（push/pull操作可选）" },
+            target_branch: { type: "string", description: "目标分支（merge操作需要）" }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // 网络工具
+      network: {
+        name: "network",
+        description: "网络操作和请求。支持HTTP请求、DNS查询、网络连接测试等。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "网络操作类型", enum: ["http_request", "dns_query", "ping", "download"] },
+            url: { type: "string", description: "URL地址（http_request/download操作需要）" },
+            method: { type: "string", description: "HTTP方法（http_request操作可选）", enum: ["GET", "POST", "PUT", "DELETE"], default: "GET" },
+            headers: { type: "object", description: "请求头（http_request操作可选）" },
+            body: { type: "string", description: "请求体（http_request操作可选）" },
+            domain: { type: "string", description: "域名（dns_query操作需要）" },
+            host: { type: "string", description: "主机地址（ping操作需要）" },
+            save_path: { type: "string", description: "保存路径（download操作需要）" }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // 系统工具
+      system: {
+        name: "system",
+        description: "系统信息和操作。支持系统状态查询、进程管理、环境变量等。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "系统操作类型", enum: ["info", "processes", "environment", "memory", "disk", "network_status"] },
+            process_id: { type: "number", description: "进程ID（进程操作时可选）" },
+            variable_name: { type: "string", description: "环境变量名称（获取环境变量时可选）" }
+          },
+          required: ["operation"]
+        }
+      },
+
       // 计划和任务管理工具
       plan: {
         name: "plan",
@@ -159,70 +212,6 @@ export const getToolsByCategories = (categories) => {
           required: ["action"]
         }
       },
-      read: {
-        name: "read",
-        description: "读取工作目录中的任何文件内容。",
-        parameters: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "文件路径" },
-            encoding: { type: "string", description: "文件编码（可选）", enum: ["utf-8", "binary", "base64"] }
-          },
-          required: ["path"]
-        }
-      },
-      write: {
-        name: "write",
-        description: "创建新文件并写入内容。",
-        parameters: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "文件路径" },
-            content: { type: "string", description: "文件内容" },
-            encoding: { type: "string", description: "文件编码（可选）", enum: ["utf-8", "binary", "base64"] }
-          },
-          required: ["path", "content"]
-        }
-      },
-      edit: {
-        name: "edit",
-        description: "差分编辑。支持对已有文件进行精确修改。",
-        parameters: {
-          type: "object",
-          properties: {
-            path: { type: "string", description: "文件路径" },
-            old_string: { type: "string", description: "要替换的旧字符串" },
-            new_string: { type: "string", description: "替换后的新字符串" },
-            replace_all: { type: "boolean", description: "是否替换所有匹配项（可选）" }
-          },
-          required: ["path", "old_string", "new_string"]
-        }
-      },
-      glob: {
-        name: "glob",
-        description: "文件检索。支持使用模式匹配查找文件。",
-        parameters: {
-          type: "object",
-          properties: {
-            pattern: { type: "string", description: "glob模式" },
-            target_directory: { type: "string", description: "目标目录（可选）" }
-          },
-          required: ["pattern"]
-        }
-      },
-      grep: {
-        name: "grep",
-        description: "内容搜索。使用正则表达式在文件内容中搜索文本。",
-        parameters: {
-          type: "object",
-          properties: {
-            pattern: { type: "string", description: "正则表达式模式" },
-            path: { type: "string", description: "文件或目录路径" },
-            case_insensitive: { type: "boolean", description: "是否忽略大小写（可选）" }
-          },
-          required: ["pattern", "path"]
-        }
-      },
 
       // 网络工具
       web_search: {
@@ -238,6 +227,7 @@ export const getToolsByCategories = (categories) => {
           required: ["query"]
         }
       },
+
       web_fetch: {
         name: "web_fetch",
         description: "获取并解析网页的Markdown内容。",
@@ -263,6 +253,7 @@ export const getToolsByCategories = (categories) => {
           required: ["question"]
         }
       },
+
       subagents: {
         name: "subagents",
         description: "创建'子Agent'来并行处理特定任务。",
@@ -291,6 +282,7 @@ export const getToolsByCategories = (categories) => {
           required: ["address", "network"]
         }
       },
+
       build_transaction: {
         name: "build_transaction",
         description: "构建区块链交易。",
@@ -305,6 +297,7 @@ export const getToolsByCategories = (categories) => {
           required: ["from", "to", "amount", "network"]
         }
       },
+
       broadcast_transaction: {
         name: "broadcast_transaction",
         description: "广播交易到区块链网络。",
@@ -317,6 +310,7 @@ export const getToolsByCategories = (categories) => {
           required: ["transaction", "network"]
         }
       },
+
       wallet_manager: {
         name: "wallet_manager",
         description: "管理多个钱包地址。",
@@ -330,6 +324,7 @@ export const getToolsByCategories = (categories) => {
           required: ["action"]
         }
       },
+
       agent_wallet: {
         name: "agent_wallet",
         description: "智能体专用钱包操作。",
@@ -343,27 +338,111 @@ export const getToolsByCategories = (categories) => {
           },
           required: ["action"]
         }
+      },
+
+      // Agent Skills工具
+      agent_skills: {
+        name: "agent_skills",
+        description: "管理和执行标准 Agent Skills 协议技能。支持 SKILL.md 格式、Progressive Disclosure 和脚本执行。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "技能操作类型", enum: ["list", "execute", "discover", "validate", "install"] },
+            skill_name: { type: "string", description: "技能名称（execute/validate/install操作需要）" },
+            parameters: { type: "object", description: "技能参数（execute操作需要）" },
+            query: { type: "string", description: "搜索查询（discover操作可选）" },
+            skill_url: { type: "string", description: "技能URL（install操作需要）" }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // Agent协作工具
+      agent_collaboration: {
+        name: "agent_collaboration",
+        description: "Agent间协作和通信。支持IPFS分布式协作、消息传递、任务共享。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "协作操作类型", enum: ["create_session", "join_session", "send_message", "share_task", "get_status"] },
+            session_id: { type: "string", description: "会话ID（join_session/send_message/share_task/get_status操作需要）" },
+            message: { type: "string", description: "消息内容（send_message操作需要）" },
+            task_data: { type: "object", description: "任务数据（share_task操作需要）" },
+            agent_did: { type: "string", description: "Agent DID（create_session操作可选）" }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // Agent创建工具
+      agent_creator: {
+        name: "agent_creator",
+        description: "创建和管理子Agent。支持动态创建、配置管理、生命周期控制。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "创建操作类型", enum: ["create", "configure", "start", "stop", "list", "delete"] },
+            agent_config: { type: "object", description: "Agent配置（create操作需要）" },
+            agent_id: { type: "string", description: "Agent ID（configure/start/stop/delete操作需要）" },
+            config_updates: { type: "object", description: "配置更新（configure操作需要）" }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // 工具创建工具
+      tool_creation: {
+        name: "tool_creation",
+        description: "动态创建和注册自定义工具。支持工具模板、代码生成、热更新。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "创建操作类型", enum: ["create", "register", "unregister", "list", "update"] },
+            tool_definition: { type: "object", description: "工具定义（create/register操作需要）" },
+            tool_id: { type: "string", description: "工具ID（unregister/update操作需要）" },
+            template_type: { type: "string", description: "模板类型（create操作可选）", enum: ["basic", "advanced", "api", "filesystem"] }
+          },
+          required: ["operation"]
+        }
+      },
+
+      // 回滚工具
+      rollback: {
+        name: "rollback",
+        description: "操作回滚和状态恢复。支持事务回滚、文件恢复、状态重置。",
+        parameters: {
+          type: "object",
+          properties: {
+            operation: { type: "string", description: "回滚操作类型", enum: ["create_checkpoint", "rollback", "list_checkpoints", "delete_checkpoint"] },
+            checkpoint_id: { type: "string", description: "检查点ID（rollback/delete_checkpoint操作需要）" },
+            target_state: { type: "string", description: "目标状态（rollback操作可选）" },
+            description: { type: "string", description: "检查点描述（create_checkpoint操作可选）" }
+          },
+          required: ["operation"]
+        }
       }
     };
 
     // 工具类别映射
     const CATEGORY_TOOLS = {
-      CORE: ["bash", "read", "write", "edit", "glob", "grep", "filesystem"],
+      CORE: ["bash", "filesystem", "search", "git_helper", "network", "system"],
       NETWORK: ["web_search", "web_fetch"],
       CONTROL_FLOW: ["plan", "ask_user_question", "subagents"],
       WEB3: ["query_blockchain", "build_transaction", "broadcast_transaction", "wallet_manager", "agent_wallet"],
       FILESYSTEM: ["filesystem"],
       SEARCH: ["search"],
-      PLANNING: ["plan", "todolist"]
+      PLANNING: ["plan", "todolist"],
+      AGENT: ["agent_skills", "agent_collaboration", "agent_creator"],
+      DEVELOPMENT: ["tool_creation", "rollback"]
     };
 
-    const tools = [];
-    const seen = new Set();
+    const tools: any[] = [];
+    const seen = new Set<string>();
 
     categories.forEach(category => {
       const categoryTools = CATEGORY_TOOLS[category.toUpperCase()] || [];
       categoryTools.forEach(toolName => {
-        const tool = SIMPLE_TOOLS[toolName];
+        const tool = SIMPLE_TOOLS[toolName as keyof typeof SIMPLE_TOOLS];
         if (tool && !seen.has(tool.name)) {
           seen.add(tool.name);
           tools.push({ ...tool });
@@ -372,7 +451,7 @@ export const getToolsByCategories = (categories) => {
     });
 
     console.log('[getToolsByCategories] 获取到的工具数量:', tools.length);
-    console.log('[getToolsByCategories] 工具列表:', tools.map(t => t.name).join(', '));
+    console.log('[getToolsByCategories] 工具列表:', tools.map((t: any) => t.name).join(', '));
 
     return tools;
   } catch (error) {
