@@ -132,11 +132,11 @@ impl ToolBridge {
         // 注册Agent Skills工具
         let skills_tool = Arc::new(AgentSkillsTool::new()?);
         self.register_tool(skills_tool).await?;
-        
+
         // 注册Agent协作工具
-        let collab_tool = AgentCollaborationTool::new(())?;
-        let collab_tool_arc = Arc::new(collab_tool);
-        self.register_tool(collab_tool_arc).await?;
+        let ipfs_api_url = std::env::var("IPFS_API_URL").unwrap_or_else(|_| "http://127.0.0.1:5001".to_string());
+        let collab_tool = Arc::new(AgentCollaborationTool::new(ipfs_api_url));
+        self.register_tool(collab_tool).await?;
         
         // 注册Agent创建工具
         let agent_creator = Arc::new(AgentCreatorTool::new());
@@ -169,11 +169,10 @@ impl ToolBridge {
         // 注册浏览器工具
         let browser_tool = Arc::new(BrowserTool::new());
         self.register_tool(browser_tool).await?;
-        
+
         // 注册UI控制工具
-        let ui_tool = UIControlTool::new(())?;
-        let ui_tool_arc = Arc::new(ui_tool);
-        self.register_tool(ui_tool_arc).await?;
+        let ui_tool = Arc::new(UIControlTool::new(None));
+        self.register_tool(ui_tool).await?;
         
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())
