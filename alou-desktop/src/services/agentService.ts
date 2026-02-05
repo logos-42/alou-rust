@@ -615,7 +615,8 @@ class AgentService {
   }
 
   /**
-   * 直接查询Claude Agent（用于文档生成等场景）
+   * 直接查询 AI API（用于文档生成等场景）
+   * 使用后端 DeepSeek API 兼容性接口
    */
   async queryClaudeAgentDirect(params: {
     apiKey: string;
@@ -626,30 +627,34 @@ class AgentService {
     temperature: number;
   }): Promise<{ content: string; success: boolean }> {
     try {
-      console.log('[AgentService] 调用Claude Agent:', params.model);
+      console.log('[AgentService] 通过后端调用 AI API:', params.model);
 
-      const response = await apiClient.post('/claude/query', {
-        apiKey: params.apiKey,
-        prompt: params.prompt,
-        systemPrompt: params.systemPrompt,
-        model: params.model,
-        maxTokens: params.maxTokens,
-        temperature: params.temperature,
-      });
+      // 使用后端兼容性接口调用 DeepSeek
+      const payload = {
+        message: params.prompt,
+        system_prompt: params.systemPrompt,
+        session_id: `doc_gen_${Date.now()}`,
+        use_async: false, // 使用同步模式获取即时响应
+      };
+
+      const response = await apiClient.post('/agent/chat', payload);
 
       if (response.success && response.data) {
+        const content = response.data.response || response.data.content || '';
+        console.log('[AgentService] AI 响应成功，长度:', content.length);
         return {
-          content: response.data.content || response.data.response || '',
+          content,
           success: true,
         };
       }
 
+      console.warn('[AgentService] AI 响应失败:', response);
       return {
         content: '',
         success: false,
       };
     } catch (error) {
-      console.error('[AgentService] 调用Claude Agent失败:', error);
+      console.error('[AgentService] 调用 AI API 失败:', error);
       return {
         content: '',
         success: false,

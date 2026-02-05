@@ -360,7 +360,7 @@ impl Router {
             (Method::Post, "/api/agent/create-from-command") => {
                 agent::handle_create_agent_from_command(&self.session_manager, &env, req).await
             }
-            (Method::Post, "/api/agent/create_agent") => {
+            (Method::Post, "/api/agent/create") | (Method::Post, "/api/agent/create_agent") => {
                 agent::handle_create_agent(&self.session_manager, req).await
             }
             (Method::Post, "/api/agent/batch-create") => {

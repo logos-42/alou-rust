@@ -3,7 +3,7 @@
  * 使用 Markdown 文件定义智能体的性格、能力、约束等
  */
 
-import ipfsService from './ipfsService'
+import ipfsService from './ipfsContentService'
 
 /**
  * 文档类型枚举

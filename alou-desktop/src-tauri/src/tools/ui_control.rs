@@ -677,6 +677,6 @@ mod tests {
         });
         let get_result = tool.execute(get_args, &context).await.unwrap();
         assert!(get_result.success);
-        assert_eq!(get_result.data.as_ref().unwrap()["text"], "Hello, UI!");
+        assert_eq!(get_result.data["text"], "Hello, UI!");
     }
 }

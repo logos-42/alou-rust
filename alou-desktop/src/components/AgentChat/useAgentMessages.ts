@@ -266,7 +266,8 @@ export const useAgentMessages = ({
         ? channelMessages.slice(savedCount)
         : channelMessages
 
-      const cid = await agentService.uploadMessagesToIpfs?.(newMessages, agentId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const cid = await agentService.uploadMessagesToIpfs?.(newMessages as any[], agentId)
 
       // 更新 agentStore 中的 messages_cid
       if (cid && agentId) {

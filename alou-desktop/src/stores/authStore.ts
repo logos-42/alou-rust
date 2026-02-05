@@ -1,19 +1,13 @@
 import { create } from 'zustand'
 import Cookies from 'js-cookie'
-import { authService } from '@/services/authService'
-import { userService } from '@/services/userService'
+import { authService, type AuthResponse, type AuthUser } from '@/services/authService'
+import { userService, type User } from '@/services/userService'
 
-/**
- * 用户信息接口
- */
-export interface User {
-  id: string
-  email: string
-  name?: string
-  avatar_url?: string
-  created_at?: string
-  [key: string]: any
-}
+// Re-export types from services for convenience
+export type { User, AuthResponse }
+
+// Define User type alias for compatibility
+export type AuthUserType = AuthUser
 
 /**
  * 钱包信息接口
@@ -22,16 +16,6 @@ export interface WalletInfo {
   address: string
   chainId?: number
   walletType?: string
-}
-
-/**
- * 认证响应接口
- */
-export interface AuthResponse {
-  user: User
-  access_token: string
-  refresh_token?: string
-  token?: string // 兼容性字段
 }
 
 /**
@@ -332,13 +316,8 @@ const useAuthStore = create<AuthStore>((set, get) => ({
 
   logout: async (): Promise<void> => {
     try {
-      const refreshToken = Cookies.get('refresh_token')
-      // authService.logout may not expect a parameter
-      if (refreshToken) {
-        await authService.logout(refreshToken as any)
-      } else {
-        await authService.logout(undefined as any)
-      }
+      // authService.logout does not expect any parameters
+      await authService.logout()
     } catch (error) {
       console.error('Logout error:', error)
     } finally {

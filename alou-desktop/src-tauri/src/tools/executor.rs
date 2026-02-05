@@ -161,6 +161,12 @@ impl ToolExecutionManager {
         }
     }
 
+    /// 更新配置
+    pub fn update_config(&mut self, config: ToolConfig) {
+        println!("[ToolExecutionManager] Updating configuration");
+        self.config = config;
+    }
+
     /// 注册工具执行器
     pub fn register_executor(&mut self, tool_id: String, executor: Arc<dyn ToolExecutor>) {
         self.executors.insert(tool_id, executor);
@@ -335,6 +341,35 @@ impl ToolExecutionManager {
     /// 获取活跃执行数量
     pub async fn active_execution_count(&self) -> usize {
         *self.active_executions.lock().await
+    }
+
+    /// 获取所有执行上下文（用于执行历史）
+    pub async fn get_all_execution_contexts(&self, limit: usize) -> Vec<serde_json::Value> {
+        let contexts = self.contexts.lock().await;
+        let mut context_list: Vec<_> = contexts.values()
+            .map(|ctx| {
+                serde_json::json!({
+                    "execution_id": ctx.execution_id,
+                    "session_id": ctx.session_id,
+                    "tool_id": ctx.tool_id,
+                    "status": ctx.status,
+                    "start_time": ctx.start_time,
+                    "progress": ctx.progress,
+                    "intermediate_results_count": ctx.intermediate_results.len(),
+                })
+            })
+            .collect();
+
+        // 按时间倒序排列（最新的在前）
+        context_list.sort_by(|a, b| {
+            let time_a = a["start_time"].as_i64().unwrap_or(0);
+            let time_b = b["start_time"].as_i64().unwrap_or(0);
+            time_b.cmp(&time_a)
+        });
+
+        // 限制返回数量
+        context_list.truncate(limit);
+        context_list
     }
 
     /// 获取所有注册的工具

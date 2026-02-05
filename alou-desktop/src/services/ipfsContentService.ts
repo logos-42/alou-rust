@@ -333,6 +333,86 @@ export class IpfsContentService {
   }
 
   /**
+   * 添加文件到 IPFS (通过 Tauri 命令，避免 CORS 问题)
+   * @param file - 文件 Blob
+   * @param filename - 文件名
+   * @returns 上传结果，包含 cid
+   */
+  async addFile(file: Blob, filename?: string): Promise<{ cid: string; size?: number }> {
+    console.log(`[IpfsContentService] 添加文件到 IPFS (通过 Tauri): ${filename || 'unnamed'}`);
+
+    try {
+      // 使用 Tauri 命令上传到 IPFS
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      // 将 Blob 转为 base64
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const binaryString = uint8Array.reduce((data, byte) => {
+        return data + String.fromCharCode(byte);
+      }, '');
+      const base64 = btoa(binaryString);
+
+      // 调用 Rust 端上传文件
+      const result: any = await invoke('ipfs_add_base64', {
+        dataBase64: base64,
+        fileName: filename || 'file',
+      });
+
+      console.log(`[IpfsContentService] 文件添加成功: ${result.cid}`);
+      return { cid: result.cid, size: result.size };
+    } catch (error) {
+      console.error(`[IpfsContentService] 添加文件失败:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 上传文件到 IPFS (兼容旧版 API，与 addFile 相同)
+   * @param file - 文件对象
+   * @returns 上传结果，包含 cid
+   */
+  async uploadFile(file: File | Blob): Promise<{ cid: string; size?: number }> {
+    const filename = file instanceof File ? file.name : 'file';
+    return this.addFile(file, filename);
+  }
+
+  /**
+   * 获取文件 URL (兼容旧版 API)
+   * @param cid - 文件 CID
+   * @returns 文件的网关 URL
+   */
+  getFileUrl(cid: string): string {
+    // 使用默认网关构建 URL
+    const gateway = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
+    return `${gateway}/ipfs/${cid}`;
+  }
+
+  /**
+   * 获取文件内容
+   * @param cid - 文件 CID
+   * @returns 文件内容字符串
+   */
+  async getFileContent(cid: string): Promise<string> {
+    console.log(`[IpfsContentService] 获取文件内容: ${cid}`);
+
+    try {
+      const response = await fetch(`${DEFAULT_IPFS_API}/api/v0/cat?arg=${cid}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const content = await response.text();
+      console.log(`[IpfsContentService] 文件内容获取成功: ${cid}`);
+      return content;
+    } catch (error) {
+      console.error(`[IpfsContentService] 获取文件内容失败: ${cid}`, error);
+      throw error;
+    }
+  }
+
+  /**
    * 获取服务统计信息
    */
   getStats(): {
@@ -346,6 +426,8 @@ export class IpfsContentService {
         'getContentFromIpns',
         'resolveIpns',
         'uploadContent',
+        'addFile',
+        'getFileContent',
         'pinContent',
         'unpinContent',
         'isPinned',

@@ -537,8 +537,8 @@ mod tests {
         });
         let subscribe_result = tool.execute(subscribe_args, &context).await.unwrap();
         assert!(subscribe_result.success);
-        assert_eq!(subscribe_result.data.as_ref().unwrap()["messages"].as_array().unwrap().len(), 1);
-        assert_eq!(subscribe_result.data.as_ref().unwrap()["messages"][0]["message"], "Hello, pubsub world!");
+        assert_eq!(subscribe_result.data["messages"].as_array().unwrap().len(), 1);
+        assert_eq!(subscribe_result.data["messages"][0]["message"], "Hello, pubsub world!");
     }
 
     #[tokio::test]
@@ -576,7 +576,7 @@ mod tests {
         let list_result = tool.execute(list_args, &context).await.unwrap();
         assert!(list_result.success);
         
-        let topics = list_result.data.as_ref().unwrap()["topics"].as_array().unwrap();
+        let topics = list_result.data["topics"].as_array().unwrap();
         assert!(topics.len() >= 2);
     }
 }

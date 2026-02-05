@@ -102,16 +102,16 @@ export const useAgentInvite = ({
       if (localIdentity) {
         try {
           console.log('[useAgentInvite] 使用DIAP群聊创建')
-          
+
           const group = await diapGroupChat.createGroupWithAgents({
-            groupName: `${channel.name} 群聊`,
-            description: `频道 "${channel.name}" 的智能体协作群聊`,
+            groupName: `${channel.name || 'Unknown'} 群聊`,
+            description: `频道 "${channel.name || 'Unknown'}" 的智能体协作群聊`,
             agents: agents,
             channel: channel,
             metadata: {
               type: 'channel_group_chat',
               channelId: channel.id,
-              channelName: channel.name,
+              channelName: channel.name || null,
               source,
               isPublic: false,
               requireAuth: true
@@ -158,7 +158,7 @@ export const useAgentInvite = ({
       
       // 构建群聊描述
       const agentNames = agents.map(a => a.display_name || a.name || 'Agent').join(', ')
-      const groupDescription = `群聊: ${channel.name} + ${agentNames}`
+      const groupDescription = `群聊: ${channel.name || 'Unknown'} + ${agentNames}`
 
       // 内联的本地群聊创建函数
       const createLocalGroupChatInline = (): string => {
@@ -298,7 +298,9 @@ export const useAgentInvite = ({
           console.log('[useAgentInvite] 网络API创建的action - agents数量:', action.agents.length)
           
           addAction(action)
-          setActiveAction(actionId, channel.id)
+          if (actionId) {
+            setActiveAction(actionId, channel.id)
+          }
           
           // 创建集群行动后立即执行，以创建 pubsub topic
           try {
@@ -306,11 +308,13 @@ export const useAgentInvite = ({
             const chain = typeof window !== 'undefined' ? localStorage.getItem('wallet_chain_id') || undefined : undefined
 
             // 执行集群行动（这会创建 pubsub topic）
-            await clusterActionService.executeClusterAction(
-              actionId,
-              walletAddress || '',
-              chain || undefined,
-            )
+            if (actionId) {
+              await clusterActionService.executeClusterAction(
+                actionId,
+                walletAddress || '',
+                chain || undefined,
+              )
+            }
           } catch (executeError) {
             // 执行失败时静默处理，不影响群聊创建
             console.warn('[useAgentInvite] 执行集群行动失败（不影响群聊创建）:', executeError)

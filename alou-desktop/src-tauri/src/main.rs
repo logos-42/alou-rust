@@ -87,7 +87,7 @@ async fn execute_tool(
     tool_id: String,
     args: String,
     timeout: Option<u64>,
-    bridge_manager: tauri::State<'_, BridgeManager>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
     println!("[Tauri] Executing tool: {}", tool_id);
 
@@ -95,7 +95,8 @@ async fn execute_tool(
         .map_err(|e| format!("Invalid JSON args: {}", e))?;
 
     // Get tool bridge and execute tool
-    let tool_bridge = bridge_manager.tool_bridge();
+    let manager = bridge_manager.lock().await;
+    let tool_bridge = manager.tool_bridge();
 
     let request = crate::bridges::ToolCallRequest {
         session_id: "tauri_session".to_string(),
@@ -129,66 +130,48 @@ async fn execute_tool(
 
 #[tauri::command]
 async fn get_tool_list(
-    bridge_manager: tauri::State<'_, BridgeManager>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
-    // TODO: Get tool list from registry
-    Ok(serde_json::json!({
-        "tools": [
-            {
-                "id": "filesystem",
-                "name": "File System",
-                "category": "FileSystem",
-                "description": "File system operations"
-            },
-            {
-                "id": "search",
-                "name": "Search",
-                "category": "Search",
-                "description": "Text and file search"
-            },
-            {
-                "id": "bash",
-                "name": "Bash",
-                "category": "Terminal",
-                "description": "Terminal command execution"
-            },
-            {
-                "id": "plan",
-                "name": "Task Planning",
-                "category": "Planning",
-                "description": "Task planning and management"
-            },
-            {
-                "id": "skills",
-                "name": "Skills",
-                "category": "Skills",
-                "description": "Extensible skills system"
-            }
-        ]
-    }))
+    // 从 ToolBridge 获取工具列表
+    let manager = bridge_manager.lock().await;
+    let tools = manager.tool_bridge().list_tools().await;
+    Ok(serde_json::json!({ "tools": tools }))
 }
 
 #[tauri::command]
 async fn cancel_tool_execution(
     execution_id: String,
-    bridge_manager: tauri::State<'_, BridgeManager>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
-    // TODO: Implement cancellation
-    Ok(serde_json::json!({
-        "cancelled": true,
-        "execution_id": execution_id
-    }))
+    println!("[Tauri] Cancelling tool execution: {}", execution_id);
+
+    let manager = bridge_manager.lock().await;
+    let result = manager.tool_bridge().cancel_execution(&execution_id).await;
+
+    match result {
+        Ok(_) => Ok(serde_json::json!({
+            "cancelled": true,
+            "execution_id": execution_id,
+            "message": "Tool execution cancelled successfully"
+        })),
+        Err(e) => Err(format!("Failed to cancel execution: {}", e))
+    }
 }
 
 #[tauri::command]
 async fn get_execution_history(
     limit: Option<usize>,
-    bridge_manager: tauri::State<'_, BridgeManager>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
-    // TODO: Implement execution history
+    println!("[Tauri] Getting execution history (limit: {:?})", limit);
+
+    let manager = bridge_manager.lock().await;
+    let history = manager.tool_bridge().get_execution_history(limit.unwrap_or(50)).await;
+
     Ok(serde_json::json!({
-        "history": [],
-        "limit": limit.unwrap_or(50)
+        "history": history,
+        "limit": limit.unwrap_or(50),
+        "count": history.len()
     }))
 }
 
@@ -199,7 +182,7 @@ async fn agent_skills(
     skill_name: Option<String>,
     inputs: Option<serde_json::Value>,
     query: Option<String>,
-    bridge_manager: tauri::State<'_, BridgeManager>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
     let args = serde_json::json!({
         "action": action,
@@ -209,6 +192,8 @@ async fn agent_skills(
     });
     
     let execution_id = format!("agent_skills_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
+    
+    let manager = bridge_manager.lock().await;
     
     let request = crate::bridges::ToolCallRequest {
         session_id: "agent_skills_session".to_string(),
@@ -223,7 +208,7 @@ async fn agent_skills(
         permissions: vec!["read".to_string(), "write".to_string(), "execute".to_string()],
     };
     
-    let result = bridge_manager.tool_bridge().handle_request(request).await;
+    let result = manager.tool_bridge().handle_request(request).await;
     
     match result {
         Ok(response) => {
@@ -265,7 +250,7 @@ fn main() {
         .manage(KvState::new())
         .manage(WorkflowState::default())
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
-        .manage(create_default_bridge_manager())
+        .manage(std::sync::Arc::new(tokio::sync::Mutex::new(create_default_bridge_manager())))
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,

@@ -22,6 +22,10 @@ pub mod message_passing;
 pub mod pubsub_tool;
 pub mod ui_control;
 pub mod browser_tool;
+pub mod rollback;
+pub mod ipfs_archive;
+pub mod git_helper;
+pub mod agent_creator;
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -236,6 +240,30 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册浏览器工具
     let browser_tool = Arc::new(crate::tools::browser_tool::BrowserTool::new());
     registry.register(browser_tool).await?;
+
+    // 注册 Git 助手工具
+    let git_helper_tool = Arc::new(crate::tools::git_helper::GitHelperTool::new());
+    registry.register(git_helper_tool).await?;
+
+    // 注册回滚工具
+    let rollback_tool = Arc::new(crate::tools::rollback::RollbackTool::new());
+    registry.register(rollback_tool).await?;
+
+    // 注册网络工具
+    let network_tool = Arc::new(crate::tools::network::NetworkTool::new());
+    registry.register(network_tool).await?;
+
+    // 注册系统工具
+    let system_tool = Arc::new(crate::tools::system::SystemTool::new());
+    registry.register(system_tool).await?;
+
+    // 注册 IPFS 归档工具
+    let ipfs_archive_tool = Arc::new(crate::tools::ipfs_archive::IpfsArchiveTool::new());
+    registry.register(ipfs_archive_tool).await?;
+
+    // 注册智能体创建工具
+    let agent_creator_tool = Arc::new(crate::tools::agent_creator::AgentCreatorTool::new());
+    registry.register(agent_creator_tool).await?;
 
     Ok(registry)
 }

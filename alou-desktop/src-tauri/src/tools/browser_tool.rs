@@ -863,7 +863,7 @@ mod tests {
         });
         let title_result = tool.execute(title_args, &context).await.unwrap();
         assert!(title_result.success);
-        assert!(title_result.data.as_ref().unwrap()["title"].as_str().unwrap().contains("Page - https://www.example.com"));
+        assert!(title_result.data["title"].as_str().unwrap().contains("Page - https://www.example.com"));
     }
 
     #[tokio::test]

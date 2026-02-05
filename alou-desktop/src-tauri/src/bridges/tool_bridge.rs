@@ -4,7 +4,13 @@
 
 use super::super::tools::{ToolRegistry, ToolResult, ExecutionContext, ToolConfig};
 use crate::tools::executor::ToolExecutionManager;
-use crate::tools::{FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, AgentSkillsTool};
+use crate::tools::{
+    FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, AgentSkillsTool,
+    AgentCollaborationTool, ToolCreationTool, network::NetworkTool, system::SystemTool,
+    rollback::RollbackTool, pubsub_tool::PubSubTool, message_passing::MessagePassingTool,
+    iroh_tool::IrohTool, ipfs_archive::IpfsArchiveTool, git_helper::GitHelperTool,
+    browser_tool::BrowserTool, agent_creator::AgentCreatorTool, ui_control::UIControlTool,
+};
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
@@ -103,6 +109,18 @@ impl ToolBridge {
         let bash_tool = Arc::new(BashTool::new());
         self.register_tool(bash_tool).await?;
         
+        // 注册Git助手工具
+        let git_tool = Arc::new(GitHelperTool::new());
+        self.register_tool(git_tool).await?;
+        
+        // 注册网络工具
+        let network_tool = Arc::new(NetworkTool::new());
+        self.register_tool(network_tool).await?;
+        
+        // 注册系统工具
+        let system_tool = Arc::new(SystemTool::new());
+        self.register_tool(system_tool).await?;
+        
         // 注册计划工具
         let plan_tool = Arc::new(PlanTool::new());
         self.register_tool(plan_tool).await?;
@@ -115,7 +133,49 @@ impl ToolBridge {
         let skills_tool = Arc::new(AgentSkillsTool::new()?);
         self.register_tool(skills_tool).await?;
         
-        println!("✅ All tools registered successfully in ToolBridge");
+        // 注册Agent协作工具
+        let collab_tool = AgentCollaborationTool::new(())?;
+        let collab_tool_arc = Arc::new(collab_tool);
+        self.register_tool(collab_tool_arc).await?;
+        
+        // 注册Agent创建工具
+        let agent_creator = Arc::new(AgentCreatorTool::new());
+        self.register_tool(agent_creator).await?;
+        
+        // 注册工具创建工具
+        let tool_creation = Arc::new(ToolCreationTool::new());
+        self.register_tool(tool_creation).await?;
+        
+        // 注册回滚工具
+        let rollback_tool = Arc::new(RollbackTool::new());
+        self.register_tool(rollback_tool).await?;
+        
+        // 注册PubSub工具
+        let pubsub_tool = Arc::new(PubSubTool::new());
+        self.register_tool(pubsub_tool).await?;
+        
+        // 注册消息传递工具
+        let msg_tool = Arc::new(MessagePassingTool::new());
+        self.register_tool(msg_tool).await?;
+        
+        // 注册Iroh工具
+        let iroh_tool = Arc::new(IrohTool::new());
+        self.register_tool(iroh_tool).await?;
+        
+        // 注册IPFS归档工具
+        let ipfs_archive_tool = Arc::new(IpfsArchiveTool::new());
+        self.register_tool(ipfs_archive_tool).await?;
+        
+        // 注册浏览器工具
+        let browser_tool = Arc::new(BrowserTool::new());
+        self.register_tool(browser_tool).await?;
+        
+        // 注册UI控制工具
+        let ui_tool = UIControlTool::new(())?;
+        let ui_tool_arc = Arc::new(ui_tool);
+        self.register_tool(ui_tool_arc).await?;
+        
+        println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())
     }
 
@@ -134,8 +194,16 @@ impl ToolBridge {
     }
 
     /// 更新配置
-    pub fn update_config(&mut self, _config: ToolBridgeConfig) {
-        // TODO: 实现配置更新逻辑
+    pub fn update_config(&mut self, config: ToolBridgeConfig) {
+        println!("[ToolBridge] Updating configuration");
+        // 更新工具执行管理器的配置
+        self.execution_manager.update_config(config.tool_config.clone());
+        // 更新缓存配置（当前仅打印日志，未来可以实现缓存管理）
+        if config.enable_cache {
+            println!("[ToolBridge] Cache enabled (size: {})", config.cache_size);
+        } else {
+            println!("[ToolBridge] Cache disabled");
+        }
     }
 
     /// 健康检查
@@ -146,6 +214,33 @@ impl ToolBridge {
             last_check: chrono::Utc::now().timestamp(),
             error_details: None,
         }
+    }
+
+    /// 获取所有工具列表
+    pub async fn list_tools(&self) -> Vec<serde_json::Value> {
+        let metadata_list = self.registry.list_all().await;
+
+        metadata_list.into_iter().map(|metadata| {
+            serde_json::json!({
+                "id": metadata.id,
+                "name": metadata.name,
+                "category": format!("{:?}", metadata.category),
+                "description": metadata.description,
+                "version": metadata.version,
+                "status": format!("{:?}", metadata.status),
+            })
+        }).collect()
+    }
+
+    /// 取消工具执行
+    pub async fn cancel_execution(&self, execution_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.execution_manager.cancel_execution(execution_id).await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+    }
+
+    /// 获取执行历史
+    pub async fn get_execution_history(&self, limit: usize) -> Vec<serde_json::Value> {
+        self.execution_manager.get_all_execution_contexts(limit).await
     }
 }
 

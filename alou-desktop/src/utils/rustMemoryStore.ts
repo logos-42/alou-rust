@@ -3,12 +3,12 @@
  * 通过Tauri调用Rust内存管理器，提供高性能的内存存储
  */
 
-// Tauri API扩展
-declare global {
-  interface Window {
-    __TAURI__?: {
-      invoke: <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>
-    }
+// Tauri API类型
+type TauriInvoke = <T = unknown>(command: string, args?: Record<string, unknown>) => Promise<T>
+
+interface TauriWindow {
+  __TAURI__?: {
+    invoke: TauriInvoke
   }
 }
 
@@ -29,9 +29,10 @@ class RustMemoryStorage {
     
     try {
       // 检查Tauri API是否可用
-      if (typeof window !== 'undefined' && window.__TAURI__) {
+      const tauriWindow = window as unknown as TauriWindow
+      if (typeof window !== 'undefined' && tauriWindow.__TAURI__) {
         // 测试连接
-        await window.__TAURI__.invoke('get_memory_stats')
+        await tauriWindow.__TAURI__.invoke('get_memory_stats')
         this.isReady = true
         console.log('[RustMemoryStore] Rust内存存储已初始化')
       } else {
@@ -62,7 +63,8 @@ class RustMemoryStorage {
   async setItem(key: string, value: string): Promise<void> {
     await this.waitForReady()
     try {
-      await window.__TAURI__!.invoke('set_memory_item', { key, value })
+      const tauriWindow = window as unknown as TauriWindow
+      await tauriWindow.__TAURI__!.invoke('set_memory_item', { key, value })
       console.log(`[RustMemoryStore] 存储到Rust内存: ${key}`)
     } catch (error) {
       console.error('[RustMemoryStore] 存储失败:', error)
@@ -73,7 +75,8 @@ class RustMemoryStorage {
   async getItem(key: string): Promise<string | null> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke<string | null>('get_memory_item', { key })
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke<string | null>('get_memory_item', { key })
       console.log(`[RustMemoryStore] 从Rust内存读取: ${key}, 存在: ${!!result}`)
       return result
     } catch (error) {
@@ -85,7 +88,8 @@ class RustMemoryStorage {
   async removeItem(key: string): Promise<boolean> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke<boolean>('remove_memory_item', { key })
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke<boolean>('remove_memory_item', { key })
       console.log(`[RustMemoryStore] 从Rust内存删除: ${key}, 成功: ${result}`)
       return result
     } catch (error) {
@@ -97,7 +101,8 @@ class RustMemoryStorage {
   async clear(): Promise<void> {
     await this.waitForReady()
     try {
-      await window.__TAURI__!.invoke('clear_memory')
+      const tauriWindow = window as unknown as TauriWindow
+      await tauriWindow.__TAURI__!.invoke('clear_memory')
       console.log('[RustMemoryStore] 清空Rust内存')
     } catch (error) {
       console.error('[RustMemoryStore] 清空失败:', error)
@@ -108,7 +113,8 @@ class RustMemoryStorage {
   async getKeys(): Promise<string[]> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke<string[]>('get_memory_keys')
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke<string[]>('get_memory_keys')
       console.log(`[RustMemoryStore] 获取Rust内存键列表: ${result.length} 个`)
       return result
     } catch (error) {
@@ -120,7 +126,8 @@ class RustMemoryStorage {
   async getStats(): Promise<unknown> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke('get_memory_stats')
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke('get_memory_stats')
       console.log('[RustMemoryStore] 获取统计信息:', result)
       return result
     } catch (error) {
@@ -133,7 +140,8 @@ class RustMemoryStorage {
   async cleanupExpired(): Promise<number> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke<number>('cleanup_expired_memory')
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke<number>('cleanup_expired_memory')
       console.log(`[RustMemoryStore] 清理过期数据: ${result} 个项目`)
       return result
     } catch (error) {
@@ -145,7 +153,8 @@ class RustMemoryStorage {
   async cleanupLRU(keepCount = 100): Promise<number> {
     await this.waitForReady()
     try {
-      const result = await window.__TAURI__!.invoke<number>('cleanup_lru_memory', { keepCount })
+      const tauriWindow = window as unknown as TauriWindow
+      const result = await tauriWindow.__TAURI__!.invoke<number>('cleanup_lru_memory', { keepCount })
       console.log(`[RustMemoryStore] LRU清理: 保留 ${keepCount} 个，删除 ${result} 个项目`)
       return result
     } catch (error) {
@@ -157,7 +166,8 @@ class RustMemoryStorage {
   async setExpiration(key: string, expiresInSeconds: number): Promise<void> {
     await this.waitForReady()
     try {
-      await window.__TAURI__!.invoke('set_memory_expiration', { key, expiresInSeconds })
+      const tauriWindow = window as unknown as TauriWindow
+      await tauriWindow.__TAURI__!.invoke('set_memory_expiration', { key, expiresInSeconds })
       console.log(`[RustMemoryStore] 设置过期时间: ${key} (${expiresInSeconds} 秒后)`)
     } catch (error) {
       console.error('[RustMemoryStore] 设置过期时间失败:', error)

@@ -56,7 +56,7 @@
   color: var(--text-primary);
   min-height: 28px;
   max-height: 120px;
-  padding: 1px 0;
+  padding: 1px 0 1px 8px;
   overflow-y: auto;
 }
 

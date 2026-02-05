@@ -43,13 +43,13 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   const parseMcpCode = useCallback((code) => {
     try {
       setMcpParseError(null)
-      
+
       // 移除注释、控制字符并修剪空白字符
       let cleanedCode = code
         .replace(/\/\/.*$/gm, '')  // 移除单行注释
         .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除多行注释
         .trim()  // 移除首尾空白
-      
+
       // 更彻底地移除控制字符
       cleanedCode = cleanedCode
         // 移除所有控制字符（除了换行、回车、制表符）
@@ -58,13 +58,13 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         .replace(/[\u200B-\u200D\uFEFF]/g, '')
         // 修复可能被破坏的 URL（如果 :// 被分割）
         .replace(/"endpoint"\s*:\s*"([^"]*):\s*\/\/([^"]*)"/g, '"endpoint": "$1://$2"')
-      
+
       if (!cleanedCode) {
         throw new Error('MCP 配置不能为空')
       }
-      
+
       let config = null
-      
+
       // 尝试多种解析方式
       try {
         // 首先尝试作为 JSON 解析
@@ -72,7 +72,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       } catch (jsonError) {
         console.log('JSON 解析失败:', jsonError.message)
         console.log('失败位置:', jsonError)
-        
+
         // 如果 JSON 解析失败，尝试作为 JavaScript 对象解析
         try {
           // 确保代码以有效的 JavaScript 对象开始
@@ -87,16 +87,16 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
           throw new Error(`解析失败: ${jsonError.message} (JSON) 或 ${jsError.message} (JS)`)
         }
       }
-      
+
       if (!config || typeof config !== 'object') {
         throw new Error('配置必须是一个对象')
       }
-      
+
       const ports = config.ports || []
       if (!Array.isArray(ports)) {
         throw new Error('ports 必须是一个数组')
       }
-      
+
       // 提取工具名称（从 label 字段）
       const tools = ports
         .filter(port => port && port.label)
@@ -106,7 +106,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
           port: port.port || '',
           description: port.description || ''
         }))
-      
+
       setMcpTools(tools)
       return { ports, tools }
     } catch (err) {
@@ -125,28 +125,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       setMcpParseError(null)
     }
   }, [mcpCode, parseMcpCode])
-
-  if (!isOpen) {
-    return null
-  }
-
-  const handleAvatarChange = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) {
-      setAvatarFile(null)
-      setAvatarPreview(null)
-      return
-    }
-    setAvatarFile(file)
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarPreview(reader.result)
-      }
-    }
-    reader.readAsDataURL(file)
-  }
-
 
   // 生成文档集合
   const generateDocuments = useCallback(async () => {
@@ -212,6 +190,28 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       throw err
     }
   }, [name, roleDescription, avatarPreview, mcpTools, t])
+
+  // 提前返回 null，但确保所有 hooks 都在条件之外定义
+  if (!isOpen) {
+    return null
+  }
+
+  const handleAvatarChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      setAvatarFile(null)
+      setAvatarPreview(null)
+      return
+    }
+    setAvatarFile(file)
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setAvatarPreview(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleInternalSubmit = async (event) => {
     event.preventDefault()
