@@ -181,7 +181,7 @@ impl RalphLoopExecutor {
                 .await?;
 
             // 5. 增加迭代计数
-            self.task_manager
+            let _ = self.task_manager
                 .update_task(task_id, |task| {
                     task.metadata.iteration_count += 1;
                 })
@@ -215,7 +215,8 @@ impl RalphLoopExecutor {
         Self::get_default_tools()
     }
 
-    /// 将 ToolMetadata 转换为 AiTool
+    /// 将 ToolMetadata 转换为 AiTool（保留供将来使用）
+    #[allow(dead_code)]
     fn metadata_to_ai_tool(metadata: crate::tools::ToolMetadata) -> AiTool {
         AiTool {
             name: metadata.id,
@@ -224,76 +225,200 @@ impl RalphLoopExecutor {
         }
     }
 
-    /// 获取工具的参数定义（简化版本）
+    /// 获取工具的参数定义
     fn get_tool_parameters(tool_name: &str) -> serde_json::Value {
         match tool_name {
             "filesystem" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": {
-                        "type": "string",
-                        "enum": ["read", "write", "edit", "delete", "list", "copy", "move"],
-                        "description": "文件操作类型"
-                    },
-                    "path": {
-                        "type": "string",
-                        "description": "文件或目录路径"
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "写入的内容（write/edit 操作需要）"
-                    },
-                    "old_text": {
-                        "type": "string",
-                        "description": "要替换的文本（edit 操作需要）"
-                    },
-                    "new_text": {
-                        "type": "string",
-                        "description": "新文本（edit 操作需要）"
-                    },
-                    "destination": {
-                        "type": "string",
-                        "description": "目标路径（copy/move 操作需要）"
-                    }
+                    "operation": { "type": "string", "enum": ["read", "write", "edit", "delete", "list", "copy", "move"], "description": "文件操作类型" },
+                    "path": { "type": "string", "description": "文件或目录路径" },
+                    "content": { "type": "string", "description": "写入的内容" },
+                    "old_text": { "type": "string", "description": "要替换的文本" },
+                    "new_text": { "type": "string", "description": "新文本" },
+                    "destination": { "type": "string", "description": "目标路径" }
                 },
                 "required": ["operation", "path"]
             }),
             "bash" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "要执行的命令"
-                    },
-                    "working_dir": {
-                        "type": "string",
-                        "description": "工作目录"
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "超时时间（秒）",
-                        "default": 300
-                    }
+                    "command": { "type": "string", "description": "要执行的命令" },
+                    "working_dir": { "type": "string", "description": "工作目录" },
+                    "timeout": { "type": "integer", "description": "超时时间（秒）", "default": 300 }
                 },
                 "required": ["command"]
             }),
             "search" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "pattern": {
-                        "type": "string",
-                        "description": "搜索模式"
-                    },
-                    "path": {
-                        "type": "string",
-                        "description": "搜索路径"
-                    },
-                    "file_pattern": {
-                        "type": "string",
-                        "description": "文件匹配模式（如 *.rs）"
-                    }
+                    "pattern": { "type": "string", "description": "搜索模式" },
+                    "path": { "type": "string", "description": "搜索路径" },
+                    "file_pattern": { "type": "string", "description": "文件匹配模式" }
                 },
                 "required": ["pattern", "path"]
+            }),
+            "git_helper" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["status", "add", "commit", "push", "pull", "branch", "checkout", "log", "diff"], "description": "Git操作" },
+                    "message": { "type": "string", "description": "提交信息" },
+                    "branch_name": { "type": "string", "description": "分支名称" },
+                    "files": { "type": "array", "items": { "type": "string" }, "description": "文件列表" }
+                },
+                "required": ["operation"]
+            }),
+            "network" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["http_get", "http_post", "http_put", "http_delete", "download", "upload"], "description": "网络操作" },
+                    "url": { "type": "string", "description": "URL地址" },
+                    "headers": { "type": "object", "description": "请求头" },
+                    "body": { "type": "string", "description": "请求体" },
+                    "save_path": { "type": "string", "description": "保存路径" }
+                },
+                "required": ["operation", "url"]
+            }),
+            "system" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["info", "memory", "disk", "cpu", "processes", "env"], "description": "系统操作" },
+                    "process_name": { "type": "string", "description": "进程名称" }
+                },
+                "required": ["operation"]
+            }),
+            "plan" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["create", "add_step", "update_step", "complete_step", "get_plan", "list_plans"], "description": "计划操作" },
+                    "plan_id": { "type": "string", "description": "计划ID" },
+                    "title": { "type": "string", "description": "计划标题" },
+                    "description": { "type": "string", "description": "计划描述" },
+                    "step_id": { "type": "string", "description": "步骤ID" },
+                    "step_description": { "type": "string", "description": "步骤描述" }
+                },
+                "required": ["operation"]
+            }),
+            "todolist" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["add", "complete", "remove", "list", "update"], "description": "待办操作" },
+                    "item_id": { "type": "string", "description": "项目ID" },
+                    "title": { "type": "string", "description": "标题" },
+                    "description": { "type": "string", "description": "描述" },
+                    "priority": { "type": "string", "enum": ["low", "medium", "high"], "description": "优先级" }
+                },
+                "required": ["operation"]
+            }),
+            "agent_skills" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["list", "execute", "get_info"], "description": "技能操作" },
+                    "skill_name": { "type": "string", "description": "技能名称" },
+                    "parameters": { "type": "object", "description": "执行参数" }
+                },
+                "required": ["operation"]
+            }),
+            "agent_collaboration" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["create_session", "join_session", "leave_session", "send_message", "get_messages", "list_sessions"], "description": "协作操作" },
+                    "session_id": { "type": "string", "description": "会话ID" },
+                    "agent_id": { "type": "string", "description": "Agent ID" },
+                    "message": { "type": "string", "description": "消息内容" }
+                },
+                "required": ["operation"]
+            }),
+            "agent_creator" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["create", "update", "delete", "get", "list", "clone"], "description": "创建器操作" },
+                    "agent_id": { "type": "string", "description": "Agent ID" },
+                    "name": { "type": "string", "description": "名称" },
+                    "description": { "type": "string", "description": "描述" },
+                    "skills": { "type": "array", "items": { "type": "string" }, "description": "技能列表" },
+                    "config": { "type": "object", "description": "配置" }
+                },
+                "required": ["operation"]
+            }),
+            "tool_creation" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["create_tool", "update_tool", "delete_tool", "get_tool", "list_tools", "execute_tool"], "description": "工具创建操作" },
+                    "tool_id": { "type": "string", "description": "工具ID" },
+                    "name": { "type": "string", "description": "名称" },
+                    "description": { "type": "string", "description": "描述" },
+                    "code": { "type": "string", "description": "代码" },
+                    "parameters": { "type": "object", "description": "参数" }
+                },
+                "required": ["operation"]
+            }),
+            "rollback" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["create_snapshot", "list_snapshots", "rollback", "delete_snapshot"], "description": "回滚操作" },
+                    "snapshot_id": { "type": "string", "description": "快照ID" },
+                    "path": { "type": "string", "description": "路径" },
+                    "description": { "type": "string", "description": "描述" }
+                },
+                "required": ["operation"]
+            }),
+            "pubsub" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["publish", "subscribe", "unsubscribe", "list_topics"], "description": "PubSub操作" },
+                    "topic": { "type": "string", "description": "主题" },
+                    "message": { "type": "string", "description": "消息内容" }
+                },
+                "required": ["operation"]
+            }),
+            "message_passing" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["send", "receive", "list_queues"], "description": "消息操作" },
+                    "queue": { "type": "string", "description": "队列名称" },
+                    "message": { "type": "string", "description": "消息内容" }
+                },
+                "required": ["operation"]
+            }),
+            "iroh" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["share_file", "get_file", "list_shares"], "description": "Iroh操作" },
+                    "ticket": { "type": "string", "description": "票据" },
+                    "path": { "type": "string", "description": "文件路径" }
+                },
+                "required": ["operation"]
+            }),
+            "ipfs_archive" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["archive", "extract", "list", "pin"], "description": "IPFS归档操作" },
+                    "cid": { "type": "string", "description": "CID" },
+                    "path": { "type": "string", "description": "路径" }
+                },
+                "required": ["operation"]
+            }),
+            "browser" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["navigate", "click", "type", "screenshot", "get_content", "execute_script"], "description": "浏览器操作" },
+                    "url": { "type": "string", "description": "URL" },
+                    "selector": { "type": "string", "description": "CSS选择器" },
+                    "text": { "type": "string", "description": "文本" },
+                    "script": { "type": "string", "description": "JavaScript代码" }
+                },
+                "required": ["operation"]
+            }),
+            "ui_control" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "operation": { "type": "string", "enum": ["show_notification", "update_status", "open_dialog", "close_dialog"], "description": "UI控制操作" },
+                    "title": { "type": "string", "description": "标题" },
+                    "message": { "type": "string", "description": "消息" },
+                    "type": { "type": "string", "enum": ["info", "success", "warning", "error"], "description": "类型" }
+                },
+                "required": ["operation"]
             }),
             _ => serde_json::json!({
                 "type": "object",
@@ -303,24 +428,28 @@ impl RalphLoopExecutor {
         }
     }
 
-    /// 获取默认工具列表（当无法访问 ToolRegistry 时使用）
+    /// 获取默认工具列表（19个标准工具）
     fn get_default_tools() -> Vec<AiTool> {
         vec![
-            AiTool {
-                name: "filesystem".to_string(),
-                description: "文件系统操作：读取、写入、编辑、删除文件".to_string(),
-                parameters: Self::get_tool_parameters("filesystem"),
-            },
-            AiTool {
-                name: "bash".to_string(),
-                description: "执行终端命令".to_string(),
-                parameters: Self::get_tool_parameters("bash"),
-            },
-            AiTool {
-                name: "search".to_string(),
-                description: "在文件中搜索内容".to_string(),
-                parameters: Self::get_tool_parameters("search"),
-            },
+            AiTool { name: "filesystem".to_string(), description: "文件系统操作：读取、写入、编辑、删除、复制、移动文件和目录".to_string(), parameters: Self::get_tool_parameters("filesystem") },
+            AiTool { name: "search".to_string(), description: "在文件中搜索内容，支持正则表达式".to_string(), parameters: Self::get_tool_parameters("search") },
+            AiTool { name: "bash".to_string(), description: "执行终端命令（Bash/PowerShell）".to_string(), parameters: Self::get_tool_parameters("bash") },
+            AiTool { name: "git_helper".to_string(), description: "Git版本控制操作：提交、推送、拉取、分支管理等".to_string(), parameters: Self::get_tool_parameters("git_helper") },
+            AiTool { name: "network".to_string(), description: "网络请求操作：HTTP GET/POST/PUT/DELETE、文件下载上传".to_string(), parameters: Self::get_tool_parameters("network") },
+            AiTool { name: "system".to_string(), description: "系统信息获取：CPU、内存、磁盘、进程、环境变量".to_string(), parameters: Self::get_tool_parameters("system") },
+            AiTool { name: "plan".to_string(), description: "任务计划管理：创建计划、添加步骤、追踪进度".to_string(), parameters: Self::get_tool_parameters("plan") },
+            AiTool { name: "todolist".to_string(), description: "待办事项管理：添加、完成、删除、更新待办".to_string(), parameters: Self::get_tool_parameters("todolist") },
+            AiTool { name: "agent_skills".to_string(), description: "Agent技能管理：查看可用技能、执行技能".to_string(), parameters: Self::get_tool_parameters("agent_skills") },
+            AiTool { name: "agent_collaboration".to_string(), description: "多Agent协作：创建会话、发送消息、协同工作".to_string(), parameters: Self::get_tool_parameters("agent_collaboration") },
+            AiTool { name: "agent_creator".to_string(), description: "Agent创建管理：创建、更新、删除、克隆Agent".to_string(), parameters: Self::get_tool_parameters("agent_creator") },
+            AiTool { name: "tool_creation".to_string(), description: "动态工具创建：创建、更新、删除自定义工具".to_string(), parameters: Self::get_tool_parameters("tool_creation") },
+            AiTool { name: "rollback".to_string(), description: "文件快照与回滚：创建快照、恢复到之前状态".to_string(), parameters: Self::get_tool_parameters("rollback") },
+            AiTool { name: "pubsub".to_string(), description: "发布订阅消息系统：发布消息、订阅主题".to_string(), parameters: Self::get_tool_parameters("pubsub") },
+            AiTool { name: "message_passing".to_string(), description: "消息队列：发送和接收异步消息".to_string(), parameters: Self::get_tool_parameters("message_passing") },
+            AiTool { name: "iroh".to_string(), description: "Iroh P2P文件传输：分享和获取文件".to_string(), parameters: Self::get_tool_parameters("iroh") },
+            AiTool { name: "ipfs_archive".to_string(), description: "IPFS归档管理：归档文件到IPFS、提取、固定".to_string(), parameters: Self::get_tool_parameters("ipfs_archive") },
+            AiTool { name: "browser".to_string(), description: "浏览器自动化：导航、点击、输入、截图、执行JS".to_string(), parameters: Self::get_tool_parameters("browser") },
+            AiTool { name: "ui_control".to_string(), description: "UI控制：显示通知、更新状态、打开对话框".to_string(), parameters: Self::get_tool_parameters("ui_control") },
         ]
     }
 
