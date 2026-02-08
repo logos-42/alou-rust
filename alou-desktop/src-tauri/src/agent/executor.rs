@@ -197,7 +197,7 @@ impl RalphLoopExecutor {
         log::info!("[RalphLoop] 调用 AI，消息数: {}", task.messages.len());
 
         let messages = self.build_messages(task);
-        let tools = self.get_available_tools();
+        let tools = self.get_available_tools().await;
 
         self.ai_client.send_message(messages, Some(tools)).await
     }
@@ -207,16 +207,22 @@ impl RalphLoopExecutor {
         task.messages.clone()
     }
 
-    /// 获取可用工具
-    fn get_available_tools(&self) -> Vec<AiTool> {
-        // 返回默认工具列表（避免异步调用问题）
-        // 注意：在异步上下文中无法直接调用异步的 list_all()
-        // 这里使用预定义的默认工具集
-        Self::get_default_tools()
+    /// 获取可用工具（从 ToolRegistry 异步获取）
+    async fn get_available_tools(&self) -> Vec<AiTool> {
+        // 从 ToolRegistry 获取工具列表
+        let metadatas = self.tool_registry.list_all().await;
+        
+        // 如果 registry 为空，返回默认工具
+        if metadatas.is_empty() {
+            log::warn!("[RalphLoop] ToolRegistry 为空，使用默认工具列表");
+            return Self::get_default_tools();
+        }
+        
+        // 将 ToolMetadata 转换为 AiTool
+        metadatas.into_iter().map(Self::metadata_to_ai_tool).collect()
     }
 
-    /// 将 ToolMetadata 转换为 AiTool（保留供将来使用）
-    #[allow(dead_code)]
+    /// 将 ToolMetadata 转换为 AiTool
     fn metadata_to_ai_tool(metadata: crate::tools::ToolMetadata) -> AiTool {
         AiTool {
             name: metadata.id,
