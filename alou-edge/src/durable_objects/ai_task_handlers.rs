@@ -195,7 +195,6 @@ impl AITaskHandlers {
         console_log!("[TOOL-RESULT] Updated state");
 
         // 返回成功响应
-        // 注意：实际的继续执行会在下一次 /status 轮询时由 check_and_execute_pending_task 触发
         let response = TaskStatusResponse::new(
             task_name.to_string(),
             state.status.to_string(),
@@ -204,7 +203,12 @@ impl AITaskHandlers {
         let headers = Headers::new();
         headers.set("Content-Type", "application/json; charset=utf-8")?;
 
-        console_log!("[TOOL-RESULT] ✅ Tool results accepted, will continue on next status check");
+        console_log!("[TOOL-RESULT] ✅ Tool results accepted");
+        
+        // 注意：实际的继续执行会在下一次 /status 轮询时由 check_and_execute_pending_task 触发
+        // 这里不立即执行是为了避免请求超时（DO 的 fetch 有 30 秒限制）
+        // 前端应该在收到 200 响应后立即开始更频繁的轮询
+        
         Ok(Response::from_json(&response)?.with_headers(headers))
     }
 

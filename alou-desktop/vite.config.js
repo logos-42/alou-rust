@@ -18,13 +18,12 @@ export default defineConfig({
       ignored: ['**/src-tauri/**'],
     },
     // 配置代理解决CORS问题
-    // 注意：Web开发环境使用代理到生产环境
-    // Tauri桌面应用直接连接到生产环境（见api.js配置）
+    // 开发环境使用本地后端，生产环境使用远程后端
     proxy: {
       '/api': {
-        target: 'https://alou-edge.yuanjieliu65.workers.dev', // 代理到生产alou-edge
+        target: 'http://127.0.0.1:8787', // 代理到本地开发服务器
         changeOrigin: true,
-        secure: true,
+        secure: false,
         configure: (proxy, options) => {
           // 添加CORS头
           proxy.on('proxyRes', (proxyRes, req, res) => {

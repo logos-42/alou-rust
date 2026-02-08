@@ -2,12 +2,12 @@
  * Agent Service - 与 Cloudflare Workers (alou-edge) 通信
  * 重构后：使用组合模式，将职责分离到不同的服务
  */
-import apiClient from './api';
-import agentResolverService from './agentResolverService';
-import ipfsContentService from './ipfsContentService';
-import asyncTaskService from './asyncTaskService';
-import promptService from './promptService';
-import { parseDidDocumentToAgent } from './didDocumentParser';
+import apiClient from './api'
+import agentResolverService from './agentResolverService'
+import ipfsContentService from './ipfsContentService'
+import asyncTaskService from './asyncTaskService'
+import promptService from './promptService'
+import { parseDidDocumentToAgent } from './didDocumentParser'
 
 // 本地类型定义
 interface AgentInfo {
@@ -38,6 +38,20 @@ interface ServiceResponse<T> {
 
 type ApiResponse<T> = ServiceResponse<T>;
 
+/**
+ * 本地AI执行配置
+ */
+interface LocalAgentConfig {
+  name: string;
+  display_name?: string;
+  description?: string;
+  role_description?: string;
+  provider: string;
+  api_key: string;
+  model?: string;
+  base_url?: string | null;
+}
+
 interface SendMessageOptions {
   sessionId?: string;
   context?: Record<string, any>;
@@ -53,6 +67,7 @@ interface SendMessageOptions {
   customInstructions?: string;
   customPrompt?: string;
   stream?: boolean;
+  preferLocal?: boolean; // 新增：优先本地执行
 }
 
 interface Message {
@@ -102,6 +117,52 @@ const getSystemPromptForChat = async (agentInfo: AgentInfo, context: Record<stri
 
 class AgentService {
   /**
+   * 本地执行AI对话
+   */
+  private async executeLocally(
+    agentInfo: AgentInfo,
+    message: string,
+    options: SendMessageOptions
+  ): Promise<ApiResponse<any>> {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      
+      const payload = {
+        agentConfig: {
+          name: agentInfo.name,
+          display_name: agentInfo.display_name,
+          description: agentInfo.description,
+          role_description: agentInfo.role_description,
+          provider: 'deepseek', // 默认使用deepseek
+          api_key: '', // 需要从配置中获取
+          model: 'deepseek-chat',
+          base_url: null
+        } as LocalAgentConfig,
+        message,
+        options: {
+          stream: options.stream || false,
+          timeout: options.timeout || 30000
+        }
+      };
+      
+      const result: any = await invoke('execute_ai_conversation', payload);
+      
+      return {
+        success: true,
+        data: result,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error('[AgentService] 本地执行失败:', error);
+      return {
+        success: false,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
    * 发送消息给智能体
    */
   async sendMessage(
@@ -110,6 +171,21 @@ class AgentService {
     options: SendMessageOptions = {}
   ): Promise<ApiResponse<any>> {
     try {
+      // 优先尝试本地执行
+      if (options.preferLocal !== false) {
+        try {
+          const localResult = await this.executeLocally(agentInfo, message, options);
+          if (localResult.success) {
+            console.log('[AgentService] 本地执行成功');
+            return localResult;
+          }
+          console.warn('[AgentService] 本地执行失败，回退到远程:', localResult.error);
+        } catch (localError) {
+          console.warn('[AgentService] 本地执行异常，回退到远程:', localError);
+        }
+      }
+
+      // 回退到远程执行
       const systemPrompt = await getSystemPromptForChat(agentInfo, {
         ...options,
         message,

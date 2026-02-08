@@ -149,6 +149,9 @@ export const useAgentMessages = ({
   // 跟踪已保存过的消息数量，避免重复保存
   const savedMessageCountRef = useRef<Record<string, number>>({})
   
+  // 获取钱包地址（在组件级别获取，供多个函数使用）
+  const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+  
   // 按智能体存储 AbortController：Map<channelId, AbortController>
   const abortControllersByAgent = useRef<Record<string, AbortController>>({})
   
@@ -236,6 +239,8 @@ export const useAgentMessages = ({
     scrollToBottom,
     setAgentLoading,
     setMessagesByChannel: setMessagesByChannel as React.Dispatch<React.SetStateAction<Record<string, unknown[]>>>,
+    walletAddress,
+    chain: activeChain,
   })
 
   const { parseAgentCreationCommandWithAIDirect } = useAgentCreation({
@@ -343,9 +348,6 @@ export const useAgentMessages = ({
 
     // 直接调用后端 API 进行单智能体聊天
     try {
-      const walletAddress =
-        typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-
       // 获取或创建该智能体的 session
       let agentSessionId = sessionsByAgent[targetAgentId] || sessionId
       
@@ -433,14 +435,24 @@ export const useAgentMessages = ({
         timeout: 30000,
       }
 
-      const data: ApiResponse = await apiClient
-        .post('/ai-task/init-and-start', claudeSdkRequest, {
-          signal: abortController.signal,
-        })
-        .then((response) => response.data)
+      const apiResult = await apiClient.post('/ai-task/init-and-start', claudeSdkRequest, {
+        signal: abortController.signal,
+      })
+
+      console.log('[useAgentMessages] API 原始响应:', apiResult)
+      
+      // apiClient 返回的是 ApiResponse 结构: { success, data, message, timestamp }
+      // 真正的后端数据在 data 字段中
+      const data = apiResult.data as ApiResponse
+      
+      console.log('[useAgentMessages] 后端数据:', data)
+      console.log('[useAgentMessages] task_id:', data?.task_id)
+      console.log('[useAgentMessages] taskId:', data?.taskId)
 
       // 检查是否为异步任务（包含 task_id）
-      const taskId = data.task_id || data.taskId
+      const taskId = data?.task_id || data?.taskId
+      
+      console.log('[useAgentMessages] 最终 taskId:', taskId)
       
       if (taskId) {
         // 是异步任务，启动轮询

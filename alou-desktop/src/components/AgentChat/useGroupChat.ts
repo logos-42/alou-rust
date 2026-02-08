@@ -100,15 +100,16 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
       const poll = async () => {
         try {
           // 获取新消息
-          const response = await apiClient.get(`/pubsub/messages`, {
+          const apiResponse = await apiClient.get(`/pubsub/messages`, {
             params: {
               topic,
               since: lastTimestamp,
             },
           })
 
-          if (response.data?.messages) {
-            const newMessages = response.data.messages as PubSubMessage[]
+          const responseData = apiResponse.data as { messages?: PubSubMessage[] }
+          if (responseData?.messages) {
+            const newMessages = responseData.messages
             if (newMessages.length > 0) {
               // 转换消息格式
               const transformedMessages = newMessages.map(transformPubSubMessage)
@@ -186,14 +187,15 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
 
       try {
         const topic = `diap/cluster_action/${actionId}`
-        const response = await apiClient.get(`/pubsub/messages`, {
+        const apiResponse = await apiClient.get(`/pubsub/messages`, {
           params: {
             topic,
           },
         })
 
-        if (response.data?.messages) {
-          const messages = (response.data.messages as PubSubMessage[]).map(transformPubSubMessage)
+        const responseData = apiResponse.data as { messages?: PubSubMessage[] }
+        if (responseData?.messages) {
+          const messages = responseData.messages.map(transformPubSubMessage)
           addGroupChatMessages(actionId, messages)
 
           // 更新最后时间戳

@@ -139,6 +139,7 @@ pub trait ToolExecutor: Send + Sync {
 }
 
 /// 工具执行器管理器
+#[derive(Clone)]
 pub struct ToolExecutionManager {
     /// 工具执行器映射
     executors: HashMap<String, Arc<dyn ToolExecutor>>,

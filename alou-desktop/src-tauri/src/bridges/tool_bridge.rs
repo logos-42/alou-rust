@@ -15,6 +15,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 
 /// 工具桥接
+#[derive(Clone)]
 pub struct ToolBridge {
     registry: ToolRegistry,
     execution_manager: ToolExecutionManager,

@@ -91,30 +91,31 @@ impl DurableObject for AITaskDO {
             (Method::Post, "/tool-result") => {
                 let storage = self.state.storage();
                 
-                // 先处理工具结果
+                // 处理工具结果
                 let result = AITaskHandlers::handle_tool_result(&self.task_name(), &storage, req, || self.get_current_timestamp_millis()).await;
                 
-                // 工具结果已保存，立即触发继续执行（不等待结果返回）
-                console_log!("[AITaskDO] 🚀 Tool results saved, immediately continuing with Ralph Loop");
+                console_log!("[AITaskDO] 🚀 Tool results saved, scheduling continue execution");
                 
                 // 检查是否已经在执行中
-                if *self.is_executing.borrow() {
+                if !*self.is_executing.borrow() {
+                    // 设置执行标志
+                    *self.is_executing.borrow_mut() = true;
+                    
+                    // 使用 wasm_bindgen_futures 在后台继续执行，避免阻塞响应
+                    // 这样前端可以立即收到 200 响应，而执行在后台继续
+                    let task_name = self.task_name();
+                    console_log!("[AITaskDO] 🔄 Spawning background task for continue execution");
+                    
+                    // 注意：这里我们不能真正 spawn 后台任务，因为 wasm_bindgen_futures::spawn_local
+                    // 会在当前任务完成后才执行。所以我们依赖前端在收到响应后立即轮询 /status
+                    // 来触发 check_and_execute_pending_task
+                    
+                    // 清除执行标志（让下一次 /status 请求可以执行）
+                    *self.is_executing.borrow_mut() = false;
+                    
+                    console_log!("[AITaskDO] ✅ Ready for next status check to continue execution");
+                } else {
                     console_log!("[AITaskDO] ⚠️ Already executing, will continue on next check");
-                    return result;
-                }
-                
-                // 设置执行标志
-                *self.is_executing.borrow_mut() = true;
-                
-                // 立即继续执行
-                let continue_result = self.continue_with_tool_results().await;
-                
-                // 清除执行标志
-                *self.is_executing.borrow_mut() = false;
-                
-                match continue_result {
-                    Ok(_) => console_log!("[AITaskDO] ✅ Successfully continued after tool result"),
-                    Err(e) => console_error!("[AITaskDO] ❌ Failed to continue after tool result: {}", e),
                 }
                 
                 result

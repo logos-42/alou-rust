@@ -113,17 +113,22 @@ impl AiProvider for DeepSeekProvider {
         let deepseek_messages: Vec<DeepSeekMessage> = messages
             .into_iter()
             .map(|m| {
-                let tool_calls_in_msg = m.tool_calls.map(|tcs| {
-                    tcs.into_iter()
-                        .map(|tc| DeepSeekToolCallInMessage {
-                            id: tc.id,
-                            call_type: "function".to_string(),
-                            function: DeepSeekFunctionCallInMessage {
-                                name: tc.name,
-                                arguments: serde_json::to_string(&tc.arguments).unwrap_or_default(),
-                            },
-                        })
-                        .collect()
+                // 只在有工具调用时才添加 tool_calls，避免空数组
+                let tool_calls_in_msg = m.tool_calls.and_then(|tcs| {
+                    if tcs.is_empty() {
+                        None
+                    } else {
+                        Some(tcs.into_iter()
+                            .map(|tc| DeepSeekToolCallInMessage {
+                                id: tc.id,
+                                call_type: "function".to_string(),
+                                function: DeepSeekFunctionCallInMessage {
+                                    name: tc.name,
+                                    arguments: serde_json::to_string(&tc.arguments).unwrap_or_default(),
+                                },
+                            })
+                            .collect())
+                    }
                 });
 
                 DeepSeekMessage {

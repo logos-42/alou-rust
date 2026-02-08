@@ -2,6 +2,16 @@ import { useCallback, useRef } from 'react'
 import apiClient from '@/services/api'
 import LoadingIcon from '@/assets/加载0.2.png'
 
+// Tauri invoke 类型
+interface LocalToolResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  execution_time_ms?: number;
+  output?: string;
+  warnings?: string[];
+}
+
 // 工具调用类型
 interface ToolCall {
   id: string;
@@ -46,6 +56,8 @@ interface UseAsyncTaskPollingParams {
   scrollToBottom: () => void;
   setAgentLoading: (agentId: string, loading: boolean) => void;
   setMessagesByChannel: React.Dispatch<React.SetStateAction<Record<string, unknown[]>>>;
+  walletAddress?: string | null;
+  chain?: string | null;
 }
 
 // 轮询状态类型
@@ -53,6 +65,7 @@ interface PollingStatus {
   taskId: string;
   messageId: string;
   startTime: number;
+  fastMode?: boolean;
 }
 
 export const useAsyncTaskPolling = ({
@@ -61,44 +74,34 @@ export const useAsyncTaskPolling = ({
   setAgentLoading,
   setMessagesByChannel,
 }: UseAsyncTaskPollingParams) => {
-  // 按智能体存储轮询定时器：Map<agentId, intervalId>
-  const pollingIntervalsByAgent = useRef<Record<string, number>>({})
-
-  // 按智能体存储轮询状态：Map<agentId, { taskId, messageId, startTime }>
+  const pollingTimeoutsByAgent = useRef<Record<string, number>>({})
   const pollingStatusByAgent = useRef<Record<string, PollingStatus>>({})
 
-  /**
-   * 执行工具调用并提交结果
-   */
-  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], _agentId: string) => {
+  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], agentId: string) => {
     console.log(`[pollAsyncTask] 执行 ${toolCalls.length} 个工具调用`, toolCalls)
 
     try {
-      // 执行所有工具调用
       const toolResults: ToolResult[] = []
       for (const toolCall of toolCalls) {
         try {
           console.log(`[pollAsyncTask] 执行工具: ${toolCall.tool}`, toolCall.arguments)
 
-          // 调用实际的工具执行API
-          const toolResponse = await apiClient.post('/mcp/execute-tool', {
-            tool_id: toolCall.tool,
-            args: toolCall.arguments,
-            session_id: `task_${taskId}`,
-            timeout_seconds: 30,
+          const { invoke } = await import('@tauri-apps/api/core')
+          const toolResponse = await invoke<LocalToolResult>('execute_tool', {
+            toolId: toolCall.tool,
+            args: JSON.stringify(toolCall.arguments),
+            timeout: 30000
           })
 
-          const toolResult: ToolResult = {
+          toolResults.push({
             tool: toolCall.tool,
-            success: toolResponse.data.success || false,
-            result: toolResponse.data.data || toolResponse.data.result || '工具执行完成',
-            error: toolResponse.data.error,
+            success: toolResponse.success || false,
+            result: toolResponse.data || toolResponse.output || '工具执行完成',
+            error: toolResponse.error,
             arguments: toolCall.arguments,
             timestamp: Date.now(),
             tool_call_id: toolCall.id,
-          }
-
-          toolResults.push(toolResult)
+          })
         } catch (toolError) {
           console.error(`[pollAsyncTask] 工具执行失败: ${toolCall.tool}`, toolError)
           toolResults.push({
@@ -111,216 +114,121 @@ export const useAsyncTaskPolling = ({
         }
       }
 
-      // 提交工具结果
       console.log(`[pollAsyncTask] 提交工具结果到任务 ${taskId}`)
       await apiClient.post(`/ai-task/${taskId}/tool-result`, {
         results: toolResults,
         timestamp: Date.now(),
       })
 
-      console.log(`[pollAsyncTask] 工具结果已提交`)
+      console.log(`[pollAsyncTask] 工具结果已提交，启用快速轮询模式`)
+      
+      const status = pollingStatusByAgent.current[agentId]
+      if (status) {
+        status.fastMode = true
+      }
     } catch (error) {
       console.error(`[pollAsyncTask] 提交工具结果失败:`, error)
       throw error
     }
   }, [])
 
-  /**
-   * 轮询异步任务状态
-   */
   const pollAsyncTask = useCallback((taskId: string, progressMessageId: string | null, agentId: string, options: PollingOptions = {}) => {
-    const {
-      interval = 1000,
-      timeout = 120000,
-    } = options
+    const { interval = 1000, timeout = 120000 } = options
 
-    // 清理该智能体之前的轮询
-    const existingInterval = pollingIntervalsByAgent.current[agentId]
-    if (existingInterval) {
-      clearInterval(existingInterval)
-      delete pollingIntervalsByAgent.current[agentId]
+    // 清理之前的轮询
+    const existingTimeout = pollingTimeoutsByAgent.current[agentId]
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+      delete pollingTimeoutsByAgent.current[agentId]
     }
 
     const startTime = Date.now()
     let pollCount = 0
 
-    // 记录轮询状态
     pollingStatusByAgent.current[agentId] = {
       taskId,
       messageId: progressMessageId || '',
       startTime,
+      fastMode: false,
     }
 
     console.log(`[pollAsyncTask] 开始轮询任务 ${taskId}，智能体: ${agentId}`)
 
-    const intervalId = window.setInterval(async () => {
+    const doPoll = async () => {
       try {
-        // 检查超时
         if (Date.now() - startTime > timeout) {
           throw new Error('任务执行超时')
         }
 
-        // 查询任务状态
-        const response = await apiClient.get(`/ai-task/${taskId}/status`)
-        const result: TaskResult = response.data
+        const currentStatus = pollingStatusByAgent.current[agentId]
+        if (!currentStatus || currentStatus.taskId !== taskId) {
+          console.log(`[pollAsyncTask] 任务 ${taskId} 已停止轮询`)
+          return
+        }
+
+        const apiResponse = await apiClient.get(`/ai-task/${taskId}/status`)
+        const result = apiResponse.data as TaskResult
 
         const { status, progress = 0, current_step, error, result: taskResult } = result
         const taskResponse = taskResult?.response
 
-        console.log(`[pollAsyncTask] 第 ${++pollCount} 次轮询 - 状态: ${status}, 进度: ${progress}%, 步骤: ${current_step}, 错误: ${error}`)
+        console.log(`[pollAsyncTask] 第 ${++pollCount} 次轮询 - 状态: ${status}, 进度: ${progress}%, 步骤: ${current_step}`)
+
+        // 更新进度消息
+        if (progressMessageId) {
+          setMessagesByChannel((prev) => {
+            const channelMessages = prev[agentId] || []
+            const messageIndex = channelMessages.findIndex((msg: unknown) => 
+              typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+            )
+
+            if (messageIndex !== -1) {
+              const updatedMessages = [...channelMessages]
+              const progressMessage = { ...updatedMessages[messageIndex] as Record<string, unknown> }
+
+              let content = `<img src="${LoadingIcon}" alt="加载中" class="loading-icon" />`
+              if (current_step) {
+                content += ` ${current_step}`
+              } else {
+                content += ' 任务正在执行中'
+              }
+              if (progress > 0) {
+                content += ` (${Math.round(progress * 100)}%)`
+              }
+
+              progressMessage.content = content
+              progressMessage.progress = progress
+              progressMessage.status = status
+              progressMessage.currentStep = current_step
+
+              updatedMessages[messageIndex] = progressMessage
+              return { ...prev, [agentId]: updatedMessages }
+            }
+            return prev
+          })
+        }
 
         // 检查是否有待处理的工具调用
         if (status === 'processing') {
-           try {
-             const toolCallsResponse = await apiClient.get(`/ai-task/${taskId}/pending-tools`)
-             const toolCalls: ToolCall[] = toolCallsResponse.data?.toolCalls || []
+          try {
+            const toolCallsApiResponse = await apiClient.get(`/ai-task/${taskId}/pending-tools`)
+            const toolCalls = (toolCallsApiResponse.data as { toolCalls?: ToolCall[] })?.toolCalls || []
 
-             if (toolCalls.length > 0) {
-               console.log(`[pollAsyncTask] 发现 ${toolCalls.length} 个待处理工具调用:`, toolCalls)
-               await executeToolCallsAndSubmitResults(taskId, toolCalls, agentId)
-               console.log(`[pollAsyncTask] 工具结果已提交，立即进行下次状态检查`)
-             }
-           } catch (toolError) {
-             console.log(`[pollAsyncTask] 获取待处理工具调用失败，继续轮询:`, (toolError as Error).message)
-           }
-         }
-
-        // 更新进度消息
-        setMessagesByChannel((prev) => {
-          const channelMessages = prev[agentId] || []
-          const messageIndex = channelMessages.findIndex((msg: unknown) => 
-            typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
-          )
-
-          if (messageIndex !== -1) {
-            const updatedMessages = [...channelMessages]
-            const progressMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
-              ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
-              : {}
-
-            progressMessage.progress = progress
-            progressMessage.status = status
-            progressMessage.currentStep = current_step
-
-            let content = `<img src="${LoadingIcon}" alt="加载中" class="loading-icon" />`
-            if (current_step) {
-              content += ` ${current_step}`
-            } else {
-              content += ' 任务正在执行中'
+            if (toolCalls.length > 0) {
+              console.log(`[pollAsyncTask] 发现 ${toolCalls.length} 个待处理工具调用`)
+              await executeToolCallsAndSubmitResults(taskId, toolCalls, agentId)
             }
-            if (progress > 0) {
-              content += ` (${Math.round(progress * 100)}%)`
-            }
-            progressMessage.content = content
-
-            updatedMessages[messageIndex] = progressMessage
-            return {
-              ...prev,
-              [agentId]: updatedMessages,
-            }
+          } catch (toolError) {
+            console.log(`[pollAsyncTask] 获取待处理工具调用失败:`, (toolError as Error).message)
           }
+        }
 
-          return prev
-        })
+        // 任务完成或失败
+        if (status === 'completed' || status === 'failed') {
+          delete pollingTimeoutsByAgent.current[agentId]
+          delete pollingStatusByAgent.current[agentId]
 
-        console.log(`[POLL_DEBUG] === 开始处理状态 ===`)
-        console.log(`[POLL_DEBUG] 任务ID: ${taskId}`)
-        console.log(`[POLL_DEBUG] 状态: "${status}" (类型: ${typeof status})`)
-        console.log(`[POLL_DEBUG] 进度: ${progress}`)
-        console.log(`[POLL_DEBUG] 轮询计数: ${pollCount}`)
-        console.log(`[POLL_DEBUG] AgentID: ${agentId}`)
-
-        switch (status) {
-           case 'queued':
-           case 'pending':
-           case 'processing':
-           case 'running':
-             console.log(`[POLL_DEBUG] 状态 "${status}" 继续轮询`)
-             
-             if (progressMessageId) {
-               setMessagesByChannel((prev) => {
-                 const channelMessages = prev[agentId] || []
-                 const messageIndex = channelMessages.findIndex((msg: unknown) =>
-                   typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
-                 )
-
-                 if (messageIndex !== -1 && current_step) {
-                   const updatedMessages = [...channelMessages]
-                   const progressMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
-                     ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
-                     : {}
-
-                   progressMessage.content = `🔄 ${current_step}${progress > 0 ? ` (${Math.round(progress * 100)}%)` : ''}`
-
-                   updatedMessages[messageIndex] = progressMessage
-                   return {
-                     ...prev,
-                     [agentId]: updatedMessages,
-                   }
-                 }
-
-                 return prev
-               })
-             }
-             break
-
-           case 'completed':
-             console.log(`[POLL_DEBUG] 🎯 检测到完成状态，执行清理逻辑`)
-             clearInterval(intervalId)
-             delete pollingIntervalsByAgent.current[agentId]
-             delete pollingStatusByAgent.current[agentId]
-             console.log(`[POLL_DEBUG] ✅ 任务完成: ${taskId}`)
-
-            if (progressMessageId && taskResponse) {
-              setMessagesByChannel((prev) => {
-                const channelMessages = prev[agentId] || []
-                const messageIndex = channelMessages.findIndex((msg: unknown) =>
-                  typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
-                )
-
-                if (messageIndex !== -1) {
-                  const updatedMessages = [...channelMessages]
-                  const completedMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
-                    ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
-                    : {}
-
-                  completedMessage.content = String(taskResponse)
-                  completedMessage.progress = 1
-                  completedMessage.status = 'completed'
-
-                  updatedMessages[messageIndex] = completedMessage
-                  return {
-                    ...prev,
-                    [agentId]: updatedMessages,
-                  }
-                }
-
-                return prev
-              })
-            } else if (taskResponse) {
-              const responseMessage = {
-                id: `assistant_${Date.now()}_${agentId}`,
-                type: 'assistant',
-                content: String(taskResponse),
-                timestamp: Date.now(),
-                source: 'alou-edge',
-                agentId: agentId,
-              }
-              appendMessage(responseMessage, agentId)
-            }
-
-            setAgentLoading(agentId, false)
-            scrollToBottom()
-            break
-
-          case 'failed':
-            console.log(`[POLL_DEBUG] ❌ 检测到失败状态，执行清理逻辑`)
-            clearInterval(intervalId)
-            delete pollingIntervalsByAgent.current[agentId]
-            delete pollingStatusByAgent.current[agentId]
-            console.error(`[pollAsyncTask] 任务失败: ${taskId}, 错误: ${error}`)
-            console.log(`[POLL_DEBUG] ❌ 任务失败: ${taskId}`)
-
+          if (status === 'completed' && taskResponse) {
             if (progressMessageId) {
               setMessagesByChannel((prev) => {
                 const channelMessages = prev[agentId] || []
@@ -330,120 +238,93 @@ export const useAsyncTaskPolling = ({
 
                 if (messageIndex !== -1) {
                   const updatedMessages = [...channelMessages]
-                  const failedMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
-                    ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
-                    : {}
+                  const completedMessage = { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                  completedMessage.content = String(taskResponse)
+                  completedMessage.progress = 1
+                  completedMessage.status = 'completed'
+                  updatedMessages[messageIndex] = completedMessage
+                  return { ...prev, [agentId]: updatedMessages }
+                }
+                return prev
+              })
+            } else {
+              appendMessage({
+                id: `assistant_${Date.now()}_${agentId}`,
+                type: 'assistant',
+                content: String(taskResponse),
+                timestamp: Date.now(),
+                source: 'alou-edge',
+                agentId: agentId,
+              }, agentId)
+            }
+          } else if (status === 'failed') {
+            const errorContent = `❌ 任务执行失败: ${error || '未知错误'}`
+            if (progressMessageId) {
+              setMessagesByChannel((prev) => {
+                const channelMessages = prev[agentId] || []
+                const messageIndex = channelMessages.findIndex((msg: unknown) =>
+                  typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
+                )
 
-                  failedMessage.content = `❌ 任务执行失败: ${error || '未知错误'}`
+                if (messageIndex !== -1) {
+                  const updatedMessages = [...channelMessages]
+                  const failedMessage = { ...updatedMessages[messageIndex] as Record<string, unknown> }
+                  failedMessage.content = errorContent
                   failedMessage.progress = 1
                   failedMessage.status = 'failed'
                   failedMessage.error = error
-
                   updatedMessages[messageIndex] = failedMessage
-                  return {
-                    ...prev,
-                    [agentId]: updatedMessages,
-                  }
+                  return { ...prev, [agentId]: updatedMessages }
                 }
-
                 return prev
               })
             } else {
               appendMessage({
                 id: `error_${Date.now()}_${agentId}`,
                 type: 'assistant',
-                content: `❌ 任务执行失败: ${error || '未知错误'}`,
+                content: errorContent,
                 timestamp: Date.now(),
                 source: 'error',
                 agentId: agentId,
               }, agentId)
             }
+          }
 
-            setAgentLoading(agentId, false)
-            scrollToBottom()
-            break
-
-          default:
-            console.warn(`[pollAsyncTask] 未知任务状态: ${status}`)
+          setAgentLoading(agentId, false)
+          scrollToBottom()
+          return
         }
+
+        // 继续轮询
+        const isFastMode = currentStatus?.fastMode
+        const nextDelay = isFastMode ? 200 : interval
+        
+        if (status !== 'processing') {
+          currentStatus.fastMode = false
+        }
+        
+        const timeoutId = window.setTimeout(doPoll, nextDelay)
+        pollingTimeoutsByAgent.current[agentId] = timeoutId
       } catch (error) {
         console.error(`[pollAsyncTask] 轮询失败:`, error)
-
-        clearInterval(intervalId)
-        delete pollingIntervalsByAgent.current[agentId]
+        delete pollingTimeoutsByAgent.current[agentId]
         delete pollingStatusByAgent.current[agentId]
-
-        if (progressMessageId) {
-          setMessagesByChannel((prev) => {
-            const channelMessages = prev[agentId] || []
-            const messageIndex = channelMessages.findIndex((msg: unknown) =>
-              typeof msg === 'object' && msg !== null && 'id' in msg && (msg as { id: string }).id === progressMessageId
-            )
-
-            if (messageIndex !== -1) {
-              const updatedMessages = [...channelMessages]
-              const errorMessage = typeof updatedMessages[messageIndex] === 'object' && updatedMessages[messageIndex] !== null
-                ? { ...updatedMessages[messageIndex] as Record<string, unknown> }
-                : {}
-
-              errorMessage.content = `❌ 任务执行出错: ${(error as Error).message}`
-              errorMessage.progress = 1
-              errorMessage.status = 'error'
-              errorMessage.error = (error as Error).message
-
-              updatedMessages[messageIndex] = errorMessage
-              return {
-                ...prev,
-                [agentId]: updatedMessages,
-              }
-            }
-
-            return prev
-          })
-        } else {
-          appendMessage({
-            id: `error_${Date.now()}_${agentId}`,
-            type: 'assistant',
-            content: `❌ 任务执行出错: ${(error as Error).message}`,
-            timestamp: Date.now(),
-            source: 'error',
-            agentId: agentId,
-          }, agentId)
-        }
-
         setAgentLoading(agentId, false)
         scrollToBottom()
       }
-    }, interval)
+    }
 
-    pollingIntervalsByAgent.current[agentId] = intervalId
-
-    const immediatePoll = window.setTimeout(async () => {
-      try {
-        const response = await apiClient.get(`/ai-task/${taskId}/status`)
-        const result: TaskResult = response.data
-
-        if (result.status) {
-          const { status, progress = 0 } = result
-          console.log(`[pollAsyncTask] 首次轮询 - 状态: ${status}, 进度: ${progress}%`)
-        }
-      } catch (error) {
-        console.error(`[pollAsyncTask] 首次轮询失败:`, error)
-      }
-    }, 100)
-    
-    pollingIntervalsByAgent.current[`${agentId}_immediate`] = immediatePoll
+    // 开始第一次轮询
+    const initialTimeoutId = window.setTimeout(doPoll, 500)
+    pollingTimeoutsByAgent.current[agentId] = initialTimeoutId
   }, [appendMessage, scrollToBottom, setAgentLoading, setMessagesByChannel, executeToolCallsAndSubmitResults])
 
-  /**
-   * 终止指定智能体的轮询
-   */
   const cancelPolling = useCallback((agentId: string) => {
-    const intervalId = pollingIntervalsByAgent.current[agentId]
-    if (intervalId) {
+    const timeoutId = pollingTimeoutsByAgent.current[agentId]
+    if (timeoutId) {
       console.log('[useAsyncTaskPolling] 终止智能体轮询:', agentId)
-      clearInterval(intervalId)
-      delete pollingIntervalsByAgent.current[agentId]
+      clearTimeout(timeoutId)
+      delete pollingTimeoutsByAgent.current[agentId]
       delete pollingStatusByAgent.current[agentId]
     }
   }, [])

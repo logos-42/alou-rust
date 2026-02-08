@@ -23,6 +23,7 @@ mod workflow;
 mod tools;
 mod prompt_system;
 mod ai_loop;
+mod agent;  // 新增 Agent 模块
 
 use std::path::PathBuf;
 use tauri::Manager;
@@ -79,6 +80,12 @@ use crate::memory_manager::{
     garbage_collect, pin_item, unpin_item, set_diap_identity, get_diap_identity,
     remove_diap_identity, get_all_diap_identities, archive_diap_identity_to_ipfs,
     pin_diap_identity, unpin_diap_identity,
+};
+
+// Agent commands
+use crate::agent::commands::{
+    execute_agent_task, execute_ai_conversation, get_agent_config, update_agent_config,
+    test_api_connection, get_available_providers, health_check,
 };
 
 // Tool commands
@@ -243,6 +250,8 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(tauri::async_runtime::Mutex::new(IpfsState {
             process: None,
             data_dir: PathBuf::new(),
@@ -344,6 +353,14 @@ fn main() {
             archive_diap_identity_to_ipfs,
             pin_diap_identity,
             unpin_diap_identity,
+            // Agent commands
+            execute_agent_task,
+            execute_ai_conversation,
+            get_agent_config,
+            update_agent_config,
+            test_api_connection,
+            get_available_providers,
+            health_check,
         ])
         .setup(|app| {
             // Set window title
