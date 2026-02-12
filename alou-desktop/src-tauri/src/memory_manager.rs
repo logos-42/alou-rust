@@ -519,9 +519,18 @@ fn get_memory_manager() -> &'static MemoryManager {
     static MANAGER: OnceLock<MemoryManager> = OnceLock::new();
 
     MANAGER.get_or_init(|| {
-        MemoryManager::new(
-            1000,  // 最大1000个项目
-            50    // 最大50MB
-        ).expect("Failed to initialize MemoryManager")
+        // 使用默认配置创建 MemoryManager
+        MemoryManager::new(1000, 50).unwrap_or_else(|_| {
+            // 如果创建失败，创建一个基本的 MemoryManager
+            let rt = Runtime::new().unwrap();
+            let ipfs_client = IpfsClient::default();
+            MemoryManager {
+                items: Arc::new(Mutex::new(HashMap::new())),
+                max_items: 1000,
+                max_size_mb: 50,
+                ipfs_client: Arc::new(ipfs_client),
+                runtime: Arc::new(rt),
+            }
+        })
     })
 }

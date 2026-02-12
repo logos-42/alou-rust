@@ -26,6 +26,12 @@ pub mod rollback;
 pub mod ipfs_archive;
 pub mod git_helper;
 pub mod agent_creator;
+pub mod task_queue;             // 任务队列系统核心
+pub mod task_queue_tool;        // 任务队列Tauri工具
+pub mod skill_auto_selector;      // Skills自动选择器核心
+pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
+pub mod autonomous_executor;       // 自主执行引擎
+pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -42,6 +48,8 @@ pub use tool_creation::ToolCreationTool;
 // 从 tool_parts 直接导出定义类型和执行器
 pub use tool_parts::definitions::{ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
 pub use tool_parts::executor::{DynamicToolExecutor, DynamicToolResult};
+pub use task_queue::{TaskQueueManager, Task, TaskPriority, TaskStatus, TaskResult, TaskStats, HeartbeatTask};
+pub use skill_auto_selector::{SkillAutoSelector, ToolMatch, AutoSelectConfig};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]

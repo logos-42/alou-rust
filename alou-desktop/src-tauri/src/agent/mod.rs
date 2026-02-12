@@ -10,6 +10,8 @@ pub mod executor;
 pub mod streaming;
 pub mod commands;
 pub mod error;
+pub mod role;
+pub mod memory;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -39,3 +41,11 @@ pub use task::{Task, TaskStatus, TaskEvent, TaskFinalResult, TaskManager};
 pub use executor::{RalphLoopExecutor, ExecutionResult, ExecutorError};
 pub use streaming::{StreamingExecutor, StreamEvent};
 pub use error::{AgentError, Result};
+pub use role::{
+    AgentRoleConfig, PersonalityConfig, CommunicationConfig, BehaviorRule,
+    CommunicationStyle, ResponseLength, ProactivityLevel, RoleManager,
+};
+pub use memory::{
+    MemoryManager, Memory, MemoryType, Importance,
+    UserPreference, BehaviorPattern, MemoryConfig,
+};

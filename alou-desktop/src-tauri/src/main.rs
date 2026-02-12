@@ -23,6 +23,9 @@ mod workflow;
 mod tools;
 mod prompt_system;
 mod ai_loop;
+mod autonomous_agent;  // 自主智能体模块
+mod autonomous_loop;    // 自主循环模块
+mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
 
 use std::path::PathBuf;
@@ -72,6 +75,7 @@ use crate::workflow::{
 };
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
 use crate::tools::initialize_tools;
+use crate::tools::task_queue_tool::{initialize_task_queue_tool, add_task, get_next_task, update_task_status, set_task_result, list_tasks, get_task_stats, get_task_by_id};
 use crate::prompts::PromptManager;
 use crate::context::create_default_context_manager;
 use crate::memory_manager::{
@@ -86,6 +90,41 @@ use crate::memory_manager::{
 use crate::agent::commands::{
     execute_agent_task, execute_ai_conversation, get_agent_config, update_agent_config,
     test_api_connection, get_available_providers, health_check,
+};
+
+// Autonomous Agent commands - 状态管理函数
+use crate::autonomous_agent::{
+    get_autonomous_agent_state, 
+    save_autonomous_agent_state,
+};
+
+// Autonomous Loop commands - 自主循环命令
+use crate::autonomous_loop_commands::{
+    start_autonomous_loop,
+    stop_autonomous_loop,
+    pause_autonomous_loop,
+    resume_autonomous_loop,
+    get_autonomous_loop_state,
+    add_autonomous_task,
+};
+
+// Skill Auto Selector commands
+use crate::tools::skill_auto_selector_tool::{
+    analyze_and_select_tools, generate_execution_plan,
+    get_available_tools, update_auto_select_config, get_auto_select_config,
+};
+
+// Autonomous Executor commands (使用别名避免冲突)
+use crate::tools::autonomous_executor_tool::{
+    autonomous_execute_plan,
+    autonomous_execute_tool,
+    autonomous_get_history,
+    clear_execution_history,
+    update_executor_config,
+    get_executor_config,
+    handle_chat_message,
+    update_respond_config,
+    get_respond_config,
 };
 
 // Tool commands
@@ -260,6 +299,7 @@ fn main() {
         .manage(WorkflowState::default())
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(create_default_bridge_manager())))
+        .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,
@@ -326,10 +366,8 @@ fn main() {
             rollback_ralph_loop_execution,
             cleanup_ralph_loop_histories,
             // Tool commands
-            execute_tool,
             get_tool_list,
             cancel_tool_execution,
-            get_execution_history,
             // Agent Skills commands
             agent_skills,
             // Memory management commands
@@ -361,7 +399,66 @@ fn main() {
             test_api_connection,
             get_available_providers,
             health_check,
+            // Task Queue commands
+            add_task,
+            get_next_task,
+            update_task_status,
+            list_tasks,
+            get_task_stats,
+            // Autonomous Agent commands
+            get_autonomous_agent_state,
+            save_autonomous_agent_state,
+            // Autonomous Loop commands
+            start_autonomous_loop,
+            stop_autonomous_loop,
+            pause_autonomous_loop,
+            resume_autonomous_loop,
+            get_autonomous_loop_state,
+            add_autonomous_task,
+            // Autonomous Loop commands
+            start_autonomous_loop,
+            stop_autonomous_loop,
+            pause_autonomous_loop,
+            resume_autonomous_loop,
+            get_autonomous_loop_state,
+            add_autonomous_task,
+            // Skill Auto Selector commands
+            analyze_and_select_tools,
+            generate_execution_plan,
+            get_available_tools,
+            update_auto_select_config,
+            get_auto_select_config,
+            // Autonomous Executor commands
+            autonomous_execute_plan,
+            autonomous_execute_tool,
+            autonomous_get_history,
+            clear_execution_history,
+            update_executor_config,
+            get_executor_config,
+            handle_chat_message,
+            update_respond_config,
+            get_respond_config,
         ])
+        
+        // Autonomous Loop state
+        .manage(std::sync::Arc::new(tokio::sync::Mutex::new(
+            crate::autonomous_loop::AutonomousLoop::new(
+                std::sync::Arc::new(tokio::sync::Mutex::new(
+                    match crate::tools::task_queue::TaskQueueManager::new(None) {
+                        Ok(manager) => manager,
+                        Err(e) => {
+                            eprintln!("Failed to create task queue manager: {}", e);
+                            crate::tools::task_queue::TaskQueueManager::new(Some(
+                                std::path::PathBuf::from("/tmp/alou/tasks")
+                            )).unwrap_or_else(|_| {
+                                panic!("Cannot create TaskQueueManager")
+                            })
+                        }
+                    }
+                )),
+                std::sync::Arc::new(tokio::sync::Mutex::new(crate::tools::ToolRegistry::new()))
+            )
+        )))
         .setup(|app| {
             // Set window title
             if let Some(window) = app.get_webview_window("main") {

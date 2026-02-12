@@ -11,6 +11,7 @@ import AboutView from '@/views/AboutView'
 import SubscriptionView from '@/views/SubscriptionView'
 import SdkExampleView from '@/routes/SdkExample.jsx'
 import AvatarTest from '@/components/AvatarTest'
+import AutonomousLoopPanel from '@/views/AutonomousLoopPanel.jsx'
 
 // 钱包同步监听组件
 const WalletSyncListener = () => {
@@ -249,6 +250,7 @@ const AppRoutes = () => (
       }
     />
     <Route path="/avatar-test" element={<AvatarTest />} />
+    <Route path="/autonomous-loop" element={<AutonomousLoopPanel />} />
     <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   </>
