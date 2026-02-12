@@ -81,6 +81,32 @@ interface Message {
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001';
 const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
 
+// AI 配置 (支持 OpenCode 和 DeepSeek)
+const AI_CONFIG = {
+  provider: import.meta.env.VITE_AI_PROVIDER || 'deepseek',
+  model: import.meta.env.VITE_OPENAI_MODEL || import.meta.env.VITE_DEEPSEEK_MODEL || 'deepseek-chat',
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.VITE_DEEPSEEK_API_KEY || '',
+  baseUrl: import.meta.env.VITE_OPENAI_API_URL || import.meta.env.VITE_DEEPSEEK_API_URL || null,
+};
+
+// 辅助函数：获取 AI 配置
+function getAIConfig() {
+  const config = {
+    provider: AI_CONFIG.provider,
+    model: AI_CONFIG.model,
+    apiKey: AI_CONFIG.apiKey,
+    baseUrl: AI_CONFIG.baseUrl,
+  };
+  
+  // 如果是 OpenCode，使用 OpenAI 兼容格式
+  if (config.provider === 'opencode') {
+    config.model = import.meta.env.VITE_OPENAI_MODEL || 'minimax-m2.1-free';
+    config.baseUrl = import.meta.env.VITE_OPENAI_API_URL || 'https://api.opencode.ai/v1';
+  }
+  
+  return config;
+}
+
 // 辅助函数：生成系统提示（使用统一Prompt服务）
 const getSystemPromptForChat = async (agentInfo: AgentInfo, context: Record<string, any> = {}): Promise<string> => {
   console.log('[getSystemPromptForChat] 使用统一Prompt服务:', { agentInfo, context });
@@ -127,16 +153,19 @@ class AgentService {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       
+      // 获取 AI 配置
+      const aiConfig = getAIConfig();
+      
       const payload = {
         agentConfig: {
           name: agentInfo.name,
           display_name: agentInfo.display_name,
           description: agentInfo.description,
           role_description: agentInfo.role_description,
-          provider: 'deepseek', // 默认使用deepseek
-          api_key: '', // 需要从配置中获取
-          model: 'deepseek-chat',
-          base_url: null
+          provider: aiConfig.provider,
+          api_key: aiConfig.apiKey,
+          model: aiConfig.model,
+          base_url: aiConfig.baseUrl
         } as LocalAgentConfig,
         message,
         options: {

@@ -140,7 +140,7 @@ impl AiClient {
                 config.model.clone().unwrap_or_else(|| "deepseek-chat".to_string()),
                 config.base_url.clone(),
             )),
-            "openai" => Box::new(providers::OpenAiProvider::new(
+            "openai" | "opencode" => Box::new(providers::OpenAiProvider::new(
                 config.api_key.clone(),
                 config.model.clone().unwrap_or_else(|| "gpt-4".to_string()),
                 config.base_url.clone(),
