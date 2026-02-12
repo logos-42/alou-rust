@@ -1,0 +1,9 @@
+{
+  "id": "sample-hello",
+  "name": "示例插件 - Hello World",
+  "version": "1.0.0",
+  "description": "展示如何创建自定义插件的示例",
+  "author": "Alou",
+  "skills": ["skill.ts"],
+  "enabled": true
+}
