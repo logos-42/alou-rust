@@ -28,9 +28,11 @@ export const useGroupChatRemoteControl = ({
   // 监听群聊面板状态，关闭时重置输入目标模式
   useEffect(() => {
     if (!showGroupChat) {
+      console.log('[useGroupChatRemoteControl] 群聊面板关闭，设置输入目标为agent模式')
       setInputTargetMode('agent')
     } else {
       // 群聊面板打开时，默认设置为 'groupChat' 模式
+      console.log('[useGroupChatRemoteControl] 群聊面板打开，设置输入目标为groupChat模式')
       setInputTargetMode('groupChat')
     }
   }, [showGroupChat])

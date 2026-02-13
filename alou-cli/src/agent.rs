@@ -1,7 +1,7 @@
 //! Alou CLI Agent Module
 //! 处理Agent对话和自主行动功能
 
-use crate::api::{self, Config, ChatMessage};
+use crate::api::{Config, Message};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -11,7 +11,7 @@ pub struct AgentState {
     pub name: String,
     pub mode: String,
     pub is_autonomous: bool,
-    pub conversation_history: VecDeque<ChatMessage>,
+    pub conversation_history: VecDeque<Message>,
 }
 
 /// 任务
@@ -75,19 +75,19 @@ impl Agent {
     /// 发送聊天消息并获取响应
     pub async fn chat(&mut self, message: &str) -> Result<String, String> {
         // 添加用户消息到历史
-        self.state.conversation_history.push_back(ChatMessage {
+        self.state.conversation_history.push_back(Message {
             role: "user".to_string(),
             content: message.to_string(),
         });
 
         // 构建消息列表
-        let messages: Vec<ChatMessage> = self.state.conversation_history.iter().cloned().collect();
+        let messages: Vec<Message> = self.state.conversation_history.iter().cloned().collect();
 
         // 调用API
-        let response = api::send_chat_request(&self.config, messages).await?;
+        let response = crate::api::send_chat_request(&self.config, messages).await?;
 
         // 添加助手回复到历史
-        self.state.conversation_history.push_back(ChatMessage {
+        self.state.conversation_history.push_back(Message {
             role: "assistant".to_string(),
             content: response.clone(),
         });

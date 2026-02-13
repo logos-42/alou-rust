@@ -148,15 +148,21 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   // 获取当前活跃的群聊（优先从DIAP群聊查找，然后从本地store查找）
   const activeGroup = useMemo(() => {
     if (!activeGroupId) return null
-    
+
+    console.log('[useGroupChatManager] 获取活跃群聊，activeGroupId:', activeGroupId)
+
     // 先从DIAP群聊查找
     const diapGroup = diapGroupChat.groups.find(g => g.groupId === activeGroupId)
-    if (diapGroup) return diapGroup
-    
+    if (diapGroup) {
+      console.log('[useGroupChatManager] 从DIAP找到群聊:', diapGroup)
+      return diapGroup
+    }
+
     // 从本地store查找
     const localActions = getActions(activeChannelId) || []
     const matchedAction = localActions.find((action) => action.action_id === activeGroupId)
     if (matchedAction) {
+      console.log('[useGroupChatManager] 从本地store找到群聊:', matchedAction)
       return {
         groupId: matchedAction.action_id,
         groupName: matchedAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
@@ -171,6 +177,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 
     const activeAction = getActiveAction(activeChannelId)
     if (activeAction?.action_id === activeGroupId) {
+      console.log('[useGroupChatManager] 从活跃行动找到群聊:', activeAction)
       return {
         groupId: activeAction.action_id,
         groupName: activeAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
@@ -182,7 +189,8 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         }
       }
     }
-    
+
+    console.log('[useGroupChatManager] 未找到活跃群聊')
     return null
   }, [diapGroupChat.groups, activeGroupId, getActiveAction, getActions, activeChannelId])
 

@@ -91,15 +91,15 @@ pub struct ChatRequest {
     pub max_tokens: u64,
 }
 
+// 聊天消息 - 公开导出
+pub use self::Message as ChatMessage;
+
 /// 聊天消息
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Message {
     pub role: String,
     pub content: String,
 }
-
-// 为了兼容性，创建ChatMessage作为Message的别名
-pub type ChatMessage = Message;
 
 /// AI聊天响应
 #[derive(Debug, Deserialize)]

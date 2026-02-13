@@ -125,6 +125,11 @@ const GroupChatPanel = ({
 
   // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
+    console.log('[GroupChatPanel] actualAgents 计算:', {
+      activeGroupAgents: activeGroup?.agents,
+      externalAgents: agents,
+      result: activeGroup?.agents || agents || []
+    })
     return activeGroup?.agents || agents || []
   }, [activeGroup, agents])
 
@@ -185,13 +190,13 @@ const GroupChatPanel = ({
   // 处理面板点击事件，切换输入目标到群聊
   const handlePanelClick = (e) => {
     console.log('[GroupChatPanel] 面板点击事件触发:', e.target)
-    
+
     // 避免点击按钮或其他交互元素时触发
     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
       console.log('[GroupChatPanel] 点击了按钮，忽略面板点击')
       return
     }
-    
+
     // 立即添加点击动画效果
     setIsClicked(true)
     const panel = e.currentTarget
@@ -200,10 +205,10 @@ const GroupChatPanel = ({
       panel.classList.remove('clicked')
       setIsClicked(false)
     }, 300)
-    
+
     console.log('[GroupChatPanel] 调用 onPanelClick')
     onPanelClick?.()
-    
+
     // 直接触发切换事件，确保状态同步
     window.dispatchEvent(new CustomEvent('switch-input-target', {
       detail: { target: 'groupChat' }
@@ -282,7 +287,7 @@ const GroupChatPanel = ({
           <div className="agents-avatars-label">{t('agent.groupChat.participants')} (actualAgents: {actualAgents.length})</div>
           <div className="agents-avatars-list">
             {actualAgents.map((agent) => (
-              <AgentAvatar 
+              <AgentAvatar
                 key={agent.id || agent.agent_id || agent.did}
                 agent={agent}
                 onAgentClick={onAgentClick}
@@ -330,7 +335,7 @@ const GroupChatPanel = ({
         {groupChatList && groupChatList.length > 0 && (
           <GroupChatArchiveList
             groupChatList={groupChatList}
-            activeActionId={actionId}
+            activeActionId={activeActionId}
             activeChannelId={activeChannelId}
             onSwitchGroupChat={onSwitchGroupChat}
           />
