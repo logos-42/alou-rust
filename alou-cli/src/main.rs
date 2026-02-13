@@ -289,7 +289,7 @@ fn cmd_agent_chat(message: &str) {
 fn cmd_config_show() {
     log_section("当前配置");
     let config = load_config();
-    
+
     println!("API配置:");
     println!("  Base URL: {}", config.api.base_url);
     println!("  Timeout: {}ms", config.api.timeout);
@@ -309,7 +309,7 @@ fn cmd_config_show() {
 
 fn cmd_config_set(key: &str, value: &str) {
     let mut config = load_config();
-    
+
     match key {
         "api_url" => {
             config.api.base_url = value.to_string();
@@ -333,9 +333,136 @@ fn cmd_config_set(key: &str, value: &str) {
             return;
         }
     }
-    
+
     if let Err(e) = save_config(&config) {
         log_error(&format!("保存配置失败: {}", e));
+    }
+}
+
+// 存档功能相关函数
+fn get_archive_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".alou")
+        .join("archive")
+}
+
+fn cmd_archive_list() {
+    let archive_path = get_archive_path();
+    if !archive_path.exists() {
+        println!("没有存档文件");
+        return;
+    }
+
+    let entries = fs::read_dir(&archive_path);
+    match entries {
+        Ok(dir) => {
+            let mut archives: Vec<String> = Vec::new();
+            for entry in dir {
+                if let Ok(entry) = entry {
+                    if let Some(file_name) = entry.file_name().to_str() {
+                        if file_name.ends_with(".json") {
+                            archives.push(file_name.to_string());
+                        }
+                    }
+                }
+            }
+            
+            if archives.is_empty() {
+                println!("没有存档文件");
+            } else {
+                log_section("存档列表");
+                for (i, archive) in archives.iter().enumerate() {
+                    println!("{}. {}", i + 1, archive);
+                }
+            }
+        }
+        Err(_) => {
+            println!("无法读取存档目录");
+        }
+    }
+}
+
+fn cmd_archive_create(name: &str) {
+    log_info(&format!("创建存档: {}", name));
+    
+    let archive_path = get_archive_path();
+    if !archive_path.exists() {
+        let _ = fs::create_dir_all(&archive_path);
+    }
+    
+    // 创建存档内容 - 包含当前状态和任务
+    let state = load_state();
+    let tasks = load_tasks();
+    
+    let archive_content = serde_json::json!({
+        "timestamp": chrono::Utc::now().timestamp(),
+        "state": state,
+        "tasks": tasks,
+        "version": "0.1.10"
+    });
+    
+    let archive_file = archive_path.join(format!("{}.json", name));
+    let content = serde_json::to_string_pretty(&archive_content).unwrap_or_default();
+    match fs::write(&archive_file, content) {
+        Ok(_) => {
+            log_success(&format!("存档 '{}' 已创建", name));
+        }
+        Err(e) => {
+            log_error(&format!("创建存档失败: {}", e));
+        }
+    }
+}
+
+fn cmd_archive_load(name: &str) {
+    log_info(&format!("加载存档: {}", name));
+    
+    let archive_file = get_archive_path().join(format!("{}.json", name));
+    if !archive_file.exists() {
+        log_error(&format!("存档 '{}' 不存在", name));
+        return;
+    }
+    
+    match fs::read_to_string(&archive_file) {
+        Ok(content) => {
+            match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(archive_data) => {
+                    // 恢复状态
+                    if let Some(state_val) = archive_data.get("state") {
+                        if let Ok(state) = serde_json::from_value::<LoopState>(state_val.clone()) {
+                            save_state(&state);
+                            log_success("状态已恢复");
+                        }
+                    }
+                    
+                    // 恢复任务
+                    if let Some(tasks_val) = archive_data.get("tasks") {
+                        if let Ok(tasks) = serde_json::from_value::<Vec<Task>>(tasks_val.clone()) {
+                            let tasks_path = dirs::home_dir()
+                                .unwrap_or_else(|| PathBuf::from("."))
+                                .join(".alou")
+                                .join("tasks");
+                            
+                            if !tasks_path.exists() {
+                                let _ = fs::create_dir_all(&tasks_path);
+                            }
+                            
+                            let content = serde_json::to_string(&tasks).unwrap_or_default();
+                            let _ = fs::write(tasks_path.join("queue.json"), content);
+                            log_success("任务已恢复");
+                        }
+                    }
+                    
+                    log_success(&format!("存档 '{}' 已加载", name));
+                }
+                Err(e) => {
+                    log_error(&format!("解析存档失败: {}", e));
+                }
+            }
+        }
+        Err(e) => {
+            log_error(&format!("读取存档失败: {}", e));
+        }
     }
 }
 
@@ -363,6 +490,11 @@ fn cmd_help() {
     println!("  config show                      显示配置");
     println!("  config set <key> <value>        设置配置");
     println!();
+    println!("{}存档管理:{}", CYAN, RESET);
+    println!("  archive create <名称>            创建存档");
+    println!("  archive load <名称>              加载存档");
+    println!("  archive list                     列出存档");
+    println!();
     println!("{}帮助:{}", CYAN, RESET);
     println!("  help             帮助");
     println!();
@@ -371,6 +503,7 @@ fn cmd_help() {
     println!("  alou task add \"检查邮件\" \"检查未读邮件\" high");
     println!("  alou agent chat \"你好\"");
     println!("  alou config set api_key your_key_here");
+    println!("  alou archive create backup");
     println!("  alou status");
 }
 
@@ -444,9 +577,36 @@ fn main() {
                 _ => log_error(&format!("未知操作: {}", args[2])),
             }
         }
-        
+
+        "archive" => {
+            if args.len() < 3 {
+                log_error("缺少存档操作");
+                return;
+            }
+            match args[2].as_str() {
+                "create" => {
+                    let name = args.get(3).map(|s| s.as_str()).unwrap_or("");
+                    if name.is_empty() {
+                        log_error("请提供存档名称");
+                    } else {
+                        cmd_archive_create(name);
+                    }
+                }
+                "load" => {
+                    let name = args.get(3).map(|s| s.as_str()).unwrap_or("");
+                    if name.is_empty() {
+                        log_error("请提供存档名称");
+                    } else {
+                        cmd_archive_load(name);
+                    }
+                }
+                "list" => cmd_archive_list(),
+                _ => log_error(&format!("未知操作: {}", args[2])),
+            }
+        }
+
         "help" | "-h" | "--help" => cmd_help(),
-        
+
         _ => {
             log_error(&format!("未知命令: {}", args[1]));
             println!("运行 {}alou help{} 查看命令", GREEN, RESET);
