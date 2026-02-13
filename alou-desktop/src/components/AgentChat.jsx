@@ -194,11 +194,12 @@ const AgentChat = () => {
   const {
     showGroupChat,
     activeActionId,
-    activeAction,
-    groupChatMessages,
+    activeGroup,
+    activeGroupMessages,
     actionStatus,
     splitPosition,
     groupChatList,
+    sendMessage: sendGroupChatMessage,
     openGroupChat,
     closeGroupChat,
     closeGroupChatCompletely,
@@ -801,7 +802,7 @@ const AgentChat = () => {
             )}
 
             <div className="conversation-shell">
-              {showGroupChat && activeActionId ? (
+              {showGroupChat ? (
                 <SplitView
                   left={
                     <ConversationPanelWrapper>
@@ -826,22 +827,23 @@ const AgentChat = () => {
                   }
                   right={
                     <GroupChatPanel
-                      actionId={activeActionId}
-                      actionDescription={activeAction?.description || activeAction?.action?.description}
-                      agents={activeAction?.agents || []}
-                      messages={groupChatMessages}
+                      actionId={activeActionId || activeGroup?.groupId}
+                      externalActiveGroup={activeGroup}
+                      externalMessages={activeGroupMessages}
+                      agents={activeGroup?.agents || []}
                       status={actionStatus}
                       onClose={closeGroupChatCompletely}
                       onRefresh={() => {
                         // 刷新群聊消息的逻辑已在 useGroupChat 中处理
                       }}
                       onAgentClick={handleAgentClickFromGroupChat}
-                      isLoading={actionStatus === 'Running'}
+                      externalIsLoading={actionStatus === 'Running'}
                       groupChatList={groupChatList}
                       activeChannelId={activeChannelId}
                       onSwitchGroupChat={switchGroupChat}
                       onPanelClick={handleGroupChatPanelClick}
                       onSelectAgent={handleSelectAgentFromGroupChat}
+                      externalOnSendMessage={sendGroupChatMessage}
                       onResize={setSplitPosition}
                       inputTargetMode={inputTargetMode}
                     />

@@ -7,12 +7,19 @@
 //!   alou status       查看状态
 //!   alou task add "测试"  添加任务
 //!   alou agent chat "你好"  和 Agent 对话
+//!   alou config show  显示配置
+
+mod api;
+mod agent;
 
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use chrono::Utc;
+
+// 导入新模块
+use api::{Config, load_config, save_config};
 
 // 颜色
 const GREEN: &str = "\x1b[32m";
@@ -251,9 +258,22 @@ fn cmd_task_list() {
     }
 }
 
+// Agent聊天命令
 fn cmd_agent_chat(message: &str) {
     log_section("Agent 对话");
     log_info(&format!("发送: {}", message));
+    
+    // 加载配置
+    let config = load_config();
+    
+    // 检查API配置
+    if config.ai.api_key.is_empty() {
+        println!();
+        println!("⚠️  请先配置API密钥:");
+        println!("   alou config set api_key <你的API密钥>");
+        println!();
+        return;
+    }
     
     println!();
     println!("🤖 Alou Agent 回复:");
@@ -261,8 +281,62 @@ fn cmd_agent_chat(message: &str) {
     println!("你好！我是 Alou AI。");
     println!("收到你的消息: \"{}\"", message);
     println!();
-    println!("自主循环已就绪，可以开始工作了。");
+    println!("(要启用真正的AI对话，请配置API密钥)");
     println!("输入 alou help 查看所有命令。");
+}
+
+// 配置命令
+fn cmd_config_show() {
+    log_section("当前配置");
+    let config = load_config();
+    
+    println!("API配置:");
+    println!("  Base URL: {}", config.api.base_url);
+    println!("  Timeout: {}ms", config.api.timeout);
+    println!();
+    println!("AI配置:");
+    println!("  Provider: {}", config.ai.provider);
+    println!("  Model: {}", config.ai.model);
+    println!("  API Key: {}", if config.ai.api_key.is_empty() { "(未设置)" } else { "******" });
+    println!("  Temperature: {}", config.ai.temperature);
+    println!("  Max Tokens: {}", config.ai.max_tokens);
+    println!();
+    println!("自主循环配置:");
+    println!("  Enabled: {}", config.autonomous.enabled);
+    println!("  Heartbeat: {}s", config.autonomous.heartbeat_interval);
+    println!("  Task Check: {}s", config.autonomous.task_check_interval);
+}
+
+fn cmd_config_set(key: &str, value: &str) {
+    let mut config = load_config();
+    
+    match key {
+        "api_url" => {
+            config.api.base_url = value.to_string();
+            log_success(&format!("API URL 设置为: {}", value));
+        }
+        "api_key" => {
+            config.ai.api_key = value.to_string();
+            log_success("API Key 已设置");
+        }
+        "model" => {
+            config.ai.model = value.to_string();
+            log_success(&format!("模型设置为: {}", value));
+        }
+        "provider" => {
+            config.ai.provider = value.to_string();
+            log_success(&format!("提供商设置为: {}", value));
+        }
+        _ => {
+            log_error(&format!("未知配置项: {}", key));
+            println!("支持的配置项: api_url, api_key, model, provider");
+            return;
+        }
+    }
+    
+    if let Err(e) = save_config(&config) {
+        log_error(&format!("保存配置失败: {}", e));
+    }
 }
 
 fn cmd_help() {
@@ -285,6 +359,10 @@ fn cmd_help() {
     println!("{}Agent 对话:{}", CYAN, RESET);
     println!("  agent chat <消息>               对话");
     println!();
+    println!("{}配置管理:{}", CYAN, RESET);
+    println!("  config show                      显示配置");
+    println!("  config set <key> <value>        设置配置");
+    println!();
     println!("{}帮助:{}", CYAN, RESET);
     println!("  help             帮助");
     println!();
@@ -292,6 +370,7 @@ fn cmd_help() {
     println!("  alou start");
     println!("  alou task add \"检查邮件\" \"检查未读邮件\" high");
     println!("  alou agent chat \"你好\"");
+    println!("  alou config set api_key your_key_here");
     println!("  alou status");
 }
 
@@ -344,6 +423,25 @@ fn main() {
                 cmd_agent_chat(&message);
             } else {
                 log_error(&format!("未知操作: {}", args[2]));
+            }
+        }
+        
+        "config" => {
+            if args.len() < 3 {
+                cmd_config_show();
+                return;
+            }
+            match args[2].as_str() {
+                "show" => cmd_config_show(),
+                "set" => {
+                    if args.len() < 5 {
+                        log_error("缺少配置参数");
+                        println!("用法: alou config set <key> <value>");
+                        return;
+                    }
+                    cmd_config_set(&args[3], &args[4]);
+                }
+                _ => log_error(&format!("未知操作: {}", args[2])),
             }
         }
         

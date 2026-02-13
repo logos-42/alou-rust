@@ -10,7 +10,6 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   // 从 store 获取集群行动相关状态
   const {
     getActions,
-    getActiveActionId,
     setActiveAction,
     getActiveAction,
     getGroupChatMessages,
@@ -98,10 +97,46 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   const [showGroupChat, setShowGroupChat] = useState(false)
   const [activeGroupId, setActiveGroupId] = useState(null)
 
-  // 初始化时自动恢复活跃群聊状态
+  // 按频道加载群聊存档，并尽量恢复活跃群聊
+  const isGroupInActiveChannel = useCallback((group) => {
+    if (!activeChannelId) return false
+    const metadata = group?.metadata || {}
+    const groupChannelId = metadata?.channel?.id || metadata?.channelId || metadata?.channel_id
+    return groupChannelId === activeChannelId
+  }, [activeChannelId])
+
+  useEffect(() => {
+    if (!activeChannelId) {
+      loadedChannelRef.current = null
+      setShowGroupChat(false)
+      return
+    }
+
+    if (loadedChannelRef.current === activeChannelId) {
+      return
+    }
+    loadedChannelRef.current = activeChannelId
+
+    const { actions, activeActionId: storedActiveActionId } = loadChannelGroupChats(activeChannelId)
+    if (!activeGroupId) {
+      if (storedActiveActionId) {
+        setActiveGroupId(storedActiveActionId)
+        return
+      }
+      const firstDiapGroup = diapGroupChat.groups.find(isGroupInActiveChannel)
+      if (firstDiapGroup) {
+        setActiveGroupId(firstDiapGroup.groupId)
+        return
+      }
+      if (actions.length > 0) {
+        setActiveGroupId(actions[0].action_id)
+      }
+    }
+  }, [activeChannelId, activeGroupId, diapGroupChat.groups, isGroupInActiveChannel, loadChannelGroupChats])
+
+  // 兜底：首次启动时若已有群聊但尚未激活，默认选第一个
   useEffect(() => {
     if (!activeGroupId && diapGroupChat.groups.length > 0) {
-      // 尝试从本地群聊获取第一个群聊作为活跃群聊
       const firstGroup = diapGroupChat.groups[0]
       if (firstGroup) {
         console.log('[useGroupChatManager] 自动恢复活跃群聊:', firstGroup.groupId)
@@ -119,10 +154,25 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     if (diapGroup) return diapGroup
     
     // 从本地store查找
-    const activeAction = getActiveAction(activeChannelId)
-    if (activeAction && (activeAction.action_id === activeGroupId || activeAction.action_id?.includes(activeGroupId))) {
+    const localActions = getActions(activeChannelId) || []
+    const matchedAction = localActions.find((action) => action.action_id === activeGroupId)
+    if (matchedAction) {
       return {
-        groupId: activeGroupId,
+        groupId: matchedAction.action_id,
+        groupName: matchedAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
+        description: matchedAction.description,
+        agents: matchedAction.agents || [],
+        metadata: {
+          type: 'local_group',
+          channel: { id: activeChannelId }
+        }
+      }
+    }
+
+    const activeAction = getActiveAction(activeChannelId)
+    if (activeAction?.action_id === activeGroupId) {
+      return {
+        groupId: activeAction.action_id,
         groupName: activeAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
         description: activeAction.description,
         agents: activeAction.agents || [],
@@ -134,30 +184,39 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     }
     
     return null
-  }, [diapGroupChat.groups, activeGroupId, getActiveAction, activeChannelId])
+  }, [diapGroupChat.groups, activeGroupId, getActiveAction, getActions, activeChannelId])
 
   // 获取当前活跃群聊的消息（优先从DIAP群聊查找，然后从本地store查找）
   const activeGroupMessages = useMemo(() => {
     if (!activeGroupId) return []
     
-    // 先从DIAP群聊获取消息
-    if (diapGroupChat.messages && diapGroupChat.messages.length > 0) {
+    // 先从DIAP群聊获取消息（仅当当前活跃群聊匹配）
+    if (diapGroupChat.activeGroup?.groupId === activeGroupId) {
       return diapGroupChat.messages
     }
     
     // 从本地store获取消息
     const messages = getGroupChatMessages(activeGroupId)
     return messages || []
-  }, [diapGroupChat.messages, activeGroupId, getGroupChatMessages])
+  }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId, getGroupChatMessages])
 
   // 获取当前频道的群聊列表（合并DIAP群聊和本地群聊）
   const groupChatList = useMemo(() => {
     if (!activeChannelId) return []
     
     // 获取DIAP群聊
-    const diapGroups = diapGroupChat.groups.filter(group => 
-      group.metadata?.channel?.id === activeChannelId
-    )
+    const diapGroups = diapGroupChat.groups
+      .filter(isGroupInActiveChannel)
+      .map((group) => ({
+        action_id: group.groupId,
+        description: group.description || group.groupName || `群聊 #${group.groupId?.slice(-8) || 'N/A'}`,
+        agents: group.agents || [],
+        metadata: {
+          ...(group.metadata || {}),
+          type: group.metadata?.type || 'diap_group_chat',
+          channel_id: activeChannelId,
+        },
+      }))
     
     // 获取本地群聊
     const localActions = getActions(activeChannelId) || []
@@ -167,20 +226,10 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         action.action_id?.startsWith('action_') ||
         action.metadata?.type === 'group_chat'
       )
-      .map(action => ({
-        groupId: action.action_id,
-        groupName: action.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
-        description: action.description,
-        agents: action.agents || [],
-        metadata: {
-          type: 'local_group',
-          channel: { id: activeChannelId }
-        }
-      }))
     
     // 合并群聊列表
     return [...diapGroups, ...localGroups]
-  }, [diapGroupChat.groups, activeChannelId, getActions])
+  }, [activeChannelId, diapGroupChat.groups, getActions, isGroupInActiveChannel])
 
   // 创建群聊
   const createGroupChat = useCallback(async (groupName, agents = []) => {
@@ -216,6 +265,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 
       // 设置为活跃群聊
       setActiveGroupId(group.groupId)
+      await diapGroupChat.switchToGroup(group.groupId)
       setShowGroupChat(true)
 
       // 打开对话面板
@@ -241,32 +291,46 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   }, [diapGroupChat])
 
   // 切换群聊
-  const switchGroupChat = useCallback((groupId) => {
-    if (diapGroupChat.groups.some(g => g.groupId === groupId)) {
-      setActiveGroupId(groupId)
-      console.log('[useGroupChatManager] 切换群聊:', groupId)
+  const switchGroupChat = useCallback(async (groupId) => {
+    if (!groupId) return
+    setActiveGroupId(groupId)
+    if (activeChannelId) {
+      setActiveAction(groupId, activeChannelId)
     }
-  }, [diapGroupChat.groups])
+    if (diapGroupChat.groups.some(g => g.groupId === groupId)) {
+      try {
+        await diapGroupChat.switchToGroup(groupId)
+      } catch (error) {
+        console.warn('[useGroupChatManager] 切换DIAP群聊失败，将继续使用本地存档消息:', error)
+      }
+    }
+    setShowGroupChat(true)
+    openConversationPanelRef.current?.()
+    console.log('[useGroupChatManager] 切换群聊:', groupId)
+  }, [activeChannelId, diapGroupChat, setActiveAction])
 
   // 打开群聊
   const openGroupChat = useCallback(async () => {
     console.log('[useGroupChatManager] openGroupChat 被调用，当前 activeGroupId:', activeGroupId)
-    console.log('[useGroupChatManager] 可用群聊数量:', diapGroupChat.groups.length)
-    
+    console.log('[useGroupChatManager] 可用群聊数量:', groupChatList.length)
+
     if (activeGroupId) {
-      // 如果已有活跃群聊，直接显示
+      if (diapGroupChat.groups.some((g) => g.groupId === activeGroupId)) {
+        try {
+          await diapGroupChat.switchToGroup(activeGroupId)
+        } catch (error) {
+          console.warn('[useGroupChatManager] 打开群聊时切换活跃DIAP群失败:', error)
+        }
+      }
       setShowGroupChat(true)
       openConversationPanelRef.current?.()
       console.log('[useGroupChatManager] 显示现有群聊:', activeGroupId)
-    } else if (diapGroupChat.groups.length > 0) {
-      // 如果没有活跃群聊但有可用群聊，选择第一个作为活跃群聊
-      const firstGroup = diapGroupChat.groups[0]
-      console.log('[useGroupChatManager] 选择第一个群聊作为活跃群聊:', firstGroup.groupId)
-      setActiveGroupId(firstGroup.groupId)
-      setShowGroupChat(true)
-      openConversationPanelRef.current?.()
+    } else if (groupChatList.length > 0) {
+      const firstGroup = groupChatList[0]
+      const firstGroupId = firstGroup.groupId || firstGroup.action_id
+      console.log('[useGroupChatManager] 选择第一个群聊作为活跃群聊:', firstGroupId)
+      await switchGroupChat(firstGroupId)
     } else {
-      // 如果没有活跃群聊也没有可用群聊，创建一个新群聊
       try {
         console.log('[useGroupChatManager] 创建新群聊...')
         const groupName = `群聊 ${new Date().toLocaleTimeString()}`
@@ -279,7 +343,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         openConversationPanelRef.current?.()
       }
     }
-  }, [activeGroupId, diapGroupChat.groups, createGroupChat])
+  }, [activeGroupId, createGroupChat, diapGroupChat, groupChatList, switchGroupChat, openConversationPanelRef])
 
   // 关闭群聊
   const closeGroupChat = useCallback(() => {
@@ -300,15 +364,15 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     } else if (activeGroupId) {
       setShowGroupChat(true)
       openConversationPanelRef.current?.()
-    } else if (diapGroupChat.groups.length > 0) {
-      // 如果没有活跃群聊但有可用群聊，选择第一个作为活跃群聊
-      const firstGroup = diapGroupChat.groups[0]
-      console.log('[useGroupChatManager] 切换时选择第一个群聊作为活跃群聊:', firstGroup.groupId)
-      setActiveGroupId(firstGroup.groupId)
+    } else if (groupChatList.length > 0) {
+      const firstGroup = groupChatList[0]
+      const firstGroupId = firstGroup.groupId || firstGroup.action_id
+      console.log('[useGroupChatManager] 切换时选择第一个群聊作为活跃群聊:', firstGroupId)
+      setActiveGroupId(firstGroupId)
       setShowGroupChat(true)
       openConversationPanelRef.current?.()
     }
-  }, [showGroupChat, activeGroupId, diapGroupChat.groups, closeGroupChatCompletely])
+  }, [activeGroupId, closeGroupChatCompletely, groupChatList, showGroupChat])
 
   // 获取action状态
   const actionStatus = useMemo(() => {
@@ -347,17 +411,22 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         let groupId
         if (actionId.startsWith('diap_group_')) {
           groupId = actionId.replace('diap_group_', '')
-        } else if (actionId.startsWith('local_group_')) {
-          groupId = actionId.replace('local_group_', '')
         } else {
-          // 对于action_开头的，直接使用完整ID作为groupId
           groupId = actionId
         }
         
         console.log('[useGroupChatManager] 设置活跃群聊:', groupId)
         setActiveGroupId(groupId)
+        if (activeChannelId) {
+          setActiveAction(groupId, activeChannelId)
+        }
         setShowGroupChat(true)
         openConversationPanelRef.current?.()
+        if (diapGroupChat.groups.some((g) => g.groupId === groupId)) {
+          diapGroupChat.switchToGroup(groupId).catch((error) => {
+            console.warn('[useGroupChatManager] 事件切换DIAP群聊失败:', error)
+          })
+        }
       }
     }
 
@@ -365,13 +434,20 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     return () => {
       window.removeEventListener('cluster-action-created', handleClusterActionCreated)
     }
-  }, [openConversationPanelRef])
+  }, [activeChannelId, diapGroupChat, setActiveAction])
+
+  const activeAction = useMemo(() => {
+    if (!activeChannelId || !activeGroupId) return null
+    const actions = getActions(activeChannelId) || []
+    return actions.find((action) => action.action_id === activeGroupId) || getActiveAction(activeChannelId)
+  }, [activeChannelId, activeGroupId, getActions, getActiveAction])
 
   return {
     // 状态
     showGroupChat,
     activeGroupId,
     activeActionId: activeGroupId, // 兼容性：将activeGroupId作为activeActionId
+    activeAction,
     activeGroup,
     activeGroupMessages,
     groupChatList,
@@ -406,5 +482,4 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 }
 
 export default useGroupChatManager
-
 

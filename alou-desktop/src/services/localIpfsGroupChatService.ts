@@ -16,7 +16,10 @@ export const MessageTypes = {
   SYSTEM: 'system',
   JOIN: 'join',
   LEAVE: 'leave',
-  AGENT_MESSAGE: 'agent_message'
+  AGENT_MESSAGE: 'agent_message',
+  TASK_ASSIGN: 'task_assign',       // 任务分配
+  TASK_PROGRESS: 'task_progress',     // 任务进度
+  TASK_COMPLETE: 'task_complete',     // 任务完成
 } as const
 
 export type MessageType = typeof MessageTypes[keyof typeof MessageTypes]

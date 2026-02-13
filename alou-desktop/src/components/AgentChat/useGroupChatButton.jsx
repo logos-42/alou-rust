@@ -71,13 +71,21 @@ export const useGroupChatButton = ({
     () =>
       ({ children }) => {
         return (
-          <div 
+          <div
             className={`conversation-panel-wrapper ${showGroupChat ? 'group-chat-active' : ''}`}
             onClick={handleConversationPanelClick}
           >
             {children}
             {/* 群聊按钮独立于对话面板显示 */}
-            <button type="button" {...buttonConfig}>
+            <button 
+              type="button" 
+              {...buttonConfig}
+              onClick={(e) => {
+                // 阻止事件冒泡到父容器
+                e.stopPropagation();
+                buttonConfig.onClick();
+              }}
+            >
               <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
             </button>
           </div>

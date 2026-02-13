@@ -16,6 +16,7 @@ use chrono::Utc;
 
 /// 任务优先级
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum TaskPriority {
     Critical = 0,  // 最高优先级
     High = 1,
@@ -25,6 +26,7 @@ pub enum TaskPriority {
 
 /// 任务状态
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum TaskStatus {
     Pending = 0,      // 待执行
     InProgress = 1,   // 执行中
@@ -51,10 +53,13 @@ pub struct Task {
     pub description: String,
     pub priority: TaskPriority,
     pub status: TaskStatus,
+    #[serde(default)]
     pub created_at: i64,
+    #[serde(default)]
     pub updated_at: i64,
     pub executor: Option<String>,
     pub result: Option<TaskResult>,
+    #[serde(default)]
     pub metadata: HashMap<String, Value>,
 }
 

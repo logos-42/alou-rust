@@ -16,6 +16,9 @@ export enum MessageType {
   LEAVE = 'leave',         // 离开频道
   AGENT_REQUEST = 'agent_request',   // 智能体请求
   AGENT_RESPONSE = 'agent_response', // 智能体响应
+  TASK_ASSIGN = 'task_assign',       // 任务分配
+  TASK_PROGRESS = 'task_progress',   // 任务进度
+  TASK_COMPLETE = 'task_complete',   // 任务完成
 }
 
 /**

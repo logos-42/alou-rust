@@ -249,8 +249,8 @@ const GroupChatPanel = ({
   // 状态显示已移除
 
   return (
-    <section 
-      className={`group-chat-panel ${inputTargetMode === 'groupChat' ? 'input-target-active' : ''} ${isClicked ? 'clicked' : ''}`} 
+    <section
+      className={`group-chat-panel ${inputTargetMode === 'groupChat' ? 'input-target-active' : ''} ${isClicked ? 'clicked' : ''}`}
       onClick={handlePanelClick}
     >
       {/* 头部 */}
