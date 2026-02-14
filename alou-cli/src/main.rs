@@ -179,6 +179,71 @@ fn cmd_resume() {
     }
 }
 
+// Run command - execute a single task iteration
+fn cmd_run() {
+    log_info("执行单次任务迭代...");
+    
+    let state = load_state();
+    
+    if !state.is_running {
+        log_error("自主循环未运行。请先使用 'alou start' 启动。");
+        return;
+    }
+    
+    if state.is_paused {
+        log_error("自主循环已暂停。请先使用 'alou resume' 恢复。");
+        return;
+    }
+    
+    // Load tasks
+    let tasks = load_tasks();
+    
+    if tasks.is_empty() {
+        log_info("没有待执行的任务");
+        println!("使用 'alou task add <标题>' 添加任务");
+        return;
+    }
+    
+    // Find the first pending task
+    if let Some(task) = tasks.iter().find(|t| t.status == "pending") {
+        let task_id = task.id.clone();
+        let task_title = task.title.clone();
+        
+        log_section("执行任务");
+        println!("任务ID: {}", task.id);
+        println!("标题: {}", task.title);
+        println!("描述: {}", task.description);
+        println!("优先级: {}", task.priority);
+        println!();
+        
+        log_info("任务执行模拟中 (连接 AI API 以执行真实任务)");
+        log_success(&format!("任务 '{}' 已完成", task_title));
+        
+        // Update task status
+        let mut updated_tasks = tasks;
+        if let Some(t) = updated_tasks.iter_mut().find(|t| t.id == task_id) {
+            t.status = "completed".to_string();
+        }
+        
+        // Save updated tasks
+        let tasks_path = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".alou")
+            .join("tasks");
+        let content = serde_json::to_string(&updated_tasks).unwrap_or_default();
+        let _ = fs::write(tasks_path.join("queue.json"), content);
+        
+        // Update state
+        let mut state = load_state();
+        state.tasks_completed += 1;
+        state.total_iterations += 1;
+        state.last_heartbeat = Utc::now().timestamp();
+        save_state(&state);
+    } else {
+        log_info("没有找到待执行的任务");
+    }
+}
+
 fn cmd_status() {
     let state = load_state();
     

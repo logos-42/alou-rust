@@ -477,7 +477,8 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     deleteGroupChat,
     setSplitPosition,
     hasActiveAction: !!activeGroupId,
-    canOpenGroupChat: !!activeChannelId,
+    // 允许无频道时也能打开群聊（会自动创建或使用默认群聊）
+    canOpenGroupChat: true,
 
     // 兼容原有接口
     getActions,

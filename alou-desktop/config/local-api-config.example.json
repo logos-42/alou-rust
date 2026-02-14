@@ -1,0 +1,34 @@
+{
+  "version": "0.1.10",
+  "description": "本地API配置文件 - 复制此文件为 local-api-config.json 并填入您的API密钥",
+  "api": {
+    "baseUrl": "http://localhost:8787",
+    "timeout": 30000
+  },
+  "ai": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "apiKey": "",
+    "temperature": 0.7,
+    "maxTokens": 4096
+  },
+  "environment": {
+    "VITE_API_BASE_URL": "",
+    "VITE_DEEPSEEK_API_KEY": "",
+    "VITE_ANTHROPIC_API_KEY": "",
+    "VITE_OPENAI_API_KEY": "",
+    "VITE_IPFS_API_URL": "http://127.0.0.1:5001"
+  },
+  "autonomous": {
+    "enabled": true,
+    "heartbeatInterval": 30,
+    "taskCheckInterval": 10,
+    "memorySaveInterval": 60,
+    "progressReportInterval": 300
+  },
+  "groupChat": {
+    "enabled": true,
+    "autoJoin": false,
+    "announcePresence": true
+  }
+}
