@@ -1,0 +1,16 @@
+# 排除编译产物
+target/
+debug/
+
+# 排除源文件
+src/
+Cargo.toml
+Cargo.lock
+
+# 保留配置文件
+bin/
+config.json
+index.js
+scripts/
+README.md
+package.json

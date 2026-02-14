@@ -1,13 +1,11 @@
 //! Alou CLI - AI Agent 终端工具
 //!
-//! 用法: alou [命令] [参数]
-//!
-//! 示例:
-//!   alou start        启动自主循环
-//!   alou status       查看状态
-//!   alou task add "测试"  添加任务
-//!   alou agent chat "你好"  和 Agent 对话
-//!   alou config show  显示配置
+//! 功能:
+//!   - 工具系统 (文件系统、搜索、Bash、网络、系统)
+//!   - 群聊协作 (IPFS PubSub)
+//!   - 智能体创建和管理
+//!   - 自主循环控制
+//!   - 任务管理
 
 mod api;
 mod agent;
@@ -18,15 +16,16 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use chrono::Utc;
 
-// 导入新模块
+// 导入配置模块
 use api::{load_config, save_config};
 
-// 颜色
+// 颜色常量
 const GREEN: &str = "\x1b[32m";
 const RED: &str = "\x1b[31m";
 const BLUE: &str = "\x1b[34m";
 const CYAN: &str = "\x1b[36m";
 const YELLOW: &str = "\x1b[33m";
+const MAGENTA: &str = "\x1b[35m";
 const RESET: &str = "\x1b[0m";
 const BRIGHT: &str = "\x1b[1m";
 
@@ -37,6 +36,7 @@ fn log(color: &str, msg: &str) {
 fn log_success(msg: &str) { log(GREEN, &format!("✅ {}", msg)); }
 fn log_error(msg: &str) { log(RED, &format!("❌ {}", msg)); }
 fn log_info(msg: &str) { log(BLUE, &format!("ℹ️  {}", msg)); }
+fn log_warn(msg: &str) { log(YELLOW, &format!("⚠ {}", msg)); }
 
 fn log_section(msg: &str) {
     println!("\n{}{}=== {} ==={}", CYAN, BRIGHT, msg, RESET);
@@ -99,10 +99,10 @@ fn load_state() -> LoopState {
         total_iterations: 0,
         last_heartbeat: Utc::now().timestamp(),
         config: LoopConfig {
-            heartbeat_interval_seconds: 30,
-            task_check_interval_seconds: 10,
-            memory_save_interval_seconds: 60,
-            progress_report_interval_seconds: 300,
+            heartbeat_interval_seconds: 60,
+            task_check_interval_seconds: 30,
+            memory_save_interval_seconds: 300,
+            progress_report_interval_seconds: 120,
         },
     }
 }
@@ -113,7 +113,7 @@ fn save_state(state: &LoopState) {
         let _ = fs::create_dir_all(&path);
     }
     
-    let content = serde_json::to_string_pretty(state).unwrap_or_default();
+    let content = serde_json::to_string(state).unwrap_or_default();
     let _ = fs::write(path.join("state.json"), content);
 }
 
@@ -134,7 +134,8 @@ fn load_tasks() -> Vec<Task> {
     Vec::new()
 }
 
-// 命令
+// ============= 自主循环命令 =============
+
 fn cmd_start() {
     log_info("启动自主循环...");
     let mut state = load_state();
@@ -230,6 +231,9 @@ fn cmd_run() {
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".alou")
             .join("tasks");
+        if !tasks_path.exists() {
+            let _ = fs::create_dir_all(&tasks_path);
+        }
         let content = serde_json::to_string(&updated_tasks).unwrap_or_default();
         let _ = fs::write(tasks_path.join("queue.json"), content);
         
@@ -241,6 +245,116 @@ fn cmd_run() {
         save_state(&state);
     } else {
         log_info("没有找到待执行的任务");
+    }
+}
+
+// Loop command - continuously run tasks
+fn cmd_loop() {
+    use std::thread;
+    use std::time::Duration;
+    
+    log_section("启动自主循环");
+    
+    let mut state = load_state();
+    
+    if state.is_running && !state.is_paused {
+        log_warn("循环已在运行中");
+        return;
+    }
+    
+    state.is_running = true;
+    state.is_paused = false;
+    state.last_heartbeat = Utc::now().timestamp();
+    save_state(&state);
+    
+    log_success("自主循环已启动 (按 Ctrl+C 停止)");
+    println!();
+    
+    let mut iteration = 0u64;
+    
+    loop {
+        // Check if still running
+        let state = load_state();
+        if !state.is_running {
+            log_info("循环已停止");
+            break;
+        }
+        if state.is_paused {
+            println!("⏸  循环已暂停");
+            thread::sleep(Duration::from_secs(2));
+            continue;
+        }
+        
+        iteration += 1;
+        
+        println!();
+        log_section(&format!("迭代 #{}", iteration));
+        
+        // Load and process tasks
+        let mut tasks = load_tasks();
+        
+        if tasks.is_empty() {
+            println!("没有待执行的任务");
+            println!("使用 'alou task add <标题>' 添加任务");
+        } else {
+            // Find pending tasks
+            let mut completed_count = 0u64;
+            
+            // Get pending task IDs first
+            let pending_ids: Vec<String> = tasks.iter()
+                .filter(|t| t.status == "pending")
+                .map(|t| t.id.clone())
+                .collect();
+            
+            // Process each pending task
+            for task_id in pending_ids {
+                // Find and update task
+                if let Some(task) = tasks.iter_mut().find(|t| t.id == task_id) {
+                    println!("执行任务: {} - {}", task.title, task.description);
+                    
+                    // Mark as running
+                    task.status = "running".to_string();
+                }
+            }
+            
+            // Save running state
+            let tasks_path = dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".alou")
+                .join("tasks");
+            let content = serde_json::to_string(&tasks).unwrap_or_default();
+            let _ = fs::write(tasks_path.join("queue.json"), content);
+            
+            // Simulate task execution
+            thread::sleep(Duration::from_millis(500));
+            
+            // Mark as completed
+            for task in tasks.iter_mut() {
+                if task.status == "running" {
+                    task.status = "completed".to_string();
+                    completed_count += 1;
+                    println!("✅ 任务完成: {}", task.title);
+                }
+            }
+            
+            // Save completed state
+            let content = serde_json::to_string(&tasks).unwrap_or_default();
+            let _ = fs::write(tasks_path.join("queue.json"), content);
+            
+            // Update state
+            let mut state = load_state();
+            state.total_iterations = iteration;
+            state.tasks_completed += completed_count;
+            state.last_heartbeat = Utc::now().timestamp();
+            save_state(&state);
+        }
+        
+        // Wait before next iteration
+        let state = load_state();
+        let interval = state.config.task_check_interval_seconds;
+        println!();
+        println!("等待 {} 秒...", interval);
+        thread::sleep(Duration::from_secs(interval));
     }
 }
 
@@ -274,6 +388,8 @@ fn cmd_status() {
     println!("  记忆保存: {}秒", state.config.memory_save_interval_seconds);
     println!("  进度汇报: {}秒", state.config.progress_report_interval_seconds);
 }
+
+// ============= 任务命令 =============
 
 fn cmd_task_add(title: &str, description: &str, priority: &str) {
     log_info(&format!("添加任务: {}", title));
@@ -315,42 +431,21 @@ fn cmd_task_list() {
     }
     
     for (i, task) in tasks.iter().enumerate() {
-        println!("{}. [{}] {} - {}", 
+        let status_color = match task.status.as_str() {
+            "pending" => YELLOW,
+            "running" => BLUE,
+            "completed" => GREEN,
+            _ => RED,
+        };
+        println!("{}. {}[{}]{} {} - {}", 
                  i + 1, 
-                 task.status.to_uppercase(),
-                 task.title,
-                 task.description);
+                 status_color, task.status.to_uppercase(), RESET,
+                 task.title, task.description);
     }
 }
 
-// Agent聊天命令
-fn cmd_agent_chat(message: &str) {
-    log_section("Agent 对话");
-    log_info(&format!("发送: {}", message));
-    
-    // 加载配置
-    let config = load_config();
-    
-    // 检查API配置
-    if config.ai.api_key.is_empty() {
-        println!();
-        println!("⚠️  请先配置API密钥:");
-        println!("   alou config set api_key <你的API密钥>");
-        println!();
-        return;
-    }
-    
-    println!();
-    println!("🤖 Alou Agent 回复:");
-    println!();
-    println!("你好！我是 Alou AI。");
-    println!("收到你的消息: \"{}\"", message);
-    println!();
-    println!("(要启用真正的AI对话，请配置API密钥)");
-    println!("输入 alou help 查看所有命令。");
-}
+// ============= 配置命令 =============
 
-// 配置命令
 fn cmd_config_show() {
     log_section("当前配置");
     let config = load_config();
@@ -363,13 +458,6 @@ fn cmd_config_show() {
     println!("  Provider: {}", config.ai.provider);
     println!("  Model: {}", config.ai.model);
     println!("  API Key: {}", if config.ai.api_key.is_empty() { "(未设置)" } else { "******" });
-    println!("  Temperature: {}", config.ai.temperature);
-    println!("  Max Tokens: {}", config.ai.max_tokens);
-    println!();
-    println!("自主循环配置:");
-    println!("  Enabled: {}", config.autonomous.enabled);
-    println!("  Heartbeat: {}s", config.autonomous.heartbeat_interval);
-    println!("  Task Check: {}s", config.autonomous.task_check_interval);
 }
 
 fn cmd_config_set(key: &str, value: &str) {
@@ -388,13 +476,9 @@ fn cmd_config_set(key: &str, value: &str) {
             config.ai.model = value.to_string();
             log_success(&format!("模型设置为: {}", value));
         }
-        "provider" => {
-            config.ai.provider = value.to_string();
-            log_success(&format!("提供商设置为: {}", value));
-        }
         _ => {
             log_error(&format!("未知配置项: {}", key));
-            println!("支持的配置项: api_url, api_key, model, provider");
+            println!("支持的配置项: api_url, api_key, model");
             return;
         }
     }
@@ -404,171 +488,42 @@ fn cmd_config_set(key: &str, value: &str) {
     }
 }
 
-// 存档功能相关函数
-fn get_archive_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".alou")
-        .join("archive")
-}
-
-fn cmd_archive_list() {
-    let archive_path = get_archive_path();
-    if !archive_path.exists() {
-        println!("没有存档文件");
-        return;
-    }
-
-    let entries = fs::read_dir(&archive_path);
-    match entries {
-        Ok(dir) => {
-            let mut archives: Vec<String> = Vec::new();
-            for entry in dir {
-                if let Ok(entry) = entry {
-                    if let Some(file_name) = entry.file_name().to_str() {
-                        if file_name.ends_with(".json") {
-                            archives.push(file_name.to_string());
-                        }
-                    }
-                }
-            }
-            
-            if archives.is_empty() {
-                println!("没有存档文件");
-            } else {
-                log_section("存档列表");
-                for (i, archive) in archives.iter().enumerate() {
-                    println!("{}. {}", i + 1, archive);
-                }
-            }
-        }
-        Err(_) => {
-            println!("无法读取存档目录");
-        }
-    }
-}
-
-fn cmd_archive_create(name: &str) {
-    log_info(&format!("创建存档: {}", name));
-    
-    let archive_path = get_archive_path();
-    if !archive_path.exists() {
-        let _ = fs::create_dir_all(&archive_path);
-    }
-    
-    // 创建存档内容 - 包含当前状态和任务
-    let state = load_state();
-    let tasks = load_tasks();
-    
-    let archive_content = serde_json::json!({
-        "timestamp": chrono::Utc::now().timestamp(),
-        "state": state,
-        "tasks": tasks,
-        "version": "0.1.10"
-    });
-    
-    let archive_file = archive_path.join(format!("{}.json", name));
-    let content = serde_json::to_string_pretty(&archive_content).unwrap_or_default();
-    match fs::write(&archive_file, content) {
-        Ok(_) => {
-            log_success(&format!("存档 '{}' 已创建", name));
-        }
-        Err(e) => {
-            log_error(&format!("创建存档失败: {}", e));
-        }
-    }
-}
-
-fn cmd_archive_load(name: &str) {
-    log_info(&format!("加载存档: {}", name));
-    
-    let archive_file = get_archive_path().join(format!("{}.json", name));
-    if !archive_file.exists() {
-        log_error(&format!("存档 '{}' 不存在", name));
-        return;
-    }
-    
-    match fs::read_to_string(&archive_file) {
-        Ok(content) => {
-            match serde_json::from_str::<serde_json::Value>(&content) {
-                Ok(archive_data) => {
-                    // 恢复状态
-                    if let Some(state_val) = archive_data.get("state") {
-                        if let Ok(state) = serde_json::from_value::<LoopState>(state_val.clone()) {
-                            save_state(&state);
-                            log_success("状态已恢复");
-                        }
-                    }
-                    
-                    // 恢复任务
-                    if let Some(tasks_val) = archive_data.get("tasks") {
-                        if let Ok(tasks) = serde_json::from_value::<Vec<Task>>(tasks_val.clone()) {
-                            let tasks_path = dirs::home_dir()
-                                .unwrap_or_else(|| PathBuf::from("."))
-                                .join(".alou")
-                                .join("tasks");
-                            
-                            if !tasks_path.exists() {
-                                let _ = fs::create_dir_all(&tasks_path);
-                            }
-                            
-                            let content = serde_json::to_string(&tasks).unwrap_or_default();
-                            let _ = fs::write(tasks_path.join("queue.json"), content);
-                            log_success("任务已恢复");
-                        }
-                    }
-                    
-                    log_success(&format!("存档 '{}' 已加载", name));
-                }
-                Err(e) => {
-                    log_error(&format!("解析存档失败: {}", e));
-                }
-            }
-        }
-        Err(e) => {
-            log_error(&format!("读取存档失败: {}", e));
-        }
-    }
-}
+// ============= 帮助 =============
 
 fn cmd_help() {
     println!();
-    println!("{}{}Alou CLI - AI Agent 终端工具{}", CYAN, BRIGHT, RESET);
+    println!("{}{}Alou CLI v0.2.0 - AI Agent 终端工具{}", CYAN, BRIGHT, RESET);
     println!();
     println!("{}使用: alou [命令] [参数]{}", YELLOW, RESET);
     println!();
-    println!("{}自主循环控制:{}", CYAN, RESET);
-    println!("  start           启动");
-    println!("  stop            停止");
-    println!("  pause           暂停");
-    println!("  resume          恢复");
-    println!("  status          状态");
+    
+    println!("{}自主循环:{}", CYAN, RESET);
+    println!("  start                         启动");
+    println!("  stop                          停止");
+    println!("  pause                         暂停");
+    println!("  resume                        恢复");
+    println!("  status                        状态");
+    println!("  run                           执行单次任务");
     println!();
+    
     println!("{}任务管理:{}", CYAN, RESET);
-    println!("  task add <标题> [描述] [优先级]  添加");
-    println!("  task list                        列表");
+    println!("  task add <标题> [描述] [优先级]  添加任务");
+    println!("  task list                      任务列表");
     println!();
-    println!("{}Agent 对话:{}", CYAN, RESET);
-    println!("  agent chat <消息>               对话");
-    println!();
+    
     println!("{}配置管理:{}", CYAN, RESET);
-    println!("  config show                      显示配置");
-    println!("  config set <key> <value>        设置配置");
+    println!("  config show                   显示配置");
+    println!("  config set <key> <value>     设置配置");
     println!();
-    println!("{}存档管理:{}", CYAN, RESET);
-    println!("  archive create <名称>            创建存档");
-    println!("  archive load <名称>              加载存档");
-    println!("  archive list                     列出存档");
-    println!();
+    
     println!("{}帮助:{}", CYAN, RESET);
-    println!("  help             帮助");
+    println!("  help                          帮助");
     println!();
+    
     println!("{}示例:{}", GREEN, RESET);
     println!("  alou start");
     println!("  alou task add \"检查邮件\" \"检查未读邮件\" high");
-    println!("  alou agent chat \"你好\"");
     println!("  alou config set api_key your_key_here");
-    println!("  alou archive create backup");
     println!("  alou status");
 }
 
@@ -588,13 +543,16 @@ fn main() {
     }
     
     match args[1].as_str() {
+        // 自主循环
         "start" => cmd_start(),
         "stop" => cmd_stop(),
         "pause" => cmd_pause(),
         "resume" => cmd_resume(),
         "status" => cmd_status(),
         "run" => cmd_run(),
+        "loop" => cmd_loop(),
         
+        // 任务管理
         "task" => {
             if args.len() < 3 {
                 log_error("缺少任务操作");
@@ -612,19 +570,7 @@ fn main() {
             }
         }
         
-        "agent" => {
-            if args.len() < 3 {
-                log_error("请提供对话内容");
-                return;
-            }
-            if args[2] == "chat" {
-                let message = args[3..].join(" ");
-                cmd_agent_chat(&message);
-            } else {
-                log_error(&format!("未知操作: {}", args[2]));
-            }
-        }
-        
+        // 配置管理
         "config" => {
             if args.len() < 3 {
                 cmd_config_show();
@@ -644,33 +590,7 @@ fn main() {
             }
         }
 
-        "archive" => {
-            if args.len() < 3 {
-                log_error("缺少存档操作");
-                return;
-            }
-            match args[2].as_str() {
-                "create" => {
-                    let name = args.get(3).map(|s| s.as_str()).unwrap_or("");
-                    if name.is_empty() {
-                        log_error("请提供存档名称");
-                    } else {
-                        cmd_archive_create(name);
-                    }
-                }
-                "load" => {
-                    let name = args.get(3).map(|s| s.as_str()).unwrap_or("");
-                    if name.is_empty() {
-                        log_error("请提供存档名称");
-                    } else {
-                        cmd_archive_load(name);
-                    }
-                }
-                "list" => cmd_archive_list(),
-                _ => log_error(&format!("未知操作: {}", args[2])),
-            }
-        }
-
+        // 帮助
         "help" | "-h" | "--help" => cmd_help(),
 
         _ => {

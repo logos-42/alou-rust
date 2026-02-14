@@ -53,3 +53,6 @@ tabled = "0.15"
 
 # futures
 futures = "0.3"
+
+# 系统信息
+sysinfo = "0.30"
