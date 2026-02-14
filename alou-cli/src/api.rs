@@ -92,7 +92,6 @@ pub struct ChatRequest {
 }
 
 // 聊天消息 - 公开导出
-pub use self::Message as ChatMessage;
 
 /// 聊天消息
 #[derive(Debug, Serialize, Deserialize, Clone)]

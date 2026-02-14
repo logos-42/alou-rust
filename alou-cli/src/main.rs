@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use chrono::Utc;
 
 // 导入新模块
-use api::{Config, load_config, save_config};
+use api::{load_config, save_config};
 
 // 颜色
 const GREEN: &str = "\x1b[32m";
@@ -513,7 +513,7 @@ fn main() {
     if args.len() < 2 || args[1] != "help" {
         println!();
         println!("{}╔═══════════════════════════════════════╗", CYAN);
-        println!("{}║     🤖 Alou CLI - AI Agent 终端      ║", CYAN);
+        println!("{}║     🤖 Alou CLI - Alou Agent          ║", CYAN);
         println!("{}╚═══════════════════════════════════════╝", CYAN);
     }
     
@@ -528,6 +528,7 @@ fn main() {
         "pause" => cmd_pause(),
         "resume" => cmd_resume(),
         "status" => cmd_status(),
+        "run" => cmd_run(),
         
         "task" => {
             if args.len() < 3 {
