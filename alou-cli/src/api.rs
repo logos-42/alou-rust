@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 /// API配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +32,24 @@ pub struct Config {
     pub autonomous: AutonomousConfig,
     #[serde(default)]
     pub group_chat: GroupChatConfig,
+    #[serde(default)]
+    pub tool_api: ToolApiConfig,
+}
+
+/// 工具 API 配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolApiConfig {
+    pub enabled: bool,
+    pub base_url: String,
+}
+
+impl Default for ToolApiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            base_url: String::new(),
+        }
+    }
 }
 
 /// 自主循环配置
@@ -139,6 +158,7 @@ pub fn load_config() -> Config {
         },
         autonomous: AutonomousConfig::default(),
         group_chat: GroupChatConfig::default(),
+        tool_api: ToolApiConfig::default(),
     }
 }
 
@@ -200,4 +220,125 @@ pub async fn send_chat_request(config: &Config, messages: Vec<Message>) -> Resul
         .first()
         .map(|c| c.message.content.clone())
         .unwrap_or_default())
+}
+
+/// 工具执行请求
+#[derive(Debug, Serialize)]
+pub struct ToolExecuteRequest {
+    pub tool_id: String,
+    pub args: serde_json::Value,
+    pub working_directory: Option<String>,
+    pub timeout_seconds: Option<u64>,
+}
+
+/// 工具执行响应
+#[derive(Debug, Deserialize)]
+pub struct ToolExecuteResponse {
+    pub success: bool,
+    pub data: Option<serde_json::Value>,
+    pub error: Option<String>,
+    #[serde(rename = "execution_time_ms")]
+    pub execution_time_ms: Option<u64>,
+}
+
+/// 工具信息
+#[derive(Debug, Deserialize)]
+pub struct ToolInfo {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub category: Option<String>,
+}
+
+/// 获取工具 API 端口
+pub fn get_tool_api_port() -> Option<u16> {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("alou");
+    let port_file = config_dir.join("tool_api_port");
+    
+    if port_file.exists() {
+        if let Ok(content) = fs::read_to_string(&port_file) {
+            if let Ok(port) = content.trim().parse::<u16>() {
+                return Some(port);
+            }
+        }
+    }
+    None
+}
+
+/// 获取工具 API 基础 URL
+pub fn get_tool_api_url() -> Option<String> {
+    let port = get_tool_api_port()?;
+    Some(format!("http://127.0.0.1:{}", port))
+}
+
+/// 检查工具 API 是否可用
+pub fn check_tool_api_available() -> bool {
+    get_tool_api_url().is_some()
+}
+
+/// 执行工具
+pub async fn execute_tool(
+    tool_id: &str,
+    args: serde_json::Value,
+    working_directory: Option<String>,
+    timeout_seconds: Option<u64>,
+) -> Result<ToolExecuteResponse, String> {
+    let base_url = get_tool_api_url().ok_or("Tool API not available. Make sure Alou Desktop is running.")?;
+    
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(timeout_seconds.unwrap_or(60)))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+    
+    let request = ToolExecuteRequest {
+        tool_id: tool_id.to_string(),
+        args,
+        working_directory,
+        timeout_seconds,
+    };
+    
+    let url = format!("{}/api/tools/execute", base_url);
+    
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&request)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<ToolExecuteResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
+}
+
+/// 获取可用工具列表
+pub async fn get_tool_list() -> Result<Vec<ToolInfo>, String> {
+    let base_url = get_tool_api_url().ok_or("Tool API not available. Make sure Alou Desktop is running.")?;
+    
+    let client = reqwest::Client::new();
+    
+    let url = format!("{}/api/tools/list", base_url);
+    
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+    
+    if !response.status().is_success() {
+        return Err(format!("API error: {}", response.status()));
+    }
+    
+    response
+        .json::<Vec<ToolInfo>>()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))
 }

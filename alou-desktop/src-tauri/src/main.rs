@@ -27,6 +27,7 @@ mod autonomous_agent;  // 自主智能体模块
 mod autonomous_loop;    // 自主循环模块
 mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
+mod tool_api;  // 工具 API 模块
 
 use std::path::PathBuf;
 use tauri::Manager;
@@ -61,6 +62,7 @@ use crate::browser::{open_browser, test_ipfs_node_connection};
 use crate::sync::{
     read_wallet_sync_data, start_wallet_sync_server, write_wallet_sync_data,
 };
+use crate::tool_api::start_tool_api_server;
 use crate::lsp::{execute_lsp, get_supported_languages};
 use crate::spec::{execute_spec, get_spec_templates, load_template_content};
 use crate::workflow::{
@@ -473,6 +475,24 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = start_wallet_sync_server(app_handle).await {
                     eprintln!("Failed to start wallet sync server: {}", e);
+                }
+            });
+
+            // Start tool API server on startup (for CLI)
+            let app_handle_tools = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                match start_tool_api_server(app_handle_tools).await {
+                    Ok(port) => {
+                        println!("Tool API server for CLI started on port {}", port);
+                        // Write port to config file for CLI to read
+                        let config_dir = dirs::config_dir()
+                            .unwrap_or_else(|| std::path::PathBuf::from("."))
+                            .join("alou");
+                        let _ = std::fs::create_dir_all(&config_dir);
+                        let port_file = config_dir.join("tool_api_port");
+                        let _ = std::fs::write(port_file, port.to_string());
+                    }
+                    Err(e) => eprintln!("Failed to start tool API server: {}", e),
                 }
             });
 
