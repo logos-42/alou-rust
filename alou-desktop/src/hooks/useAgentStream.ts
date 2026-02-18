@@ -78,6 +78,11 @@ export const useAgentStream = (
       return undefined
     }
 
+    // 本地会话（无后端）不需要轮询远端进度
+    if (sessionId.startsWith('local_')) {
+      return undefined
+    }
+
     let stopped = false
     setEvents([])
     setState('polling')

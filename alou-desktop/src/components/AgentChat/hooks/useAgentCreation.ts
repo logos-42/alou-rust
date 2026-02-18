@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import agentService from '@/services/agentService';
+import agentDocumentService from '@/services/agentDocumentService';
 import type { AgentInfo } from '@shared/types/services';
 
 interface UseAgentCreationParams {
@@ -12,6 +13,8 @@ interface AgentCreationResult {
   description?: string;
   avatar?: string;
   isDefault?: boolean;
+  customPrompt?: string | null;
+  documents?: Record<string, string> | null;
 }
 
 interface Message {
@@ -83,22 +86,47 @@ export const useAgentCreation = ({
       const aiContent = result.content || result.message;
 
       // 尝试解析JSON
+      let parsedName: string;
+      let parsedRoleDescription: string;
+      let parsedDescription: string | undefined;
+      let parsedAvatar: string | undefined;
+
       try {
         const parsed = JSON.parse(aiContent);
-        return {
-          name: parsed.name || `智能体_${Date.now().toString().slice(-6)}`,
-          roleDescription: parsed.roleDescription || '这是一个自动创建的智能体',
-          description: parsed.description,
-          avatar: parsed.avatar,
-        };
+        parsedName = parsed.name || `智能体_${Date.now().toString().slice(-6)}`;
+        parsedRoleDescription = parsed.roleDescription || '这是一个自动创建的智能体';
+        parsedDescription = parsed.description;
+        parsedAvatar = parsed.avatar;
       } catch (parseError) {
         console.warn('[useAgentCreation] AI返回的不是有效JSON，使用默认配置');
-        return {
-          name: `智能体_${Date.now().toString().slice(-6)}`,
-          roleDescription: aiContent.slice(0, 200) || '这是一个自动创建的智能体',
-          isDefault: true
-        };
+        parsedName = `智能体_${Date.now().toString().slice(-6)}`;
+        parsedRoleDescription = aiContent.slice(0, 200) || '这是一个自动创建的智能体';
       }
+
+      // 生成文档集，构建 customPrompt
+      let customPrompt: string | null = null;
+      let documentsMap: Record<string, string> | null = null;
+      try {
+        console.log('[useAgentCreation] 开始为自动创建的智能体生成文档集...');
+        const userPrompt = `创建一个名为"${parsedName}"的智能体，角色描述：${parsedRoleDescription}`;
+        const agentDocuments = await agentDocumentService.generateFullDocumentSet(userPrompt, {
+          name: parsedName,
+        });
+        customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments);
+        documentsMap = agentDocumentService.extractDocumentMap(agentDocuments);
+        console.log('[useAgentCreation] 文档集生成完成，customPrompt 长度:', customPrompt?.length, '文档数:', Object.keys(documentsMap).length);
+      } catch (docErr) {
+        console.warn('[useAgentCreation] 文档集生成失败，将使用无文档模式:', (docErr as Error).message);
+      }
+
+      return {
+        name: parsedName,
+        roleDescription: parsedRoleDescription,
+        description: parsedDescription,
+        avatar: parsedAvatar,
+        customPrompt,
+        documents: documentsMap,
+      };
     } catch (error) {
       console.error('[useAgentCreation] 解析创建指令失败:', error);
       
@@ -106,7 +134,8 @@ export const useAgentCreation = ({
       return {
         name: `智能体_${Date.now().toString().slice(-6)}`,
         roleDescription: '这是一个自动创建的智能体，可以帮助您处理各种任务。',
-        isDefault: true
+        isDefault: true,
+        customPrompt: null,
       };
     }
   }, []);
@@ -117,7 +146,7 @@ export const useAgentCreation = ({
       console.log('[useAgentCreation] 开始创建智能体:', agentConfig);
 
       // 构建智能体数据
-      const agentData: Partial<AgentInfo> = {
+      const agentData: Partial<AgentInfo> & { customPrompt?: string | null; documents?: Record<string, string> | null } = {
         name: agentConfig.name,
         display_name: agentConfig.name,
         description: agentConfig.description || agentConfig.roleDescription,
@@ -127,7 +156,13 @@ export const useAgentCreation = ({
         mode: 'agent',
         status: 'active',
         agent_type: 'custom',
+        // 传递 AI 生成的文档系统提示词
+        customPrompt: agentConfig.customPrompt ?? null,
+        // 传递单独文档 map
+        documents: agentConfig.documents ?? null,
       };
+
+      console.log('[useAgentCreation] 构建智能体数据，hasCustomPrompt:', !!agentConfig.customPrompt, 'promptLen:', agentConfig.customPrompt?.length ?? 0);
 
       // 调用服务创建智能体
       const result = await agentService.createAgent(agentData);

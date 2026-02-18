@@ -196,12 +196,17 @@ impl ToolExecutionManager {
             *active += 1;
         }
 
-        // 获取执行器
-        let executor = self.executors.get(tool_id)
-            .ok_or_else(|| ToolError::ToolUnavailable(
-                format!("Tool '{}' not found", tool_id)
-            ))?
-            .clone();
+        // 获取执行器（工具不存在时需先减计数再返回）
+        let executor = match self.executors.get(tool_id) {
+            Some(e) => e.clone(),
+            None => {
+                let mut active = self.active_executions.lock().await;
+                *active -= 1;
+                return Err(ToolError::ToolUnavailable(
+                    format!("Tool '{}' not found", tool_id)
+                ));
+            }
+        };
 
         // 检查工具是否可用
         if !executor.is_available().await {
@@ -212,8 +217,12 @@ impl ToolExecutionManager {
             ));
         }
 
-        // 验证参数
-        executor.validate_args(&args).await?;
+        // 验证参数（注意：validate_args 失败时必须先减计数再返回，否则计数器泄漏）
+        if let Err(e) = executor.validate_args(&args).await {
+            let mut active = self.active_executions.lock().await;
+            *active -= 1;
+            return Err(e);
+        }
 
         // 创建执行上下文
         let execution_id = format!("exec_{}_{}", tool_id, uuid::Uuid::new_v4().to_string());

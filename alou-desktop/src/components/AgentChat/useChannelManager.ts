@@ -826,7 +826,7 @@ export const useChannelManager = ({
 
   // 创建智能体
   const handleCreateAgentSubmit = useCallback(
-    async ({ name, roleDescription, avatar_cid, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId }) => {
+    async ({ name, roleDescription, avatar_cid, avatar_url, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId, customPrompt }) => {
       // 如果有 tempId，说明是后台更新，不需要显示 loading
       const isBackgroundUpdate = !!tempId
       if (!isBackgroundUpdate) {
@@ -870,6 +870,8 @@ export const useChannelManager = ({
           mcp_config_cid,
           mcp_ports,
           diapIdentity,
+          // 传递 AI 生成的文档系统提示词（用于构建有深度的智能体）
+          customPrompt: customPrompt || undefined,
         })
 
         console.log('[useChannelManager] 智能体创建API响应:', result)
@@ -885,6 +887,7 @@ export const useChannelManager = ({
           role_description: result.agent_metadata?.role_description || roleDescription,
           // 关键：必须包含我们上传的头像和配置
           avatar_cid: avatar_cid || result.agent_metadata?.avatar_cid,  // 优先使用我们上传的
+          avatar_url: avatar_url || result.agent_metadata?.avatar_url,  // 本地 base64（无 IPFS 时）
           mcp_config_cid: mcp_config_cid || result.agent_metadata?.mcp_config_cid,
           mcp_ports: mcp_ports || result.agent_metadata?.mcp_ports,
           diap_identity: diapIdentity || result.agent_metadata?.diap_identity,
@@ -988,6 +991,7 @@ export const useChannelManager = ({
             display_name: name,
             role_description: roleDescription,
             avatar_cid: avatar_cid,
+            avatar_url: avatar_url, // 本地 base64（无 IPFS 时）
             mcp_config_cid: mcp_config_cid,
             mcp_ports: mcp_ports,
             diap_identity: diapIdentity,

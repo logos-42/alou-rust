@@ -1,14 +1,12 @@
-﻿//! Tauri Commands
+//! Tauri Commands
 //!
 //! 提供给前端调用的 Tauri 命令
 
 use super::ai_client::AiClient;
 use super::config::{ApiConfig, UserApiConfig};
-use super::error::AgentError;
-use super::executor::{ExecutionResult, RalphLoopExecutor};
+use super::executor::RalphLoopExecutor;
 use super::streaming::StreamingExecutor;
 use super::task::{TaskFinalResult, TaskManager};
-use crate::bridges::ToolBridge;
 use std::sync::Arc;
 
 /// Tauri 命令：执行 Agent 任务（同步返回结果）
@@ -107,8 +105,10 @@ pub async fn test_api_connection(config: UserApiConfig) -> std::result::Result<T
 /// Tauri 命令：执行 AI 对话（支持流式响应）
 #[tauri::command]
 pub async fn execute_ai_conversation(
+    app_handle: tauri::AppHandle,
     agent_config: serde_json::Value,
     message: String,
+    messages: Option<Vec<serde_json::Value>>, // 完整的对话历史消息数组（role + content）
     options: Option<serde_json::Value>,
     bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::bridges::BridgeManager>>>,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -133,16 +133,40 @@ pub async fn execute_ai_conversation(
         Err(e) => return Err(format!("创建 AI 客户端失败: {}", e)),
     };
 
-    // 创建执行器
+    // 创建执行器（附带 AppHandle，以便向前端推送进度事件）
     let executor = RalphLoopExecutor::new(
         ai_client.clone(),
         task_manager.clone(),
         Arc::new(tool_bridge.clone()),
         Arc::new(crate::tools::ToolRegistry::new()),
-    );
+    )
+    .with_app_handle(app_handle);
 
-    // 创建任务
-    let task_id = task_manager.create_task("conversation".to_string(), message).await;
+    // 创建任务：优先使用 messages 数组（包含完整上下文），否则退回单条消息
+    use super::ai_client::AiMessage;
+    let task_id = if let Some(msgs) = messages {
+        // 将 JSON 数组转换为 AiMessage 列表
+        let ai_messages: Vec<AiMessage> = msgs
+            .into_iter()
+            .filter_map(|m| {
+                let role = m.get("role")?.as_str()?.to_string();
+                let content = m.get("content")?.as_str()?.to_string();
+                Some(AiMessage {
+                    role,
+                    content,
+                    tool_call_id: None,
+                    tool_calls: None,
+                })
+            })
+            .collect();
+        if ai_messages.is_empty() {
+            task_manager.create_task("conversation".to_string(), message).await
+        } else {
+            task_manager.create_task_with_messages("conversation".to_string(), ai_messages).await
+        }
+    } else {
+        task_manager.create_task("conversation".to_string(), message).await
+    };
 
     // 检查是否需要流式响应
     let use_stream = options

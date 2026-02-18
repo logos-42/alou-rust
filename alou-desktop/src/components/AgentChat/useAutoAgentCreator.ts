@@ -6,6 +6,7 @@ import { useCallback, useState } from 'react'
 interface AgentInfo {
   name: string;
   roleDescription: string;
+  customPrompt?: string | null;
 }
 
 /**
@@ -19,6 +20,7 @@ interface CreateAgentParams {
   mcpPorts: never[];
   diapIdentity: null;
   tempId: null;
+  customPrompt?: string | null;
 }
 
 /**
@@ -85,6 +87,7 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
         mcpPorts: [], // 空端口列表
         diapIdentity: null, // 自动创建 DIAP identity
         tempId: null, // 没有临时 ID
+        customPrompt: agentInfo.customPrompt ?? null, // AI 生成的文档系统提示词
       })
       
       console.log('[useAutoAgentCreator] 智能体自动创建成功:', agentInfo.name)

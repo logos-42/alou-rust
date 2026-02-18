@@ -4,7 +4,6 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import apiClient from './api'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 
@@ -573,123 +572,91 @@ class LocalIpfsGroupChatService {
   }
 
   /**
-   * 保存群聊到后端KV存储
+   * 保存群聊到 Tauri KV 存储
    */
   async saveGroupToKV(group: LocalGroup): Promise<void> {
     try {
-      // 使用后端API存储群聊数据
-      const response = await apiClient.post<KVResponse>('/kv/set', {
+      await invoke('kv_set', {
         key: `group:${group.groupId}`,
         value: JSON.stringify(group.toJSON())
       })
-      
-      if (response.data.success) {
-        console.log('[LocalIpfsGroupChatService] 群聊已保存到后端KV:', group.groupId)
-      } else {
-        throw new Error(response.data.error || '保存失败')
-      }
+      console.log('[LocalIpfsGroupChatService] 群聊已保存到KV:', group.groupId)
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 保存群聊到后端KV失败:', error.message)
+      console.warn('[LocalIpfsGroupChatService] 保存群聊到KV失败:', error.message)
     }
   }
 
   /**
-   * 保存消息到后端KV存储
+   * 保存消息到 Tauri KV 存储
    */
   async saveMessageToKV(groupId: string, message: LocalGroupMessage): Promise<void> {
     try {
-      // 使用后端API存储消息数据
-      const response = await apiClient.post<KVResponse>('/kv/set', {
+      await invoke('kv_set', {
         key: `message:${groupId}:${message.id}`,
         value: JSON.stringify(message.toJSON())
       })
-      
-      if (response.data.success) {
-        console.log('[LocalIpfsGroupChatService] 消息已保存到后端KV:', message.id)
-      } else {
-        throw new Error(response.data.error || '保存失败')
-      }
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 保存消息到后端KV失败:', error.message)
+      console.warn('[LocalIpfsGroupChatService] 保存消息到KV失败:', error.message)
     }
   }
 
   /**
-   * 从后端KV存储加载群聊数据
+   * 从 Tauri KV 存储加载群聊数据
    */
   async loadGroupsFromKV(): Promise<void> {
     try {
-      // 获取所有群聊相关的键
-      const response = await apiClient.get<KVResponse>('/kv/keys', {
-        params: { prefix: 'group:' }
-      })
-      
-      if (response.data.success && response.data.keys) {
-        console.log(`[LocalIpfsGroupChatService] 找到 ${response.data.keys.length} 个群聊数据`)
-        
-        for (const key of response.data.keys) {
-          try {
-            const valueResponse = await apiClient.get<KVResponse>('/kv/get', {
-              params: { key }
-            })
-            
-            if (valueResponse.data.success && valueResponse.data.value) {
-              const group = LocalGroup.fromJSON(JSON.parse(valueResponse.data.value))
-              this.groups.set(group.groupId, group)
-              
-              // 同时加载该群聊的消息
-              await this.loadMessagesFromKV(group.groupId)
-            }
-          } catch (error: any) {
-            console.warn(`[LocalIpfsGroupChatService] 加载群聊 ${key} 失败:`, error.message)
+      const keys: string[] = await invoke('kv_keys', { prefix: 'group:' })
+      console.log(`[LocalIpfsGroupChatService] 找到 ${keys.length} 个群聊数据`)
+
+      for (const key of keys) {
+        try {
+          const value: string | null = await invoke('kv_get', { key })
+          if (value) {
+            const group = LocalGroup.fromJSON(JSON.parse(value))
+            this.groups.set(group.groupId, group)
+            await this.loadMessagesFromKV(group.groupId)
           }
+        } catch (error: any) {
+          console.warn(`[LocalIpfsGroupChatService] 加载群聊 ${key} 失败:`, error.message)
         }
-        
-        console.log(`[LocalIpfsGroupChatService] 成功加载 ${this.groups.size} 个群聊`)
       }
+
+      console.log(`[LocalIpfsGroupChatService] 成功加载 ${this.groups.size} 个群聊`)
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 从后端KV加载群聊数据失败:', error.message)
+      console.warn('[LocalIpfsGroupChatService] 从KV加载群聊数据失败:', error.message)
     }
   }
 
   /**
-   * 从后端KV存储加载群聊消息
+   * 从 Tauri KV 存储加载群聊消息
    */
   async loadMessagesFromKV(groupId: string): Promise<void> {
     try {
-      // 获取该群聊的所有消息键
-      const response = await apiClient.get<KVResponse>('/kv/keys', {
-        params: { prefix: `message:${groupId}:` }
-      })
-      
-      if (response.data.success && response.data.keys) {
-        const messages: LocalGroupMessage[] = []
-        for (const key of response.data.keys) {
-          try {
-            const valueResponse = await apiClient.get<KVResponse>('/kv/get', {
-              params: { key }
-            })
-            
-            if (valueResponse.data.success && valueResponse.data.value) {
-              const message = LocalGroupMessage.fromJSON(JSON.parse(valueResponse.data.value))
-              messages.push(message)
-            }
-          } catch (error: any) {
-            console.warn(`[LocalIpfsGroupChatService] 加载消息 ${key} 失败:`, error.message)
+      const keys: string[] = await invoke('kv_keys', { prefix: `message:${groupId}:` })
+
+      const messages: LocalGroupMessage[] = []
+      for (const key of keys) {
+        try {
+          const value: string | null = await invoke('kv_get', { key })
+          if (value) {
+            const message = LocalGroupMessage.fromJSON(JSON.parse(value))
+            messages.push(message)
           }
+        } catch (error: any) {
+          console.warn(`[LocalIpfsGroupChatService] 加载消息 ${key} 失败:`, error.message)
         }
-        
-        // 按时间戳排序
-        messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
-        
-        // 限制内存中的消息数量
-        if (messages.length > 100) {
-          messages.splice(0, messages.length - 100)
-        }
-        
-        this.messages.set(groupId, messages)
-        console.log(`[LocalIpfsGroupChatService] 加载群聊 ${groupId} 的 ${messages.length} 条消息`)
       }
+
+      // 按时间戳排序
+      messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
+
+      // 限制内存中的消息数量
+      if (messages.length > 100) {
+        messages.splice(0, messages.length - 100)
+      }
+
+      this.messages.set(groupId, messages)
+      console.log(`[LocalIpfsGroupChatService] 加载群聊 ${groupId} 的 ${messages.length} 条消息`)
     } catch (error: any) {
       console.warn(`[LocalIpfsGroupChatService] 加载群聊 ${groupId} 消息失败:`, error.message)
     }

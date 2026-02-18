@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import CloseIcon from '@/assets/关闭0.3.png'
-import { apiService } from '@/services/api'
-import useAuthStore from '@/stores/authStore'
+import { invoke } from '@tauri-apps/api/core'
+import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
 import './ApiConfigModal.css'
 
 const PROVIDERS = [
@@ -23,56 +23,49 @@ const DEFAULT_MODELS = {
 
 function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   const { t } = useI18n()
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [provider, setProvider] = useState('deepseek')
   const [model, setModel] = useState(DEFAULT_MODELS.deepseek)
+  const [baseUrl, setBaseUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const modalRef = useRef(null)
 
-  // 从 localStorage 加载配置，如果已认证则尝试从后端加载
+  // 从 Tauri 本地存储加载配置（不需要 Workers 后端）
   useEffect(() => {
     if (isOpen) {
       const loadConfig = async () => {
-        let storedApiKey = localStorage.getItem('user_api_key') || ''
-        let storedProvider = localStorage.getItem('ai_provider') || 'deepseek'
-        let storedModel = localStorage.getItem('ai_model') || DEFAULT_MODELS[storedProvider] || 'deepseek-chat'
-
-        // 如果用户已认证，尝试从后端获取配置
-        if (isAuthenticated) {
-          try {
-            const result = await apiService.getApiConfig()
-            if (result.success && result.data) {
-              // 后端只返回是否有 API key，不返回实际的 key
-              // 所以如果后端说有 key，我们保留本地的 key
-              if (!result.data.has_api_key) {
-                // 后端没有保存 key，清空本地 key
-                storedApiKey = ''
-                localStorage.removeItem('user_api_key')
-              }
-              // 使用后端的 provider 和 model
-              storedProvider = result.data.provider || storedProvider
-              storedModel = result.data.model || storedModel
-            }
-          } catch (err) {
-            console.warn('[ApiConfigModal] 从后端加载配置失败，使用本地配置:', err)
+        try {
+          const config = await getActiveApiConfig()
+          if (config) {
+            setApiKey(config.api_key || '')
+            setProvider(config.provider || 'deepseek')
+            setModel(config.model || DEFAULT_MODELS[config.provider] || 'deepseek-chat')
+            setBaseUrl(config.base_url || '')
+          } else {
+            // 回退到 localStorage
+            setApiKey(localStorage.getItem('user_api_key') || '')
+            const p = localStorage.getItem('ai_provider') || 'deepseek'
+            setProvider(p)
+            setModel(localStorage.getItem('ai_model') || DEFAULT_MODELS[p] || 'deepseek-chat')
+            setBaseUrl('')
           }
+        } catch (err) {
+          console.warn('[ApiConfigModal] 加载配置失败，使用 localStorage:', err)
+          setApiKey(localStorage.getItem('user_api_key') || '')
+          const p = localStorage.getItem('ai_provider') || 'deepseek'
+          setProvider(p)
+          setModel(localStorage.getItem('ai_model') || DEFAULT_MODELS[p] || 'deepseek-chat')
         }
-
-        setApiKey(storedApiKey)
-        setProvider(storedProvider)
-        setModel(storedModel)
         setError(null)
         setSuccess(null)
       }
-
       loadConfig()
     }
-  }, [isOpen, isAuthenticated])
+  }, [isOpen])
 
   // 当 provider 改变时，更新默认 model
   useEffect(() => {
@@ -88,18 +81,13 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         handleClose()
       }
     }
-
     const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        handleClose()
-      }
+      if (event.key === 'Escape') handleClose()
     }
-
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('keydown', handleEscape)
     }
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleEscape)
@@ -114,45 +102,21 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       setError(t('apiConfig.error.apiKeyRequired'))
       return
     }
-
     if (!model.trim()) {
       setError(t('apiConfig.error.modelRequired'))
       return
     }
 
     setIsLoading(true)
-
     try {
-      // 先保存到 localStorage（前端备用）
-      localStorage.setItem('user_api_key', apiKey.trim())
-      localStorage.setItem('ai_provider', provider)
-      localStorage.setItem('ai_model', model.trim())
+      // 通过 Tauri 加密保存到本地文件（同时写入 localStorage 作为备份）
+      await saveApiConfig(apiKey.trim(), provider, model.trim(), baseUrl.trim() || undefined)
 
-      // 只有在用户已认证时才尝试保存到后端
-      if (isAuthenticated) {
-        try {
-          const result = await apiService.saveApiConfig(
-            apiKey.trim(),
-            provider,
-            model.trim()
-          )
-          
-          if (!result.success) {
-            console.warn('[ApiConfigModal] 后端保存失败，但本地配置已保存:', result.error)
-            // 继续显示成功消息，因为本地保存成功了
-          }
-        } catch (backendErr) {
-          console.warn('[ApiConfigModal] 后端保存失败，但本地配置已保存:', backendErr)
-          // 继续显示成功消息，因为本地保存成功了
-        }
-      } else {
-        console.log('[ApiConfigModal] 用户未认证，仅保存到本地存储')
-      }
+      // 通知其他组件配置已更新
+      window.dispatchEvent(new CustomEvent('api-config-changed'))
 
       setSuccess(t('apiConfig.success.saved'))
-      setTimeout(() => {
-        handleClose()
-      }, 1000)
+      setTimeout(() => handleClose(), 1000)
     } catch (err) {
       console.error('[ApiConfigModal] 保存配置失败:', err)
       setError(t('apiConfig.error.saveFailed') + (err?.message ? `: ${err.message}` : ''))
@@ -172,32 +136,26 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     setIsVerifying(true)
 
     try {
-      // 使用新的 API 服务测试连接
-      const result = await apiService.testApiConnection(
-        apiKey.trim(),
-        provider,
-        model.trim()
-      )
+      // 通过 Tauri invoke 直接测试 API 连接，无需 Workers 后端
+      const result = await invoke('test_api_connection', {
+        config: {
+          id: 'test',
+          provider,
+          api_key: apiKey.trim(),
+          base_url: baseUrl.trim() || null,
+          model: model.trim(),
+          is_active: true,
+        },
+      })
 
-      if (result.success) {
-        if (result.data?.valid) {
-          setSuccess(t('apiConfig.success.verified'))
-        } else {
-          setError(result.data?.error || t('apiConfig.error.verifyFailed'))
-        }
+      if (result?.success) {
+        setSuccess(t('apiConfig.success.verified'))
       } else {
-        // 处理不同的错误情况
-        if (result.error?.includes('验证端点未实现')) {
-          setSuccess(t('apiConfig.success.verifyNotEnabled'))
-        } else if (result.error?.includes('无法连接到后端服务器')) {
-          setError(t('apiConfig.error.networkError'))
-        } else {
-          setError(result.error || t('apiConfig.error.verifyFailed'))
-        }
+        setError(result?.message || t('apiConfig.error.verifyFailed'))
       }
     } catch (err) {
       console.error('[ApiConfigModal] 验证 API Key 失败:', err)
-      setError(err.message || t('apiConfig.error.networkError'))
+      setError(err?.message || t('apiConfig.error.networkError'))
     } finally {
       setIsVerifying(false)
     }
@@ -209,9 +167,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     onClose()
   }
 
-  if (!isOpen) {
-    return null
-  }
+  if (!isOpen) return null
 
   return (
     <div className="api-config-modal-backdrop">
@@ -221,16 +177,13 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             <h2>{t('apiConfig.title')}</h2>
             <p>{t('apiConfig.subtitle')}</p>
           </div>
-          <button 
-            type="button" 
-            onClick={handleClose} 
-            className="api-config-modal__close"
-          >
+          <button type="button" onClick={handleClose} className="api-config-modal__close">
             <img src={CloseIcon} alt="关闭" />
           </button>
         </div>
 
         <div className="api-config-modal__content">
+          {/* API Key */}
           <div className="api-config-modal__field">
             <label>
               <span>{t('apiConfig.apiKey.label')}</span>
@@ -257,6 +210,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             </p>
           </div>
 
+          {/* Provider */}
           <div className="api-config-modal__field">
             <label>
               <span>{t('apiConfig.provider.label')}</span>
@@ -274,6 +228,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             </label>
           </div>
 
+          {/* Model */}
           <div className="api-config-modal__field">
             <label>
               <span>{t('apiConfig.model.label')}</span>
@@ -290,23 +245,35 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             </p>
           </div>
 
+          {/* Base URL（可选，用于自定义 API 端点） */}
+          <div className="api-config-modal__field">
+            <label>
+              <span>Base URL <span style={{ fontWeight: 'normal', opacity: 0.6 }}>(可选)</span></span>
+              <input
+                type="text"
+                placeholder="https://api.example.com/v1 (留空使用官方端点)"
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                disabled={isLoading}
+              />
+            </label>
+            <p className="api-config-modal__hint">
+              💡 配置后可直接使用工具和自主循环，无需启动 Workers 后端
+            </p>
+          </div>
+
           {error && <div className="api-config-modal__error">{error}</div>}
           {success && <div className="api-config-modal__success">{success}</div>}
-          
-          {!isAuthenticated && (
-            <div className="api-config-modal__info">
-              <p>💡 {t('apiConfig.info.connectWallet')}</p>
-              <p className="api-config-modal__info-detail">
-                {t('apiConfig.info.connectWalletDetail')}
-              </p>
-            </div>
-          )}
+
+          <div className="api-config-modal__info">
+            <p>🔒 API Key 加密存储在本地，不上传到任何服务器</p>
+          </div>
         </div>
 
         <div className="api-config-modal__actions">
-          <button 
-            type="button" 
-            className="api-config-modal__btn-ghost" 
+          <button
+            type="button"
+            className="api-config-modal__btn-ghost"
             onClick={handleClose}
             disabled={isLoading}
           >
@@ -335,4 +302,3 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 }
 
 export default ApiConfigModal
-

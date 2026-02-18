@@ -108,8 +108,8 @@ export const resolveAgentAvatar = (agent: Agent | null | undefined): string => {
     }
   }
   
-  // 2. 使用 avatar_url 字段
-  if (agent.avatar_url && agent.avatar_url.startsWith('http')) {
+  // 2. 使用 avatar_url 字段（支持 http URL 和 base64 data URL）
+  if (agent.avatar_url && (agent.avatar_url.startsWith('http') || agent.avatar_url.startsWith('data:'))) {
     return agent.avatar_url
   }
   

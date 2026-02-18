@@ -411,6 +411,65 @@
   pointer-events: auto;
 }
 
+/* ── Typing Indicator (AI 正在思考动画) ── */
+.typing-indicator-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  margin-top: 0.25rem;
+}
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 18px;
+  padding: 10px 16px;
+}
+
+.app-shell.dark-mode .typing-indicator {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.2);
+}
+
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6366f1;
+  display: inline-block;
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+.app-shell.dark-mode .typing-dot {
+  background: #8b5cf6;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
 .conversation-empty {
   min-height: 180px;
   display: flex;

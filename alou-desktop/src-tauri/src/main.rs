@@ -325,6 +325,8 @@ fn main() {
             kv_keys,
             kv_clear,
             kv_stats,
+            kv_get_batch,
+            kv_set_batch,
             // DIAP commands
             create_local_diap_identity,
             create_diap_identity_from_did_document,
@@ -332,6 +334,7 @@ fn main() {
             update_local_diap_identity,
             create_diap_identity_with_zkp,
             test_ipns_on_public_gateway,
+            ipfs_publish_ipns,
             // LSP SDK commands
             execute_lsp,
             get_supported_languages,
@@ -368,8 +371,10 @@ fn main() {
             rollback_ralph_loop_execution,
             cleanup_ralph_loop_histories,
             // Tool commands
+            execute_tool,
             get_tool_list,
             cancel_tool_execution,
+            get_execution_history,
             // Agent Skills commands
             agent_skills,
             // Memory management commands
@@ -405,18 +410,13 @@ fn main() {
             add_task,
             get_next_task,
             update_task_status,
+            set_task_result,
             list_tasks,
             get_task_stats,
+            get_task_by_id,
             // Autonomous Agent commands
             get_autonomous_agent_state,
             save_autonomous_agent_state,
-            // Autonomous Loop commands
-            start_autonomous_loop,
-            stop_autonomous_loop,
-            pause_autonomous_loop,
-            resume_autonomous_loop,
-            get_autonomous_loop_state,
-            add_autonomous_task,
             // Autonomous Loop commands
             start_autonomous_loop,
             stop_autonomous_loop,

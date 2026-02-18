@@ -1,6 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
 import MessageList from '@/components/MessageList'
-import AgentStreamPanel from '@/components/agent/AgentStreamPanel'
 import CloseIcon from '@/assets/关闭0.3.png'
 import EditIcon from '@/assets/修改.png'
 import './AgentConversationOverlay.css'
@@ -140,8 +139,12 @@ const AgentConversationOverlay = forwardRef(
             messages={messages}
             isLoading={isLoading}
             loadingContent={
-              <div className="stream-panel-wrapper">
-                <AgentStreamPanel events={streamEvents} status={streamStatus} />
+              <div className="typing-indicator-wrapper">
+                <div className="typing-indicator">
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                  <span className="typing-dot" />
+                </div>
               </div>
             }
             onMessageSelect={onInspectMessage}

@@ -646,6 +646,7 @@ const AgentChat = () => {
     createSession,
     setSessionReady,
     userName,
+    openConversationPanel,
   })
 
   const { inputTargetMode, sendMessage, handleGroupChatPanelClick } = remoteControl

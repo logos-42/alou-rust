@@ -20,6 +20,7 @@ export const useGroupChatRemoteControl = ({
   createSession,
   setSessionReady,
   userName,
+  openConversationPanel,
 }) => {
   // 输入目标模式：'agent' = 发送到智能体（遥控模式），'groupChat' = 发送到群聊
   // 只有在群聊面板打开时才启用遥控功能
@@ -244,6 +245,8 @@ export const useGroupChatRemoteControl = ({
       }
 
       setCurrentMessage('')
+      // 发送消息后自动打开对话面板
+      openConversationPanel?.()
       await sendMessageToAgent(activeChannelId, text, selectedAgent)
       return
     }
@@ -261,6 +264,8 @@ export const useGroupChatRemoteControl = ({
       }
 
       setCurrentMessage('')
+      // 发送消息后自动打开对话面板
+      openConversationPanel?.()
       await sendMessageToAgent(activeChannelId, text, selectedAgent)
     }
   }, [
@@ -271,6 +276,7 @@ export const useGroupChatRemoteControl = ({
     inputTargetMode,
     isAgentLoading,
     isSessionReady,
+    openConversationPanel,
     selectedAgent,
     sendMessageToAgent,
     sendMessageToGroupChat,

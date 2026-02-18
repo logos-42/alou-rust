@@ -1,14 +1,58 @@
 import { useCallback, useState, useMemo, useEffect, useRef, RefObject } from 'react'
-import apiClient from '@/services/api'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import agentService from '@/services/agentService'
+import { getActiveApiConfig } from '@/hooks/useApiConfig'
 import useAgentStore from '@/stores/agentStore'
-import { getToolCategoriesByMode, getToolsByCategories } from './agentUtils'
 import { getSystemPromptForAgent } from './utils/agentPrompts'
 import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
-import LoadingIcon from '@/assets/加载0.2.png'
 import type { ClusterActionStore } from '@/stores/clusterActionStore.types'
+
+// ── Tauri 进度事件类型 ──────────────────────────────────────────
+interface AgentProgressPayload {
+  type: 'started' | 'thinking' | 'tool_calling' | 'tool_done' | 'tools_pending' | 'completed' | 'failed'
+  task_id: string
+  // thinking
+  content?: string
+  // tool_calling
+  tool_name?: string
+  // tool_done
+  success?: boolean
+  preview?: string
+  error?: string
+  // tools_pending
+  count?: number
+  // completed
+  result?: string
+}
+
+/** 将进度事件转换为可读的中文消息 */
+function progressToText(e: AgentProgressPayload): string | null {
+  switch (e.type) {
+    case 'started':
+      return '🚀 开始执行任务...'
+    case 'thinking':
+      // 只在有工具调用中间过程时显示思考内容（最终回复由主流程处理）
+      return e.content ? `💭 ${e.content}` : null
+    case 'tools_pending':
+      return `🔧 准备调用 ${e.count} 个工具...`
+    case 'tool_calling':
+      return `⚙️ 调用工具：**${e.tool_name}**`
+    case 'tool_done':
+      if (e.success) {
+        const preview = e.preview ? `\n\`\`\`\n${e.preview.slice(0, 200)}\n\`\`\`` : ''
+        return `✅ 工具 **${e.tool_name}** 完成${preview}`
+      } else {
+        return `❌ 工具 **${e.tool_name}** 失败：${e.error || '未知错误'}`
+      }
+    case 'failed':
+      return `❌ 任务失败：${e.error || '未知错误'}`
+    default:
+      return null
+  }
+}
 
 // 消息类型
 export interface Message {
@@ -85,32 +129,6 @@ export interface ToolCall {
   arguments: Record<string, unknown>
 }
 
-// API响应类型
-interface ApiResponse {
-  task_id?: string
-  taskId?: string
-  toolCalls?: ToolCall[]
-  tool_calls?: ToolCall[]
-  response?: string
-  content?: string
-  timestamp?: number
-  source?: string
-  session_id?: string
-}
-
-// 错误响应类型
-interface ApiError {
-  response?: {
-    status: number
-    data: {
-      error?: string
-      remaining_requests?: number
-      reset_time?: string | null
-    } | string
-  }
-  name?: string
-}
-
 /**
  * Hook for managing messages and conversation
  * 按频道分开存储消息，支持 IPFS 持久化
@@ -173,8 +191,12 @@ export const useAgentMessages = ({
   }, [activeChannelId])
 
   // 当前频道的消息
+  // 当没有选中智能体时，显示 'welcome' 虚拟频道的消息（用于对话式创建流程）
   const messages = useMemo(() => {
-    return messagesByChannel[activeChannelId || ''] || []
+    if (activeChannelId) {
+      return messagesByChannel[activeChannelId] || []
+    }
+    return messagesByChannel['welcome'] || []
   }, [messagesByChannel, activeChannelId])
 
   // 添加消息到指定频道
@@ -234,7 +256,8 @@ export const useAgentMessages = ({
   }, [conversationOverlayRef])
 
   // 使用子Hook（在所有依赖函数定义之后）
-  const { pollAsyncTask, cancelPolling } = useAsyncTaskPolling({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { pollAsyncTask: _pollAsyncTask, cancelPolling } = useAsyncTaskPolling({
     appendMessage: (message: unknown, agentId: string) => appendMessage(message as Message, agentId),
     scrollToBottom,
     setAgentLoading,
@@ -244,7 +267,8 @@ export const useAgentMessages = ({
   })
 
   const { parseAgentCreationCommandWithAIDirect } = useAgentCreation({
-    appendMessage: (message: string | Message) => appendMessage(message as Message),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    appendMessage: (message: any) => appendMessage(message as Message),
   })
 
   // Suppress unused variable warning
@@ -303,7 +327,8 @@ export const useAgentMessages = ({
       const data = await agentService.loadMessagesFromIpfs?.(messagesCid)
 
       if (data && data.messages && Array.isArray(data.messages)) {
-        setMessagesForChannel(channelId, data.messages)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setMessagesForChannel(channelId, data.messages as any as Message[])
         console.log(`[useAgentMessages] 已加载 ${data.messages.length} 条消息`)
         return true
       }
@@ -344,7 +369,9 @@ export const useAgentMessages = ({
     recordInteraction('user_message', { content: text, agentId: targetAgentId })
     scrollToBottom()
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const contextSnapshot = contextEventsRef.current?.splice(0, contextEventsRef.current.length) || []
+    void contextSnapshot // clear context events even though not passed to local AI
 
     // 直接调用后端 API 进行单智能体聊天
     try {
@@ -382,125 +409,114 @@ export const useAgentMessages = ({
       const abortController = new AbortController()
       abortControllersByAgent.current[targetAgentId] = abortController
 
-      const agentInfo = targetAgent || selectedAgent
-      
-      // 构建 Claude SDK 格式的请求
-      console.log('[sendMessageToAgent] 构建请求，参数:', {
-        currentMode,
-        hasAgentInfo: !!agentInfo,
-        walletAddress,
-        activeChain,
-        agentInfoKeys: agentInfo ? Object.keys(agentInfo) : []
-      });
-      
-      // 使用原有的系统提示词生成逻辑
-      const systemPrompt = getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain);
-      console.log('[sendMessageToAgent] 生成的 systemPrompt:', systemPrompt ? `有内容，长度: ${systemPrompt.length}` : 'undefined');
-      
-      // 获取工具配置（但不覆盖系统提示词）
-      const toolCategories = getToolCategoriesByMode(currentMode, agentInfo);
-      console.log('[sendMessageToAgent] 工具类别:', toolCategories);
-      
-      // 只获取工具配置，不生成新的系统提示词
-      const tools = getToolsByCategories(toolCategories);
-      console.log('[sendMessageToAgent] 可用工具数量:', tools.length);
-      
-      const claudeSdkRequest = {
-        apiKey: "alou-backend-default-token",
-        prompt: text.trim(),
-        systemPrompt: systemPrompt,
-        history: getMessageHistory(targetAgentId, messagesByChannel),
-        agentInfo: {
-          session_id: agentSessionId,
-          wallet_address: walletAddress || null,
-          chain: activeChain || undefined,
-          context_events: contextSnapshot,
-          agent_id: targetAgentId,
-          name: agentInfo?.display_name || agentInfo?.name,
-          role_description: agentInfo?.role_description,
-          custom_prompt: agentInfo?.customPrompt,
-          mode: currentMode,
-          custom_instructions: agentInfo?.customInstructions,
-          did: agentInfo?.did,
-          ipns: agentInfo?.ipns,
-          mcp_tools: agentInfo?.mcpTools || agentInfo?.mcp_tools || [],
-          allowed_tools: tools.map((t: { name: string }) => t.name),
-          ...(agentInfo?.metadata || {}),
-        },
-        tools: tools,
-        model: agentInfo?.model || "deepseek-chat",
-        maxTokens: agentInfo?.maxTokens || 4096,
-        temperature: agentInfo?.temperature || 0.7,
-        taskType: "async",
-        timeout: 30000,
+      // ── 本地 API 模式：通过 Tauri invoke 直接调用 AI，不依赖 Workers 后端 ──
+
+      // 1. 读取本地已保存的 API 配置
+      const localApiConfig = await getActiveApiConfig()
+
+      if (!localApiConfig) {
+        // 未配置 API Key，提示用户去配置
+        appendMessage({
+          id: `no_api_${Date.now()}`,
+          type: 'assistant',
+          content: '⚙️ **请先配置 API Key**\n\n点击右上角设置图标 → API 配置，填入你的 API Key（支持 DeepSeek / OpenAI / Claude / Kimi），然后即可直接使用工具和自主循环。',
+          timestamp: Date.now(),
+          source: 'system',
+          agentId: targetAgentId,
+        }, targetAgentId)
+        setAgentLoading(targetAgentId, false)
+        return
       }
 
-      const apiResult = await apiClient.post('/ai-task/init-and-start', claudeSdkRequest, {
-        signal: abortController.signal,
+      // 2. 构建包含上下文的正确消息数组（system + history + 当前 user）
+      const agentInfo = targetAgent || selectedAgent
+      const systemPrompt = getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null)
+      const history = getMessageHistory(targetAgentId, messagesByChannel)
+
+      // 构建正确格式的 messages 数组发送给 Rust
+      const messagesArray: Array<{ role: string; content: string }> = []
+      if (systemPrompt) {
+        messagesArray.push({ role: 'system', content: systemPrompt })
+      }
+      // 最近 10 条历史记录
+      for (const m of history.slice(-10)) {
+        messagesArray.push({ role: m.role, content: m.content })
+      }
+      // 当前用户消息
+      messagesArray.push({ role: 'user', content: text.trim() })
+
+      console.log('[useAgentMessages] 调用本地 AI，provider:', localApiConfig.provider, 'model:', localApiConfig.model, '消息数:', messagesArray.length)
+
+      // 3. 通过 Tauri invoke 执行 AI 对话（本地 Rust 直接调用 AI API）
+      // Rust 返回 { success, result: TaskFinalResult, execution_mode, timestamp }
+      // TaskFinalResult = { task_id, success, result: string, error, iteration_count }
+      const tauri_result = await invoke<{
+        success: boolean
+        result?: {
+          task_id?: string
+          success?: boolean
+          result?: string      // AI 最终回复的文本
+          error?: string
+          iteration_count?: number
+          // 兼容旧字段
+          final_answer?: string
+          content?: string
+          summary?: string
+        }
+        execution_mode?: string
+        timestamp?: number
+      }>('execute_ai_conversation', {
+        agentConfig: {
+          id: localApiConfig.id || 'primary',
+          provider: localApiConfig.provider,
+          api_key: localApiConfig.api_key,
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          base_url: localApiConfig.base_url != null ? localApiConfig.base_url : null,
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          model: localApiConfig.model != null ? localApiConfig.model : null,
+          is_active: true,
+        },
+        message: text.trim(),       // fallback 单条消息
+        messages: messagesArray,    // 完整上下文数组（优先使用）
+        options: { stream: false },
       })
 
-      console.log('[useAgentMessages] API 原始响应:', apiResult)
-      
-      // apiClient 返回的是 ApiResponse 结构: { success, data, message, timestamp }
-      // 真正的后端数据在 data 字段中
-      const data = apiResult.data as ApiResponse
-      
-      console.log('[useAgentMessages] 后端数据:', data)
-      console.log('[useAgentMessages] task_id:', data?.task_id)
-      console.log('[useAgentMessages] taskId:', data?.taskId)
+      console.log('[useAgentMessages] Tauri AI 响应:', tauri_result)
 
-      // 检查是否为异步任务（包含 task_id）
-      const taskId = data?.task_id || data?.taskId
-      
-      console.log('[useAgentMessages] 最终 taskId:', taskId)
-      
-      if (taskId) {
-        // 是异步任务，启动轮询
-        console.log(`[useAgentMessages] 检测到异步任务: ${taskId}`)
-        
-        // 显示加载消息
-        const loadingMessage: Message = {
-          id: `task_${taskId}`,
-          type: 'assistant',
-          content: `<img src="${LoadingIcon}" alt="加载中" class="loading-icon" /> 正在处理中...`,
-          timestamp: Date.now(),
-          source: 'task-progress',
-          agentId: targetAgentId,
-          isLoading: true,
-        }
-        appendMessage(loadingMessage, targetAgentId)
-        
-        // 启动轮询
-        pollAsyncTask(taskId, loadingMessage.id, targetAgentId)
-      } else {
-        // 同步任务，直接处理响应
-        const toolCalls = data.toolCalls || data.tool_calls || []
-        const content = data.response || data.content || ""
-        
-        if (toolCalls.length > 0) {
-          await handleToolCalls(toolCalls)
-        }
+      if (tauri_result?.success) {
+        // 提取响应内容
+        // TaskFinalResult.result 是 AI 最终回复的字符串
+        const result = tauri_result.result
+        const content =
+          result?.result ||        // TaskFinalResult.result (主字段)
+          result?.final_answer ||  // 兼容旧格式
+          result?.content ||
+          result?.summary ||
+          '✅ 任务已完成'
 
         const assistantMessage: Message = {
           id: `assistant_${Date.now()}_${targetAgentId}`,
           type: 'assistant',
-          content: String(content || '收到响应'),
-          timestamp: data.timestamp || Date.now(),
-          source: data.source || 'alou-edge',
+          content: String(content),
+          timestamp: tauri_result.timestamp ? tauri_result.timestamp * 1000 : Date.now(),
+          source: 'local',
           agentId: targetAgentId,
         }
         appendMessage(assistantMessage, targetAgentId)
-
-        if (data.session_id) {
-          setSessionsByAgent(prev => ({ ...prev, [targetAgentId]: data.session_id! }))
-          if (targetAgentId === activeChannelId) {
-            setSessionId(data.session_id!)
-          }
-        }
+      } else {
+        appendMessage({
+          id: `error_${Date.now()}`,
+          type: 'assistant',
+          content: '❌ AI 执行失败，请检查 API Key 是否正确，或查看日志获取详情。',
+          timestamp: Date.now(),
+          source: 'error',
+          agentId: targetAgentId,
+        }, targetAgentId)
       }
     } catch (error) {
-      const err = error as ApiError
-      // 如果是用户主动取消，不显示错误消息
+      const err = error as { name?: string; message?: string }
+
+      // 用户主动取消
       if (err.name === 'AbortError' || err.name === 'CanceledError') {
         console.log('[useAgentMessages] 用户取消了智能体执行:', targetAgentId)
         appendMessage({
@@ -512,57 +528,14 @@ export const useAgentMessages = ({
         }, targetAgentId)
         return
       }
-      
-      const errorMessage = error instanceof Error ? error.message : '未知错误'
-      const statusCode = err?.response?.status
-      
-      // 尝试从响应中提取详细错误信息
-      let detailedError = errorMessage
-      if (err?.response?.data) {
-        const errorData = err.response.data
-        if (typeof errorData === 'object' && errorData.error) {
-          detailedError = errorData.error
-        } else if (typeof errorData === 'string') {
-          detailedError = errorData
-        }
-      }
-      
-      console.error('[useAgentMessages] 后端 API 错误:', {
-        status: statusCode,
-        message: errorMessage,
-        detailedError,
-        response: err?.response?.data,
-      })
-      
-      // 处理 429 错误（限额超限）
-      if (statusCode === 429) {
-        const errorData = err?.response?.data as { remaining_requests?: number; reset_time?: string | null } | undefined
-        const remainingRequests = errorData?.remaining_requests ?? 0
-        const resetTime = errorData?.reset_time ?? null
-        
-        if (onRateLimitExceeded) {
-          onRateLimitExceeded({
-            remainingRequests,
-            resetTime,
-          })
-        }
-        return
-      }
-      
-      let friendlyMessage = `❌ 抱歉，发生了错误：${detailedError}`
-      if (statusCode === 404) {
-        friendlyMessage = '❌ 会话已过期，请刷新页面重试。'
-        setSessionReady(false)
-      } else if (statusCode === 500) {
-        friendlyMessage = `❌ 服务器内部错误：${detailedError}\n\n请检查后端服务是否正常运行，或查看控制台获取更多信息。`
-      } else if (!err?.response) {
-        friendlyMessage = '❌ 无法连接到服务器，请检查网络连接。'
-      }
-      
+
+      const errorMessage = err?.message || '未知错误'
+      console.error('[useAgentMessages] 本地 AI 执行错误:', errorMessage)
+
       appendMessage({
         id: `error_${Date.now()}`,
         type: 'assistant',
-        content: String(friendlyMessage),
+        content: `❌ 执行出错：${errorMessage}\n\n请检查 API Key 配置是否正确。`,
         timestamp: Date.now(),
         source: 'error',
       }, targetAgentId)
@@ -582,6 +555,7 @@ export const useAgentMessages = ({
     createSession,
     handleToolCalls,
     loadingByAgent,
+    messagesByChannel,
     onRateLimitExceeded,
     recordInteraction,
     scrollToBottom,
@@ -591,86 +565,97 @@ export const useAgentMessages = ({
     setAgentLoading,
     setSessionId,
     setSessionReady,
+    currentMode,
+    walletAddress,
   ])
 
 
   // 向后兼容的 sendMessage（发送到当前活动智能体）
+  // 当没有选中智能体时，任何文本消息都会触发"用对话创建智能体"流程
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
     if (!text || isLoading) {
       return
     }
 
-    // 如果没有活动频道，检查是否为创建智能体的命令
+    // ── 没有活动频道（未选中任何智能体）→ 进入对话式创建流程 ──
     if (!activeChannelId) {
-      const createCommands = ['创建智能体', '新建智能体', 'create agent', 'new agent', '/create', '/new']
-      const isCreateCommand = createCommands.some(cmd => 
-        text.toLowerCase().includes(cmd.toLowerCase())
-      )
-      
-      if (isCreateCommand) {
-        console.log('[useAgentMessages] 检测到创建智能体命令:', text)
-        setCurrentMessage('')
-        
-        // 解析指令并生成智能体信息
-        const agentInfo = await parseAgentCreationCommandWithAIDirect(text)
-        console.log('[useAgentMessages] 解析的智能体信息:', agentInfo)
-        
-        // 显示创建中的消息
+      setCurrentMessage('')
+
+      // 显示用户消息（在 'welcome' 虚拟频道，让用户感受到"有对话"）
+      appendMessage({
+        id: `user_${Date.now()}`,
+        type: 'user',
+        content: text,
+        timestamp: Date.now(),
+        source: 'user',
+      }, 'welcome')
+
+      // 如果有自动创建回调（父组件支持），用 AI 解析描述 → 自动创建
+      if (onAutoCreateAgent) {
         appendMessage({
-          id: `system_${Date.now()}`,
-          type: 'assistant',
-          content: `🔄 正在创建智能体 "${agentInfo.name}"...`,
+          id: `system_thinking_${Date.now()}`,
+          type: 'system',
+          content: '🤔 正在理解你的需求，准备创建智能体...',
           timestamp: Date.now(),
           source: 'system',
-        }, 'system')
-        
-        // 调用自动创建智能体的逻辑
-        if (onAutoCreateAgent) {
-          try {
-            await onAutoCreateAgent(agentInfo)
-            console.log('[useAgentMessages] 智能体自动创建命令已处理')
-            
-            appendMessage({
-              id: `system_${Date.now()}_success`,
-              type: 'assistant',
-              content: `✅ 智能体 "${agentInfo.name}" 创建成功！已添加到频道栏。`,
-              timestamp: Date.now(),
-              source: 'system',
-            }, 'system')
-          } catch (error) {
-            console.error('[useAgentMessages] 自动创建智能体失败:', error)
-            appendMessage({
-              id: `system_${Date.now()}_error`,
-              type: 'assistant',
-              content: `❌ 创建智能体失败: ${(error as Error).message || '未知错误'}`,
-              timestamp: Date.now(),
-              source: 'system',
-            }, 'system')
-          }
-        } else if (onCreateAgent) {
-          try {
-            await onCreateAgent()
-            console.log('[useAgentMessages] 智能体创建命令已处理（打开模态框）')
-          } catch (error) {
-            console.error('[useAgentMessages] 打开创建模态框失败:', error)
-          }
-        } else {
-          setTimeout(() => {
-            appendMessage({
-              id: `system_${Date.now()}_2`,
-              type: 'assistant',
-              content: '⚠️ 智能体创建功能需要从左侧"+"按钮启动。请点击左侧的"+"按钮创建智能体。',
-              timestamp: Date.now(),
-              source: 'system',
-            }, 'system')
-          }, 1000)
+        }, 'welcome')
+
+        try {
+          const agentInfo = await parseAgentCreationCommandWithAIDirect(text)
+          console.log('[sendMessage] 解析的智能体信息:', agentInfo)
+
+          appendMessage({
+            id: `system_creating_${Date.now()}`,
+            type: 'system',
+            content: `🔄 正在创建智能体 **"${agentInfo.name}"**...`,
+            timestamp: Date.now(),
+            source: 'system',
+          }, 'welcome')
+
+          await onAutoCreateAgent(agentInfo as unknown as AgentInfo)
+
+          appendMessage({
+            id: `system_done_${Date.now()}`,
+            type: 'assistant',
+            content: `✅ 智能体 **"${agentInfo.name}"** 已创建！点击左侧频道开始对话。`,
+            timestamp: Date.now(),
+            source: 'system',
+          }, 'welcome')
+        } catch (err) {
+          appendMessage({
+            id: `system_err_${Date.now()}`,
+            type: 'assistant',
+            content: `❌ 创建失败：${(err as Error).message || '未知错误'}`,
+            timestamp: Date.now(),
+            source: 'error',
+          }, 'welcome')
         }
-        
-        return
+      } else if (onCreateAgent) {
+        // 父组件只支持打开模态框
+        appendMessage({
+          id: `system_modal_${Date.now()}`,
+          type: 'assistant',
+          content: '📝 即将打开创建表单...',
+          timestamp: Date.now(),
+          source: 'system',
+        }, 'welcome')
+        try {
+          await onCreateAgent()
+        } catch (e) {
+          console.error('[sendMessage] 打开创建模态框失败:', e)
+        }
+      } else {
+        // 兜底：提示用户点击 "+" 按钮
+        appendMessage({
+          id: `system_hint_${Date.now()}`,
+          type: 'assistant',
+          content: '👈 点击左侧 **"+"** 按钮创建你的第一个智能体，或者试试输入：\n\n> `创建一个擅长写代码的助手`',
+          timestamp: Date.now(),
+          source: 'system',
+        }, 'welcome')
       }
-      
-      console.warn('[useAgentMessages] 无法发送消息：没有活动频道')
+
       return
     }
 
@@ -811,8 +796,7 @@ export const useAgentMessages = ({
         
         try {
           const store = require('@/stores/clusterActionStore') as { default: ClusterActionStore }
-          const { addGroupChatMessage, getState } = store.default
-          const state = getState()
+          const { addGroupChatMessage } = store.default
           const groupReplyMessage = {
             id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             type: 'agent' as const,
@@ -835,6 +819,192 @@ export const useAgentMessages = ({
       }
     }
   }, [messages, selectedAgent])
+
+  // 用 ref 持有最新的 onAutoCreateAgent 回调，避免 useEffect([]) 的陈旧闭包
+  // 同时防止回调变化时重新注册 Tauri listener（会导致重复监听）
+  const onAutoCreateAgentRef = useRef(onAutoCreateAgent)
+  useEffect(() => {
+    onAutoCreateAgentRef.current = onAutoCreateAgent
+  }, [onAutoCreateAgent])
+
+  // ── 监听 Rust 发来的 agent:created 事件（agent_creator 工具创建成功后触发）────
+  // Rust executor 在 agent_creator create 成功后 emit "agent:created"
+  // 前端收到后调用 onAutoCreateAgent 将新 Agent 写入 Zustand 并显示在侧边栏
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+
+    // cancelled flag：防止 React 18 Strict Mode 双重挂载导致注册两个监听器
+    // Strict Mode: mount → cleanup(cancel) → mount。async listen 的 resolve 可能在 cleanup 之后，
+    // 所以用 cancelled 在 resolve 时立即 unlisten，确保只有最新的监听器存活
+    let cancelled = false
+
+    const setupAgentCreatedListener = async () => {
+      try {
+        const fn = await listen<{ name: string; role_description?: string }>('agent:created', async (event) => {
+          const payload = event.payload
+          console.log('[useAgentMessages] 收到 agent:created 事件:', payload)
+
+          // 通过 ref 获取最新回调，避免陈旧闭包导致 "Should have a queue" React 错误
+          const cb = onAutoCreateAgentRef.current
+          if (cb && payload?.name) {
+            try {
+              await cb({
+                name: payload.name,
+                // 同时传两种字段命名，兼容 useAutoAgentCreator (roleDescription) 和其他消费者 (role_description)
+                role_description: payload.role_description ?? '',
+                roleDescription: payload.role_description ?? '',
+              })
+              console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name)
+            } catch (err) {
+              console.error('[useAgentMessages] 自动创建 Agent 失败:', err)
+            }
+          }
+        })
+        if (cancelled) {
+          // Strict Mode 的第一次挂载已经被取消，立即释放
+          fn()
+          console.log('[useAgentMessages] agent:created listener 已取消（Strict Mode cleanup）')
+        } else {
+          unlisten = fn
+        }
+      } catch (e) {
+        console.warn('[useAgentMessages] agent:created listen 不可用（非桌面环境）:', e)
+      }
+    }
+
+    setupAgentCreatedListener()
+
+    return () => {
+      cancelled = true
+      if (unlisten) {
+        unlisten()
+        unlisten = null
+      }
+    }
+  // 只挂载一次；通过 onAutoCreateAgentRef 访问最新回调
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── 监听 Rust 发来的 agent:progress 进度事件 ──────────────────────────────
+  // 在智能体执行期间，Rust 会通过 AppHandle 发送工具调用进度
+  // 我们在当前活动频道插入进度消息（source='progress'），让用户实时可见
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+
+    const setupListener = async () => {
+      try {
+        unlisten = await listen<AgentProgressPayload>('agent:progress', (event) => {
+          const payload = event.payload
+          console.log('[useAgentMessages] 收到进度事件:', payload)
+
+          // 只显示工具相关进度（tool_calling / tool_done / tools_pending）
+          // thinking/started/completed 由主流程负责，避免重复
+          const showTypes: AgentProgressPayload['type'][] = ['tools_pending', 'tool_calling', 'tool_done']
+          if (!showTypes.includes(payload.type)) return
+
+          const text = progressToText(payload)
+          if (!text) return
+
+          // 向当前活动频道插入进度消息
+          // 用 activeChannelIdRef 避免闭包陈旧
+          const channelId = activeChannelIdRef.current
+          if (!channelId) return
+
+          setMessagesByChannel((prev) => {
+            const channelMessages = prev[channelId] || []
+            const progressMsg: Message = {
+              id: `progress_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              type: 'system',
+              content: text,
+              timestamp: Date.now(),
+              source: 'progress',
+              agentId: channelId,
+              metadata: { progressType: payload.type, toolName: payload.tool_name },
+            }
+            return { ...prev, [channelId]: [...channelMessages, progressMsg] }
+          })
+
+          // 滚动到底部
+          requestAnimationFrame(() => {
+            conversationOverlayRef.current?.scrollToBottom?.()
+          })
+        })
+      } catch (e) {
+        console.warn('[useAgentMessages] Tauri listen 不可用（非桌面环境）:', e)
+      }
+    }
+
+    setupListener()
+
+    return () => {
+      if (unlisten) unlisten()
+    }
+  // 只需要挂载一次，通过 ref 访问最新的 activeChannelId
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationOverlayRef])
+
+  // 用 ref 持有最新的 activeChannelId，供 listen 闭包使用（避免陈旧闭包）
+  const activeChannelIdRef = useRef<string | null>(activeChannelId)
+  useEffect(() => {
+    activeChannelIdRef.current = activeChannelId
+  }, [activeChannelId])
+
+  // ── 监听 Rust 发来的 document:updated 事件（agent_document update 工具触发）──
+  // AI 在 Ralph Loop 中调用 agent_document({ action: "update", ... }) 后，
+  // Rust 会 emit "document:updated"，前端负责持久化到 agentStore
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+
+    const setupDocumentUpdatedListener = async () => {
+      try {
+        const fn = await listen<{ document_type: string; new_content: string; reason?: string }>(
+          'document:updated',
+          (event) => {
+            const { document_type, new_content, reason } = event.payload
+            console.log('[useAgentMessages] 收到 document:updated 事件:', document_type, '原因:', reason)
+
+            // 用 activeChannelIdRef 获取当前活动智能体（无陈旧闭包问题）
+            const agentId = activeChannelIdRef.current
+            if (!agentId) {
+              console.warn('[useAgentMessages] document:updated: 无活动智能体，跳过更新')
+              return
+            }
+
+            // 调用 agentStore.updateAgentDocument 持久化文档变更
+            const updateDocFn = useAgentStore.getState().updateAgentDocument
+            if (updateDocFn) {
+              const updated = updateDocFn(agentId, document_type, new_content)
+              if (updated) {
+                console.log(`[useAgentMessages] 智能体 '${agentId}' 的 ${document_type} 文档已更新，新长度: ${new_content.length}`)
+              } else {
+                console.warn(`[useAgentMessages] 未找到智能体 '${agentId}'，无法更新文档`)
+              }
+            }
+          }
+        )
+        if (cancelled) {
+          fn()
+          return
+        }
+        unlisten = fn
+      } catch (e) {
+        console.warn('[useAgentMessages] document:updated listen 不可用（非桌面环境）:', e)
+      }
+    }
+
+    setupDocumentUpdatedListener()
+
+    return () => {
+      cancelled = true
+      if (unlisten) {
+        unlisten()
+        unlisten = null
+      }
+    }
+  // 只挂载一次；通过 ref 获取最新 activeChannelId
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /**
    * 终止指定智能体的执行

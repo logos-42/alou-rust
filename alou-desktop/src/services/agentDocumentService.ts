@@ -694,6 +694,12 @@ Before doing anything else:
 5. Read MEMORY.md — this is how you remember
 6. Check recent interactions in working memory
 
+You can read any of these documents at any time using the \`agent_document\` tool:
+- \`agent_document({ action: "read", document_type: "memory" })\` — read your memory
+- \`agent_document({ action: "update", document_type: "memory", new_content: "...", reason: "..." })\` — update memory with new info
+
+**Important**: Use \`agent_document\` to update MEMORY.md whenever you learn something important that should persist across sessions.
+
 ## Session Workflow
 
 ### Initialization
@@ -980,6 +986,24 @@ Before doing anything else:
 
     // 如果没有代码块，返回整个文本
     return text.trim()
+  }
+
+  /**
+   * 从 AgentDocuments 提取文档映射 Record<string, string>
+   * 用于存储到 agentStore.documents
+   */
+  extractDocumentMap(documents: AgentDocuments): Record<string, string> {
+    const map: Record<string, string> = {}
+    const keys: Array<keyof AgentDocuments> = [
+      'soul', 'identity', 'capabilities', 'constraints', 'tools', 'memory', 'agents',
+    ]
+    for (const key of keys) {
+      const value = documents[key]
+      if (value && typeof value === 'object' && 'content' in value && (value as any).content) {
+        map[key as string] = (value as any).content as string
+      }
+    }
+    return map
   }
 
   /**

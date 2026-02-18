@@ -7,8 +7,7 @@ use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult
 use super::error::AgentError;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
+use tauri::Emitter;
 
 /// Ralph Loop 执行器
 pub struct RalphLoopExecutor {
@@ -16,6 +15,7 @@ pub struct RalphLoopExecutor {
     task_manager: Arc<TaskManager>,
     tool_bridge: Arc<ToolBridge>,
     tool_registry: Arc<crate::tools::ToolRegistry>,
+    app_handle: Option<tauri::AppHandle>,
 }
 
 /// 执行结果
@@ -72,7 +72,14 @@ impl RalphLoopExecutor {
             task_manager,
             tool_bridge,
             tool_registry,
+            app_handle: None,
         }
+    }
+
+    /// 设置 AppHandle（用于向前端发送进度事件）
+    pub fn with_app_handle(mut self, app_handle: tauri::AppHandle) -> Self {
+        self.app_handle = Some(app_handle);
+        self
     }
 
     /// 执行完整的 Ralph Loop
@@ -319,11 +326,12 @@ impl RalphLoopExecutor {
             "agent_skills" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["list", "execute", "get_info"], "description": "技能操作" },
-                    "skill_name": { "type": "string", "description": "技能名称" },
-                    "parameters": { "type": "object", "description": "执行参数" }
+                    "action": { "type": "string", "enum": ["discover", "list", "load", "execute", "search"], "description": "技能操作：discover=扫描可用技能，list=列出已发现的技能，load=加载技能完整内容，execute=执行技能，search=搜索技能" },
+                    "skill_name": { "type": "string", "description": "技能名称（load/execute/search 操作需要）" },
+                    "inputs": { "type": "object", "description": "执行技能时的输入参数（execute 操作需要）" },
+                    "query": { "type": "string", "description": "搜索关键词（search 操作需要）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "agent_collaboration" => serde_json::json!({
                 "type": "object",
@@ -338,14 +346,24 @@ impl RalphLoopExecutor {
             "agent_creator" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["create", "update", "delete", "get", "list", "clone"], "description": "创建器操作" },
-                    "agent_id": { "type": "string", "description": "Agent ID" },
-                    "name": { "type": "string", "description": "名称" },
-                    "description": { "type": "string", "description": "描述" },
-                    "skills": { "type": "array", "items": { "type": "string" }, "description": "技能列表" },
-                    "config": { "type": "object", "description": "配置" }
+                    "action": { "type": "string", "enum": ["create", "list", "get", "delete"], "description": "操作类型：create=创建新Agent，list=列出所有Agent，get=获取指定Agent，delete=删除Agent" },
+                    "agent_id": { "type": "string", "description": "Agent ID（get/delete 操作需要）" },
+                    "display_name": { "type": "string", "description": "Agent名称（create 操作需要）" },
+                    "description": { "type": "string", "description": "Agent描述（create 操作可选）" },
+                    "skills": { "type": "array", "items": { "type": "string" }, "description": "技能列表（create 操作可选）" },
+                    "config": { "type": "object", "description": "额外配置（可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
+            }),
+            "agent_document" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "enum": ["read", "update"], "description": "read=读取文档内容（从系统提示词中提取），update=更新文档内容（会触发前端同步到持久化存储）" },
+                    "document_type": { "type": "string", "enum": ["soul", "identity", "capabilities", "constraints", "tools", "memory", "agents"], "description": "要读取/更新的文档类型" },
+                    "new_content": { "type": "string", "description": "新文档内容（Markdown格式，update时必填）" },
+                    "reason": { "type": "string", "description": "更新原因（建议填写，有助于调试和理解）" }
+                },
+                "required": ["action", "document_type"]
             }),
             "tool_creation" => serde_json::json!({
                 "type": "object",
@@ -434,7 +452,7 @@ impl RalphLoopExecutor {
         }
     }
 
-    /// 获取默认工具列表（19个标准工具）
+    /// 获取默认工具列表（20个标准工具）
     fn get_default_tools() -> Vec<AiTool> {
         vec![
             AiTool { name: "filesystem".to_string(), description: "文件系统操作：读取、写入、编辑、删除、复制、移动文件和目录".to_string(), parameters: Self::get_tool_parameters("filesystem") },
@@ -448,6 +466,7 @@ impl RalphLoopExecutor {
             AiTool { name: "agent_skills".to_string(), description: "Agent技能管理：查看可用技能、执行技能".to_string(), parameters: Self::get_tool_parameters("agent_skills") },
             AiTool { name: "agent_collaboration".to_string(), description: "多Agent协作：创建会话、发送消息、协同工作".to_string(), parameters: Self::get_tool_parameters("agent_collaboration") },
             AiTool { name: "agent_creator".to_string(), description: "Agent创建管理：创建、更新、删除、克隆Agent".to_string(), parameters: Self::get_tool_parameters("agent_creator") },
+            AiTool { name: "agent_document".to_string(), description: "读取或更新自己的身份文档（SOUL.md, MEMORY.md, AGENTS.md 等）。用 update 更新 MEMORY.md 来跨会话记忆重要信息。".to_string(), parameters: Self::get_tool_parameters("agent_document") },
             AiTool { name: "tool_creation".to_string(), description: "动态工具创建：创建、更新、删除自定义工具".to_string(), parameters: Self::get_tool_parameters("tool_creation") },
             AiTool { name: "rollback".to_string(), description: "文件快照与回滚：创建快照、恢复到之前状态".to_string(), parameters: Self::get_tool_parameters("rollback") },
             AiTool { name: "pubsub".to_string(), description: "发布订阅消息系统：发布消息、订阅主题".to_string(), parameters: Self::get_tool_parameters("pubsub") },
@@ -457,6 +476,108 @@ impl RalphLoopExecutor {
             AiTool { name: "browser".to_string(), description: "浏览器自动化：导航、点击、输入、截图、执行JS".to_string(), parameters: Self::get_tool_parameters("browser") },
             AiTool { name: "ui_control".to_string(), description: "UI控制：显示通知、更新状态、打开对话框".to_string(), parameters: Self::get_tool_parameters("ui_control") },
         ]
+    }
+
+    /// 从系统提示词中提取指定文档段落
+    fn extract_section_from_prompt(prompt: &str, doc_type: &str) -> Option<String> {
+        let marker = format!("=== {} ===", doc_type.to_uppercase());
+        let start = prompt.find(&marker)?;
+        let content_start = start + marker.len();
+        let remaining = &prompt[content_start..];
+        // 下一个 === 段落开始（或字符串末尾）
+        let end = remaining.find("\n=== ").unwrap_or(remaining.len());
+        let content = remaining[..end].trim().to_string();
+        if content.is_empty() { None } else { Some(content) }
+    }
+
+    /// 处理 agent_document 工具调用（内联，不经过 ToolBridge）
+    async fn execute_agent_document(&self, task_id: &str, tool_call: &ProviderToolCall) -> super::error::Result<ToolResult> {
+        let action = tool_call.arguments.get("action").and_then(|v| v.as_str()).unwrap_or("");
+        let doc_type = tool_call.arguments.get("document_type").and_then(|v| v.as_str()).unwrap_or("");
+
+        match action {
+            "read" => {
+                // 从当前任务的系统消息中提取文档段落
+                let task = self.task_manager.get_task(task_id).await;
+                let content = task.and_then(|t| {
+                    // 找第一条 system 消息（包含 customPrompt）
+                    t.messages.iter().find_map(|msg| {
+                        let msg_json = serde_json::to_value(msg).ok()?;
+                        let role = msg_json.get("role")?.as_str()?;
+                        if role != "system" { return None; }
+                        let text = msg_json.get("content")?.as_str()?;
+                        Self::extract_section_from_prompt(text, doc_type)
+                    })
+                });
+
+                match content {
+                    Some(text) => {
+                        log::info!("[RalphLoop] agent_document read: 已读取 {} 文档，长度: {}", doc_type, text.len());
+                        Ok(ToolResult {
+                            tool_call_id: tool_call.id.clone(),
+                            success: true,
+                            data: Some(serde_json::json!({ "document_type": doc_type, "content": text })),
+                            error: None,
+                        })
+                    }
+                    None => {
+                        log::warn!("[RalphLoop] agent_document read: 未找到文档 '{}'", doc_type);
+                        Ok(ToolResult {
+                            tool_call_id: tool_call.id.clone(),
+                            success: false,
+                            data: None,
+                            error: Some(format!("文档 '{}' 未找到，可能系统提示词中没有此段落", doc_type)),
+                        })
+                    }
+                }
+            }
+            "update" => {
+                let new_content = tool_call.arguments.get("new_content")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+                let reason = tool_call.arguments.get("reason")
+                    .and_then(|v| v.as_str()).unwrap_or("");
+
+                if new_content.is_empty() {
+                    return Ok(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some("update 操作需要提供 new_content 字段".to_string()),
+                    });
+                }
+
+                // 发送 document:updated 事件到前端，前端负责持久化到 agentStore
+                if let Some(app) = &self.app_handle {
+                    let payload = serde_json::json!({
+                        "document_type": doc_type,
+                        "new_content": new_content,
+                        "reason": reason,
+                    });
+                    match app.emit("document:updated", &payload) {
+                        Ok(_) => log::info!("[RalphLoop] 已发送 document:updated 事件，文档类型: {}, 原因: {}", doc_type, reason),
+                        Err(e) => log::warn!("[RalphLoop] 发送 document:updated 事件失败: {}", e),
+                    }
+                }
+
+                Ok(ToolResult {
+                    tool_call_id: tool_call.id.clone(),
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "document_type": doc_type,
+                        "status": "updated",
+                        "message": format!("文档 '{}' 已发送更新请求，将由前端持久化", doc_type),
+                        "reason": reason,
+                    })),
+                    error: None,
+                })
+            }
+            _ => Ok(ToolResult {
+                tool_call_id: tool_call.id.clone(),
+                success: false,
+                data: None,
+                error: Some(format!("agent_document: 未知的 action '{}'，支持 read / update", action)),
+            }),
+        }
     }
 
     /// 执行工具调用
@@ -475,8 +596,12 @@ impl RalphLoopExecutor {
             })
             .await;
 
-            // 执行工具
-            let result = self.execute_single_tool(tool_call).await?;
+            // agent_document 工具内联处理，不经过 ToolBridge
+            let result = if tool_call.name == "agent_document" {
+                self.execute_agent_document(task_id, tool_call).await?
+            } else {
+                self.execute_single_tool(tool_call).await?
+            };
 
             // 发送工具执行完成事件
             self.emit_event(task_id, TaskEvent::ToolCompleted {
@@ -513,6 +638,36 @@ impl RalphLoopExecutor {
 
         match self.tool_bridge.handle_request(request).await {
             Ok(ToolCallResponse { success, result, error }) => {
+                // ── 如果是 agent_creator create 成功，通知前端更新侧边栏 ──
+                if success && tool_call.name == "agent_creator" {
+                    let action = tool_call.arguments
+                        .get("action")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if action == "create" {
+                        let display_name = tool_call.arguments
+                            .get("display_name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("New Agent")
+                            .to_string();
+                        let description = tool_call.arguments
+                            .get("description")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        if let Some(app) = &self.app_handle {
+                            let payload = serde_json::json!({
+                                "name": display_name,
+                                "role_description": description,
+                            });
+                            if let Err(e) = app.emit("agent:created", &payload) {
+                                log::warn!("[RalphLoop] 发送 agent:created 事件失败: {}", e);
+                            } else {
+                                log::info!("[RalphLoop] 已发送 agent:created 事件，名称: {}", display_name);
+                            }
+                        }
+                    }
+                }
                 Ok(ToolResult {
                     tool_call_id: tool_call.id.clone(),
                     success,
@@ -612,9 +767,67 @@ impl RalphLoopExecutor {
         Ok(())
     }
 
-    /// 发送事件
-    async fn emit_event(&self, _task_id: &str, event: TaskEvent) {
-        // 通过 task_manager 的事件通道发送
-        self.task_manager.emit_event(event).await;
+    /// 发送事件（同时到内部 broadcast channel 和 Tauri 前端）
+    async fn emit_event(&self, task_id: &str, event: TaskEvent) {
+        // 通过 task_manager 的事件通道发送（内部订阅者使用）
+        self.task_manager.emit_event(event.clone()).await;
+
+        // 如果有 AppHandle，将事件转换为前端格式并发送
+        if let Some(app) = &self.app_handle {
+            let payload = self.task_event_to_progress(task_id, event);
+            if let Some(p) = payload {
+                if let Err(e) = app.emit("agent:progress", &p) {
+                    log::warn!("[RalphLoop] 发送 Tauri 事件失败: {}", e);
+                }
+            }
+        }
+    }
+
+    /// 将内部 TaskEvent 转换为前端可用的进度事件
+    fn task_event_to_progress(&self, task_id: &str, event: TaskEvent) -> Option<serde_json::Value> {
+        let task_id = task_id.to_string();
+        match event {
+            TaskEvent::TaskStarted { .. } => Some(serde_json::json!({
+                "type": "started",
+                "task_id": task_id,
+            })),
+            TaskEvent::AiResponse { content, .. } => {
+                // 获取当前迭代数（用于前端显示）
+                Some(serde_json::json!({
+                    "type": "thinking",
+                    "task_id": task_id,
+                    "content": content,
+                }))
+            }
+            TaskEvent::ToolExecuting { tool_name, .. } => Some(serde_json::json!({
+                "type": "tool_calling",
+                "task_id": task_id,
+                "tool_name": tool_name,
+            })),
+            TaskEvent::ToolCompleted { tool_name, result, .. } => Some(serde_json::json!({
+                "type": "tool_done",
+                "task_id": task_id,
+                "tool_name": tool_name,
+                "success": result.success,
+                "preview": result.data_preview,
+                "error": result.error,
+            })),
+            TaskEvent::TaskCompleted { result, .. } => Some(serde_json::json!({
+                "type": "completed",
+                "task_id": task_id,
+                "result": result,
+            })),
+            TaskEvent::TaskFailed { error, .. } => Some(serde_json::json!({
+                "type": "failed",
+                "task_id": task_id,
+                "error": error,
+            })),
+            TaskEvent::ToolCallsPending { count, .. } => Some(serde_json::json!({
+                "type": "tools_pending",
+                "task_id": task_id,
+                "count": count,
+            })),
+            _ => None,
+        }
     }
 }

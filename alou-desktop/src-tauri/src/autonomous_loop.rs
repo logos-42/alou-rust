@@ -324,27 +324,109 @@ impl AutonomousLoop {
         }
     }
 
-    /// 运行任务工作流
+    /// 运行任务工作流（真正调用 AI 执行任务）
     async fn run_task_workflow(&self, task: Task) -> TaskExecutionResult {
         let start_time = Utc::now().timestamp();
         
-        info!("🔧 执行任务工具: {}", task.title);
+        info!("🔧 执行 AI 任务: {}", task.title);
         
-        // 这里可以根据任务类型调用相应的工具
-        // 暂时模拟执行
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // 读取本地 API 配置
+        let api_config = match crate::agent::config::ApiConfig::load().await {
+            Ok(config) => config,
+            Err(e) => {
+                warn!("[AutonomousLoop] 无法加载 API 配置: {}，跳过 AI 执行", e);
+                return TaskExecutionResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("无法加载 API 配置: {} (请先在 APP 中配置 API Key)", e)),
+                    duration_ms: 0,
+                };
+            }
+        };
         
-        let output = Some(json!({
-            "message": format!("任务 '{}' 已执行", task.title),
-            "task_id": task.id,
-        }));
+        // 获取激活的 API 配置
+        let user_api = match api_config.get_active_api() {
+            Some(api) if !api.api_key.is_empty() => api.clone(),
+            _ => {
+                // 没有配置 API Key，返回友好提示
+                warn!("[AutonomousLoop] 未配置 API Key，无法执行 AI 任务");
+                let duration_ms = (Utc::now().timestamp() - start_time) as u64;
+                return TaskExecutionResult {
+                    success: false,
+                    output: None,
+                    error: Some("未配置 API Key。请在 APP 中点击 API 配置，填入你的 API Key 后再启动自主循环。".to_string()),
+                    duration_ms,
+                };
+            }
+        };
         
-        let duration_ms = (Utc::now().timestamp() - start_time) as u64;
+        // 构建任务消息
+        let task_message = format!(
+            "请执行以下任务：\n\n标题：{}\n描述：{}\n\n请分析任务并执行，完成后给出执行结果。",
+            task.title, task.description
+        );
+        
+        // 创建 AI 客户端
+        let ai_client = match crate::agent::ai_client::AiClient::new(&user_api) {
+            Ok(client) => std::sync::Arc::new(client),
+            Err(e) => {
+                error!("[AutonomousLoop] 创建 AI 客户端失败: {}", e);
+                let duration_ms = (Utc::now().timestamp() - start_time) as u64;
+                return TaskExecutionResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("创建 AI 客户端失败: {}", e)),
+                    duration_ms,
+                };
+            }
+        };
+        
+        // 创建任务管理器和执行器
+        let task_manager = std::sync::Arc::new(crate::agent::task::TaskManager::new());
+        let tool_registry = std::sync::Arc::new(crate::tools::ToolRegistry::new());
+        let tool_bridge = std::sync::Arc::new(
+            crate::bridges::ToolBridge::new_sync(crate::bridges::ToolBridgeConfig::default())
+        );
+        
+        let executor = crate::agent::executor::RalphLoopExecutor::new(
+            ai_client,
+            task_manager.clone(),
+            tool_bridge,
+            tool_registry,
+        );
+        
+        // 创建任务并执行
+        let task_id = task_manager.create_task(
+            "autonomous_loop".to_string(),
+            task_message,
+        ).await;
+        
+        let duration_ms = match executor.execute(&task_id).await {
+            Ok(result) => {
+                let elapsed = (Utc::now().timestamp() - start_time) as u64;
+                info!("[AutonomousLoop] AI 任务完成: {} - {}", task.title, result.result);
+                return TaskExecutionResult {
+                    success: true,
+                    output: Some(json!({
+                        "message": result.result,
+                        "task_id": task.id,
+                        "ai_task_id": result.task_id,
+                        "iterations": result.iteration_count,
+                    })),
+                    error: None,
+                    duration_ms: elapsed,
+                };
+            }
+            Err(e) => {
+                error!("[AutonomousLoop] AI 任务执行失败: {}", e);
+                (Utc::now().timestamp() - start_time) as u64
+            }
+        };
         
         TaskExecutionResult {
-            success: true,
-            output,
-            error: None,
+            success: false,
+            output: None,
+            error: Some(format!("AI 任务执行失败: {}", task.title)),
             duration_ms,
         }
     }

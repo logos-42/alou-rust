@@ -20,6 +20,7 @@ export interface AgentMetadata {
   did?: string | null
   diapIdentity?: any | null
   customPrompt?: string | null
+  documents?: Record<string, string> | null
   messages_cid?: string | null
   last_saved_at?: number
   created_at: number
@@ -47,6 +48,7 @@ interface AgentStoreActions {
   removeAgent: (idOrSessionId: string) => AgentMetadata[]
   getAgent: (idOrSessionId: string) => AgentMetadata | null
   getAgentByTarget: (target: string) => AgentMetadata | null
+  updateAgentDocument: (idOrSessionId: string, docType: string, content: string) => AgentMetadata | null
   clearAgents: () => void
   importAgent: (agentData: Partial<AgentMetadata>) => { agent: AgentMetadata; isNew: boolean }
 }
@@ -136,6 +138,7 @@ const useAgentStore = create<AgentStore>()(
           did: agentData.did || agentData.diapIdentity?.did || null,
           diapIdentity: null,
           customPrompt: agentData.customPrompt || null,
+          documents: agentData.documents || null,
           messages_cid: agentData.messages_cid || null,
           created_at: agentData.created_at || now,
           updated_at: now,
@@ -227,6 +230,49 @@ const useAgentStore = create<AgentStore>()(
         return agents.find(
           a => a.ipns === target || a.cid === target || a.did === target || a.id === target
         ) || null
+      },
+
+      // 更新智能体的单个文档，并重建 customPrompt
+      updateAgentDocument: (idOrSessionId: string, docType: string, content: string): AgentMetadata | null => {
+        const agents = get().agents
+        const index = agents.findIndex(
+          a => a.id === idOrSessionId || a.sessionId === idOrSessionId
+        )
+
+        if (index < 0) {
+          console.warn(`[AgentStore] updateAgentDocument: 未找到智能体: ${idOrSessionId}`)
+          return null
+        }
+
+        const updatedAgents = [...agents]
+        const existingAgent = updatedAgents[index]
+
+        // 合并新文档到 documents map
+        const updatedDocs: Record<string, string> = {
+          ...(existingAgent.documents || {}),
+          [docType.toLowerCase()]: content,
+        }
+
+        // 重建 customPrompt（按照固定顺序拼接）
+        const docOrder = ['soul', 'identity', 'capabilities', 'constraints', 'tools', 'memory', 'agents']
+        const parts: string[] = []
+        for (const key of docOrder) {
+          if (updatedDocs[key]) {
+            parts.push(`=== ${key.toUpperCase()} ===\n${updatedDocs[key]}`)
+          }
+        }
+        const newCustomPrompt = parts.join('\n\n')
+
+        updatedAgents[index] = {
+          ...existingAgent,
+          documents: updatedDocs,
+          customPrompt: newCustomPrompt,
+          updated_at: Date.now(),
+        }
+
+        set({ agents: updatedAgents })
+        console.log(`[AgentStore] 智能体文档已更新: ${idOrSessionId}, 文档类型: ${docType}`)
+        return updatedAgents[index]
       },
 
       // 清空所有智能体

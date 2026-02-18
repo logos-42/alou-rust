@@ -672,11 +672,21 @@ class AgentService {
 
   /**
    * 上传消息到 IPFS
+   * MVP 阶段：Workers 后端不可用时自动禁用，避免重复 500 错误噪音
    */
-  async uploadMessagesToIpfs(messages: Message[], agentId: string): Promise<string | null> {
-    try {
-      console.log('[AgentService] 上传消息到 IPFS:', { messageCount: messages.length, agentId });
+  private _ipfsUploadDisabled = false
 
+  async uploadMessagesToIpfs(messages: Message[], agentId: string): Promise<string | null> {
+    // 如果之前已经失败过，静默跳过（本地模式下 Workers 不可用）
+    if (this._ipfsUploadDisabled) {
+      return null
+    }
+
+    // 检查本地配置：如果是纯本地模式，跳过 IPFS 上传
+    const localConfig = localStorage.getItem('user_api_key')
+    if (!localConfig) return null
+
+    try {
       const response = await apiClient.post('/ipfs/upload', {
         type: 'messages',
         data: messages,
@@ -687,13 +697,14 @@ class AgentService {
       });
 
       if (response.success && response.data?.cid) {
-        console.log('[AgentService] 消息上传成功:', response.data.cid);
         return response.data.cid;
       }
 
       return null;
     } catch (error) {
-      console.error('[AgentService] 上传消息到 IPFS 失败:', error);
+      // 遇到 500 等服务器错误时，禁用后续上传（本次会话内不再重试）
+      this._ipfsUploadDisabled = true
+      console.warn('[AgentService] IPFS 上传不可用（本地模式），已自动禁用消息存档:', error instanceof Error ? error.message : error)
       return null;
     }
   }

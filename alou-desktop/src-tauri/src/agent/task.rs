@@ -177,18 +177,24 @@ impl TaskManager {
         }
     }
 
-    /// 创建任务
+    /// 创建任务（单条消息）
     pub async fn create_task(&self, agent_id: String, initial_message: String) -> String {
+        let messages = vec![AiMessage {
+            role: "user".to_string(),
+            content: initial_message,
+            tool_call_id: None,
+            tool_calls: None,
+        }];
+        self.create_task_with_messages(agent_id, messages).await
+    }
+
+    /// 创建任务（完整消息数组，支持 system/user/assistant 角色）
+    pub async fn create_task_with_messages(&self, agent_id: String, messages: Vec<AiMessage>) -> String {
         let task_id = uuid::Uuid::new_v4().to_string();
         let task = Task {
             id: task_id.clone(),
             status: TaskStatus::Pending,
-            messages: vec![AiMessage {
-                role: "user".to_string(),
-                content: initial_message,
-                tool_call_id: None,
-                tool_calls: None,
-            }],
+            messages,
             pending_tools: Vec::new(),
             tool_results: Vec::new(),
             final_response: None,
@@ -199,7 +205,7 @@ impl TaskManager {
                 agent_id,
                 workflow_id: None,
                 iteration_count: 0,
-                max_iterations: u32::MAX, // 无限迭代
+                max_iterations: 20, // 合理的最大迭代次数
                 ralph_loop_enabled: true,
             },
         };

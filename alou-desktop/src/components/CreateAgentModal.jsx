@@ -31,7 +31,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   const [error, setError] = useState(null)
   const [avatarUploadError, setAvatarUploadError] = useState(null)
 
-  // 文档化创建相关状态
+  // 文档化创建相关状态（默认开启，AI 生成文档集）
   const [useDocumentBasedCreation, setUseDocumentBasedCreation] = useState(true)
   const [isGeneratingDocuments, setIsGeneratingDocuments] = useState(false)
   const [documentsGenerated, setDocumentsGenerated] = useState(false)
@@ -126,41 +126,26 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
     }
   }, [mcpCode, parseMcpCode])
 
-  // 生成文档集合
+  // 生成文档集合（不依赖 IPFS，AI 生成是核心，IPFS 上传是可选后台操作）
   const generateDocuments = useCallback(async () => {
     const fallbackName = name.trim() || 'agent'
     const finalRoleDescription = roleDescription.trim() || t('agent.create.role.default')
 
     setIsGeneratingDocuments(true)
-    setDocumentGenerationProgress({ message: '正在生成智能体文档...', stage: 'soul' })
+    setDocumentGenerationProgress({ message: '正在生成智能体性格文档...', stage: 'soul' })
     setError(null)
 
     try {
-      // 检查 IPFS 节点
-      let isRunning = await ipfsService.isNodeRunning()
-      if (!isRunning) {
-        const startResult = await ipfsService.startNode(true)
-        if (!startResult.success) {
-          throw new Error('IPFS 节点启动失败')
-        }
-      }
-
-      // 等待 IPFS API 就绪
-      const apiReady = await ipfsService.waitForApiReady(15, 1000)
-      if (!apiReady.success) {
-        throw new Error(apiReady.error || 'IPFS API 未就绪')
-      }
-
       // 构建用户提示
       const userPrompt = `创建一个名为"${fallbackName}"的智能体，角色描述：${finalRoleDescription}`
 
-      // 生成完整文档集
-      setDocumentGenerationProgress({ message: '生成性格与哲学文档...', stage: 'soul' })
+      // 生成完整文档集（纯 AI 调用，不依赖 IPFS）
+      setDocumentGenerationProgress({ message: '生成 SOUL.md 性格与哲学...', stage: 'soul' })
       const documents = await agentDocumentService.generateFullDocumentSet(userPrompt, {
         name: fallbackName,
         avatar: avatarPreview,
         emoji: '🤖',
-        mcpTools: mcpTools.filter(t => t.name),
+        mcpTools: mcpTools.filter(tool => tool.name),
         memoryConfig: {
           enableLongTerm: true,
           enableWorkingMemory: true,
@@ -168,18 +153,27 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         },
       })
 
-      setDocumentGenerationProgress({ message: '上传文档到 IPFS...', stage: 'uploading' })
-
-      // 上传文档到 IPFS
-      const documentCids = await agentDocumentService.uploadFullDocumentSet(documents)
-
-      console.log('[CreateAgentModal] 文档上传完成:', documentCids)
-
+      console.log('[CreateAgentModal] 文档生成完成:', Object.keys(documents))
       setAgentDocuments(documents)
       setDocumentsGenerated(true)
-      setIsGeneratingDocuments(false)
       setDocumentGenerationProgress(null)
 
+      // 尝试上传到 IPFS（可选，失败不影响创建）
+      let documentCids = {}
+      try {
+        setDocumentGenerationProgress({ message: '上传文档到 IPFS（可选）...', stage: 'uploading' })
+        const isRunning = await ipfsService.isNodeRunning()
+        if (isRunning) {
+          documentCids = await agentDocumentService.uploadFullDocumentSet(documents)
+          console.log('[CreateAgentModal] 文档已上传到 IPFS:', documentCids)
+        }
+      } catch (ipfsErr) {
+        console.warn('[CreateAgentModal] IPFS 上传失败，文档已本地保存:', ipfsErr.message)
+      } finally {
+        setDocumentGenerationProgress(null)
+      }
+
+      setIsGeneratingDocuments(false)
       return documentCids
 
     } catch (err) {
@@ -242,90 +236,79 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         documentCids = agentDocuments.getAllCids()
       }
 
-      // 检查 IPFS 节点是否运行
-      let isRunning = await ipfsService.isNodeRunning()
-      if (!isRunning) {
-        const startResult = await ipfsService.startNode(true)
-        if (!startResult.success) {
-          setError(t('agent.create.error.ipfsNotRunning'))
-          setIsLoading(false)
-          return
-        }
-        console.log('[IPFS] 节点已自动启动，等待 API 就绪...')
-      }
-
-      // 等待 IPFS API 完全就绪（最多等待 15 秒）
-      const apiReady = await ipfsService.waitForApiReady(15, 1000)
-      if (!apiReady.success) {
-        setError(
-          apiReady.error ||
-            'IPFS API 未就绪。请确保 IPFS 节点正常运行，然后重试。'
-        )
-        setIsLoading(false)
-        return
-      }
-      console.log(`[IPFS] API 已就绪 (尝试 ${apiReady.attempts} 次)`)
-
-      // 1. 创建 DIAP Identity（核心步骤）
-      let diapIdentity = null
+      // 检查 IPFS 是否可用（可选，不阻塞创建）
+      let ipfsAvailable = false
       try {
-        console.log('[CreateAgentModal] 开始创建 DIAP Identity...')
-        
-        // 使用新的DiapIntegrationService
-        const { default: diapIntegrationService } = await import('../services/diapIntegrationService')
-        
-        const result = await diapIntegrationService.createCompleteDiapIdentity(sessionId, {
-          agentName: fallbackName,
-          agentDescription: finalRoleDescription,
-        })
-        
-        diapIdentity = result.identity
-        console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
-        
-      } catch (err) {
-        console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
-        // DIAP 创建失败时显示错误但继续（允许用户创建没有 DIAP 的智能体）
-        console.warn('[CreateAgentModal] 将创建没有 DIAP Identity 的智能体')
+        const isRunning = await ipfsService.isNodeRunning()
+        if (isRunning) {
+          const apiReady = await ipfsService.waitForApiReady(3, 500) // 短暂等待
+          ipfsAvailable = apiReady.success
+        }
+      } catch (ipfsErr) {
+        console.warn('[CreateAgentModal] IPFS 不可用，将使用本地存储模式:', ipfsErr.message)
+      }
+      console.log(`[CreateAgentModal] IPFS 可用: ${ipfsAvailable}`)
+
+      // 1. 尝试创建 DIAP Identity（需要 IPFS，失败则跳过）
+      let diapIdentity = null
+      if (ipfsAvailable) {
+        try {
+          console.log('[CreateAgentModal] 开始创建 DIAP Identity...')
+          const { default: diapIntegrationService } = await import('../services/diapIntegrationService')
+          const result = await diapIntegrationService.createCompleteDiapIdentity(sessionId, {
+            agentName: fallbackName,
+            agentDescription: finalRoleDescription,
+          })
+          diapIdentity = result.identity
+          console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
+        } catch (err) {
+          console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
+          console.warn('[CreateAgentModal] 将创建没有 DIAP Identity 的智能体')
+        }
+      } else {
+        console.log('[CreateAgentModal] IPFS 不可用，跳过 DIAP Identity 创建')
       }
 
-      // 2. 上传头像
+      // 2. 头像处理：IPFS 可用则上传，否则使用 base64 本地存储
       let avatarCid = null
-      if (avatarFile) {
+      // 本地 base64 作为头像备用（即使没有 IPFS 也能显示头像）
+      const avatarBase64 = avatarPreview || null
+
+      if (avatarFile && ipfsAvailable) {
         try {
-          console.log('[CreateAgentModal] 开始上传头像...')
-          setAvatarUploadError(null) // 清除之前的错误
+          console.log('[CreateAgentModal] 开始上传头像到 IPFS...')
+          setAvatarUploadError(null)
           const uploaded = await agentAssetsService.uploadAvatar(avatarFile, { sessionId })
           avatarCid = uploaded?.cid || null
           console.log('[CreateAgentModal] 头像上传成功:', avatarCid)
         } catch (err) {
           console.error('[CreateAgentModal] 头像上传失败:', err)
-          // 头像上传失败不阻塞创建，但显示警告
-          setAvatarUploadError(err.message || '头像上传失败')
-          // 继续创建流程，但avatarCid为null
+          setAvatarUploadError(err.message || '头像上传失败，已使用本地存储')
         }
+      } else if (avatarFile && !ipfsAvailable) {
+        console.log('[CreateAgentModal] IPFS 不可用，头像将使用 base64 本地存储')
       }
 
-      // 3. 解析并上传 MCP 配置
+      // 3. 解析 MCP 配置（IPFS 可用则上传，否则只本地保存）
       let mcpConfigCid = null
       let filteredPorts = []
-      
+
       if (mcpCode.trim()) {
         try {
           console.log('[CreateAgentModal] 解析 MCP 配置...')
           const { ports } = parseMcpCode(mcpCode)
           filteredPorts = ports.filter((port) => port.label?.trim() || port.endpoint?.trim())
-          
-          if (filteredPorts.length > 0) {
-            console.log('[CreateAgentModal] 开始上传 MCP 配置...')
+
+          if (filteredPorts.length > 0 && ipfsAvailable) {
+            console.log('[CreateAgentModal] 开始上传 MCP 配置到 IPFS...')
             const uploadedConfig = await agentAssetsService.uploadMcpConfig(
-              {
-                ports: filteredPorts,
-                generatedAt: Date.now(),
-              },
+              { ports: filteredPorts, generatedAt: Date.now() },
               { sessionId },
             )
             mcpConfigCid = uploadedConfig?.cid || null
             console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
+          } else if (filteredPorts.length > 0) {
+            console.log('[CreateAgentModal] IPFS 不可用，MCP 配置将本地保存')
           }
         } catch (err) {
           console.error('[CreateAgentModal] MCP 配置处理失败:', err)
@@ -333,11 +316,26 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         }
       }
 
+      // 4. 提取文档系统提示词（用于增强智能体的深度）
+      let customPrompt = null
+      let documentsMap = null
+      if (useDocumentBasedCreation && agentDocuments) {
+        try {
+          customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments)
+          console.log('[CreateAgentModal] 已从文档集构建 customPrompt，长度:', customPrompt?.length)
+          documentsMap = agentDocumentService.extractDocumentMap(agentDocuments)
+          console.log('[CreateAgentModal] 已提取文档 map，文档数:', Object.keys(documentsMap).length)
+        } catch (promptErr) {
+          console.warn('[CreateAgentModal] 构建 customPrompt 失败，将忽略文档内容:', promptErr.message)
+        }
+      }
+
       // 4. 构建完整的智能体数据（只调用一次onSubmit）
       const agentData = {
         name: fallbackName,
         roleDescription: finalRoleDescription,
-        avatar_cid: avatarCid, // 修复：使用下划线命名与agentStore保持一致
+        avatar_cid: avatarCid, // IPFS CID（有 IPFS 时使用）
+        avatar_url: avatarCid ? null : avatarBase64, // 本地 base64 data URL（无 IPFS 时使用）
         mcp_config_cid: mcpConfigCid, // 修复：使用下划线命名与agentStore保持一致
         mcp_ports: filteredPorts, // 修复：使用下划线命名与agentStore保持一致
         diapIdentity: diapIdentity ? {
@@ -350,6 +348,10 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         // 添加文档化配置
         useDocumentBasedCreation,
         documentCids: Object.keys(documentCids).length > 0 ? documentCids : null,
+        // 添加文档系统提示词（AI 生成的 SOUL/IDENTITY/CAPABILITIES 等文档的组合）
+        customPrompt,
+        // 添加单独文档 map（用于 agent_document 工具的 read/update）
+        documents: documentsMap,
         // 添加标识，表明这是完整的智能体数据
         isComplete: true,
       }

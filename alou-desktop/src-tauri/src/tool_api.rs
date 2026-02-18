@@ -1,5 +1,5 @@
 // Tool API server module - 为 CLI 提供 HTTP API 来执行工具
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -82,10 +82,13 @@ async fn execute_tool(
 
     let start_time = std::time::Instant::now();
 
-    // 获取 BridgeManager
-    let bridge_manager = match api_state.app_handle.state::<std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>().try_get() {
-        Ok(manager) => manager,
-        Err(_) => {
+    // 获取 BridgeManager - 使用 try_state 安全获取
+    let bridge_manager: Arc<tokio::sync::Mutex<BridgeManager>> = match api_state
+        .app_handle
+        .try_state::<Arc<tokio::sync::Mutex<BridgeManager>>>()
+    {
+        Some(s) => s.inner().clone(),
+        None => {
             return Json(ToolExecuteResponse {
                 success: false,
                 data: None,
@@ -162,10 +165,13 @@ async fn list_tools(
         }
     };
 
-    // 获取 BridgeManager
-    let bridge_manager = match api_state.app_handle.state::<std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>().try_get() {
-        Ok(manager) => manager,
-        Err(_) => {
+    // 获取 BridgeManager - 使用 try_state 安全获取
+    let bridge_manager: Arc<tokio::sync::Mutex<BridgeManager>> = match api_state
+        .app_handle
+        .try_state::<Arc<tokio::sync::Mutex<BridgeManager>>>()
+    {
+        Some(s) => s.inner().clone(),
+        None => {
             return Json(vec![]);
         }
     };
@@ -173,14 +179,14 @@ async fn list_tools(
     let manager = bridge_manager.lock().await;
     let tool_bridge = manager.tool_bridge();
 
-    // 获取工具列表
-    let tools = tool_bridge.list_tools().await;
+    // 获取工具列表（list_tools 返回 Vec<serde_json::Value>）
+    let tools: Vec<serde_json::Value> = tool_bridge.list_tools().await;
 
     Json(tools.into_iter().map(|t| ToolInfo {
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        category: t.category,
+        id: t["id"].as_str().unwrap_or("").to_string(),
+        name: t["name"].as_str().unwrap_or("").to_string(),
+        description: t["description"].as_str().map(|s| s.to_string()),
+        category: t["category"].as_str().map(|s| s.to_string()),
     }).collect())
 }
 
@@ -189,7 +195,8 @@ pub async fn start_tool_api_server(app: AppHandle) -> Result<u16, String> {
     let api_state = ApiState { app_handle: app };
     let state: Arc<Mutex<Option<ApiState>>> = Arc::new(Mutex::new(Some(api_state)));
 
-    let router = add_tool_routes(Router::new()).with_state(state);
+    // add_tool_routes 是 async fn，需要 .await 后再调用 .with_state()
+    let router = add_tool_routes(Router::new()).await.with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -200,10 +207,9 @@ pub async fn start_tool_api_server(app: AppHandle) -> Result<u16, String> {
         .port();
 
     tokio::spawn(async move {
-        axum::serve(listener, router)
-            .await
-            .map_err(|e| eprintln!("Tool API server error: {}", e))
-            .ok();
+        if let Err(e) = axum::serve(listener, router).await {
+            eprintln!("Tool API server error: {}", e);
+        }
     });
 
     println!("Tool API server started on port {}", port);
