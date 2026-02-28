@@ -189,6 +189,7 @@ export const useLocalIpfsGroupChatManager = ({
 
   // 初始化时加载本地群聊
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/setState-in-effect
     loadPersistentGroups()
   }, [loadPersistentGroups])
 

@@ -144,6 +144,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       const firstGroup = diapGroupChat.groups[0]
       if (firstGroup) {
         console.log('[useGroupChatManager] 自动恢复活跃群聊:', firstGroup.groupId)
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setActiveGroupId(firstGroup.groupId)
       }
     }
