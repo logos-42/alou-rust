@@ -193,16 +193,13 @@ const GroupChatPanel = ({
   }
 
   // 处理面板点击事件，切换输入目标到群聊
-  const handlePanelClick = (e) => {
-    console.log('[GroupChatPanel] 面板点击事件触发:', e.target)
-
+  const handlePanelClick = useCallback((e) => {
     // 避免点击按钮或其他交互元素时触发
     if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
-      console.log('[GroupChatPanel] 点击了按钮，忽略面板点击')
       return
     }
 
-    // 立即添加点击动画效果
+    // 添加点击动画效果
     setIsClicked(true)
     const panel = e.currentTarget
     panel.classList.add('clicked')
@@ -211,14 +208,9 @@ const GroupChatPanel = ({
       setIsClicked(false)
     }, 300)
 
-    console.log('[GroupChatPanel] 调用 onPanelClick')
+    // 调用 onPanelClick
     onPanelClick?.()
-
-    // 直接触发切换事件，确保状态同步
-    window.dispatchEvent(new CustomEvent('switch-input-target', {
-      detail: { target: 'groupChat' }
-    }))
-  }
+  }, [onPanelClick])
 
   // 处理消息发送
   const handleSendMessage = useCallback(async () => {
@@ -363,6 +355,19 @@ const GroupChatPanel = ({
             </button>
           </div>
         </div>
+        {/* 内存模式提示 */}
+        {!isIpfsAvailable && isInitialized && (
+          <div className="memory-mode-indicator" style={{
+            fontSize: '11px',
+            color: '#ff9800',
+            padding: '4px 8px',
+            background: 'rgba(255, 152, 0, 0.1)',
+            borderRadius: '4px',
+            marginRight: '8px'
+          }}>
+            📱 内存模式
+          </div>
+        )}
       </header>
 
       {/* 错误提示 */}

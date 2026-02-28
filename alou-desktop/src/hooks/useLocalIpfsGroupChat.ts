@@ -162,8 +162,8 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
 
   // 创建群聊
   const createGroup = useCallback(async (config: GroupConfig): Promise<LocalGroup> => {
-    if (!isInitialized || !isIpfsAvailable) {
-      throw new Error('服务未初始化或IPFS不可用')
+    if (!isInitialized) {
+      throw new Error('服务未初始化')
     }
 
     // 检查是否有本地身份
@@ -177,7 +177,13 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
       setIsLoading(true)
       setError(null)
 
-      const group = await localIpfsGroupChatService.createGroup(config)
+      // 如果IPFS可用，正常创建；否则降级到内存模式
+      const forceMemoryMode = !isIpfsAvailable
+      if (forceMemoryMode) {
+        console.log('[useLocalIpfsGroupChat] IPFS不可用，使用内存模式创建群聊')
+      }
+
+      const group = await localIpfsGroupChatService.createGroup(config, forceMemoryMode)
       
       // 更新群聊列表
       setGroups(prev => [...prev, group])
@@ -195,15 +201,21 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
 
   // 加入群聊
   const joinGroup = useCallback(async (groupId: string, topic?: string | null): Promise<LocalGroup> => {
-    if (!isInitialized || !isIpfsAvailable) {
-      throw new Error('服务未初始化或IPFS不可用')
+    if (!isInitialized) {
+      throw new Error('服务未初始化')
     }
 
     try {
       setIsLoading(true)
       setError(null)
 
-      const group = await localIpfsGroupChatService.joinGroup(groupId, topic)
+      // 如果IPFS不可用，降级到内存模式
+      const forceMemoryMode = !isIpfsAvailable
+      if (forceMemoryMode) {
+        console.log('[useLocalIpfsGroupChat] IPFS不可用，使用内存模式加入群聊')
+      }
+
+      const group = await localIpfsGroupChatService.joinGroup(groupId, topic, forceMemoryMode)
       
       // 更新群聊列表
       setGroups(prev => {

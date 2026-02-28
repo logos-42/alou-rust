@@ -11,6 +11,7 @@ const TransactionList = ({ transactions = [], isRefreshing, onRefresh, onViewTra
   const { t } = useI18n()
 
   const formatTime = (timestamp) => {
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
     const diff = now - timestamp
     const minutes = Math.floor(diff / 60000)

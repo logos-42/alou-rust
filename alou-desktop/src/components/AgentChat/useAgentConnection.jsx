@@ -7,8 +7,8 @@ import { resolveBackendChain } from '@/hooks/useAgentChat'
  */
 export const useAgentConnection = ({ activeChain, preferredChain, setPreferredChain }) => {
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
-  const [sessionId, setSessionId] = useState(
-    `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+  const [sessionId, setSessionId] = useState(() => 
+    `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   )
   const [isSessionReady, setSessionReady] = useState(false)
 

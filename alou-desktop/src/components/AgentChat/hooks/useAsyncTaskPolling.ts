@@ -30,6 +30,80 @@ interface ToolResult {
   tool_call_id?: string;
 }
 
+/**
+ * 格式化参数用于日志输出
+ */
+function formatArgsForLogging(args: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(args, null, 2)
+  } catch {
+    return String(args)
+  }
+}
+
+/**
+ * 转换参数格式为 Rust 后端期望的格式
+ * 
+ * Rust 后端期望的格式：
+ * - FileSystem: { operation: "list"|"read"|"write"|..., path: string, ... }
+ * - Bash: { operation: "execute", shell: "bash"|"cmd"|"powershell", command: string, ... }
+ */
+function normalizeToolArguments(
+  toolId: string,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  // 如果已经有 operation 字段，说明格式已经正确
+  if ((args as any).operation !== undefined) {
+    return args
+  }
+
+  // FileSystem Tool 参数转换
+  if (toolId === 'filesystem') {
+    const normalizedArgs: Record<string, unknown> = { ...args }
+    
+    // 确保必要的默认值
+    if (normalizedArgs.recursive === undefined) {
+      normalizedArgs.recursive = false
+    }
+    if (normalizedArgs.create_dirs === undefined) {
+      normalizedArgs.create_dirs = false
+    }
+    
+    return normalizedArgs
+  }
+
+  // Bash Tool 参数转换
+  if (toolId === 'bash') {
+    const normalizedArgs: Record<string, unknown> = { ...args }
+    
+    // 确保有 operation 字段
+    if (normalizedArgs.operation === undefined) {
+      normalizedArgs.operation = 'execute'
+    }
+    
+    // 确保有 shell 字段
+    if (normalizedArgs.shell === undefined) {
+      normalizedArgs.shell = 'bash'
+    }
+    
+    // 确保有 timeout_seconds 字段
+    if (normalizedArgs.timeout_seconds === undefined) {
+      normalizedArgs.timeout_seconds = 30
+    }
+    
+    // 确保 environment 是数组
+    if (normalizedArgs.environment === undefined) {
+      normalizedArgs.environment = []
+    }
+    
+    return normalizedArgs
+  }
+
+  // 其他工具保持原样
+  return args
+}
+
+
 // 任务状态类型
 type TaskStatus = 'queued' | 'pending' | 'processing' | 'running' | 'completed' | 'failed';
 
@@ -76,32 +150,48 @@ export const useAsyncTaskPolling = ({
 }: UseAsyncTaskPollingParams) => {
   const pollingTimeoutsByAgent = useRef<Record<string, number>>({})
   const pollingStatusByAgent = useRef<Record<string, PollingStatus>>({})
+  const toolRetryCounts = useRef<Record<string, number>>({})
 
-  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], agentId: string) => {
-    console.log(`[pollAsyncTask] 执行 ${toolCalls.length} 个工具调用`, toolCalls)
+  const executeToolCallsAndSubmitResults = useCallback(async (taskId: string, toolCalls: ToolCall[], agentId: string, retryCount: number = 0) => {
+    const MAX_RETRY_COUNT = 3 // 最大重试次数
+    console.log(`[pollAsyncTask] 执行 ${toolCalls.length} 个工具调用 (重试次数：${retryCount})`, toolCalls)
 
     try {
       const toolResults: ToolResult[] = []
+      let hasFailure = false
+      
       for (const toolCall of toolCalls) {
         try {
-          console.log(`[pollAsyncTask] 执行工具: ${toolCall.tool}`, toolCall.arguments)
+          // 使用 normalizeToolArguments 转换参数格式
+          const normalizedArgs = normalizeToolArguments(toolCall.tool, toolCall.arguments)
+          
+          console.log(`[pollAsyncTask] 执行工具: ${toolCall.tool}`)
+          console.log(`[pollAsyncTask] 原始参数:`, JSON.stringify(toolCall.arguments, null, 2))
+          console.log(`[pollAsyncTask] 转换后参数:`, JSON.stringify(normalizedArgs, null, 2))
 
           const { invoke } = await import('@tauri-apps/api/core')
           const toolResponse = await invoke<LocalToolResult>('execute_tool', {
             toolId: toolCall.tool,
-            args: JSON.stringify(toolCall.arguments),
+            args: JSON.stringify(normalizedArgs),
             timeout: 30000
           })
 
-          toolResults.push({
+          const result = {
             tool: toolCall.tool,
             success: toolResponse.success || false,
             result: toolResponse.data || toolResponse.output || '工具执行完成',
             error: toolResponse.error,
-            arguments: toolCall.arguments,
+            arguments: normalizedArgs,
             timestamp: Date.now(),
             tool_call_id: toolCall.id,
-          })
+          }
+          
+          if (!result.success) {
+            hasFailure = true
+            console.error(`[pollAsyncTask] 工具执行失败：${toolCall.tool}`, result.error)
+          }
+          
+          toolResults.push(result)
         } catch (toolError) {
           console.error(`[pollAsyncTask] 工具执行失败: ${toolCall.tool}`, toolError)
           toolResults.push({
@@ -112,6 +202,18 @@ export const useAsyncTaskPolling = ({
             timestamp: Date.now(),
           })
         }
+      }
+
+      // 如果所有工具都失败且超过最大重试次数，不再重试
+      if (hasFailure && retryCount >= MAX_RETRY_COUNT) {
+        console.error(`[pollAsyncTask] 达到最大重试次数 (${MAX_RETRY_COUNT})，停止重试`)
+        toolResults.push({
+          tool: 'system',
+          success: false,
+          error: `工具执行失败，已达到最大重试次数 ${MAX_RETRY_COUNT}。请检查参数或尝试其他方法。`,
+          arguments: {},
+          timestamp: Date.now(),
+        })
       }
 
       console.log(`[pollAsyncTask] 提交工具结果到任务 ${taskId}`)
@@ -216,7 +318,13 @@ export const useAsyncTaskPolling = ({
 
             if (toolCalls.length > 0) {
               console.log(`[pollAsyncTask] 发现 ${toolCalls.length} 个待处理工具调用`)
-              await executeToolCallsAndSubmitResults(taskId, toolCalls, agentId)
+              // 获取当前重试次数
+              const currentRetryCount = toolRetryCounts.current[taskId] || 0
+              console.log(`[pollAsyncTask] 工具调用重试次数：${currentRetryCount}`)
+              await executeToolCallsAndSubmitResults(taskId, toolCalls, agentId, currentRetryCount)
+              
+              // 增加重试计数
+              toolRetryCounts.current[taskId] = currentRetryCount + 1
             }
           } catch (toolError) {
             console.log(`[pollAsyncTask] 获取待处理工具调用失败:`, (toolError as Error).message)
@@ -227,6 +335,7 @@ export const useAsyncTaskPolling = ({
         if (status === 'completed' || status === 'failed') {
           delete pollingTimeoutsByAgent.current[agentId]
           delete pollingStatusByAgent.current[agentId]
+          delete toolRetryCounts.current[taskId]
 
           if (status === 'completed' && taskResponse) {
             if (progressMessageId) {

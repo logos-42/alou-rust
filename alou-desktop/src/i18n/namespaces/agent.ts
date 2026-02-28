@@ -389,6 +389,28 @@ export const agent = {
     'agent.groupChat.archive': 'Group Chat Archive',
     'agent.groupChat.collapse': 'Collapse',
     'agent.groupChat.expand': 'Expand',
+    'agent.groupChat.create': 'Create Group Chat',
+    'agent.groupChat.join': 'Join Group Chat',
+
+    // ==================== Empty State Guide ====================
+    'agent.emptyState.title': 'Welcome to Alou AI Agent',
+    'agent.emptyState.subtitle': 'Create your first AI agent to get started, or try entering a command directly below',
+    'agent.emptyState.inputHint': '💡 You can enter a description directly below to create an agent',
+    
+    'agent.emptyState.quickActions.title': 'Quick Actions',
+    'agent.emptyState.quickActions.createAgent': 'Create Agent',
+    'agent.emptyState.quickActions.createAgentDesc': 'Customize your own agent',
+    'agent.emptyState.quickActions.workAssistant': 'Work Assistant',
+    'agent.emptyState.quickActions.workAssistantDesc': 'Help with daily work tasks',
+    'agent.emptyState.quickActions.writingAssistant': 'Writing Assistant',
+    'agent.emptyState.quickActions.writingAssistantDesc': 'Help with writing and editing',
+    'agent.emptyState.quickActions.codingAssistant': 'Coding Assistant',
+    'agent.emptyState.quickActions.codingAssistantDesc': 'Help with programming tasks',
+    
+    'agent.emptyState.tips.title': 'Tips',
+    'agent.emptyState.tips.tip1': 'Enter a description to automatically create an agent using AI',
+    'agent.emptyState.tips.tip2': 'Click the "+" button on the left to manually create an agent',
+    'agent.emptyState.tips.tip3': 'Agents can collaborate in group chats to complete complex tasks',
   },
 }
 

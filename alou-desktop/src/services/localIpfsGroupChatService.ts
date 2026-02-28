@@ -473,12 +473,14 @@ class LocalIpfsGroupChatService {
   /**
    * 创建本地群聊
    * @param config - 群聊配置
+   * @param forceMemoryMode - 是否强制使用内存模式（当IPFS不可用时）
    * @returns 创建的群聊信息
    */
-  async createGroup(config: CreateGroupConfig): Promise<LocalGroup> {
-    this.log(LogLevel.INFO, '创建群聊:', { groupName: config.groupName })
+  async createGroup(config: CreateGroupConfig, forceMemoryMode: boolean = false): Promise<LocalGroup> {
+    this.log(LogLevel.INFO, '创建群聊:', { groupName: config.groupName, forceMemoryMode })
     
-    if (!this.ipfsAvailable) {
+    // 如果不是强制内存模式且IPFS不可用，则抛出错误
+    if (!forceMemoryMode && !this.ipfsAvailable) {
       throw new Error('IPFS节点不可用，无法创建群聊')
     }
 
@@ -502,27 +504,42 @@ class LocalIpfsGroupChatService {
       metadata: {
         isPublic: config.isPublic || false,
         maxMembers: config.maxMembers || 50,
+        memoryMode: forceMemoryMode || !this.ipfsAvailable, // 标记是否为内存模式
         ...config.metadata
       }
     })
 
     try {
-      // 保存到内存
+      // 保存到内存（不依赖IPFS）
       this.groups.set(groupId, group)
       this.messages.set(groupId, [])
       this.messageIdSet.set(groupId, new Set())
       this.messageHashSet.set(groupId, new Set())
 
-      // 保存到KV存储
-      await this.saveGroupToKV(group)
+      // 保存到KV存储（需要后端，如果失败则跳过）
+      try {
+        await this.saveGroupToKV(group)
+      } catch (kvError) {
+        this.log(LogLevel.WARN, '保存到KV失败，使用内存模式:', { error: kvError })
+      }
       
-      // 保存到LocalStorage备份
-      await this.saveToLocalStorage()
+      // 保存到LocalStorage备份（不依赖IPFS）
+      try {
+        await this.saveToLocalStorage()
+      } catch (lsError) {
+        this.log(LogLevel.WARN, '保存到LocalStorage失败:', { error: lsError })
+      }
 
-      // 发送群聊创建消息到IPFS PubSub
-      await this._sendSystemMessage(group, `群聊 "${config.groupName}" 已创建`)
+      // 仅在IPFS可用时发送群聊创建消息到IPFS PubSub
+      if (this.ipfsAvailable) {
+        try {
+          await this._sendSystemMessage(group, `群聊 "${config.groupName}" 已创建`)
+        } catch (pubsubError) {
+          this.log(LogLevel.WARN, '发送PubSub消息失败:', { error: pubsubError })
+        }
+      }
 
-      this.log(LogLevel.INFO, '群聊创建成功:', { groupId, groupName: group.groupName })
+      this.log(LogLevel.INFO, '群聊创建成功:', { groupId, groupName: group.groupName, memoryMode: forceMemoryMode || !this.ipfsAvailable })
       return group
 
     } catch (error: any) {
@@ -540,10 +557,11 @@ class LocalIpfsGroupChatService {
    * 加入群聊
    * @param groupId - 群聊ID
    * @param topic - 群聊主题（可选）
+   * @param forceMemoryMode - 是否强制使用内存模式
    * @returns 加入的群聊信息
    */
-  async joinGroup(groupId: string, topic?: string | null): Promise<LocalGroup> {
-    this.log(LogLevel.INFO, '加入群聊:', { groupId })
+  async joinGroup(groupId: string, topic?: string | null, forceMemoryMode: boolean = false): Promise<LocalGroup> {
+    this.log(LogLevel.INFO, '加入群聊:', { groupId, forceMemoryMode })
 
     if (!this.localIdentity) {
       throw new Error('未设置本地身份，无法加入群聊')
@@ -555,9 +573,13 @@ class LocalIpfsGroupChatService {
     // 2. 如果内存中没有，尝试从 KV 加载
     if (!group) {
       this.log(LogLevel.INFO, '内存中未找到群聊，尝试从 KV 加载:', { groupId })
-      const groupFromKV = await this.loadGroupFromKV(groupId)
-      if (groupFromKV) {
-        group = groupFromKV
+      try {
+        const groupFromKV = await this.loadGroupFromKV(groupId)
+        if (groupFromKV) {
+          group = groupFromKV
+        }
+      } catch (kvError) {
+        this.log(LogLevel.WARN, '从KV加载群聊失败:', { error: kvError })
       }
     }
     
@@ -575,41 +597,65 @@ class LocalIpfsGroupChatService {
         createdAt: Date.now(),
         metadata: {
           isPublic: true,
-          externalGroup: true
+          externalGroup: true,
+          memoryMode: forceMemoryMode || !this.ipfsAvailable
         }
       })
       
-      // 保存到新创建的群聊到 KV
-      await this.saveGroupToKV(group)
+      // 保存到新创建的群聊到 KV（失败则跳过）
+      try {
+        await this.saveGroupToKV(group)
+      } catch (kvError) {
+        this.log(LogLevel.WARN, '保存群聊到KV失败:', { error: kvError })
+      }
     }
 
     const groupTopic = topic || group.topic
 
     try {
-      // 订阅群聊消息
-      await this.subscribeToGroup(groupId, groupTopic)
+      // 仅在IPFS可用时订阅群聊消息
+      if (this.ipfsAvailable) {
+        try {
+          await this.subscribeToGroup(groupId, groupTopic)
+        } catch (subError) {
+          this.log(LogLevel.WARN, '订阅群聊消息失败:', { error: subError })
+        }
+      }
 
       // 如果用户不在群聊成员列表中，添加进去
       if (!group.members.includes(this.localIdentity.did)) {
         group.members.push(this.localIdentity.did)
-        await this.saveGroupToKV(group)
+        try {
+          await this.saveGroupToKV(group)
+        } catch (kvError) {
+          this.log(LogLevel.WARN, '更新群聊成员到KV失败:', { error: kvError })
+        }
       }
 
-      // 发送加入消息
-      const joinMessage = new LocalGroupMessage({
-        groupId,
-        topic: groupTopic,
-        from: this.localIdentity.did,
-        fromName: this.localIdentity.name || this.localIdentity.did,
-        content: `${this.localIdentity.did} 加入了群聊`,
-        type: MessageTypes.JOIN,
-        metadata: {
-          type: 'member_joined',
-          member: this.localIdentity.did
-        }
-      })
+      // 仅在IPFS可用时发送加入消息
+      if (this.ipfsAvailable) {
+        try {
+          const joinMessage = new LocalGroupMessage({
+            groupId,
+            topic: groupTopic,
+            from: this.localIdentity.did,
+            fromName: this.localIdentity.name || this.localIdentity.did,
+            content: `${this.localIdentity.did} 加入了群聊`,
+            type: MessageTypes.JOIN,
+            metadata: {
+              type: 'member_joined',
+              member: this.localIdentity.did
+            }
+          })
 
-      await this.sendMessage(joinMessage)
+          await this.sendMessage(joinMessage)
+        } catch (msgError) {
+          this.log(LogLevel.WARN, '发送加入消息失败:', { error: msgError })
+        }
+      }
+
+      // 保存到内存
+      this.groups.set(groupId, group)
 
       this.log(LogLevel.INFO, '加入群聊成功:', { groupId, member: this.localIdentity.did })
       return group

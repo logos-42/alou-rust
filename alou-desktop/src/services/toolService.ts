@@ -126,6 +126,81 @@ export interface ExecutionHistoryItem {
   [key: string]: any
 }
 
+
+/**
+ * 格式化参数用于日志输出
+ */
+function formatArgsForLogging(args: Record<string, any>): string {
+  try {
+    return JSON.stringify(args, null, 2)
+  } catch {
+    return String(args)
+  }
+}
+
+/**
+ * 转换参数格式为 Rust 后端期望的格式
+ * 
+ * Rust 后端期望的格式：
+ * - FileSystem: { operation: "list"|"read"|"write"|..., path: string, ... }
+ * - Bash: { operation: "execute", shell: "bash"|"cmd"|"powershell", command: string, ... }
+ */
+function normalizeToolArguments(
+  toolId: string,
+  args: Record<string, any>
+): Record<string, any> {
+  // 如果已经有 operation 字段，说明格式已经正确
+  if (args.operation !== undefined) {
+    return args
+  }
+
+  // FileSystem Tool 参数转换
+  if (toolId === 'filesystem') {
+    const normalizedArgs: Record<string, any> = { ...args }
+    
+    // 确保必要的默认值
+    if (normalizedArgs.recursive === undefined) {
+      normalizedArgs.recursive = false
+    }
+    if (normalizedArgs.create_dirs === undefined) {
+      normalizedArgs.create_dirs = false
+    }
+    
+    return normalizedArgs
+  }
+
+  // Bash Tool 参数转换
+  if (toolId === 'bash') {
+    const normalizedArgs: Record<string, any> = { ...args }
+    
+    // 确保有 operation 字段
+    if (normalizedArgs.operation === undefined) {
+      normalizedArgs.operation = 'execute'
+    }
+    
+    // 确保有 shell 字段
+    if (normalizedArgs.shell === undefined) {
+      normalizedArgs.shell = 'bash'
+    }
+    
+    // 确保有 timeout_seconds 字段
+    if (normalizedArgs.timeout_seconds === undefined) {
+      normalizedArgs.timeout_seconds = 30
+    }
+    
+    // 确保 environment 是数组
+    if (normalizedArgs.environment === undefined) {
+      normalizedArgs.environment = []
+    }
+    
+    return normalizedArgs
+  }
+
+  // 其他工具保持原样
+  return args
+}
+
+
 class ToolService {
   private localTools: Set<string>
   private complexTools: Set<string>
@@ -244,7 +319,7 @@ class ToolService {
     try {
       const result = await invoke<LocalToolResult>('execute_tool', {
         toolId,
-        args: JSON.stringify(args),
+        args: JSON.stringify(this.normalizeToolArguments(args, toolId)),
         timeout
       })
 
@@ -272,6 +347,95 @@ class ToolService {
    * @param options - 执行选项
    * @returns 执行结果
    */
+
+  /**
+   * 标准化工具参数格式
+   * 确保参数符合 Rust 后端期望的格式
+   */
+  private normalizeToolArguments(args: Record<string, any>, toolId: string): Record<string, any> {
+    if (!args || typeof args !== 'object') {
+      return args
+    }
+
+    const n = { ...args }
+
+    // FileSystem Tool 参数格式转换
+    if (toolId === 'filesystem') {
+      // 如果没有 operation 字段，根据其他字段推断
+      if (!n.operation) {
+        if (n.content) {
+          n.operation = 'write'
+        } else if (n.path) {
+          n.operation = 'list'
+        } else {
+          n.operation = 'list'
+        }
+      }
+      
+      // 确保有 path 字段
+      if (!n.path && n.operation !== 'write') {
+        n.path = '.'
+      }
+      
+      // 确保 create_dirs 字段存在（写操作需要）
+      if (n.operation === 'write' && n.create_dirs === undefined) {
+        n.create_dirs = true
+      }
+      
+      // 确保 recursive 字段存在（list 操作需要）
+      if (n.operation === 'list' && n.recursive === undefined) {
+        n.recursive = false
+      }
+    }
+
+    // Bash Tool 参数格式转换
+    if (toolId === 'bash') {
+      // 必须有 operation 字段
+      n.operation = 'execute'
+      
+      // 必须有 shell 字段
+      if (!n.shell) {
+        n.shell = 'bash'
+      }
+      
+      // 必须有 command 字段
+      if (!n.command) {
+        // 尝试从其他字段推断
+        if (n.cmd) {
+          n.command = n.cmd
+        } else if (n.script) {
+          n.command = n.script
+        } else {
+          throw new Error('Bash tool requires "command" argument')
+        }
+      }
+      
+      // 确保有 timeout_seconds 字段
+      if (!n.timeout_seconds) {
+        n.timeout_seconds = 30
+      }
+      
+      // 确保 environment 是数组
+      if (!n.environment || !Array.isArray(n.environment)) {
+        n.environment = []
+      }
+      
+      // working_dir 可选，默认为 null
+      if (n.working_dir === undefined) {
+        n.working_dir = null
+      }
+    }
+
+    // UI Control Tool 参数格式转换
+    if (toolId === 'ui_control') {
+      if (!n.action) {
+        throw new Error('UI control tool requires "action" argument')
+      }
+    }
+
+    console.log(`[ToolService] normalizeToolArguments: ${toolId}`, { input: args, output: n })
+    return n
+  }
   private async executeRemoteTool(
     toolId: string,
     args: Record<string, any>,

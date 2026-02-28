@@ -229,13 +229,62 @@ export const useGroupChatRemoteControl = ({
     }
   }, [showGroupChat, inputTargetMode, setInputTargetMode])
 
+  // 零状态处理：检测是否需要创建智能体
+  const handleZeroStateMessage = useCallback(async (text: string) => {
+    console.log('[useGroupChatRemoteControl] 零状态处理，检测意图:', text)
+    
+    // 检测是否是创建智能体的意图
+    const createKeywords = ['创建智能体', '新建智能体', 'create agent', 'new agent', '创建一个', '建一个', '帮我创建一个']
+    const isCreateIntent = createKeywords.some(keyword => text.toLowerCase().includes(keyword.toLowerCase()))
+    
+    if (isCreateIntent) {
+      console.log('[useGroupChatRemoteControl] 检测到创建智能体意图')
+      // 触发创建智能体的事件，让上层组件处理
+      window.dispatchEvent(new CustomEvent('create-agent-from-message', {
+        detail: { message: text }
+      }))
+      return true
+    }
+    
+    // 不是创建智能体，显示引导提示
+    console.log('[useGroupChatRemoteControl] 显示引导提示')
+    window.dispatchEvent(new CustomEvent('show-zero-state-hint', {
+      detail: { message: text }
+    }))
+    return false
+  }, [])
+
   // 发送消息（整合了遥控功能的逻辑）
   const sendMessage = useCallback(async () => {
     const text = currentMessage.trim()
-    if (!text || !activeChannelId) {
+    if (!text) {
       return
     }
 
+    // 零状态处理：没有活跃频道或智能体时
+    if (!activeChannelId || !selectedAgent) {
+      console.log('[useGroupChatRemoteControl] 零状态，尝试创建智能体或引导用户:', { activeChannelId, selectedAgent })
+      
+      // 检查是否是群聊模式
+      if (showGroupChat && activeActionId) {
+        // 群聊模式，发送到群聊
+        if (inputTargetMode === 'groupChat') {
+          setCurrentMessage('')
+          await sendMessageToGroupChat(text, activeActionId)
+          return
+        }
+      }
+      
+      // 尝试处理零状态消息
+      const handled = await handleZeroStateMessage(text)
+      if (handled) {
+        setCurrentMessage('')
+        return
+      }
+      // 如果没有成功处理，仍然允许发送（可能会有其他逻辑处理）
+    }
+
+    // 以下是原有逻辑...
     // 检查当前智能体是否正在执行（仅在发送到智能体时检查）
     const shouldCheckLoading = !showGroupChat || inputTargetMode === 'agent'
     if (shouldCheckLoading && isAgentLoading(activeChannelId)) {
@@ -275,6 +324,7 @@ export const useGroupChatRemoteControl = ({
       await sendMessageToAgent(activeChannelId, text, selectedAgent)
     }
   }, [
+    handleZeroStateMessage,
     activeChannelId,
     activeActionId,
     createSession,

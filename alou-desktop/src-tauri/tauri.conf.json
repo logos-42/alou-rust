@@ -54,9 +54,6 @@
     "shell": {
       "open": true
     },
-    "updater": {
-      "active": false
-    },
     "event": {
       "all": true
     }

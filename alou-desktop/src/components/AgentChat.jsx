@@ -691,6 +691,15 @@ const AgentChat = () => {
       window.addEventListener('resize', handleResize)
       window.addEventListener('pointerup', handleGlobalPointerUp)
       window.addEventListener('agent-avatar-updated', handleAvatarUpdated)
+      // 零状态事件监听
+      window.addEventListener('create-agent-from-message', (e) => {
+        console.log('[AgentChat] 收到创建智能体事件:', e.detail)
+        createChannel()
+      })
+      window.addEventListener('show-zero-state-hint', (e) => {
+        console.log('[AgentChat] 收到零状态提示事件:', e.detail)
+        // 可以显示 toast 提示用户
+      })
     }
 
     return () => {
@@ -699,6 +708,8 @@ const AgentChat = () => {
         window.removeEventListener('resize', handleResize)
         window.removeEventListener('pointerup', handleGlobalPointerUp)
         window.removeEventListener('agent-avatar-updated', handleAvatarUpdated)
+        window.removeEventListener('create-agent-from-message', () => {})
+        window.removeEventListener('show-zero-state-hint', () => {})
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

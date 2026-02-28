@@ -137,10 +137,33 @@ async fn execute_tool(
     timeout: Option<u64>,
     bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
 ) -> Result<serde_json::Value, String> {
-    println!("[Tauri] Executing tool: {}", tool_id);
+    // 记录工具调用开始
+    println!("\n========================================");
+    println!("[Tauri] 开始执行工具：{}", tool_id);
+    println!("[Tauri] 原始参数 JSON: {}", args);
+    println!("========================================");
 
+    // 解析参数
     let args_value: serde_json::Value = serde_json::from_str(&args)
-        .map_err(|e| format!("Invalid JSON args: {}", e))?;
+        .map_err(|e| {
+            let error_msg = format!("Invalid JSON args: {}", e);
+            println!("[Tauri] ❌ 参数解析失败：{}", error_msg);
+            error_msg
+        })?;
+
+    // 记录解析后的参数
+    println!("[Tauri] 解析后的参数：{:#}", args_value);
+    
+    // 检查关键工具的 operation 字段
+    if tool_id == "filesystem" || tool_id == "bash" {
+        if let Some(operation) = args_value.get("operation") {
+            println!("[Tauri] ✓ 操作类型：{}", operation);
+        } else {
+            println!("[Tauri] ⚠️ 警告：{} 工具缺少 operation 字段", tool_id);
+            println!("[Tauri] ⚠️ FileSystem 期望格式：{{ \"operation\": \"list\"|\"read\"|\"write\"|..., \"path\": string, ... }}");
+            println!("[Tauri] ⚠️ Bash 期望格式：{{ \"operation\": \"execute\", \"shell\": \"bash\"|\"cmd\"|\"powershell\", \"command\": string, ... }}");
+        }
+    }
 
     // Get tool bridge and execute tool
     let manager = bridge_manager.lock().await;
@@ -150,7 +173,7 @@ async fn execute_tool(
         session_id: "tauri_session".to_string(),
         user_id: None,
         tool_id: tool_id.clone(),
-        args: args_value,
+        args: args_value.clone(),
         working_directory: std::env::current_dir()
             .ok()
             .and_then(|p| p.to_str().map(|s| s.to_string())),
@@ -159,20 +182,39 @@ async fn execute_tool(
         permissions: vec!["read".to_string(), "write".to_string()],
     };
 
+    println!("[Tauri] 调用 tool_bridge.handle_request...");
+    
     match tool_bridge.handle_request(request).await {
         Ok(response) => {
             if response.success {
+                println!("[Tauri] ✓ 工具执行成功：{}", tool_id);
+                let execution_time = response.result.as_ref()
+                    .map(|r| r.execution_time_ms)
+                    .unwrap_or(100);
+                let output = response.result.as_ref()
+                    .and_then(|r| r.output.clone())
+                    .unwrap_or_else(|| format!("Tool '{}' executed successfully", tool_id));
+                let data = response.result.as_ref()
+                    .map(|r| r.data.clone())
+                    .unwrap_or_else(|| serde_json::json!({"status": "success"}));
                 Ok(serde_json::json!({
                     "success": true,
-                    "data": response.result.map(|r| r.data).unwrap_or_else(|| serde_json::json!({"status": "success"})),
-                    "execution_time_ms": 100,
-                    "output": format!("Tool '{}' executed successfully", tool_id)
+                    "data": data,
+                    "execution_time_ms": execution_time,
+                    "output": output
                 }))
             } else {
-                Err(response.error.unwrap_or_else(|| format!("Tool '{}' execution failed", tool_id)))
+                let error_msg = response.error.unwrap_or_else(|| format!("Tool '{}' execution failed", tool_id));
+                println!("[Tauri] ❌ 工具执行失败：{} - {}", tool_id, error_msg);
+                println!("[Tauri] 请求参数：{:#}", args_value);
+                Err(error_msg)
             }
         }
-        Err(e) => Err(format!("Tool bridge error: {}", e))
+        Err(e) => {
+            println!("[Tauri] ❌ Tool bridge error: {}", e);
+            println!("[Tauri] 请求参数：{:#}", args_value);
+            Err(format!("Tool bridge error: {}", e))
+        }
     }
 }
 
@@ -289,7 +331,6 @@ async fn agent_skills(
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())

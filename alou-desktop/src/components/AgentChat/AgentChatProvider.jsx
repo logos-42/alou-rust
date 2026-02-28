@@ -53,9 +53,9 @@ export const AgentChatProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false)
 
   // Session State
-  const [sessionId, setSessionId] = useState(
-    `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-  )
+  const [sessionId, setSessionId] = useState(() => {
+    return 'frontend_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9)
+  })
   const [isSessionReady, setSessionReady] = useState(false)
 
   // Channel State

@@ -583,14 +583,15 @@ export const useAgentMessages = ({
     if (!activeChannelId) {
       setCurrentMessage('')
 
-      // 显示用户消息（在 'welcome' 虚拟频道，让用户感受到"有对话"）
+      // 显示用户消息 - 直接在当前可见区域显示，而不是 'welcome' 虚拟频道
+      // 这样用户可以看到自己的输入和后续的系统响应
       appendMessage({
         id: `user_${Date.now()}`,
         type: 'user',
         content: text,
         timestamp: Date.now(),
         source: 'user',
-      }, 'welcome')
+      }) // 不指定 channelId，使用当前默认频道
 
       // 如果有自动创建回调（父组件支持），用 AI 解析描述 → 自动创建
       if (onAutoCreateAgent) {
@@ -600,7 +601,7 @@ export const useAgentMessages = ({
           content: '🤔 正在理解你的需求，准备创建智能体...',
           timestamp: Date.now(),
           source: 'system',
-        }, 'welcome')
+        })
 
         try {
           const agentInfo = await parseAgentCreationCommandWithAIDirect(text)
@@ -612,7 +613,7 @@ export const useAgentMessages = ({
             content: `🔄 正在创建智能体 **"${agentInfo.name}"**...`,
             timestamp: Date.now(),
             source: 'system',
-          }, 'welcome')
+          })
 
           await onAutoCreateAgent(agentInfo as unknown as AgentInfo)
 
@@ -622,7 +623,7 @@ export const useAgentMessages = ({
             content: `✅ 智能体 **"${agentInfo.name}"** 已创建！点击左侧频道开始对话。`,
             timestamp: Date.now(),
             source: 'system',
-          }, 'welcome')
+          })
         } catch (err) {
           appendMessage({
             id: `system_err_${Date.now()}`,
@@ -630,7 +631,7 @@ export const useAgentMessages = ({
             content: `❌ 创建失败：${(err as Error).message || '未知错误'}`,
             timestamp: Date.now(),
             source: 'error',
-          }, 'welcome')
+          })
         }
       } else if (onCreateAgent) {
         // 父组件只支持打开模态框
@@ -640,7 +641,7 @@ export const useAgentMessages = ({
           content: '📝 即将打开创建表单...',
           timestamp: Date.now(),
           source: 'system',
-        }, 'welcome')
+        })
         try {
           await onCreateAgent()
         } catch (e) {
@@ -654,7 +655,7 @@ export const useAgentMessages = ({
           content: '👈 点击左侧 **"+"** 按钮创建你的第一个智能体，或者试试输入：\n\n> `创建一个擅长写代码的助手`',
           timestamp: Date.now(),
           source: 'system',
-        }, 'welcome')
+        })
       }
 
       return
@@ -669,8 +670,8 @@ export const useAgentMessages = ({
     selectedAgent,
     sendMessageToAgent,
     appendMessage,
-    onCreateAgent,
     onAutoCreateAgent,
+    onCreateAgent,
     parseAgentCreationCommandWithAIDirect,
   ])
 
