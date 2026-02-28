@@ -73,30 +73,26 @@ function normalizeToolArguments(
 
   // Bash Tool 参数转换
   if (toolId === 'bash') {
-    // 确保有 operation 字段 - 使用 Rust 枚举格式（大写）
+    // 确保有 operation 字段 - 使用 Rust 枚举格式（小写）
     if (normalizedArgs.operation === undefined) {
-      normalizedArgs.operation = 'Execute'
+      normalizedArgs.operation = 'execute'
     } else {
-      // 转换 operation 为首字母大写
-      const op = String(normalizedArgs.operation).toLowerCase()
-      const opMap: Record<string, string> = {
-        'execute': 'Execute'
-      }
-      normalizedArgs.operation = opMap[op] || 'Execute'
+      // 转换 operation 为小写
+      normalizedArgs.operation = String(normalizedArgs.operation).toLowerCase()
     }
 
-    // 确保有 shell 字段 - 转换为 Rust 枚举大写格式
+    // 确保有 shell 字段 - 转换为 Rust 枚举小写格式
     if (normalizedArgs.shell === undefined) {
-      normalizedArgs.shell = 'Bash'
+      normalizedArgs.shell = 'bash'
     } else if (typeof normalizedArgs.shell === 'string') {
       const shellMap: Record<string, string> = {
-        'bash': 'Bash',
-        'cmd': 'Cmd',
-        'powershell': 'PowerShell',
-        'python': 'Python',
-        'node': 'Node'
+        'bash': 'bash',
+        'cmd': 'cmd',
+        'powershell': 'powershell',
+        'python': 'python',
+        'node': 'node'
       }
-      normalizedArgs.shell = shellMap[normalizedArgs.shell.toLowerCase()] || 'Bash'
+      normalizedArgs.shell = shellMap[normalizedArgs.shell.toLowerCase()] || 'bash'
     }
 
     // 确保有 command 字段
@@ -124,18 +120,12 @@ function normalizeToolArguments(
 
   // Search Tool 参数转换
   if (toolId === 'search') {
-    // 如果没有 operation 字段，根据参数推断 - 使用 Rust 枚举格式
+    // 如果没有 operation 字段，根据参数推断 - 使用 Rust 枚举格式（小写）
     if (!hasOperation) {
       normalizedArgs.operation = 'grep'
     } else {
-      // 转换 operation 为首字母大写
-      const op = String(normalizedArgs.operation).toLowerCase()
-      const opMap: Record<string, string> = {
-        'grep': 'Grep',
-        'glob': 'Glob',
-        'find': 'Find'
-      }
-      normalizedArgs.operation = opMap[op] || 'Grep'
+      // 转换 operation 为小写
+      normalizedArgs.operation = String(normalizedArgs.operation).toLowerCase()
     }
 
     // 将 query 转换为 pattern

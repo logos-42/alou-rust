@@ -1,5 +1,5 @@
 use crate::prompts::{PromptManager, PromptContext};
-use crate::tools::{ToolRegistry, ToolExecutor, ToolResult, ExecutionContext};
+use crate::tools::{ToolRegistry, ToolResult, ExecutionContext};
 use serde_json::Value;
 use std::collections::HashMap;
 use tokio::time::{sleep, Duration};

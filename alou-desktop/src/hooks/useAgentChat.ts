@@ -375,16 +375,16 @@ function normalizeToolCallArguments(
     
     // Shell 字段必须使用 Rust 枚举的大写形式
     if (!n.shell) {
-      n.shell = 'Bash';
+      n.shell = 'bash';
     } else if (typeof n.shell === 'string') {
       const shellMap: Record<string, string> = {
-        'bash': 'Bash',
-        'cmd': 'Cmd',
-        'powershell': 'PowerShell',
-        'python': 'Python',
-        'node': 'Node'
+        'bash': 'bash',
+        'cmd': 'cmd',
+        'powershell': 'powershell',
+        'python': 'python',
+        'node': 'node'
       };
-      n.shell = shellMap[n.shell.toLowerCase()] || 'Bash';
+      n.shell = shellMap[n.shell.toLowerCase()] || 'bash';
     }
     
     // 必须有 command 字段
@@ -415,7 +415,12 @@ function normalizeToolCallArguments(
   if (toolId === 'filesystem') {
     if (!n.operation) {
       n.operation = n.content ? 'write' : 'list';
+    } else {
+      // 转换为小写格式以匹配 Rust 枚举
+      n.operation = String(n.operation).toLowerCase();
     }
+    
+    // 确保 path 字段
     if (!n.path && n.operation !== 'write') {
       n.path = '.';
     }

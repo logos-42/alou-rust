@@ -256,11 +256,14 @@ impl RalphLoopExecutor {
             "bash" => serde_json::json!({
                 "type": "object",
                 "properties": {
+                    "operation": { "type": "string", "enum": ["execute"], "description": "操作类型，固定为 execute", "default": "execute" },
+                    "shell": { "type": "string", "enum": ["bash", "cmd", "powershell", "python", "node"], "description": "Shell类型", "default": "bash" },
                     "command": { "type": "string", "description": "要执行的命令" },
-                    "working_dir": { "type": "string", "description": "工作目录" },
-                    "timeout": { "type": "integer", "description": "超时时间（秒）", "default": 300 }
+                    "working_dir": { "type": "string", "description": "工作目录（可选）" },
+                    "environment": { "type": "array", "items": { "type": "array", "items": { "type": "string" }, "minItems": 2, "maxItems": 2 }, "description": "环境变量数组，格式: [[\"KEY\", \"VALUE\"]]", "default": [] },
+                    "timeout_seconds": { "type": "integer", "description": "超时时间（秒）", "default": 30 }
                 },
-                "required": ["command"]
+                "required": ["operation", "shell", "command"]
             }),
             "search" => serde_json::json!({
                 "type": "object",
@@ -295,8 +298,7 @@ impl RalphLoopExecutor {
             "system" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["info", "memory", "disk", "cpu", "processes", "env"], "description": "系统操作" },
-                    "process_name": { "type": "string", "description": "进程名称" }
+                    "operation": { "type": "string", "enum": ["Info", "Processes", "Cpu", "Memory", "Disks", "Environment"], "description": "系统操作类型" }
                 },
                 "required": ["operation"]
             }),
@@ -589,10 +591,11 @@ impl RalphLoopExecutor {
         let mut results = Vec::new();
 
         for tool_call in tool_calls {
-            // 发送工具执行开始事件
+            // 发送工具执行开始事件（包含参数）
             self.emit_event(task_id, TaskEvent::ToolExecuting {
                 task_id: task_id.to_string(),
                 tool_name: tool_call.name.clone(),
+                arguments: Some(tool_call.arguments.clone()),
             })
             .await;
 
@@ -619,6 +622,10 @@ impl RalphLoopExecutor {
 
     /// 执行单个工具
     async fn execute_single_tool(&self, tool_call: &ProviderToolCall) -> super::error::Result<ToolResult> {
+        // 添加详细日志
+        log::info!("[RalphLoop] 执行工具：{}", tool_call.name);
+        log::info!("[RalphLoop] 工具参数：{}", serde_json::to_string(&tool_call.arguments).unwrap_or_default());
+        
         let request = ToolCallRequest {
             session_id: "ralph_loop".to_string(),
             user_id: None,

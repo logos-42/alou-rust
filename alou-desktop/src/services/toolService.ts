@@ -158,17 +158,17 @@ function normalizeToolArguments(
     if (normalizedArgs.operation !== undefined) {
       const op = String(normalizedArgs.operation).toLowerCase()
       const opMap: Record<string, string> = {
-        'read': 'Read',
-        'write': 'Write',
-        'list': 'List',
-        'edit': 'Edit',
-        'delete': 'Delete',
-        'copy': 'Copy',
-        'move': 'Move'
+        'read': 'read',
+        'write': 'write',
+        'list': 'list',
+        'edit': 'edit',
+        'delete': 'delete',
+        'copy': 'copy',
+        'move': 'move'
       }
-      normalizedArgs.operation = opMap[op] || 'List'
+      normalizedArgs.operation = opMap[op] || 'list'
     } else {
-      normalizedArgs.operation = normalizedArgs.content ? 'Write' : 'List'
+      normalizedArgs.operation = normalizedArgs.content ? 'write' : 'list'
     }
     
     // 确保必要的默认值
@@ -187,23 +187,23 @@ function normalizeToolArguments(
     // 确保 operation 字段使用首字母大写
     if (normalizedArgs.operation !== undefined) {
       const op = String(normalizedArgs.operation).toLowerCase()
-      normalizedArgs.operation = op === 'execute' ? 'Execute' : 'Execute'
+      normalizedArgs.operation = op === 'execute' ? 'execute' : 'execute'
     } else {
-      normalizedArgs.operation = 'Execute'
+      normalizedArgs.operation = 'execute'
     }
     
-    // 确保 shell 字段使用首字母大写
+    // 确保 shell 字段使用小写
     if (normalizedArgs.shell !== undefined) {
       const shellMap: Record<string, string> = {
-        'bash': 'Bash',
-        'cmd': 'Cmd',
-        'powershell': 'PowerShell',
-        'python': 'Python',
-        'node': 'Node'
+        'bash': 'bash',
+        'cmd': 'cmd',
+        'powershell': 'powershell',
+        'python': 'python',
+        'node': 'node'
       }
-      normalizedArgs.shell = shellMap[String(normalizedArgs.shell).toLowerCase()] || 'Bash'
+      normalizedArgs.shell = shellMap[String(normalizedArgs.shell).toLowerCase()] || 'bash'
     } else {
-      normalizedArgs.shell = 'Bash'
+      normalizedArgs.shell = 'bash'
     }
     
     // 确保有 timeout_seconds 字段
@@ -510,11 +510,18 @@ class ToolService {
     }
 
     try {
-      const response = await apiClient.post<RemoteToolResult>('/tools/execute', requestData, {
+      const response = await apiClient.request<RemoteToolResult>('/tools/execute', {
+        method: 'POST',
+        body: requestData,
         timeout
       })
 
       const result = response.data
+
+      // 如果 result 为空
+      if (!result) {
+        throw new Error('Empty response from remote tool execution')
+      }
 
       // 如果是异步任务，等待完成
       if (result.task_id && allowAsync) {
@@ -567,6 +574,13 @@ class ToolService {
           // 查询任务状态
           const response = await apiClient.get<ToolTaskStatus>(`/api/tools/status/${taskId}`)
           const status = response.data
+
+          // 如果 status 为空
+          if (!status) {
+            console.log(`[ToolService] 任务状态为空: ${taskId}`)
+            setTimeout(checkStatus, pollInterval)
+            return
+          }
 
           console.log(`[ToolService] 任务状态: ${taskId} -> ${status.status}`)
 
@@ -667,7 +681,11 @@ class ToolService {
   private async getRemoteToolList(): Promise<ToolInfo[]> {
     try {
       const response = await apiClient.get<{ tools: Array<Record<string, any>> }>('/tools/list')
-      return response.data.tools.map(tool => ({
+      const tools = response.data?.tools
+      if (!tools) {
+        return []
+      }
+      return tools.map(tool => ({
         ...tool,
         id: tool.id || 'unknown',
         name: tool.name || tool.id || 'Unknown Tool',
@@ -821,7 +839,7 @@ class ToolService {
       const response = await apiClient.get<{ history: ExecutionHistoryItem[] }>('/tools/history', {
         params: { limit }
       })
-      return response.data.history || []
+      return response.data?.history || []
     } catch (error) {
       return []
     }

@@ -155,13 +155,25 @@ async fn execute_tool(
     println!("[Tauri] 解析后的参数：{:#}", args_value);
     
     // 检查关键工具的 operation 字段
-    if tool_id == "filesystem" || tool_id == "bash" {
+    if tool_id == "filesystem" || tool_id == "bash" || tool_id == "search" {
         if let Some(operation) = args_value.get("operation") {
             println!("[Tauri] ✓ 操作类型：{}", operation);
         } else {
             println!("[Tauri] ⚠️ 警告：{} 工具缺少 operation 字段", tool_id);
-            println!("[Tauri] ⚠️ FileSystem 期望格式：{{ \"operation\": \"list\"|\"read\"|\"write\"|..., \"path\": string, ... }}");
-            println!("[Tauri] ⚠️ Bash 期望格式：{{ \"operation\": \"execute\", \"shell\": \"bash\"|\"cmd\"|\"powershell\", \"command\": string, ... }}");
+        }
+        
+        // 检查 shell 字段（bash 工具需要）
+        if tool_id == "bash" {
+            if let Some(shell) = args_value.get("shell") {
+                println!("[Tauri] ✓ Shell 类型：{}", shell);
+            } else {
+                println!("[Tauri] ⚠️ Bash 工具缺少 shell 字段");
+            }
+            if let Some(command) = args_value.get("command") {
+                println!("[Tauri] ✓ Command：{}", command);
+            } else {
+                println!("[Tauri] ⚠️ Bash 工具缺少 command 字段");
+            }
         }
     }
 

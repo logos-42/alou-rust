@@ -139,7 +139,7 @@ pub enum TaskEvent {
     ToolCallsPending { task_id: String, count: usize },
 
     /// 工具开始执行
-    ToolExecuting { task_id: String, tool_name: String },
+    ToolExecuting { task_id: String, tool_name: String, arguments: Option<serde_json::Value> },
 
     /// 工具执行完成
     ToolCompleted {

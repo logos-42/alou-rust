@@ -359,38 +359,38 @@ class AutonomousAgentService {
     // FileSystem Tool 参数格式转换
     if (toolId === 'filesystem') {
       if (!n.operation) {
-        n.operation = n.content ? 'Write' : 'List'
+        n.operation = n.content ? 'write' : 'list'
       } else {
         const op = String(n.operation).toLowerCase()
         const opMap: Record<string, string> = {
-          'read': 'Read',
-          'write': 'Write',
-          'list': 'List',
-          'edit': 'Edit',
-          'delete': 'Delete'
+          'read': 'read',
+          'write': 'write',
+          'list': 'list',
+          'edit': 'edit',
+          'delete': 'delete'
         }
-        n.operation = opMap[op] || 'List'
+        n.operation = opMap[op] || 'list'
       }
-      if (!n.path && n.operation !== 'Write') {
+      if (!n.path && n.operation !== 'write') {
         n.path = '.'
       }
-      if (n.operation === 'Write' && n.create_dirs === undefined) {
+      if (n.operation === 'write' && n.create_dirs === undefined) {
         n.create_dirs = true
       }
     }
 
     // Bash Tool 参数格式转换
     if (toolId === 'bash') {
-      n.operation = 'Execute'
+      n.operation = 'execute'
       if (!n.shell) {
-        n.shell = 'Bash'
+        n.shell = 'bash'
       } else if (typeof n.shell === 'string') {
         const shellMap: Record<string, string> = {
-          'bash': 'Bash',
-          'cmd': 'Cmd',
-          'powershell': 'PowerShell'
+          'bash': 'bash',
+          'cmd': 'cmd',
+          'powershell': 'powershell'
         }
-        n.shell = shellMap[n.shell.toLowerCase()] || 'Bash'
+        n.shell = shellMap[n.shell.toLowerCase()] || 'bash'
       }
       if (!n.timeout_seconds) {
         n.timeout_seconds = 30

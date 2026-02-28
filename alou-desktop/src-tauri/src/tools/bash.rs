@@ -142,8 +142,14 @@ impl ToolExecutor for BashTool {
         args: serde_json::Value,
         _context: &ExecutionContext,
     ) -> Result<ToolResult, ToolError> {
-        let operation: BashOperation = serde_json::from_value(args)
-            .map_err(|e| ToolError::InvalidArguments(format!("Invalid arguments: {}", e)))?;
+        println!("[BashTool] 收到的参数: {:#}", args);
+        
+        let operation: BashOperation = serde_json::from_value(args.clone())
+            .map_err(|e| {
+                println!("[BashTool] ❌ 参数解析失败: {}", e);
+                println!("[BashTool] ❌ 尝试解析的JSON: {}", args);
+                ToolError::InvalidArguments(format!("Invalid arguments: {}", e))
+            })?;
 
         match operation {
             BashOperation::Execute { shell, command, working_dir, environment, timeout_seconds } => {

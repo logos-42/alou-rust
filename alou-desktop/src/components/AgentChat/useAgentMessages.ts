@@ -38,10 +38,30 @@ function progressToText(e: AgentProgressPayload): string | null {
       // 只在有工具调用中间过程时显示思考内容（最终回复由主流程处理）
       return e.content ? `💭 ${e.content}` : null
     case 'tools_pending':
+      console.log(`[progressToText] tools_pending:`, {
+        count: e.count,
+        task_id: e.task_id
+      });
       return `🔧 准备调用 ${e.count} 个工具...`
     case 'tool_calling':
+      // 添加详细日志来捕获工具调用参数
+      console.log(`[tool_calling] 工具调用详情:`, {
+        task_id: e.task_id,
+        tool_name: e.tool_name,
+        // 尝试从其他地方获取参数
+      });
+      console.log(`[progressToText] tool_calling:`, {
+        tool_name: e.tool_name,
+        preview: e.preview
+      });
       return `⚙️ 调用工具：**${e.tool_name}**`
     case 'tool_done':
+      console.log(`[progressToText] tool_done:`, {
+        tool_name: e.tool_name,
+        success: e.success,
+        error: e.error,
+        preview: e.preview
+      });
       if (e.success) {
         const preview = e.preview ? `\n\`\`\`\n${e.preview.slice(0, 200)}\n\`\`\`` : ''
         return `✅ 工具 **${e.tool_name}** 完成${preview}`

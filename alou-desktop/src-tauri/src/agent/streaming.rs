@@ -125,7 +125,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: None,
             error: None,
         },
-        TaskEvent::ToolExecuting { task_id, tool_name } => StreamEvent {
+        TaskEvent::ToolExecuting { task_id, tool_name, arguments: _ } => StreamEvent {
             r#type: "tool_executing".to_string(),
             content: None,
             name: Some(tool_name.clone()),
