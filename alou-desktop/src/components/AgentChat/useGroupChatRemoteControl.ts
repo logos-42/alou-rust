@@ -38,16 +38,16 @@ export const useGroupChatRemoteControl = ({
     }
   }, [showGroupChat])
 
-  // 监听输入目标切换事件
+  // 监听输入目标切换事件 - 只添加一次，避免内存泄漏
   useEffect(() => {
-    const handleSwitchInputTarget = (event) => {
+    const handleSwitchInputTarget = (event: CustomEvent<{ target: string }>) => {
       const { target } = event.detail
       console.log('[useGroupChatRemoteControl] 收到切换事件:', {
         target,
         currentMode: inputTargetMode,
         showGroupChat
       })
-      
+
       if (target === 'groupChat' || target === 'agent') {
         setInputTargetMode(target)
         console.log('[useGroupChatRemoteControl] 输入目标切换到:', target)
@@ -55,18 +55,15 @@ export const useGroupChatRemoteControl = ({
         console.warn('[useGroupChatRemoteControl] 未知的切换目标:', target)
       }
     }
-    
-    // 移除可能存在的旧监听器
-    window.removeEventListener('switch-input-target', handleSwitchInputTarget)
-    // 添加新监听器
+
     window.addEventListener('switch-input-target', handleSwitchInputTarget)
     console.log('[useGroupChatRemoteControl] 事件监听器已设置')
-    
+
     return () => {
       console.log('[useGroupChatRemoteControl] 清理事件监听器')
       window.removeEventListener('switch-input-target', handleSwitchInputTarget)
     }
-  }, [inputTargetMode, showGroupChat])
+  }, []) // 空依赖数组，只执行一次
 
   // 发送消息到群聊
   const sendMessageToGroupChat = useCallback(
@@ -119,7 +116,10 @@ export const useGroupChatRemoteControl = ({
           }
 
           // 关键改进：通知所有智能体处理群聊消息
-          const activeAction = getActiveAction()
+          const { getActiveAction } = useClusterActionStore.getState()
+          // 使用 activeChannelId 获取正确的活跃行动
+          const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
+          
           if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
             // 广播消息给所有参与群聊的智能体
             const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
@@ -200,7 +200,7 @@ export const useGroupChatRemoteControl = ({
         // 可以考虑显示错误提示给用户
       }
     },
-    [userName],
+    [userName, activeChannelId],
   )
 
   // 处理群聊面板点击，切换输入目标模式

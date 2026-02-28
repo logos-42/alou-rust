@@ -1,0 +1,155 @@
+/* 网络状态指示器样式 */
+
+.network-status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: network-slide-down 0.3s ease-out;
+}
+
+.network-status.online {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.network-status.offline {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+@keyframes network-slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.network-status-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-weight: 500;
+}
+
+.network-status-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.network-status-text {
+  font-size: 14px;
+}
+
+/* 网络状态徽章 */
+.network-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.network-badge.online {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.network-badge.offline {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.network-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: network-pulse 2s infinite;
+}
+
+.network-badge.online .network-badge-dot {
+  background: #10b981;
+}
+
+.network-badge.offline .network-badge-dot {
+  background: #ef4444;
+  animation: none;
+}
+
+@keyframes network-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+.network-badge-label {
+  white-space: nowrap;
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .network-badge.online {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.app-shell.dark-mode .network-badge.offline {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* 高对比度模式 */
+@media (prefers-contrast: high) {
+  .network-status.online {
+    background: #059669;
+  }
+  
+  .network-status.offline {
+    background: #dc2626;
+  }
+  
+  .network-badge.online {
+    border: 2px solid #059669;
+    background: transparent;
+    color: #059669;
+  }
+  
+  .network-badge.offline {
+    border: 2px solid #dc2626;
+    background: transparent;
+    color: #dc2626;
+  }
+}
+
+/* 减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .network-status {
+    animation: none;
+  }
+  
+  .network-badge-dot {
+    animation: none;
+  }
+}

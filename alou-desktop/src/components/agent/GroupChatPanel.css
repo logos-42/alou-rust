@@ -637,3 +637,279 @@
   color: var(--text-muted-dark, #718096);
 }
 
+
+/* 错误提示 */
+.send-error-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin: 0 20px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 14px;
+  animation: slideDown 0.2s ease;
+}
+
+.send-error-toast .error-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.send-error-toast .error-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+.send-error-toast .error-dismiss {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.send-error-toast .error-dismiss:hover {
+  opacity: 1;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+/* 模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 320px;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+.modal-content h3 {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.modal-btn.cancel {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.modal-btn.cancel:hover {
+  background: #e0e0e0;
+}
+
+.modal-btn.confirm {
+  background: #6366f1;
+  color: white;
+}
+
+.modal-btn.confirm:hover {
+  background: #5558e3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 暗色模式 */
+.app-shell.dark-mode .modal-content {
+  background: #2d2d2d;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .modal-content h3 {
+  color: #f0f0f0;
+}
+
+.app-shell.dark-mode .modal-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f0f0f0;
+}
+
+.app-shell.dark-mode .modal-input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.app-shell.dark-mode .modal-btn.cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+}
+
+.app-shell.dark-mode .modal-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+
+/* 群聊操作按钮 */
+.group-chat-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  filter: brightness(1.1);
+}
+
+.action-btn:active {
+  transform: translateY(0);
+}
+
+/* 暗色模式下的操作按钮 */
+.app-shell.dark-mode .action-btn {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+
+/* 头部加载指示器 */
+.header-loading-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #6366f1;
+  margin-right: 8px;
+  animation: pulse 2s infinite;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #6366f1;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* 暗色模式下的加载指示器 */
+.app-shell.dark-mode .header-loading-indicator {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+}
+
+.app-shell.dark-mode .loading-spinner {
+  border-color: #818cf8;
+  border-top-color: transparent;
+}
+

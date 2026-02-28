@@ -16,16 +16,26 @@ export const useGroupChatButton = ({
 }) => {
   const { t } = useI18n()
   
-  // 按钮配置
+  // 使用 useCallback 确保事件处理函数的稳定性
+  const handleToggleGroupChat = useCallback(() => {
+    console.log('[useGroupChatButton] 切换群聊状态:', { showGroupChat, canOpenGroupChat })
+    if (showGroupChat) {
+      closeGroupChat()
+    } else {
+      openGroupChat()
+    }
+  }, [showGroupChat, canOpenGroupChat, openGroupChat, closeGroupChat])
+  
+  // 按钮配置 - 使用稳定的函数引用
   const buttonConfig = useMemo(
     () => ({
       className: `group-chat-toggle-btn-fixed ${showGroupChat ? 'active' : ''}`,
-      onClick: showGroupChat ? closeGroupChat : openGroupChat,
+      onClick: handleToggleGroupChat,
       title: showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
       'aria-label': showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
       disabled: !canOpenGroupChat && !showGroupChat,
     }),
-    [showGroupChat, canOpenGroupChat, openGroupChat, closeGroupChat, t],
+    [showGroupChat, canOpenGroupChat, handleToggleGroupChat, t],
   )
 
   // 处理对话面板点击，切换输入目标到智能体
@@ -66,7 +76,18 @@ export const useGroupChatButton = ({
     }
   }, [showGroupChat])
 
-  // 包装对话面板的包装器组件
+  // 使用 useCallback 确保按钮点击处理器的稳定性
+  const handleButtonClick = useCallback((e) => {
+    console.log('[useGroupChatButton] 群聊按钮点击')
+    // 阻止事件冒泡到父容器
+    e.stopPropagation()
+    // 阻止默认行为
+    e.preventDefault()
+    // 调用切换函数
+    handleToggleGroupChat()
+  }, [handleToggleGroupChat])
+  
+  // 包装对话面板的包装器组件 - 使用稳定的函数引用
   const ConversationPanelWrapper = useMemo(
     () =>
       ({ children }) => {
@@ -79,19 +100,18 @@ export const useGroupChatButton = ({
             {/* 群聊按钮独立于对话面板显示 */}
             <button 
               type="button" 
-              {...buttonConfig}
-              onClick={(e) => {
-                // 阻止事件冒泡到父容器
-                e.stopPropagation();
-                buttonConfig.onClick();
-              }}
+              className={buttonConfig.className}
+              onClick={handleButtonClick}
+              title={buttonConfig.title}
+              aria-label={buttonConfig['aria-label']}
+              disabled={buttonConfig.disabled}
             >
               <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
             </button>
           </div>
         )
       },
-    [buttonConfig, showGroupChat, t, handleConversationPanelClick],
+    [buttonConfig, showGroupChat, t, handleConversationPanelClick, handleButtonClick],
   )
 
   return {

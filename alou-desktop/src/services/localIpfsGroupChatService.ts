@@ -1,11 +1,23 @@
 /**
  * 本地IPFS PubSub群聊服务
- * 使用本地IPFS节点创建pubsub，消息存储在本地内存和后端KV中
+ * 使用本地IPFS节点创建pubsub，消息存储在本地内存、后端KV和LocalStorage中
  */
 
 import { invoke } from '@tauri-apps/api/core'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
+
+/**
+ * 日志级别
+ */
+const LogLevel = {
+  DEBUG: 'DEBUG',
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+} as const
+
+type LogLevelType = typeof LogLevel[keyof typeof LogLevel]
 
 /**
  * 消息类型常量
@@ -19,6 +31,8 @@ export const MessageTypes = {
   TASK_ASSIGN: 'task_assign',       // 任务分配
   TASK_PROGRESS: 'task_progress',     // 任务进度
   TASK_COMPLETE: 'task_complete',     // 任务完成
+  ACK: 'ack',                         // 消息确认
+  REPLAY: 'replay',                   // 消息重放请求
 } as const
 
 export type MessageType = typeof MessageTypes[keyof typeof MessageTypes]
@@ -62,6 +76,10 @@ export class LocalGroupMessage {
   type: MessageType
   timestamp: number
   metadata: Record<string, any>
+  // 消息状态跟踪
+  delivered: boolean
+  acked: boolean
+  retryCount: number
 
   constructor({
     id,
@@ -85,9 +103,13 @@ export class LocalGroupMessage {
     this.type = type
     this.timestamp = timestamp || Date.now()
     this.metadata = metadata
+    // 初始化消息状态
+    this.delivered = metadata?.delivered || false
+    this.acked = metadata?.acked || false
+    this.retryCount = metadata?.retryCount || 0
   }
 
-  toJSON(): LocalGroupMessageConfig {
+  toJSON(): LocalGroupMessageConfig & { delivered: boolean; acked: boolean; retryCount: number } {
     return {
       id: this.id,
       groupId: this.groupId,
@@ -98,12 +120,19 @@ export class LocalGroupMessage {
       content: this.content,
       type: this.type,
       timestamp: this.timestamp,
-      metadata: this.metadata
+      metadata: this.metadata,
+      delivered: this.delivered,
+      acked: this.acked,
+      retryCount: this.retryCount,
     }
   }
 
-  static fromJSON(json: LocalGroupMessageConfig): LocalGroupMessage {
-    return new LocalGroupMessage(json)
+  static fromJSON(json: LocalGroupMessageConfig & { delivered?: boolean; acked?: boolean; retryCount?: number }): LocalGroupMessage {
+    const msg = new LocalGroupMessage(json)
+    msg.delivered = json.delivered || false
+    msg.acked = json.acked || false
+    msg.retryCount = json.retryCount || 0
+    return msg
   }
 }
 
@@ -205,8 +234,26 @@ interface KVResponse {
 }
 
 /**
+ * 分页配置
+ */
+export interface PaginationConfig {
+  page: number
+  pageSize: number
+}
+
+/**
+ * 消息查询结果
+ */
+export interface MessageQueryResult {
+  messages: LocalGroupMessage[]
+  total: number
+  hasMore: boolean
+}
+
+/**
  * 本地IPFS群聊服务类
  * 专注于使用本地IPFS节点进行PubSub通信
+ * 包含消息去重、顺序保证、错误重试和消息确认机制
  */
 class LocalIpfsGroupChatService {
   private localIdentity: LocalIdentity | null = null
@@ -216,6 +263,144 @@ class LocalIpfsGroupChatService {
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map() // groupId -> Set<callback>
   private ipfsAvailable: boolean = false
   private initialized: boolean = false
+  
+  // 消息去重相关
+  private messageIdSet: Map<string, Set<string>> = new Map() // groupId -> Set<messageId>
+  private messageHashSet: Map<string, Set<string>> = new Map() // groupId -> Set<contentHash>
+  
+  // 错误重试相关
+  private retryQueue: Map<string, { message: LocalGroupMessage; retries: number; lastAttempt: number }> = new Map()
+  private readonly MAX_RETRY_ATTEMPTS = 3
+  private readonly RETRY_DELAY_MS = 2000
+  private retryTimer: NodeJS.Timeout | null = null
+  
+  // 消息确认相关
+  private pendingAcks: Map<string, { resolve: () => void; reject: (error: Error) => void; timeout: NodeJS.Timeout }> = new Map()
+  private readonly ACK_TIMEOUT_MS = 10000
+  
+  // 日志相关
+  private logLevel: LogLevelType = LogLevel.INFO
+  private logs: Array<{ level: LogLevelType; message: string; timestamp: number; data?: any }> = []
+  private readonly MAX_LOGS = 1000
+
+  /**
+   * 记录日志
+   */
+  private log(level: LogLevelType, message: string, data?: any): void {
+    const logEntry = {
+      level,
+      message,
+      timestamp: Date.now(),
+      data
+    }
+    
+    this.logs.push(logEntry)
+    
+    // 限制日志数量
+    if (this.logs.length > this.MAX_LOGS) {
+      this.logs.shift()
+    }
+    
+    // 控制台输出
+    const prefix = `[LocalIpfsGroupChatService][${level}]`
+    switch (level) {
+      case LogLevel.DEBUG:
+        if (this.logLevel === LogLevel.DEBUG) {
+          console.debug(prefix, message, data || '')
+        }
+        break
+      case LogLevel.INFO:
+        console.log(prefix, message, data || '')
+        break
+      case LogLevel.WARN:
+        console.warn(prefix, message, data || '')
+        break
+      case LogLevel.ERROR:
+        console.error(prefix, message, data || '')
+        break
+    }
+  }
+
+  /**
+   * 设置日志级别
+   */
+  setLogLevel(level: LogLevelType): void {
+    this.logLevel = level
+    this.log(LogLevel.INFO, '日志级别设置为:', level)
+  }
+
+  /**
+   * 获取日志
+   */
+  getLogs(level?: LogLevelType, limit: number = 100): Array<{ level: LogLevelType; message: string; timestamp: number; data?: any }> {
+    let filteredLogs = this.logs
+    if (level) {
+      filteredLogs = this.logs.filter(log => log.level === level)
+    }
+    return filteredLogs.slice(-limit)
+  }
+
+  /**
+   * 生成消息内容的哈希值（用于去重）
+   */
+  private generateMessageHash(message: LocalGroupMessage): string {
+    const content = `${message.from}:${message.content}:${message.timestamp}`
+    // 简单的哈希算法
+    let hash = 0
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // 转换为32位整数
+    }
+    return `hash_${hash}_${message.timestamp}`
+  }
+
+  /**
+   * 检查消息是否重复
+   */
+  private isDuplicateMessage(groupId: string, message: LocalGroupMessage): boolean {
+    const idSet = this.messageIdSet.get(groupId)
+    if (idSet && idSet.has(message.id)) {
+      this.log(LogLevel.DEBUG, '消息ID重复，忽略消息:', { groupId, messageId: message.id })
+      return true
+    }
+    
+    // 检查内容哈希（短时间内相同内容的消息）
+    const hash = this.generateMessageHash(message)
+    const hashSet = this.messageHashSet.get(groupId)
+    if (hashSet) {
+      // 清理超过1分钟的旧哈希
+      const now = Date.now()
+      for (const [key, timestamp] of Array.from(hashSet.entries()).map(e => e[0].split('_').slice(-1)).map(s => [s, parseInt(s[0])])) {
+        if (now - (timestamp as number) > 60000) {
+          hashSet.delete(key as string)
+        }
+      }
+      
+      if (hashSet.has(hash)) {
+        this.log(LogLevel.DEBUG, '消息内容重复，忽略消息:', { groupId, hash })
+        return true
+      }
+    }
+    
+    return false
+  }
+
+  /**
+   * 记录消息ID和哈希
+   */
+  private recordMessageId(groupId: string, message: LocalGroupMessage): void {
+    if (!this.messageIdSet.has(groupId)) {
+      this.messageIdSet.set(groupId, new Set())
+    }
+    this.messageIdSet.get(groupId)!.add(message.id)
+    
+    if (!this.messageHashSet.has(groupId)) {
+      this.messageHashSet.set(groupId, new Set())
+    }
+    const hash = this.generateMessageHash(message)
+    this.messageHashSet.get(groupId)!.add(hash)
+  }
 
   /**
    * 初始化服务
@@ -225,7 +410,7 @@ class LocalIpfsGroupChatService {
       return
     }
 
-    console.log('[LocalIpfsGroupChatService] 初始化本地IPFS群聊服务')
+    this.log(LogLevel.INFO, '初始化本地IPFS群聊服务')
     
     // 检查IPFS节点可用性
     await this.checkIpfsAvailability()
@@ -233,8 +418,17 @@ class LocalIpfsGroupChatService {
     // 从KV存储加载群聊数据
     await this.loadGroupsFromKV()
     
+    // 从LocalStorage加载备份数据
+    await this.loadFromLocalStorage()
+    
+    // 启动重试处理器
+    this.startRetryProcessor()
+    
     this.initialized = true
-    console.log('[LocalIpfsGroupChatService] 初始化完成')
+    this.log(LogLevel.INFO, '初始化完成', { 
+      groupsCount: this.groups.size,
+      ipfsAvailable: this.ipfsAvailable 
+    })
   }
 
   /**
@@ -242,7 +436,7 @@ class LocalIpfsGroupChatService {
    */
   setLocalIdentity(identity: LocalIdentity | null): void {
     this.localIdentity = identity
-    console.log('[LocalIpfsGroupChatService] 设置本地身份:', identity?.did)
+    this.log(LogLevel.INFO, '设置本地身份:', { did: identity?.did })
   }
 
   /**
@@ -253,11 +447,11 @@ class LocalIpfsGroupChatService {
       // 尝试获取IPFS节点信息
       const result = await invoke('get_ipfs_info')
       this.ipfsAvailable = !!result
-      console.log('[LocalIpfsGroupChatService] IPFS节点可用性:', this.ipfsAvailable)
+      this.log(LogLevel.INFO, 'IPFS节点可用性检查:', { available: this.ipfsAvailable })
       return this.ipfsAvailable
     } catch (error: any) {
       this.ipfsAvailable = false
-      console.warn('[LocalIpfsGroupChatService] IPFS节点不可用:', error.message)
+      this.log(LogLevel.WARN, 'IPFS节点不可用:', { error: error.message })
       return false
     }
   }
@@ -282,6 +476,8 @@ class LocalIpfsGroupChatService {
    * @returns 创建的群聊信息
    */
   async createGroup(config: CreateGroupConfig): Promise<LocalGroup> {
+    this.log(LogLevel.INFO, '创建群聊:', { groupName: config.groupName })
+    
     if (!this.ipfsAvailable) {
       throw new Error('IPFS节点不可用，无法创建群聊')
     }
@@ -314,21 +510,28 @@ class LocalIpfsGroupChatService {
       // 保存到内存
       this.groups.set(groupId, group)
       this.messages.set(groupId, [])
+      this.messageIdSet.set(groupId, new Set())
+      this.messageHashSet.set(groupId, new Set())
 
       // 保存到KV存储
       await this.saveGroupToKV(group)
+      
+      // 保存到LocalStorage备份
+      await this.saveToLocalStorage()
 
       // 发送群聊创建消息到IPFS PubSub
       await this._sendSystemMessage(group, `群聊 "${config.groupName}" 已创建`)
 
-      console.log('[LocalIpfsGroupChatService] 本地群聊创建成功:', group)
+      this.log(LogLevel.INFO, '群聊创建成功:', { groupId, groupName: group.groupName })
       return group
 
     } catch (error: any) {
-      console.error('[LocalIpfsGroupChatService] 创建群聊失败:', error)
+      this.log(LogLevel.ERROR, '创建群聊失败:', { error: error.message })
       // 清理内存中的数据
       this.groups.delete(groupId)
       this.messages.delete(groupId)
+      this.messageIdSet.delete(groupId)
+      this.messageHashSet.delete(groupId)
       throw new Error(`创建群聊失败: ${error.message}`)
     }
   }
@@ -340,6 +543,8 @@ class LocalIpfsGroupChatService {
    * @returns 加入的群聊信息
    */
   async joinGroup(groupId: string, topic?: string | null): Promise<LocalGroup> {
+    this.log(LogLevel.INFO, '加入群聊:', { groupId })
+    
     if (!this.localIdentity) {
       throw new Error('未设置本地身份，无法加入群聊')
     }
@@ -377,11 +582,11 @@ class LocalIpfsGroupChatService {
 
       await this.sendMessage(joinMessage)
 
-      console.log('[LocalIpfsGroupChatService] 加入群聊成功:', groupId)
+      this.log(LogLevel.INFO, '加入群聊成功:', { groupId, member: this.localIdentity.did })
       return group
 
     } catch (error: any) {
-      console.error('[LocalIpfsGroupChatService] 加入群聊失败:', error)
+      this.log(LogLevel.ERROR, '加入群聊失败:', { groupId, error: error.message })
       throw new Error(`加入群聊失败: ${error.message}`)
     }
   }
@@ -395,6 +600,7 @@ class LocalIpfsGroupChatService {
   async subscribeToGroup(groupId: string, topic: string): Promise<UnsubscribeFunction> {
     if (this.subscriptions.has(groupId)) {
       // 已经订阅，返回现有的取消订阅函数
+      this.log(LogLevel.DEBUG, '群聊已订阅，返回现有订阅:', { groupId })
       return this.subscriptions.get(groupId)!
     }
 
@@ -419,27 +625,60 @@ class LocalIpfsGroupChatService {
               const msgData = typeof msgStr === 'string' ? JSON.parse(msgStr) : msgStr
               const message = LocalGroupMessage.fromJSON(msgData)
               
+              this.log(LogLevel.DEBUG, '收到PubSub消息:', { 
+                groupId, 
+                messageId: message.id,
+                type: message.type 
+              })
+              
+              // 消息去重检查
+              if (this.isDuplicateMessage(groupId, message)) {
+                return
+              }
+              
+              // 记录消息ID
+              this.recordMessageId(groupId, message)
+              
+              // 处理确认消息
+              if (message.type === MessageTypes.ACK) {
+                this.handleAckMessage(message)
+                return
+              }
+              
+              // 发送确认（如果不是自己的消息且不是系统消息）
+              if (message.from !== this.localIdentity?.did && message.type !== MessageTypes.SYSTEM) {
+                this.sendAck(message)
+              }
+              
               // 保存到内存
               this.saveMessageToMemory(groupId, message)
               
               // 保存到KV存储
               this.saveMessageToKV(groupId, message)
               
+              // 保存到LocalStorage备份
+              this.saveMessageToLocalStorage(groupId, message)
+              
               // 通知所有处理器
               messageHandlers.forEach((handler: MessageHandler) => {
                 try {
                   handler(message)
                 } catch (error: any) {
-                  console.error('[LocalIpfsGroupChatService] 消息处理器错误:', error)
+                  this.log(LogLevel.ERROR, '消息处理器错误:', { error: error.message })
                 }
               })
             } catch (error: any) {
-              console.error('[LocalIpfsGroupChatService] 解析消息失败:', error)
+              this.log(LogLevel.ERROR, '解析消息失败:', { error: error.message, msgStr })
             }
           })
         }
-      } catch (error) {
+      } catch (error: any) {
         // IPFS错误时静默处理，避免频繁日志
+        if (error.message?.includes('timeout')) {
+          // 超时是正常的，不记录
+        } else {
+          this.log(LogLevel.DEBUG, 'PubSub轮询错误:', { error: error.message })
+        }
       }
     }
 
@@ -453,26 +692,72 @@ class LocalIpfsGroupChatService {
     const unsubscribe: UnsubscribeFunction = () => {
       isSubscribed = false
       clearInterval(interval)
-      console.log('[LocalIpfsGroupChatService] 取消订阅:', groupId)
+      this.log(LogLevel.INFO, '取消订阅群聊:', { groupId })
     }
 
     this.subscriptions.set(groupId, unsubscribe)
 
-    console.log('[LocalIpfsGroupChatService] 订阅群聊成功:', groupId)
+    this.log(LogLevel.INFO, '订阅群聊成功:', { groupId, topic })
     return unsubscribe
   }
 
   /**
-   * 发送消息到群聊
+   * 发送确认消息
+   */
+  private async sendAck(originalMessage: LocalGroupMessage): Promise<void> {
+    if (!this.localIdentity) return
+    
+    const ackMessage = new LocalGroupMessage({
+      groupId: originalMessage.groupId,
+      topic: originalMessage.topic,
+      from: this.localIdentity.did,
+      fromName: this.localIdentity.name || this.localIdentity.did,
+      content: 'ack',
+      type: MessageTypes.ACK,
+      metadata: {
+        ackedMessageId: originalMessage.id,
+        ackedBy: this.localIdentity.did
+      }
+    })
+    
+    try {
+      await invoke('ipfs_pubsub_publish', {
+        topic: ackMessage.topic,
+        message: JSON.stringify(ackMessage.toJSON()),
+        ipfs_api_url: DEFAULT_IPFS_API
+      })
+    } catch (error: any) {
+      this.log(LogLevel.DEBUG, '发送确认消息失败:', { error: error.message })
+    }
+  }
+
+  /**
+   * 处理确认消息
+   */
+  private handleAckMessage(ackMessage: LocalGroupMessage): void {
+    const ackedMessageId = ackMessage.metadata?.ackedMessageId
+    if (ackedMessageId && this.pendingAcks.has(ackedMessageId)) {
+      const pending = this.pendingAcks.get(ackedMessageId)!
+      clearTimeout(pending.timeout)
+      this.pendingAcks.delete(ackedMessageId)
+      pending.resolve()
+      this.log(LogLevel.DEBUG, '收到消息确认:', { messageId: ackedMessageId })
+    }
+  }
+
+  /**
+   * 发送消息到群聊（带确认机制）
    * @param message - 消息对象或内容字符串
    * @param groupId - 群聊ID（如果message是字符串）
    * @param topic - 群聊主题（如果message是字符串）
+   * @param waitForAck - 是否等待确认
    * @returns 发送是否成功
    */
   async sendMessage(
     message: LocalGroupMessage | string,
     groupId?: string | null,
-    topic?: string | null
+    topic?: string | null,
+    waitForAck: boolean = false
   ): Promise<boolean> {
     if (!this.ipfsAvailable) {
       throw new Error('IPFS节点不可用，无法发送消息')
@@ -501,6 +786,12 @@ class LocalIpfsGroupChatService {
       messageObj = message
     }
 
+    this.log(LogLevel.INFO, '发送消息:', { 
+      messageId: messageObj.id, 
+      groupId: messageObj.groupId,
+      type: messageObj.type 
+    })
+
     try {
       // 发布到IPFS PubSub
       await invoke('ipfs_pubsub_publish', {
@@ -514,13 +805,137 @@ class LocalIpfsGroupChatService {
       
       // 保存到KV存储
       await this.saveMessageToKV(messageObj.groupId, messageObj)
+      
+      // 保存到LocalStorage备份
+      this.saveMessageToLocalStorage(messageObj.groupId, messageObj)
+      
+      // 记录消息ID
+      this.recordMessageId(messageObj.groupId, messageObj)
 
-      console.log('[LocalIpfsGroupChatService] 消息发送成功:', messageObj.id)
+      // 标记为已发送
+      messageObj.delivered = true
+
+      // 如果需要等待确认
+      if (waitForAck) {
+        await this.waitForAck(messageObj.id)
+      }
+
+      this.log(LogLevel.INFO, '消息发送成功:', { messageId: messageObj.id })
       return true
 
     } catch (error: any) {
-      console.error('[LocalIpfsGroupChatService] 发送消息失败:', error)
+      this.log(LogLevel.ERROR, '发送消息失败，加入重试队列:', { 
+        messageId: messageObj.id, 
+        error: error.message 
+      })
+      
+      // 加入重试队列
+      this.addToRetryQueue(messageObj)
+      
       throw new Error(`发送消息失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 等待消息确认
+   */
+  private waitForAck(messageId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingAcks.delete(messageId)
+        reject(new Error('消息确认超时'))
+      }, this.ACK_TIMEOUT_MS)
+      
+      this.pendingAcks.set(messageId, { resolve, reject, timeout })
+    })
+  }
+
+  /**
+   * 添加消息到重试队列
+   */
+  private addToRetryQueue(message: LocalGroupMessage): void {
+    this.retryQueue.set(message.id, {
+      message,
+      retries: 0,
+      lastAttempt: Date.now()
+    })
+    this.log(LogLevel.INFO, '消息加入重试队列:', { messageId: message.id })
+  }
+
+  /**
+   * 启动重试处理器
+   */
+  private startRetryProcessor(): void {
+    if (this.retryTimer) {
+      clearInterval(this.retryTimer)
+    }
+    
+    this.retryTimer = setInterval(() => {
+      this.processRetryQueue()
+    }, this.RETRY_DELAY_MS)
+    
+    this.log(LogLevel.INFO, '重试处理器已启动')
+  }
+
+  /**
+   * 处理重试队列
+   */
+  private async processRetryQueue(): Promise<void> {
+    if (this.retryQueue.size === 0) return
+    if (!this.ipfsAvailable) return
+    
+    const now = Date.now()
+    const toRemove: string[] = []
+    
+    for (const [messageId, item] of this.retryQueue.entries()) {
+      // 检查是否到达重试间隔
+      if (now - item.lastAttempt < this.RETRY_DELAY_MS) {
+        continue
+      }
+      
+      // 检查是否超过最大重试次数
+      if (item.retries >= this.MAX_RETRY_ATTEMPTS) {
+        this.log(LogLevel.ERROR, '消息重试次数超限，放弃发送:', { messageId, retries: item.retries })
+        toRemove.push(messageId)
+        continue
+      }
+      
+      try {
+        item.retries++
+        item.lastAttempt = now
+        item.message.retryCount = item.retries
+        
+        this.log(LogLevel.INFO, '重试发送消息:', { messageId, attempt: item.retries })
+        
+        // 重新发送
+        await invoke('ipfs_pubsub_publish', {
+          topic: item.message.topic,
+          message: JSON.stringify(item.message.toJSON()),
+          ipfs_api_url: DEFAULT_IPFS_API
+        })
+        
+        // 发送成功，从队列移除
+        toRemove.push(messageId)
+        
+        // 保存到存储
+        this.saveMessageToMemory(item.message.groupId, item.message)
+        await this.saveMessageToKV(item.message.groupId, item.message)
+        this.saveMessageToLocalStorage(item.message.groupId, item.message)
+        
+        this.log(LogLevel.INFO, '消息重试发送成功:', { messageId })
+        
+      } catch (error: any) {
+        this.log(LogLevel.WARN, '消息重试发送失败:', { 
+          messageId, 
+          attempt: item.retries, 
+          error: error.message 
+        })
+      }
+    }
+    
+    // 移除已处理的消息
+    for (const messageId of toRemove) {
+      this.retryQueue.delete(messageId)
     }
   }
 
@@ -545,12 +960,12 @@ class LocalIpfsGroupChatService {
       await this.sendMessage(systemMessage)
     } catch (error: any) {
       // 系统消息发送失败不影响群聊创建
-      console.warn('[LocalIpfsGroupChatService] 系统消息发送失败:', error.message)
+      this.log(LogLevel.WARN, '系统消息发送失败:', { error: error.message })
     }
   }
 
   /**
-   * 保存消息到内存
+   * 保存消息到内存（带去重和排序）
    */
   saveMessageToMemory(groupId: string, message: LocalGroupMessage): void {
     if (!this.messages.has(groupId)) {
@@ -564,10 +979,19 @@ class LocalIpfsGroupChatService {
     if (existingIndex === -1) {
       messages.push(message)
       
-      // 限制内存中的消息数量（保留最新的100条）
-      if (messages.length > 100) {
-        messages.splice(0, messages.length - 100)
+      // 按时间戳排序，确保消息顺序
+      messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
+      
+      // 限制内存中的消息数量（保留最新的200条）
+      if (messages.length > 200) {
+        messages.splice(0, messages.length - 200)
       }
+      
+      this.log(LogLevel.DEBUG, '消息保存到内存:', { 
+        groupId, 
+        messageId: message.id,
+        totalMessages: messages.length 
+      })
     }
   }
 
@@ -580,9 +1004,12 @@ class LocalIpfsGroupChatService {
         key: `group:${group.groupId}`,
         value: JSON.stringify(group.toJSON())
       })
-      console.log('[LocalIpfsGroupChatService] 群聊已保存到KV:', group.groupId)
+      this.log(LogLevel.DEBUG, '群聊已保存到KV:', { groupId: group.groupId })
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 保存群聊到KV失败:', error.message)
+      this.log(LogLevel.WARN, '保存群聊到KV失败:', { 
+        groupId: group.groupId, 
+        error: error.message 
+      })
     }
   }
 
@@ -596,7 +1023,64 @@ class LocalIpfsGroupChatService {
         value: JSON.stringify(message.toJSON())
       })
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 保存消息到KV失败:', error.message)
+      this.log(LogLevel.WARN, '保存消息到KV失败:', { 
+        groupId, 
+        messageId: message.id, 
+        error: error.message 
+      })
+    }
+  }
+
+  /**
+   * 保存消息到 LocalStorage（关键信息备份）
+   */
+  private saveMessageToLocalStorage(groupId: string, message: LocalGroupMessage): void {
+    try {
+      const storageKey = `alou:groupchat:messages:${groupId}`
+      const existing = localStorage.getItem(storageKey)
+      let messages: any[] = existing ? JSON.parse(existing) : []
+      
+      // 检查是否已存在
+      if (!messages.find((m: any) => m.id === message.id)) {
+        messages.push({
+          id: message.id,
+          groupId: message.groupId,
+          from: message.from,
+          content: message.content.substring(0, 500), // 限制内容长度
+          type: message.type,
+          timestamp: message.timestamp
+        })
+        
+        // 限制数量
+        if (messages.length > 500) {
+          messages = messages.slice(-500)
+        }
+        
+        localStorage.setItem(storageKey, JSON.stringify(messages))
+      }
+    } catch (error: any) {
+      this.log(LogLevel.WARN, '保存消息到LocalStorage失败:', { error: error.message })
+    }
+  }
+
+  /**
+   * 保存群聊信息到 LocalStorage
+   */
+  private async saveToLocalStorage(): Promise<void> {
+    try {
+      const groups = Array.from(this.groups.values()).map(g => ({
+        groupId: g.groupId,
+        groupName: g.groupName,
+        description: g.description,
+        topic: g.topic,
+        memberCount: g.members.length,
+        createdAt: g.createdAt
+      }))
+      
+      localStorage.setItem('alou:groupchat:groups', JSON.stringify(groups))
+      this.log(LogLevel.DEBUG, '群聊信息已保存到LocalStorage:', { count: groups.length })
+    } catch (error: any) {
+      this.log(LogLevel.WARN, '保存群聊到LocalStorage失败:', { error: error.message })
     }
   }
 
@@ -606,7 +1090,7 @@ class LocalIpfsGroupChatService {
   async loadGroupsFromKV(): Promise<void> {
     try {
       const keys: string[] = await invoke('kv_keys', { prefix: 'group:' })
-      console.log(`[LocalIpfsGroupChatService] 找到 ${keys.length} 个群聊数据`)
+      this.log(LogLevel.INFO, '从KV加载群聊数据:', { count: keys.length })
 
       for (const key of keys) {
         try {
@@ -614,16 +1098,21 @@ class LocalIpfsGroupChatService {
           if (value) {
             const group = LocalGroup.fromJSON(JSON.parse(value))
             this.groups.set(group.groupId, group)
+            
+            // 初始化消息ID集合
+            this.messageIdSet.set(group.groupId, new Set())
+            this.messageHashSet.set(group.groupId, new Set())
+            
             await this.loadMessagesFromKV(group.groupId)
           }
         } catch (error: any) {
-          console.warn(`[LocalIpfsGroupChatService] 加载群聊 ${key} 失败:`, error.message)
+          this.log(LogLevel.WARN, `加载群聊失败:`, { key, error: error.message })
         }
       }
 
-      console.log(`[LocalIpfsGroupChatService] 成功加载 ${this.groups.size} 个群聊`)
+      this.log(LogLevel.INFO, '群聊数据加载完成:', { count: this.groups.size })
     } catch (error: any) {
-      console.warn('[LocalIpfsGroupChatService] 从KV加载群聊数据失败:', error.message)
+      this.log(LogLevel.WARN, '从KV加载群聊数据失败:', { error: error.message })
     }
   }
 
@@ -633,6 +1122,7 @@ class LocalIpfsGroupChatService {
   async loadMessagesFromKV(groupId: string): Promise<void> {
     try {
       const keys: string[] = await invoke('kv_keys', { prefix: `message:${groupId}:` })
+      this.log(LogLevel.INFO, '加载群聊消息:', { groupId, count: keys.length })
 
       const messages: LocalGroupMessage[] = []
       for (const key of keys) {
@@ -643,7 +1133,7 @@ class LocalIpfsGroupChatService {
             messages.push(message)
           }
         } catch (error: any) {
-          console.warn(`[LocalIpfsGroupChatService] 加载消息 ${key} 失败:`, error.message)
+          this.log(LogLevel.WARN, `加载消息失败:`, { key, error: error.message })
         }
       }
 
@@ -651,14 +1141,62 @@ class LocalIpfsGroupChatService {
       messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
 
       // 限制内存中的消息数量
-      if (messages.length > 100) {
-        messages.splice(0, messages.length - 100)
+      if (messages.length > 200) {
+        messages.splice(0, messages.length - 200)
       }
 
       this.messages.set(groupId, messages)
-      console.log(`[LocalIpfsGroupChatService] 加载群聊 ${groupId} 的 ${messages.length} 条消息`)
+      
+      // 初始化消息ID集合
+      const idSet = new Set<string>()
+      const hashSet = new Set<string>()
+      messages.forEach(msg => {
+        idSet.add(msg.id)
+        hashSet.add(this.generateMessageHash(msg))
+      })
+      this.messageIdSet.set(groupId, idSet)
+      this.messageHashSet.set(groupId, hashSet)
+      
+      this.log(LogLevel.INFO, '群聊消息加载完成:', { groupId, count: messages.length })
     } catch (error: any) {
-      console.warn(`[LocalIpfsGroupChatService] 加载群聊 ${groupId} 消息失败:`, error.message)
+      this.log(LogLevel.WARN, '加载群聊消息失败:', { groupId, error: error.message })
+    }
+  }
+
+  /**
+   * 从 LocalStorage 加载备份数据
+   */
+  private async loadFromLocalStorage(): Promise<void> {
+    try {
+      // 加载群聊信息
+      const groupsData = localStorage.getItem('alou:groupchat:groups')
+      if (groupsData) {
+        const groups = JSON.parse(groupsData)
+        this.log(LogLevel.INFO, '从LocalStorage加载群聊信息:', { count: groups.length })
+      }
+    } catch (error: any) {
+      this.log(LogLevel.WARN, '从LocalStorage加载数据失败:', { error: error.message })
+    }
+  }
+
+  /**
+   * 分页获取群聊消息
+   */
+  getGroupMessagesPaginated(
+    groupId: string, 
+    pagination: PaginationConfig = { page: 1, pageSize: 50 }
+  ): MessageQueryResult {
+    const allMessages = this.messages.get(groupId) || []
+    const { page, pageSize } = pagination
+    
+    const startIndex = (page - 1) * pageSize
+    const endIndex = startIndex + pageSize
+    const paginatedMessages = allMessages.slice(startIndex, endIndex)
+    
+    return {
+      messages: paginatedMessages,
+      total: allMessages.length,
+      hasMore: endIndex < allMessages.length
     }
   }
 
@@ -670,6 +1208,7 @@ class LocalIpfsGroupChatService {
       this.messageHandlers.set(groupId, new Set())
     }
     this.messageHandlers.get(groupId)!.add(handler)
+    this.log(LogLevel.DEBUG, '添加消息处理器:', { groupId })
   }
 
   /**
@@ -679,11 +1218,12 @@ class LocalIpfsGroupChatService {
     const handlers = this.messageHandlers.get(groupId)
     if (handlers) {
       handlers.delete(handler)
+      this.log(LogLevel.DEBUG, '移除消息处理器:', { groupId })
     }
   }
 
   /**
-   * 获取群聊消息
+   * 获取群聊消息（向后兼容）
    */
   getGroupMessages(groupId: string, limit: number = 50): LocalGroupMessage[] {
     const messages = this.messages.get(groupId) || []
@@ -708,6 +1248,8 @@ class LocalIpfsGroupChatService {
    * 离开群聊
    */
   async leaveGroup(groupId: string): Promise<void> {
+    this.log(LogLevel.INFO, '离开群聊:', { groupId })
+    
     try {
       const group = this.groups.get(groupId)
       if (group && this.localIdentity) {
@@ -747,12 +1289,29 @@ class LocalIpfsGroupChatService {
 
       // 从内存中移除群聊（但保留消息历史）
       this.groups.delete(groupId)
+      
+      // 清理消息ID集合
+      this.messageIdSet.delete(groupId)
+      this.messageHashSet.delete(groupId)
 
-      console.log('[LocalIpfsGroupChatService] 离开群聊成功:', groupId)
+      this.log(LogLevel.INFO, '离开群聊成功:', { groupId })
 
     } catch (error: any) {
-      console.error('[LocalIpfsGroupChatService] 离开群聊失败:', error)
+      this.log(LogLevel.ERROR, '离开群聊失败:', { groupId, error: error.message })
       throw new Error(`离开群聊失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 获取重试队列状态
+   */
+  getRetryQueueStatus(): { size: number; messages: Array<{ id: string; retries: number }> } {
+    return {
+      size: this.retryQueue.size,
+      messages: Array.from(this.retryQueue.entries()).map(([id, item]) => ({
+        id,
+        retries: item.retries
+      }))
     }
   }
 
@@ -760,12 +1319,27 @@ class LocalIpfsGroupChatService {
    * 清理所有订阅
    */
   cleanup(): void {
+    this.log(LogLevel.INFO, '开始清理群聊服务资源')
+    
+    // 停止重试处理器
+    if (this.retryTimer) {
+      clearInterval(this.retryTimer)
+      this.retryTimer = null
+    }
+    
+    // 清理待处理确认
+    for (const [messageId, pending] of this.pendingAcks.entries()) {
+      clearTimeout(pending.timeout)
+      pending.reject(new Error('服务已清理'))
+    }
+    this.pendingAcks.clear()
+
     // 取消所有订阅
     this.subscriptions.forEach((unsubscribe: UnsubscribeFunction, groupId: string) => {
       try {
         unsubscribe()
       } catch (error: any) {
-        console.error('[LocalIpfsGroupChatService] 清理订阅失败:', groupId, error)
+        this.log(LogLevel.ERROR, '清理订阅失败:', { groupId, error: error.message })
       }
     })
 
@@ -774,8 +1348,11 @@ class LocalIpfsGroupChatService {
     this.messageHandlers.clear()
     this.groups.clear()
     this.messages.clear()
+    this.messageIdSet.clear()
+    this.messageHashSet.clear()
+    this.retryQueue.clear()
 
-    console.log('[LocalIpfsGroupChatService] 已清理所有群聊订阅')
+    this.log(LogLevel.INFO, '群聊服务资源已清理')
   }
 }
 

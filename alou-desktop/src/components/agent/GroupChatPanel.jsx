@@ -122,6 +122,11 @@ const GroupChatPanel = ({
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
   const [isClicked, setIsClicked] = useState(false)
   const [messageInput, setMessageInput] = useState('')
+  const [sendError, setSendError] = useState(null) // 添加错误提示状态
+  const [showCreateModal, setShowCreateModal] = useState(false) // 创建群聊模态框
+  const [showJoinModal, setShowJoinModal] = useState(false) // 加入群聊模态框
+  const [newGroupName, setNewGroupName] = useState('') // 新群聊名称
+  const [joinGroupId, setJoinGroupId] = useState('') // 加入群聊 ID
 
   // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
@@ -239,7 +244,7 @@ const GroupChatPanel = ({
       console.log('[GroupChatPanel] 消息发送成功:', messageInput.trim())
     } catch (error) {
       console.error('[GroupChatPanel] 发送消息失败:', error)
-      // 可以在这里显示错误提示
+      setSendError(error.message || '消息发送失败，请重试')
     }
   }, [messageInput, activeGroup, isInitialized, isIpfsAvailable, sendMessage, externalOnSendMessage, clearError])
 
@@ -250,6 +255,54 @@ const GroupChatPanel = ({
       handleSendMessage()
     }
   }, [handleSendMessage])
+
+  // 处理创建群聊
+  const handleCreateGroup = useCallback(async () => {
+    if (!newGroupName.trim()) {
+      setSendError('请输入群聊名称')
+      return
+    }
+
+    try {
+      if (createGroup) {
+        await createGroup({
+          groupName: newGroupName.trim(),
+          description: '新创建的群聊',
+          isPublic: true
+        })
+        setNewGroupName('')
+        setShowCreateModal(false)
+        console.log('[GroupChatPanel] 群聊创建成功:', newGroupName)
+      } else {
+        setSendError('创建群聊功能不可用')
+      }
+    } catch (error) {
+      console.error('[GroupChatPanel] 创建群聊失败:', error)
+      setSendError(error.message || '创建群聊失败，请重试')
+    }
+  }, [newGroupName, createGroup])
+
+  // 处理加入群聊
+  const handleJoinGroup = useCallback(async () => {
+    if (!joinGroupId.trim()) {
+      setSendError('请输入群聊 ID')
+      return
+    }
+
+    try {
+      if (joinGroup) {
+        await joinGroup(joinGroupId.trim())
+        setJoinGroupId('')
+        setShowJoinModal(false)
+        console.log('[GroupChatPanel] 群聊加入成功:', joinGroupId)
+      } else {
+        setSendError('加入群聊功能不可用')
+      }
+    } catch (error) {
+      console.error('[GroupChatPanel] 加入群聊失败:', error)
+      setSendError(error.message || '加入群聊失败，请重试')
+    }
+  }, [joinGroupId, joinGroup])
 
   // 状态显示已移除
 
@@ -277,9 +330,56 @@ const GroupChatPanel = ({
           </div>
         </div>
         <div className="header-right">
-          {/* 状态显示已移除 */}
+          {/* 加载状态指示器 */}
+          {isLoading && (
+            <div className="header-loading-indicator">
+              <div className="loading-spinner"></div>
+              <span>加载中...</span>
+            </div>
+          )}
+          {/* 群聊操作按钮 */}
+          <div className="group-chat-actions">
+            <button
+              type="button"
+              className="action-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowCreateModal(true)
+              }}
+              title={t('agent.groupChat.create') || '创建群聊'}
+            >
+              ➕ 创建
+            </button>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowJoinModal(true)
+              }}
+              title={t('agent.groupChat.join') || '加入群聊'}
+            >
+              🚀 加入
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* 错误提示 */}
+      {sendError && (
+        <div className="send-error-toast">
+          <span className="error-icon">⚠️</span>
+          <span className="error-message">{sendError}</span>
+          <button
+            type="button"
+            className="error-dismiss"
+            onClick={() => setSendError(null)}
+            title="关闭提示"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* 参与智能体列表 - 头像区域 */}
       {actualAgents.length > 0 && (
@@ -335,7 +435,7 @@ const GroupChatPanel = ({
         {groupChatList && groupChatList.length > 0 && (
           <GroupChatArchiveList
             groupChatList={groupChatList}
-            activeActionId={activeActionId}
+            activeActionId={activeChannelId}
             activeChannelId={activeChannelId}
             onSwitchGroupChat={onSwitchGroupChat}
           />
@@ -392,6 +492,72 @@ const GroupChatPanel = ({
             >
               {(isInitialized && isLoading) ? '...' : '→'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 创建群聊模态框 */}
+      {showCreateModal && (
+        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>创建群聊</h3>
+            <input
+              type="text"
+              className="modal-input"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="请输入群聊名称"
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn cancel"
+                onClick={() => setShowCreateModal(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="modal-btn confirm"
+                onClick={handleCreateGroup}
+              >
+                创建
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 加入群聊模态框 */}
+      {showJoinModal && (
+        <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>加入群聊</h3>
+            <input
+              type="text"
+              className="modal-input"
+              value={joinGroupId}
+              onChange={(e) => setJoinGroupId(e.target.value)}
+              placeholder="请输入群聊 ID"
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="modal-btn cancel"
+                onClick={() => setShowJoinModal(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="modal-btn confirm"
+                onClick={handleJoinGroup}
+              >
+                加入
+              </button>
+            </div>
           </div>
         </div>
       )}

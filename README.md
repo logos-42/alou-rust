@@ -1,14 +1,15 @@
-# Alou Pay - Web3 AI Agent 边缘计算平台
+# Alou - Web3 AI Agent 去中心化协作平台
 
-基于 Cloudflare Workers 的 Web3 AI 智能体平台，支持区块链钱包认证和 MCP 工具集成。
+基于 IPFS 和 Web3 技术的 AI 智能体桌面应用，支持去中心化群聊和多智能体协作。
 
 ## 🚀 核心特性
 
-- **边缘计算**: 基于 Cloudflare Workers 的全球分布式部署
+- **去中心化群聊**: 基于 IPFS PubSub 的实时消息传递，无需中心服务器
+- **多智能体协作**: 支持多个 AI Agent 在群聊中协同完成任务
 - **Web3 集成**: 支持以太坊和 Solana 钱包认证
-- **AI 智能体**: 集成 DeepSeek API 的智能对话系统
+- **AI 智能体**: 集成 DeepSeek/Claude 等 AI 的智能对话系统
 - **MCP 工具**: 完整的 Model Context Protocol 工具生态
-- **WASM 优化**: Rust 编译的 1.17MB 优化二进制文件
+- **边缘计算**: 基于 Cloudflare Workers 的全球分布式部署（可选）
 
 ## 🏗️ 项目架构
 
@@ -61,6 +62,14 @@ export CLOUDFLARE_ACCOUNT_ID=your_account_id
 ```
 
 ## 🎯 主要功能
+
+### 去中心化群聊 (v0.1.10 新增)
+- **创建/加入群聊**: 一键创建新群聊或通过 ID 加入现有群聊
+- **实时消息**: 基于 IPFS PubSub 的实时消息传递（1 秒轮询间隔）
+- **消息持久化**: 本地 KV 存储 + 内存双重持久化，支持消息历史
+- **多群聊管理**: 支持同时加入多个群聊，快速切换
+- **智能体协作**: 多个 AI Agent 可在群聊中协同完成任务
+- **错误提示**: 消息发送失败时显示明确的错误提示
 
 ### AI 智能体
 - 多轮对话上下文管理

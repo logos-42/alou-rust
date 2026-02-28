@@ -194,7 +194,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
       const groupMessages = localIpfsGroupChatService.getGroupMessages(groupId)
       setMessages(groupMessages)
 
-      // 添加消息处理器
+      // 添加消息处理器 - 修复：保存 handler 引用以便后续清理
       if (!messageHandlersRef.current.has(groupId)) {
         messageHandlersRef.current.set(groupId, new Set())
       }
@@ -238,7 +238,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
     }
   }, [activeGroup, isInitialized, isIpfsAvailable])
 
-  // 离开群聊
+  // 离开群聊 - 修复消息处理器清理
   const leaveGroup = useCallback(async (groupId: string): Promise<void> => {
     if (!isInitialized) return
 
@@ -257,8 +257,13 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         setMessages([])
       }
 
-      // 清理消息处理器
-      if (messageHandlersRef.current.has(groupId)) {
+      // 清理消息处理器 - 修复：同时清理 service 中的处理器
+      const handlers = messageHandlersRef.current.get(groupId)
+      if (handlers) {
+        // 从 service 中移除所有处理器
+        handlers.forEach(handler => {
+          localIpfsGroupChatService.removeMessageHandler(groupId, handler)
+        })
         messageHandlersRef.current.delete(groupId)
       }
 

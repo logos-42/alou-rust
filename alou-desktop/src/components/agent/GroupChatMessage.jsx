@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { useI18n } from '@/hooks/useI18n'
+import DOMPurify from 'dompurify'
 import './GroupChatMessage.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
@@ -48,14 +49,19 @@ const GroupChatMessage = ({ message }) => {
   const avatarSrc = avatar || DEFAULT_AVATAR
   const displayName = fromName || from || t('agent.groupChat.unknown')
 
-  // 格式化消息内容
+  // 格式化消息内容 - 使用 DOMPurify 防止 XSS
   const formatContent = (text) => {
     if (!text) return ''
-    return text
+    const formatted = text
       .replace(/\n/g, '<br>')
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
+    // 使用 DOMPurify 清理 HTML，防止 XSS 攻击
+    return DOMPurify.sanitize(formatted, {
+      ALLOWED_TAGS: ['br', 'strong', 'em', 'code'],
+      ALLOWED_ATTR: []
+    })
   }
 
   // 系统消息样式

@@ -286,7 +286,7 @@ class PubSubService {
     poll()
 
     // 设置轮询间隔（3秒）
-    const intervalId = setInterval(poll, 3000)
+    const intervalId = setInterval(poll, 1000)
     this.pollingIntervals.set(topic, intervalId)
   }
 
