@@ -386,10 +386,23 @@ const AgentChat = () => {
     }
   }, [channels, selectChannel, openConversationPanel, recordInteraction])
 
-  // ==================== Tool Call Handler (需要先定义，因为 useAgentMessages 需要它) ====================
-  // 注意：这里先创建一个占位函数，实际的 handleToolCalls 会在 messageState 之后更新
-  const handleToolCallsRef = useRef(null)
-  
+  // ==================== Refs for circular dependency ====================
+  const appendMessageRef = useRef(null)
+  const scrollToBottomRef = useRef(null)
+
+  // ==================== Tool Call Handler ====================
+  // 需要在 useAgentMessages 之前定义，因为 useAgentMessages 需要它
+  // 使用 ref 来避免循环依赖
+  const handleToolCalls = useToolCallHandler({
+    handleTransactionBuild,
+    handleTransactionBroadcast,
+    refreshWallet,
+    recordInteraction,
+    appendMessage: (msg) => appendMessageRef.current?.(msg),
+    scrollToBottom: () => scrollToBottomRef.current?.(),
+    openUiResource,
+  })
+
   // ==================== 自动创建智能体 Hook ====================
   // 使用专门的 hook 处理自动创建，便于 SDK 复用
   const autoAgentCreator = useAutoAgentCreator({
@@ -414,12 +427,7 @@ const AgentChat = () => {
     createSession,
     setSessionReady,
     recordInteraction,
-    handleToolCalls: useCallback((toolCalls) => {
-      // 使用 ref 中的实际处理函数
-      if (handleToolCallsRef.current) {
-        handleToolCallsRef.current(toolCalls)
-      }
-    }, []),
+    handleToolCalls, // 直接传递 handleToolCalls
     conversationOverlayRef,
     consoleDockRef,
     contextEventsRef,
@@ -449,21 +457,11 @@ const AgentChat = () => {
     _loadMessagesFromIpfs,
   } = messageState
 
-  // ==================== Tool Call Handler ====================
-  const handleToolCalls = useToolCallHandler({
-    handleTransactionBuild,
-    handleTransactionBroadcast,
-    refreshWallet,
-    recordInteraction,
-    appendMessage,
-    scrollToBottom,
-    openUiResource,
-  })
-  
-  // 使用 useEffect 更新 ref，确保在每次渲染后更新
+  // Update refs after messageState is defined
   useEffect(() => {
-    handleToolCallsRef.current = handleToolCalls
-  }, [handleToolCalls])
+    appendMessageRef.current = appendMessage
+    scrollToBottomRef.current = scrollToBottom
+  }, [appendMessage, scrollToBottom])
 
   // ==================== 7. Invite State Hook ====================
   const inviteState = useAgentInvite({

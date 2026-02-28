@@ -351,6 +351,11 @@ class ToolService {
   /**
    * 标准化工具参数格式
    * 确保参数符合 Rust 后端期望的格式
+   *
+   * Rust 后端期望的格式：
+   * - FileSystem: { operation: "list"|"read"|"write"|..., path: string, ... }
+   * - Bash: { operation: "execute", shell: "bash"|"cmd"|"powershell", command: string, ... }
+   * - Search: { operation: "grep", pattern: string, directory: string, ... }
    */
   private normalizeToolArguments(args: Record<string, any>, toolId: string): Record<string, any> {
     if (!args || typeof args !== 'object') {
@@ -359,10 +364,13 @@ class ToolService {
 
     const n = { ...args }
 
+    // 如果已经有 operation 字段，说明格式已经正确，但仍需确保其他字段完整
+    const hasOperation = n.operation !== undefined
+
     // FileSystem Tool 参数格式转换
     if (toolId === 'filesystem') {
       // 如果没有 operation 字段，根据其他字段推断
-      if (!n.operation) {
+      if (!hasOperation) {
         if (n.content) {
           n.operation = 'write'
         } else if (n.path) {
@@ -371,17 +379,17 @@ class ToolService {
           n.operation = 'list'
         }
       }
-      
+
       // 确保有 path 字段
       if (!n.path && n.operation !== 'write') {
         n.path = '.'
       }
-      
+
       // 确保 create_dirs 字段存在（写操作需要）
       if (n.operation === 'write' && n.create_dirs === undefined) {
         n.create_dirs = true
       }
-      
+
       // 确保 recursive 字段存在（list 操作需要）
       if (n.operation === 'list' && n.recursive === undefined) {
         n.recursive = false
@@ -390,14 +398,17 @@ class ToolService {
 
     // Bash Tool 参数格式转换
     if (toolId === 'bash') {
-      // 必须有 operation 字段
+      // 必须有 operation 字段（小写）
       n.operation = 'execute'
-      
-      // 必须有 shell 字段
+
+      // 必须有 shell 字段（小写）
       if (!n.shell) {
         n.shell = 'bash'
+      } else if (typeof n.shell === 'string') {
+        // 转换为小写格式
+        n.shell = n.shell.toLowerCase()
       }
-      
+
       // 必须有 command 字段
       if (!n.command) {
         // 尝试从其他字段推断
@@ -409,20 +420,45 @@ class ToolService {
           throw new Error('Bash tool requires "command" argument')
         }
       }
-      
+
       // 确保有 timeout_seconds 字段
       if (!n.timeout_seconds) {
         n.timeout_seconds = 30
       }
-      
+
       // 确保 environment 是数组
       if (!n.environment || !Array.isArray(n.environment)) {
         n.environment = []
       }
-      
+
       // working_dir 可选，默认为 null
       if (n.working_dir === undefined) {
         n.working_dir = null
+      }
+    }
+
+    // Search Tool 参数格式转换
+    if (toolId === 'search') {
+      // 如果没有 operation 字段，根据参数推断
+      if (!hasOperation) {
+        n.operation = 'grep'
+      }
+
+      // 将 query 转换为 pattern
+      if (!n.pattern && n.query) {
+        n.pattern = n.query
+        delete n.query
+      }
+
+      // 将 path 转换为 directory
+      if (!n.directory && n.path) {
+        n.directory = n.path
+        delete n.path
+      }
+
+      // 确保有 directory 字段（默认为当前目录）
+      if (!n.directory) {
+        n.directory = '.'
       }
     }
 

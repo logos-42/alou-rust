@@ -351,13 +351,81 @@ class AutonomousAgentService {
   }
 
   /**
+   * 标准化工具参数格式
+   */
+  private normalizeToolParams(toolId: string, params: Record<string, unknown>): Record<string, unknown> {
+    const n = { ...params }
+
+    // FileSystem Tool 参数格式转换
+    if (toolId === 'filesystem') {
+      if (!n.operation) {
+        n.operation = n.content ? 'Write' : 'List'
+      } else {
+        const op = String(n.operation).toLowerCase()
+        const opMap: Record<string, string> = {
+          'read': 'Read',
+          'write': 'Write',
+          'list': 'List',
+          'edit': 'Edit',
+          'delete': 'Delete'
+        }
+        n.operation = opMap[op] || 'List'
+      }
+      if (!n.path && n.operation !== 'Write') {
+        n.path = '.'
+      }
+      if (n.operation === 'Write' && n.create_dirs === undefined) {
+        n.create_dirs = true
+      }
+    }
+
+    // Bash Tool 参数格式转换
+    if (toolId === 'bash') {
+      n.operation = 'Execute'
+      if (!n.shell) {
+        n.shell = 'Bash'
+      } else if (typeof n.shell === 'string') {
+        const shellMap: Record<string, string> = {
+          'bash': 'Bash',
+          'cmd': 'Cmd',
+          'powershell': 'PowerShell'
+        }
+        n.shell = shellMap[n.shell.toLowerCase()] || 'Bash'
+      }
+      if (!n.timeout_seconds) {
+        n.timeout_seconds = 30
+      }
+    }
+
+    // Search Tool 参数格式转换
+    if (toolId === 'search') {
+      if (!n.operation) {
+        n.operation = 'Grep'
+      } else {
+        const op = String(n.operation).toLowerCase()
+        const opMap: Record<string, string> = {
+          'grep': 'Grep',
+          'glob': 'Glob',
+          'find': 'Find'
+        }
+        n.operation = opMap[op] || 'Grep'
+      }
+    }
+
+    return n
+  }
+
+  /**
    * 执行单个工具
    */
   async executeTool(toolId: string, params: Record<string, unknown>): Promise<ExecutionResult | null> {
     try {
+      // 标准化参数格式
+      const normalizedParams = this.normalizeToolParams(toolId, params)
+      
       const result = await invoke<ExecutionResult>('execute_tool', {
         toolId,
-        params,
+        args: JSON.stringify(normalizedParams),
       });
       return result;
     } catch (error) {

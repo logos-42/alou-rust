@@ -891,10 +891,12 @@ export const useAgentMessages = ({
   // 我们在当前活动频道插入进度消息（source='progress'），让用户实时可见
   useEffect(() => {
     let unlisten: (() => void) | null = null
+    // cancelled flag：防止 React 18 Strict Mode 双重挂载导致注册两个监听器
+    let cancelled = false
 
     const setupListener = async () => {
       try {
-        unlisten = await listen<AgentProgressPayload>('agent:progress', (event) => {
+        const fn = await listen<AgentProgressPayload>('agent:progress', (event) => {
           const payload = event.payload
           console.log('[useAgentMessages] 收到进度事件:', payload)
 
@@ -930,6 +932,13 @@ export const useAgentMessages = ({
             conversationOverlayRef.current?.scrollToBottom?.()
           })
         })
+        
+        // Strict Mode 的第一次挂载已经被取消，立即释放
+        if (cancelled) {
+          fn()
+        } else {
+          unlisten = fn
+        }
       } catch (e) {
         console.warn('[useAgentMessages] Tauri listen 不可用（非桌面环境）:', e)
       }
@@ -938,10 +947,12 @@ export const useAgentMessages = ({
     setupListener()
 
     return () => {
+      cancelled = true
       if (unlisten) unlisten()
+      unlisten = null
     }
   // 只需要挂载一次，通过 ref 访问最新的 activeChannelId
-   
+     
   }, [conversationOverlayRef])
 
   // 用 ref 持有最新的 activeChannelId，供 listen 闭包使用（避免陈旧闭包）

@@ -43,23 +43,24 @@ function formatArgsForLogging(args: Record<string, unknown>): string {
 
 /**
  * 转换参数格式为 Rust 后端期望的格式
- *
+ * 
  * Rust 后端期望的格式：
  * - FileSystem: { operation: "list"|"read"|"write"|..., path: string, ... }
  * - Bash: { operation: "execute", shell: "bash"|"cmd"|"powershell", command: string, ... }
- * - Search: { operation: "grep"|"search", pattern: string, directory: string, ... }
  */
 function normalizeToolArguments(
   toolId: string,
   args: Record<string, unknown>
 ): Record<string, unknown> {
-  const normalizedArgs: Record<string, unknown> = { ...args }
-
-  // 如果已经有 operation 字段，说明格式已经正确，但仍需确保其他字段完整
-  const hasOperation = normalizedArgs.operation !== undefined
+  // 如果已经有 operation 字段，说明格式已经正确
+  if ((args as any).operation !== undefined) {
+    return args
+  }
 
   // FileSystem Tool 参数转换
   if (toolId === 'filesystem') {
+    const normalizedArgs: Record<string, unknown> = { ...args }
+    
     // 确保必要的默认值
     if (normalizedArgs.recursive === undefined) {
       normalizedArgs.recursive = false
@@ -67,92 +68,39 @@ function normalizeToolArguments(
     if (normalizedArgs.create_dirs === undefined) {
       normalizedArgs.create_dirs = false
     }
-
+    
     return normalizedArgs
   }
 
   // Bash Tool 参数转换
   if (toolId === 'bash') {
-    // 确保有 operation 字段 - 使用 Rust 枚举格式
+    const normalizedArgs: Record<string, unknown> = { ...args }
+    
+    // 确保有 operation 字段
     if (normalizedArgs.operation === undefined) {
       normalizedArgs.operation = 'execute'
     }
-
-    // 确保有 shell 字段 - 转换为 Rust 枚举大写格式
+    
+    // 确保有 shell 字段
     if (normalizedArgs.shell === undefined) {
-      normalizedArgs.shell = 'Bash'
-    } else if (typeof normalizedArgs.shell === 'string') {
-      const shellMap: Record<string, string> = {
-        'bash': 'Bash',
-        'cmd': 'Cmd',
-        'powershell': 'PowerShell',
-        'python': 'Python',
-        'node': 'Node'
-      }
-      normalizedArgs.shell = shellMap[normalizedArgs.shell.toLowerCase()] || 'Bash'
+      normalizedArgs.shell = 'bash'
     }
-
-    // 确保有 command 字段
-    if (normalizedArgs.command === undefined) {
-      // 尝试从其他字段推断
-      if ((normalizedArgs as any).cmd !== undefined) {
-        normalizedArgs.command = (normalizedArgs as any).cmd
-      } else if ((normalizedArgs as any).script !== undefined) {
-        normalizedArgs.command = (normalizedArgs as any).script
-      }
-    }
-
+    
     // 确保有 timeout_seconds 字段
     if (normalizedArgs.timeout_seconds === undefined) {
       normalizedArgs.timeout_seconds = 30
     }
-
+    
     // 确保 environment 是数组
     if (normalizedArgs.environment === undefined) {
       normalizedArgs.environment = []
     }
-
-    return normalizedArgs
-  }
-
-  // Search Tool 参数转换
-  if (toolId === 'search') {
-    // 如果没有 operation 字段，根据参数推断 - 使用 Rust 枚举格式
-    if (!hasOperation) {
-      normalizedArgs.operation = 'grep'
-    } else {
-      // 转换 operation 为首字母大写
-      const op = String(normalizedArgs.operation).toLowerCase()
-      const opMap: Record<string, string> = {
-        'grep': 'Grep',
-        'glob': 'Glob',
-        'find': 'Find'
-      }
-      normalizedArgs.operation = opMap[op] || 'Grep'
-    }
-
-    // 将 query 转换为 pattern
-    if (normalizedArgs.pattern === undefined && (normalizedArgs as any).query !== undefined) {
-      normalizedArgs.pattern = (normalizedArgs as any).query
-      delete (normalizedArgs as any).query
-    }
-
-    // 将 path 转换为 directory
-    if (normalizedArgs.directory === undefined && (normalizedArgs as any).path !== undefined) {
-      normalizedArgs.directory = (normalizedArgs as any).path
-      delete (normalizedArgs as any).path
-    }
-
-    // 确保有 directory 字段（默认为当前目录）
-    if (normalizedArgs.directory === undefined) {
-      normalizedArgs.directory = '.'
-    }
-
+    
     return normalizedArgs
   }
 
   // 其他工具保持原样
-  return normalizedArgs
+  return args
 }
 
 
