@@ -354,6 +354,99 @@ export const ACTION_LABELS: Record<string, string> = {
   stream_event: '流式事件',
 }
 
+
+/**
+ * 标准化工具调用参数格式
+ * 确保参数符合 Rust 后端期望的格式
+ */
+function normalizeToolCallArguments(
+  args: Record<string, unknown>,
+  toolId: string
+): Record<string, unknown> {
+  if (!args || typeof args !== 'object') {
+    return args;
+  }
+
+  const n = { ...args } as Record<string, unknown>;
+
+  // Bash Tool 参数格式转换 - 强制覆盖所有字段
+  if (toolId === 'bash') {
+    n.operation = 'execute';
+    
+    // Shell 字段必须使用 Rust 枚举的大写形式
+    if (!n.shell) {
+      n.shell = 'Bash';
+    } else if (typeof n.shell === 'string') {
+      const shellMap: Record<string, string> = {
+        'bash': 'Bash',
+        'cmd': 'Cmd',
+        'powershell': 'PowerShell',
+        'python': 'Python',
+        'node': 'Node'
+      };
+      n.shell = shellMap[n.shell.toLowerCase()] || 'Bash';
+    }
+    
+    // 必须有 command 字段
+    if (!n.command) {
+      if (n.cmd) {
+        n.command = n.cmd;
+      } else if (n.script) {
+        n.command = n.script;
+      } else {
+        throw new Error('Bash tool requires "command" argument');
+      }
+    }
+    
+    if (!n.timeout_seconds) {
+      n.timeout_seconds = 30;
+    }
+    
+    if (!n.environment || !Array.isArray(n.environment)) {
+      n.environment = [];
+    }
+    
+    if (n.working_dir === undefined) {
+      n.working_dir = null;
+    }
+  }
+
+  // FileSystem Tool 参数格式转换
+  if (toolId === 'filesystem') {
+    if (!n.operation) {
+      n.operation = n.content ? 'write' : 'list';
+    }
+    if (!n.path && n.operation !== 'write') {
+      n.path = '.';
+    }
+    if (n.operation === 'write' && n.create_dirs === undefined) {
+      n.create_dirs = true;
+    }
+    if (n.operation === 'list' && n.recursive === undefined) {
+      n.recursive = false;
+    }
+  }
+
+  // System Tool 参数格式转换
+  if (toolId === 'system') {
+    if (!n.operation) {
+      n.operation = 'info';
+    }
+  }
+
+  // Search Tool 参数格式转换
+  if (toolId === 'search') {
+    if (!n.operation) {
+      n.operation = n.query ? 'search' : 'list';
+    }
+    if (!n.query && n.operation === 'search') {
+      n.query = '';
+    }
+  }
+
+  return n;
+}
+
 export const useToolCallHandler = ({
   handleTransactionBuild,
   handleTransactionBroadcast,

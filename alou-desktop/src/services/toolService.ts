@@ -149,14 +149,27 @@ function normalizeToolArguments(
   toolId: string,
   args: Record<string, any>
 ): Record<string, any> {
-  // 如果已经有 operation 字段，说明格式已经正确
-  if (args.operation !== undefined) {
-    return args
-  }
+  // 复制参数以避免修改原对象
+  let normalizedArgs: Record<string, any> = { ...args }
 
   // FileSystem Tool 参数转换
   if (toolId === 'filesystem') {
-    const normalizedArgs: Record<string, any> = { ...args }
+    // 确保 operation 字段使用首字母大写
+    if (normalizedArgs.operation !== undefined) {
+      const op = String(normalizedArgs.operation).toLowerCase()
+      const opMap: Record<string, string> = {
+        'read': 'Read',
+        'write': 'Write',
+        'list': 'List',
+        'edit': 'Edit',
+        'delete': 'Delete',
+        'copy': 'Copy',
+        'move': 'Move'
+      }
+      normalizedArgs.operation = opMap[op] || 'List'
+    } else {
+      normalizedArgs.operation = normalizedArgs.content ? 'Write' : 'List'
+    }
     
     // 确保必要的默认值
     if (normalizedArgs.recursive === undefined) {
@@ -171,16 +184,26 @@ function normalizeToolArguments(
 
   // Bash Tool 参数转换
   if (toolId === 'bash') {
-    const normalizedArgs: Record<string, any> = { ...args }
-    
-    // 确保有 operation 字段
-    if (normalizedArgs.operation === undefined) {
-      normalizedArgs.operation = 'execute'
+    // 确保 operation 字段使用首字母大写
+    if (normalizedArgs.operation !== undefined) {
+      const op = String(normalizedArgs.operation).toLowerCase()
+      normalizedArgs.operation = op === 'execute' ? 'Execute' : 'Execute'
+    } else {
+      normalizedArgs.operation = 'Execute'
     }
     
-    // 确保有 shell 字段
-    if (normalizedArgs.shell === undefined) {
-      normalizedArgs.shell = 'bash'
+    // 确保 shell 字段使用首字母大写
+    if (normalizedArgs.shell !== undefined) {
+      const shellMap: Record<string, string> = {
+        'bash': 'Bash',
+        'cmd': 'Cmd',
+        'powershell': 'PowerShell',
+        'python': 'Python',
+        'node': 'Node'
+      }
+      normalizedArgs.shell = shellMap[String(normalizedArgs.shell).toLowerCase()] || 'Bash'
+    } else {
+      normalizedArgs.shell = 'Bash'
     }
     
     // 确保有 timeout_seconds 字段
@@ -197,7 +220,7 @@ function normalizeToolArguments(
   }
 
   // 其他工具保持原样
-  return args
+  return normalizedArgs
 }
 
 

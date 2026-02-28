@@ -227,6 +227,7 @@ impl BashTool {
 
 /// Shell 类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Shell {
     Bash,
     Cmd,
@@ -237,7 +238,7 @@ pub enum Shell {
 
 /// Bash 操作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "operation")]
+#[serde(tag = "operation", rename_all = "lowercase")]
 pub enum BashOperation {
     /// 执行命令
     Execute {

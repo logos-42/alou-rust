@@ -573,7 +573,7 @@ Example usage:
 
 /// 文件操作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "operation")]
+#[serde(tag = "operation", rename_all = "lowercase")]
 pub enum FileOperation {
     /// 读取文件
     Read { path: String },

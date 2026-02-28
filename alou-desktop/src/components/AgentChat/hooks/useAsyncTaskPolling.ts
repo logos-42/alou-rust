@@ -73,9 +73,16 @@ function normalizeToolArguments(
 
   // Bash Tool 参数转换
   if (toolId === 'bash') {
-    // 确保有 operation 字段 - 使用 Rust 枚举格式
+    // 确保有 operation 字段 - 使用 Rust 枚举格式（大写）
     if (normalizedArgs.operation === undefined) {
-      normalizedArgs.operation = 'execute'
+      normalizedArgs.operation = 'Execute'
+    } else {
+      // 转换 operation 为首字母大写
+      const op = String(normalizedArgs.operation).toLowerCase()
+      const opMap: Record<string, string> = {
+        'execute': 'Execute'
+      }
+      normalizedArgs.operation = opMap[op] || 'Execute'
     }
 
     // 确保有 shell 字段 - 转换为 Rust 枚举大写格式

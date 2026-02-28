@@ -373,7 +373,7 @@ Supported glob patterns:
 
 /// 搜索操作
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "operation")]
+#[serde(tag = "operation", rename_all = "lowercase")]
 pub enum SearchOperation {
     /// 文本搜索
     Grep {
