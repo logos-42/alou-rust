@@ -197,6 +197,7 @@ export const useLocalIpfsGroupChatManager = ({
   useEffect(() => {
     if (activeChannelId && loadedChannelRef.current !== activeChannelId) {
       loadedChannelRef.current = activeChannelId
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setIsLoading(true)
 
       // 加载频道的群聊（从本地存储）
