@@ -128,6 +128,7 @@ export const useMultiAgentChat = ({
       registeredAgents.forEach(agent => {
         agentCoordinatorService.registerAgent(agent)
       })
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setCoordinatorReady(true)
     }
 

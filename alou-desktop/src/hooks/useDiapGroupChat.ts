@@ -59,15 +59,22 @@ export const useDiapGroupChat = (options: Record<string, any> = {}): UseDiapGrou
   // 状态同步
   useEffect(() => {
     if (localIpfsGroupChat.isLoading) {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setStatus('loading')
     } else if (localIpfsGroupChat.error) {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setStatus('error')
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setError(localIpfsGroupChat.error)
     } else if (localIpfsGroupChat.isInitialized) {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setStatus('ready')
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setError(null)
     } else {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setStatus('idle')
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setError(null)
     }
   }, [localIpfsGroupChat.isLoading, localIpfsGroupChat.error, localIpfsGroupChat.isInitialized])

@@ -1,7 +1,0 @@
-{
-  "apiKey": "test-key",
-  "prompt": "Hello, world!",
-  "model": "deepseek-chat",
-  "maxTokens": 100,
-  "temperature": 0.7
-}
