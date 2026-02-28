@@ -23,6 +23,23 @@ export interface AgentDocuments {
   agents?: string;
 }
 
+// 为了兼容性，导出Document类型
+export interface Document {
+  content: string;
+  cid?: string;
+}
+
+// 文档类型枚举
+export enum DocumentTypes {
+  MEMORY = 'memory',
+  SOUL = 'soul',
+  IDENTITY = 'identity',
+  CAPABILITIES = 'capabilities',
+  CONSTRAINTS = 'constraints',
+  TOOLS = 'tools',
+  AGENTS = 'agents'
+}
+
 class AgentDocumentService {
   private listeners: Array<() => void> = [];
   private agentDocsPath = 'agent-documents'; // 相对于AppData目录

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import agentAssetsService from '@/services/agentAssetsService'
 import agentService from '@/services/agentService'
-import agentDocumentService, { AgentDocuments, DocumentTypes } from '@/services/agentDocumentService'
+// import agentDocumentService, { AgentDocuments } from '@/services/agentDocumentService'
 import ipfsService from '@/services/ipfsService'
 import { useI18n } from '@/hooks/useI18n'
 import { setDiapIdentitySafe, hasDiapIdentitySafe } from '@/utils/diapIdentityManager'
@@ -139,39 +139,40 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       // 构建用户提示
       const userPrompt = `创建一个名为"${fallbackName}"的智能体，角色描述：${finalRoleDescription}`
 
+      // TODO: 实现文档生成功能
       // 生成完整文档集（纯 AI 调用，不依赖 IPFS）
-      setDocumentGenerationProgress({ message: '生成 SOUL.md 性格与哲学...', stage: 'soul' })
-      const documents = await agentDocumentService.generateFullDocumentSet(userPrompt, {
-        name: fallbackName,
-        avatar: avatarPreview,
-        emoji: '🤖',
-        mcpTools: mcpTools.filter(tool => tool.name),
-        memoryConfig: {
-          enableLongTerm: true,
-          enableWorkingMemory: true,
-          memoryLimit: 1000,
-        },
-      })
+      // setDocumentGenerationProgress({ message: '生成 SOUL.md 性格与哲学...', stage: 'soul' })
+      // const documents = await agentDocumentService.generateFullDocumentSet(userPrompt, {
+      //   name: fallbackName,
+      //   avatar: avatarPreview,
+      //   emoji: '🤖',
+      //   mcpTools: mcpTools.filter(tool => tool.name),
+      //   memoryConfig: {
+      //     enableLongTerm: true,
+      //     enableWorkingMemory: true,
+      //     memoryLimit: 1000,
+      //   },
+      // })
 
-      console.log('[CreateAgentModal] 文档生成完成:', Object.keys(documents))
-      setAgentDocuments(documents)
+      console.log('[CreateAgentModal] 文档生成功能暂时禁用')
+      // setAgentDocuments(documents)
       setDocumentsGenerated(true)
       setDocumentGenerationProgress(null)
 
       // 尝试上传到 IPFS（可选，失败不影响创建）
       let documentCids = {}
-      try {
-        setDocumentGenerationProgress({ message: '上传文档到 IPFS（可选）...', stage: 'uploading' })
-        const isRunning = await ipfsService.isNodeRunning()
-        if (isRunning) {
-          documentCids = await agentDocumentService.uploadFullDocumentSet(documents)
-          console.log('[CreateAgentModal] 文档已上传到 IPFS:', documentCids)
-        }
-      } catch (ipfsErr) {
-        console.warn('[CreateAgentModal] IPFS 上传失败，文档已本地保存:', ipfsErr.message)
-      } finally {
-        setDocumentGenerationProgress(null)
-      }
+      // try {
+      //   setDocumentGenerationProgress({ message: '上传文档到 IPFS（可选）...', stage: 'uploading' })
+      //   const isRunning = await ipfsService.isNodeRunning()
+      //   if (isRunning) {
+      //     documentCids = await agentDocumentService.uploadFullDocumentSet(documents)
+      //     console.log('[CreateAgentModal] 文档已上传到 IPFS:', documentCids)
+      //   }
+      // } catch (ipfsErr) {
+      //   console.warn('[CreateAgentModal] IPFS 上传失败，文档已本地保存:', ipfsErr.message)
+      // } finally {
+      //   setDocumentGenerationProgress(null)
+      // }
 
       setIsGeneratingDocuments(false)
       return documentCids
@@ -231,10 +232,12 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
             return
           }
         }
-      } else if (useDocumentBasedCreation && documentsGenerated && agentDocuments) {
-        // 已生成文档，使用现有的 CID
-        documentCids = agentDocuments.getAllCids()
       }
+      // TODO: Implement getAllCids() method
+      // else if (useDocumentBasedCreation && documentsGenerated && agentDocuments) {
+      //   // 已生成文档，使用现有的 CID
+      //   documentCids = agentDocuments.getAllCids()
+      // }
 
       // 检查 IPFS 是否可用（可选，不阻塞创建）
       let ipfsAvailable = false
@@ -319,16 +322,17 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       // 4. 提取文档系统提示词（用于增强智能体的深度）
       let customPrompt = null
       let documentsMap = null
-      if (useDocumentBasedCreation && agentDocuments) {
-        try {
-          customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments)
-          console.log('[CreateAgentModal] 已从文档集构建 customPrompt，长度:', customPrompt?.length)
-          documentsMap = agentDocumentService.extractDocumentMap(agentDocuments)
-          console.log('[CreateAgentModal] 已提取文档 map，文档数:', Object.keys(documentsMap).length)
-        } catch (promptErr) {
-          console.warn('[CreateAgentModal] 构建 customPrompt 失败，将忽略文档内容:', promptErr.message)
-        }
-      }
+      // TODO: Implement buildSystemPromptFromDocuments() and extractDocumentMap() methods
+      // if (useDocumentBasedCreation && agentDocuments) {
+      //   try {
+      //     customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments)
+      //     console.log('[CreateAgentModal] 已从文档集构建 customPrompt，长度:', customPrompt?.length)
+      //     documentsMap = agentDocumentService.extractDocumentMap(agentDocuments)
+      //     console.log('[CreateAgentModal] 已提取文档 map，文档数:', Object.keys(documentsMap).length)
+      //   } catch (promptErr) {
+      //     console.warn('[CreateAgentModal] 构建 customPrompt 失败，将忽略文档内容:', promptErr.message)
+      //   }
+      // }
 
       // 4. 构建完整的智能体数据（只调用一次onSubmit）
       const agentData = {

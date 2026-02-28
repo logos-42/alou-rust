@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import agentService from '@/services/agentService';
-import agentDocumentService from '@/services/agentDocumentService';
+// import agentDocumentService from '@/services/agentDocumentService';
 import type { AgentInfo } from '@shared/types/services';
 
 interface UseAgentCreationParams {
@@ -108,13 +108,14 @@ export const useAgentCreation = ({
       let documentsMap: Record<string, string> | null = null;
       try {
         console.log('[useAgentCreation] 开始为自动创建的智能体生成文档集...');
-        const userPrompt = `创建一个名为"${parsedName}"的智能体，角色描述：${parsedRoleDescription}`;
-        const agentDocuments = await agentDocumentService.generateFullDocumentSet(userPrompt, {
-          name: parsedName,
-        });
-        customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments);
-        documentsMap = agentDocumentService.extractDocumentMap(agentDocuments);
-        console.log('[useAgentCreation] 文档集生成完成，customPrompt 长度:', customPrompt?.length, '文档数:', Object.keys(documentsMap).length);
+        // TODO: 实现文档生成逻辑
+        // const userPrompt = `创建一个名为"${parsedName}"的智能体，角色描述：${parsedRoleDescription}`;
+        // const agentDocuments = await agentDocumentService.generateFullDocumentSet(userPrompt, {
+        //   name: parsedName,
+        // });
+        // customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments);
+        // documentsMap = agentDocumentService.extractDocumentMap(agentDocuments);
+        console.log('[useAgentCreation] 文档集生成跳过（待实现）');
       } catch (docErr) {
         console.warn('[useAgentCreation] 文档集生成失败，将使用无文档模式:', (docErr as Error).message);
       }
