@@ -159,9 +159,12 @@ impl ToolExecutor for BashTool {
     }
 
     async fn validate_args(&self, args: &serde_json::Value) -> Result<(), ToolError> {
-        if serde_json::from_value::<BashOperation>(args.clone()).is_ok() {
+        println!("[BashTool] validate_args 收到的参数: {:#}", args);
+        if let Ok(op) = serde_json::from_value::<BashOperation>(args.clone()) {
+            println!("[BashTool] validate_args 解析成功: {:?}", op);
             Ok(())
         } else {
+            println!("[BashTool] validate_args 解析失败");
             Err(ToolError::InvalidArguments("Invalid bash operation arguments".to_string()))
         }
     }
