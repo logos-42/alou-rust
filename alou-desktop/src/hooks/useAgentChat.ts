@@ -369,11 +369,11 @@ function normalizeToolCallArguments(
 
   const n = { ...args } as Record<string, unknown>;
 
-  // Bash Tool 参数格式转换 - 强制覆盖所有字段
+  // ========== Bash Tool ==========
   if (toolId === 'bash') {
     n.operation = 'execute';
     
-    // Shell 字段必须使用 Rust 枚举的大写形式
+    // Shell 字段必须使用小写（serde 会自动转换为 Shell::Bash）
     if (!n.shell) {
       n.shell = 'bash';
     } else if (typeof n.shell === 'string') {
@@ -411,16 +411,11 @@ function normalizeToolCallArguments(
     }
   }
 
-  // FileSystem Tool 参数格式转换
-  if (toolId === 'filesystem') {
+  // ========== FileSystem Tool ==========
+  else if (toolId === 'filesystem') {
     if (!n.operation) {
       n.operation = n.content ? 'write' : 'list';
-    } else {
-      // 转换为小写格式以匹配 Rust 枚举
-      n.operation = String(n.operation).toLowerCase();
     }
-    
-    // 确保 path 字段
     if (!n.path && n.operation !== 'write') {
       n.path = '.';
     }
@@ -432,23 +427,128 @@ function normalizeToolCallArguments(
     }
   }
 
-  // System Tool 参数格式转换
-  if (toolId === 'system') {
+  // ========== System Tool ==========
+  else if (toolId === 'system') {
     if (!n.operation) {
       n.operation = 'info';
     }
   }
 
-  // Search Tool 参数格式转换
-  if (toolId === 'search') {
+  // ========== Search Tool ==========
+  else if (toolId === 'search') {
     if (!n.operation) {
-      n.operation = n.query ? 'search' : 'list';
+      n.operation = n.query ? 'grep' : 'list';
     }
-    if (!n.query && n.operation === 'search') {
-      n.query = '';
+    if (!n.pattern && n.operation === 'grep') {
+      n.pattern = n.query || '';
+    }
+    if (!n.directory) {
+      n.directory = '.';
+    }
+    if (n.case_sensitive === undefined) {
+      n.case_sensitive = false;
     }
   }
 
+  // ========== UIControl Tool ==========
+  else if (toolId === 'ui_control') {
+    if (!n.action) {
+      throw new Error('UI control tool requires "action" argument');
+    }
+  }
+
+  // ========== TodoList Tool ==========
+  else if (toolId === 'todolist') {
+    if (!n.action) {
+      n.action = 'list';
+    }
+  }
+
+  // ========== Network Tool ==========
+  else if (toolId === 'network') {
+    if (!n.operation) {
+      n.operation = 'get';
+    }
+    if (!n.url) {
+      throw new Error('Network tool requires "url" argument');
+    }
+  }
+
+  // ========== Browser Tool ==========
+  else if (toolId === 'browser') {
+    if (!n.action) {
+      n.action = 'navigate';
+    }
+    if (!n.url) {
+      throw new Error('Browser tool requires "url" argument');
+    }
+  }
+
+  // ========== Iroh Tool ==========
+  else if (toolId === 'iroh') {
+    if (!n.action) {
+      n.action = 'list';
+    }
+  }
+
+  // ========== PubSub Tool ==========
+  else if (toolId === 'pubsub') {
+    if (!n.action) {
+      n.action = 'subscribe';
+    }
+    if (!n.topic) {
+      throw new Error('PubSub tool requires "topic" argument');
+    }
+  }
+
+  // ========== MessagePassing Tool ==========
+  else if (toolId === 'message_passing') {
+    if (!n.action) {
+      n.action = 'send';
+    }
+    if (!n.recipient) {
+      throw new Error('MessagePassing tool requires "recipient" argument');
+    }
+    if (!n.content) {
+      throw new Error('MessagePassing tool requires "content" argument');
+    }
+  }
+
+  // ========== TaskQueue Tool ==========
+  else if (toolId === 'task_queue') {
+    if (!n.action) {
+      n.action = 'list';
+    }
+  }
+
+  // ========== Rollback Tool ==========
+  else if (toolId === 'rollback') {
+    if (!n.action) {
+      n.action = 'create_snapshot';
+    }
+    if (!n.target_path) {
+      throw new Error('Rollback tool requires "target_path" argument');
+    }
+  }
+
+  // ========== GitHelper Tool ==========
+  else if (toolId === 'git_helper') {
+    if (!n.action) {
+      n.action = 'status';
+    }
+    if (!n.repo_path) {
+      n.repo_path = '.';
+    }
+  }
+
+  // ========== AgentSkills/AgentCollaboration/AgentCreator/ToolCreation/Skills ==========
+  else if (['agent_skills', 'agent_collaboration', 'agent_creator', 'tool_creation', 'skills', 'autonomous_executor'].includes(toolId)) {
+    if (!n.action) {
+      throw new Error(`${toolId} tool requires "action" argument`);
+    }
+  }
+
+  // 其他工具保持原样
   return n;
 }
 

@@ -268,32 +268,66 @@ impl RalphLoopExecutor {
             "search" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "pattern": { "type": "string", "description": "搜索模式" },
-                    "path": { "type": "string", "description": "搜索路径" },
-                    "file_pattern": { "type": "string", "description": "文件匹配模式" }
+                    "operation": { "type": "string", "enum": ["grep", "glob", "find"], "description": "搜索操作类型：grep=文本搜索，glob=文件模式匹配，find=高级查找" },
+                    "pattern": { "type": "string", "description": "搜索模式或文件匹配模式" },
+                    "directory": { "type": "string", "description": "搜索目录" },
+                    "file_pattern": { "type": "string", "description": "文件匹配模式（grep操作可选）" },
+                    "case_sensitive": { "type": "boolean", "description": "是否区分大小写（grep操作，默认false）", "default": false },
+                    "max_results": { "type": "integer", "description": "最大结果数（grep操作可选）" },
+                    "recursive": { "type": "boolean", "description": "是否递归搜索（glob操作，默认false）", "default": false },
+                    "options": { "type": "object", "description": "高级查找选项（find操作）" }
                 },
-                "required": ["pattern", "path"]
+                "required": ["operation", "pattern", "directory"]
             }),
             "git_helper" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["status", "add", "commit", "push", "pull", "branch", "checkout", "log", "diff"], "description": "Git操作" },
-                    "message": { "type": "string", "description": "提交信息" },
-                    "branch_name": { "type": "string", "description": "分支名称" },
-                    "files": { "type": "array", "items": { "type": "string" }, "description": "文件列表" }
+                    "action": { "type": "string", "enum": ["execute", "smart_commit", "create_feature_branch", "safe_merge", "status_check", "diff_summary", "log_history", "stash_management", "get_prompt", "batch_operation", "undo_operation", "remote_sync", "init_repository", "config_management"], "description": "Git操作类型" },
+                    "subcommand": { "type": "string", "description": "Git子命令（execute需要）" },
+                    "args": { "type": "array", "items": { "type": "string" }, "description": "命令参数（execute可选）" },
+                    "working_dir": { "type": "string", "description": "工作目录（可选）" },
+                    "message": { "type": "string", "description": "提交信息（smart_commit/stash_management需要）" },
+                    "add_all": { "type": "boolean", "description": "是否添加所有文件（smart_commit可选）" },
+                    "allow_empty": { "type": "boolean", "description": "是否允许空提交（smart_commit可选）" },
+                    "branch_name": { "type": "string", "description": "分支名称（create_feature_branch需要）" },
+                    "base_branch": { "type": "string", "description": "基础分支（create_feature_branch可选）" },
+                    "source_branch": { "type": "string", "description": "源分支（safe_merge需要）" },
+                    "strategy": { "type": "string", "description": "合并策略（safe_merge可选，默认merge）" },
+                    "detailed": { "type": "boolean", "description": "是否详细输出（status_check可选）" },
+                    "target": { "type": "string", "description": "目标（diff_summary/undo_operation可选）" },
+                    "stat_only": { "type": "boolean", "description": "仅统计（diff_summary可选）" },
+                    "count": { "type": "integer", "description": "日志数量（log_history可选，默认10）" },
+                    "branch": { "type": "string", "description": "分支名称（log_history/remote_sync可选）" },
+                    "format": { "type": "string", "description": "日志格式（log_history可选，默认oneline）" },
+                    "operation": { "type": "string", "description": "操作类型（stash_management/remote_sync/config_management需要）" },
+                    "scenario": { "type": "string", "description": "场景（get_prompt需要）" },
+                    "context": { "type": "object", "description": "上下文（get_prompt可选）" },
+                    "operations": { "type": "array", "description": "批量操作列表（batch_operation需要）" },
+                    "undo_type": { "type": "string", "description": "撤销类型（undo_operation需要）" },
+                    "force": { "type": "boolean", "description": "是否强制（undo_operation可选）" },
+                    "remote": { "type": "string", "description": "远程仓库名（remote_sync可选，默认origin）" },
+                    "path": { "type": "string", "description": "仓库路径（init_repository需要）" },
+                    "initial_branch": { "type": "string", "description": "初始分支名（init_repository可选，默认main）" },
+                    "key": { "type": "string", "description": "配置键（config_management需要）" },
+                    "value": { "type": "string", "description": "配置值（config_management可选）" },
+                    "global": { "type": "boolean", "description": "是否全局配置（config_management可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "network" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["http_get", "http_post", "http_put", "http_delete", "download", "upload"], "description": "网络操作" },
-                    "url": { "type": "string", "description": "URL地址" },
-                    "headers": { "type": "object", "description": "请求头" },
-                    "body": { "type": "string", "description": "请求体" },
-                    "save_path": { "type": "string", "description": "保存路径" }
+                    "operation": { "type": "string", "enum": ["HttpRequest", "DnsLookup", "Ping"], "description": "网络操作类型" },
+                    "method": { "type": "string", "description": "HTTP方法（HttpRequest需要）：GET, POST, PUT, DELETE等" },
+                    "url": { "type": "string", "description": "URL地址（HttpRequest需要）" },
+                    "headers": { "type": "object", "description": "请求头（HttpRequest可选）" },
+                    "body": { "type": "string", "description": "请求体（HttpRequest可选）" },
+                    "timeout": { "type": "integer", "description": "超时时间秒数（HttpRequest可选）" },
+                    "domain": { "type": "string", "description": "域名（DnsLookup需要）" },
+                    "host": { "type": "string", "description": "主机地址（Ping需要）" },
+                    "count": { "type": "integer", "description": "Ping次数（Ping可选，默认4）" }
                 },
-                "required": ["operation", "url"]
+                "required": ["operation"]
             }),
             "system" => serde_json::json!({
                 "type": "object",
@@ -305,23 +339,39 @@ impl RalphLoopExecutor {
             "plan" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["create", "add_step", "update_step", "complete_step", "get_plan", "list_plans"], "description": "计划操作" },
-                    "plan_id": { "type": "string", "description": "计划ID" },
-                    "title": { "type": "string", "description": "计划标题" },
-                    "description": { "type": "string", "description": "计划描述" },
-                    "step_id": { "type": "string", "description": "步骤ID" },
-                    "step_description": { "type": "string", "description": "步骤描述" }
+                    "action": { "type": "string", "enum": ["create_plan", "add_step", "update_step_status", "get_plan", "list_plans", "delete_plan", "analyze_dependencies", "create_todo", "update_todo_status", "list_todos", "delete_todo"], "description": "计划操作类型" },
+                    "name": { "type": "string", "description": "计划名称（create_plan需要）" },
+                    "description": { "type": "string", "description": "描述（create_plan/create_todo需要）" },
+                    "goal": { "type": "string", "description": "目标（create_plan需要）" },
+                    "steps": { "type": "array", "description": "步骤列表（create_plan需要）" },
+                    "plan_id": { "type": "string", "description": "计划ID（add_step/update_step_status/get_plan/delete_plan/analyze_dependencies需要）" },
+                    "step_name": { "type": "string", "description": "步骤名称（add_step需要）" },
+                    "step_description": { "type": "string", "description": "步骤描述（add_step需要）" },
+                    "dependencies": { "type": "array", "items": { "type": "string" }, "description": "依赖步骤ID列表（add_step可选）" },
+                    "estimated_duration": { "type": "integer", "description": "预计时长分钟数（add_step可选）" },
+                    "resources": { "type": "array", "items": { "type": "string" }, "description": "资源列表（add_step可选）" },
+                    "step_id": { "type": "string", "description": "步骤ID（update_step_status需要）" },
+                    "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "paused", "cancelled", "failed"], "description": "状态（update_step_status/update_todo_status需要）" },
+                    "title": { "type": "string", "description": "标题（create_todo需要）" },
+                    "priority": { "type": "string", "enum": ["low", "medium", "high", "urgent"], "description": "优先级（create_todo可选）" },
+                    "due_date": { "type": "integer", "description": "截止日期时间戳（create_todo可选）" },
+                    "todo_id": { "type": "string", "description": "待办ID（update_todo_status/delete_todo需要）" },
+                    "status_filter": { "type": "string", "description": "状态过滤（list_todos可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "todolist" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["add", "complete", "remove", "list", "update"], "description": "待办操作" },
-                    "item_id": { "type": "string", "description": "项目ID" },
-                    "title": { "type": "string", "description": "标题" },
-                    "description": { "type": "string", "description": "描述" },
-                    "priority": { "type": "string", "enum": ["low", "medium", "high"], "description": "优先级" }
+                    "operation": { "type": "string", "enum": ["Create", "Update", "Delete", "Get", "List", "Clear"], "description": "待办操作类型" },
+                    "id": { "type": "string", "description": "待办事项ID（Update/Delete/Get需要）" },
+                    "title": { "type": "string", "description": "标题（Create需要，Update可选）" },
+                    "description": { "type": "string", "description": "描述（Create/Update可选）" },
+                    "priority": { "type": "string", "enum": ["low", "medium", "high"], "description": "优先级（Create/Update可选）" },
+                    "status": { "type": "string", "description": "状态（Update可选）" },
+                    "due_date": { "type": "integer", "description": "截止日期时间戳（Create/Update可选）" },
+                    "status_filter": { "type": "string", "description": "状态过滤（List/Clear可选）" },
+                    "priority_filter": { "type": "string", "description": "优先级过滤（List可选）" }
                 },
                 "required": ["operation"]
             }),
@@ -338,12 +388,15 @@ impl RalphLoopExecutor {
             "agent_collaboration" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["create_session", "join_session", "leave_session", "send_message", "get_messages", "list_sessions"], "description": "协作操作" },
-                    "session_id": { "type": "string", "description": "会话ID" },
-                    "agent_id": { "type": "string", "description": "Agent ID" },
-                    "message": { "type": "string", "description": "消息内容" }
+                    "action": { "type": "string", "enum": ["create_session", "join_session", "leave_session", "send_message", "get_messages", "list_sessions", "get_session_info", "update_session", "delete_session"], "description": "协作操作类型" },
+                    "session_id": { "type": "string", "description": "会话ID（除create_session/list_sessions外都需要）" },
+                    "session_name": { "type": "string", "description": "会话名称（create_session需要）" },
+                    "description": { "type": "string", "description": "会话描述（create_session/update_session可选）" },
+                    "agent_id": { "type": "string", "description": "Agent ID（join_session/leave_session需要）" },
+                    "message": { "type": "string", "description": "消息内容（send_message需要）" },
+                    "limit": { "type": "integer", "description": "消息数量限制（get_messages可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "agent_creator" => serde_json::json!({
                 "type": "object",
@@ -370,81 +423,124 @@ impl RalphLoopExecutor {
             "tool_creation" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["create_tool", "update_tool", "delete_tool", "get_tool", "list_tools", "execute_tool"], "description": "工具创建操作" },
-                    "tool_id": { "type": "string", "description": "工具ID" },
-                    "name": { "type": "string", "description": "名称" },
-                    "description": { "type": "string", "description": "描述" },
-                    "code": { "type": "string", "description": "代码" },
-                    "parameters": { "type": "object", "description": "参数" }
+                    "action": { "type": "string", "enum": ["create", "update", "delete", "get", "list", "execute"], "description": "工具创建操作类型" },
+                    "tool_id": { "type": "string", "description": "工具ID（update/delete/get/execute需要）" },
+                    "name": { "type": "string", "description": "工具名称（create需要）" },
+                    "description": { "type": "string", "description": "工具描述（create需要）" },
+                    "code": { "type": "string", "description": "工具代码（create/update需要）" },
+                    "parameters": { "type": "object", "description": "工具参数schema（create/update可选）" },
+                    "args": { "type": "object", "description": "执行参数（execute需要）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "rollback" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["create_snapshot", "list_snapshots", "rollback", "delete_snapshot"], "description": "回滚操作" },
-                    "snapshot_id": { "type": "string", "description": "快照ID" },
-                    "path": { "type": "string", "description": "路径" },
-                    "description": { "type": "string", "description": "描述" }
+                    "action": { "type": "string", "enum": ["create_snapshot", "create_batch_snapshot", "list_snapshots", "restore_snapshot", "compare_snapshot", "delete_snapshot", "cleanup_snapshots"], "description": "回滚操作类型" },
+                    "target_path": { "type": "string", "description": "目标路径（create_snapshot需要）" },
+                    "name": { "type": "string", "description": "快照名称（create_snapshot需要）" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "标签（create_snapshot/list_snapshots可选）" },
+                    "target_paths": { "type": "array", "items": { "type": "string" }, "description": "多个目标路径（create_batch_snapshot需要）" },
+                    "name_prefix": { "type": "string", "description": "快照名称前缀（create_batch_snapshot需要）" },
+                    "session_id": { "type": "string", "description": "会话ID过滤（list_snapshots可选）" },
+                    "snapshot_id": { "type": "string", "description": "快照ID（restore_snapshot/compare_snapshot/delete_snapshot需要）" },
+                    "restore_path": { "type": "string", "description": "恢复路径（restore_snapshot可选）" },
+                    "force": { "type": "boolean", "description": "是否强制覆盖（restore_snapshot可选）" },
+                    "keep_last": { "type": "integer", "description": "保留最近N个快照（cleanup_snapshots可选）" },
+                    "older_than_days": { "type": "integer", "description": "删除N天前的快照（cleanup_snapshots可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "pubsub" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["publish", "subscribe", "unsubscribe", "list_topics"], "description": "PubSub操作" },
-                    "topic": { "type": "string", "description": "主题" },
-                    "message": { "type": "string", "description": "消息内容" }
+                    "action": { "type": "string", "enum": ["publish", "subscribe", "subscriber_count", "list_topics", "get_history", "create_persistent_topic"], "description": "PubSub操作类型" },
+                    "topic": { "type": "string", "description": "主题名称（除list_topics外都需要）" },
+                    "message": { "type": "string", "description": "消息内容（publish需要）" },
+                    "message_type": { "type": "string", "description": "消息类型（publish可选）" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "消息标签（publish可选）" },
+                    "limit": { "type": "integer", "description": "消息数量限制（subscribe/get_history可选，默认10）" },
+                    "description": { "type": "string", "description": "主题描述（create_persistent_topic可选）" },
+                    "persistent": { "type": "boolean", "description": "是否持久化（create_persistent_topic可选，默认true）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "message_passing" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["send", "receive", "list_queues"], "description": "消息操作" },
-                    "queue": { "type": "string", "description": "队列名称" },
-                    "message": { "type": "string", "description": "消息内容" }
+                    "action": { "type": "string", "enum": ["send_message", "subscribe_topic", "list_topics", "get_message_history", "create_topic"], "description": "消息传递操作类型" },
+                    "topic": { "type": "string", "description": "主题名称（除list_topics外都需要）" },
+                    "content": { "type": "string", "description": "消息内容（send_message需要）" },
+                    "message_type": { "type": "string", "description": "消息类型（send_message可选，默认text）" },
+                    "tags": { "type": "array", "items": { "type": "string" }, "description": "消息标签（send_message可选）" },
+                    "latest_only": { "type": "boolean", "description": "是否仅获取最新消息（subscribe_topic可选，默认false）" },
+                    "limit": { "type": "integer", "description": "消息数量限制（subscribe_topic/get_message_history可选，默认10）" },
+                    "description": { "type": "string", "description": "主题描述（create_topic可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "iroh" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["share_file", "get_file", "list_shares"], "description": "Iroh操作" },
-                    "ticket": { "type": "string", "description": "票据" },
-                    "path": { "type": "string", "description": "文件路径" }
+                    "action": { "type": "string", "enum": ["create_doc", "open_doc", "set", "get", "list_entries", "get_node_id", "connect_to_node", "share_doc_ticket"], "description": "Iroh操作类型" },
+                    "name": { "type": "string", "description": "文档名称（create_doc可选）" },
+                    "doc_id": { "type": "string", "description": "文档ID（open_doc/set/get/list_entries/share_doc_ticket需要）" },
+                    "key": { "type": "string", "description": "键（set/get需要）" },
+                    "value": { "type": "string", "description": "值（set需要）" },
+                    "peer_id": { "type": "string", "description": "对等节点ID（connect_to_node需要）" },
+                    "addr": { "type": "string", "description": "节点地址（connect_to_node可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "ipfs_archive" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["archive", "extract", "list", "pin"], "description": "IPFS归档操作" },
-                    "cid": { "type": "string", "description": "CID" },
-                    "path": { "type": "string", "description": "路径" }
+                    "action": { "type": "string", "enum": ["add", "get", "pin", "unpin", "list_pins", "cat"], "description": "IPFS归档操作类型" },
+                    "path": { "type": "string", "description": "文件路径（add需要）" },
+                    "cid": { "type": "string", "description": "内容ID（get/pin/unpin/cat需要）" },
+                    "output_path": { "type": "string", "description": "输出路径（get可选）" },
+                    "recursive": { "type": "boolean", "description": "是否递归（add可选）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "browser" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["navigate", "click", "type", "screenshot", "get_content", "execute_script"], "description": "浏览器操作" },
-                    "url": { "type": "string", "description": "URL" },
-                    "selector": { "type": "string", "description": "CSS选择器" },
-                    "text": { "type": "string", "description": "文本" },
-                    "script": { "type": "string", "description": "JavaScript代码" }
+                    "action": { "type": "string", "enum": ["open_page", "close_page", "navigate", "refresh", "click_element", "input_text", "get_element_text", "get_page_title", "get_page_url", "take_screenshot", "wait_for_element", "scroll_to_element", "execute_script", "get_page_source", "set_window_size", "open_new_tab", "switch_tab"], "description": "浏览器操作类型" },
+                    "url": { "type": "string", "description": "页面URL（open_page/navigate/open_new_tab需要）" },
+                    "wait_time": { "type": "integer", "description": "等待时间秒数（open_page/click_element可选）" },
+                    "selector": { "type": "string", "description": "元素选择器（click_element/input_text/get_element_text/wait_for_element/scroll_to_element需要）" },
+                    "text": { "type": "string", "description": "输入文本（input_text需要）" },
+                    "clear_first": { "type": "boolean", "description": "是否先清空（input_text可选，默认true）" },
+                    "path": { "type": "string", "description": "截图保存路径（take_screenshot可选）" },
+                    "timeout": { "type": "integer", "description": "超时时间秒数（wait_for_element可选，默认10）" },
+                    "script": { "type": "string", "description": "JavaScript代码（execute_script需要）" },
+                    "width": { "type": "integer", "description": "窗口宽度（set_window_size需要）" },
+                    "height": { "type": "integer", "description": "窗口高度（set_window_size需要）" },
+                    "index": { "type": "integer", "description": "标签页索引（switch_tab需要）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             "ui_control" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "operation": { "type": "string", "enum": ["show_notification", "update_status", "open_dialog", "close_dialog"], "description": "UI控制操作" },
-                    "title": { "type": "string", "description": "标题" },
-                    "message": { "type": "string", "description": "消息" },
-                    "type": { "type": "string", "enum": ["info", "success", "warning", "error"], "description": "类型" }
+                    "action": { "type": "string", "enum": ["click_button", "set_input_text", "get_input_text", "select_dropdown_option", "toggle_checkbox", "select_radio_button", "show_notification", "show_modal", "get_window_state", "set_window_state"], "description": "UI控制操作类型" },
+                    "button_id": { "type": "string", "description": "按钮ID（click_button需要）" },
+                    "params": { "type": "object", "description": "额外参数（click_button可选）" },
+                    "input_id": { "type": "string", "description": "输入框ID（set_input_text/get_input_text需要）" },
+                    "text": { "type": "string", "description": "文本内容（set_input_text需要）" },
+                    "dropdown_id": { "type": "string", "description": "下拉菜单ID（select_dropdown_option需要）" },
+                    "option_value": { "type": "string", "description": "选项值（select_dropdown_option/select_radio_button需要）" },
+                    "checkbox_id": { "type": "string", "description": "复选框ID（toggle_checkbox需要）" },
+                    "radio_group_id": { "type": "string", "description": "单选按钮组ID（select_radio_button需要）" },
+                    "title": { "type": "string", "description": "标题（show_notification/show_modal需要）" },
+                    "message": { "type": "string", "description": "消息内容（show_notification需要）" },
+                    "notification_type": { "type": "string", "enum": ["info", "warning", "error", "success"], "description": "通知类型（show_notification可选）" },
+                    "content": { "type": "string", "description": "对话框内容（show_modal需要）" },
+                    "buttons": { "type": "array", "items": { "type": "string" }, "description": "按钮配置（show_modal可选）" },
+                    "state": { "type": "string", "enum": ["minimized", "maximized", "fullscreen", "normal"], "description": "窗口状态（set_window_state需要）" }
                 },
-                "required": ["operation"]
+                "required": ["action"]
             }),
             _ => serde_json::json!({
                 "type": "object",
@@ -465,10 +561,10 @@ impl RalphLoopExecutor {
             AiTool { name: "system".to_string(), description: "系统信息获取：CPU、内存、磁盘、进程、环境变量".to_string(), parameters: Self::get_tool_parameters("system") },
             AiTool { name: "plan".to_string(), description: "任务计划管理：创建计划、添加步骤、追踪进度".to_string(), parameters: Self::get_tool_parameters("plan") },
             AiTool { name: "todolist".to_string(), description: "待办事项管理：添加、完成、删除、更新待办".to_string(), parameters: Self::get_tool_parameters("todolist") },
-            AiTool { name: "agent_skills".to_string(), description: "Agent技能管理：查看可用技能、执行技能".to_string(), parameters: Self::get_tool_parameters("agent_skills") },
+            AiTool { name: "agent_skills".to_string(), description: "Agent技能管理：discover=扫描可用技能，list=列出已发现的技能，load=加载技能完整内容，execute=执行技能，search=搜索技能。技能是可复用的代码模块，可以自动发现和调用。你应该主动使用discover发现新技能，并在合适的时候execute执行它们。".to_string(), parameters: Self::get_tool_parameters("agent_skills") },
             AiTool { name: "agent_collaboration".to_string(), description: "多Agent协作：创建会话、发送消息、协同工作".to_string(), parameters: Self::get_tool_parameters("agent_collaboration") },
             AiTool { name: "agent_creator".to_string(), description: "Agent创建管理：创建、更新、删除、克隆Agent".to_string(), parameters: Self::get_tool_parameters("agent_creator") },
-            AiTool { name: "agent_document".to_string(), description: "读取或更新自己的身份文档（SOUL.md, MEMORY.md, AGENTS.md 等）。用 update 更新 MEMORY.md 来跨会话记忆重要信息。".to_string(), parameters: Self::get_tool_parameters("agent_document") },
+            AiTool { name: "agent_document".to_string(), description: "读取或更新自己的身份文档（SOUL.md, MEMORY.md, AGENTS.md 等）。用 update 更新 MEMORY.md 来跨会话记忆重要信息。这是你的长期记忆系统，可以记录重要的用户偏好、项目信息、学到的知识等。".to_string(), parameters: Self::get_tool_parameters("agent_document") },
             AiTool { name: "tool_creation".to_string(), description: "动态工具创建：创建、更新、删除自定义工具".to_string(), parameters: Self::get_tool_parameters("tool_creation") },
             AiTool { name: "rollback".to_string(), description: "文件快照与回滚：创建快照、恢复到之前状态".to_string(), parameters: Self::get_tool_parameters("rollback") },
             AiTool { name: "pubsub".to_string(), description: "发布订阅消息系统：发布消息、订阅主题".to_string(), parameters: Self::get_tool_parameters("pubsub") },
