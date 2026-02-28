@@ -128,14 +128,20 @@ export const useGroupChatRemoteControl = ({
             try {
               const { broadcastToAgents } = await import('@/hooks/useMultiAgentChat')
               if (broadcastToAgents) {
-                await broadcastToAgents({
-                  content: text,
-                  from: from,
-                  fromName: userName || from,
-                  timestamp: Date.now(),
-                  groupId: actionId,
-                  type: 'group_chat_message'
-                }, from) // 排除发送者（用户）
+                // 使用第一个智能体作为发送方，或者使用系统标识
+                const systemAgentId = 'system-group-chat'
+                await broadcastToAgents(
+                  systemAgentId,  // fromAgentId: 发送方 ID
+                  {
+                    content: text,
+                    from: from,
+                    fromName: userName || from,
+                    timestamp: Date.now(),
+                    groupId: actionId,
+                    type: 'group_chat_message'
+                  },
+                  from  // excludeAgentId: 排除发送者（用户）
+                )
                 console.log('[useGroupChatRemoteControl] 已广播消息给所有智能体:', agentIds)
               }
             } catch (error) {

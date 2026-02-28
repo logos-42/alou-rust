@@ -10,22 +10,21 @@ import GroupIcon from '@/assets/群组.png'
 export const useGroupChatButton = ({
   showConversationPanel,
   showGroupChat,
-  canOpenGroupChat,
   openGroupChat,
   closeGroupChat,
 }) => {
   const { t } = useI18n()
-  
+
   // 使用 useCallback 确保事件处理函数的稳定性
   const handleToggleGroupChat = useCallback(() => {
-    console.log('[useGroupChatButton] 切换群聊状态:', { showGroupChat, canOpenGroupChat })
+    console.log('[useGroupChatButton] 切换群聊状态:', { showGroupChat })
     if (showGroupChat) {
       closeGroupChat()
     } else {
       openGroupChat()
     }
-  }, [showGroupChat, canOpenGroupChat, openGroupChat, closeGroupChat])
-  
+  }, [showGroupChat, openGroupChat, closeGroupChat])
+
   // 按钮配置 - 使用稳定的函数引用
   const buttonConfig = useMemo(
     () => ({
@@ -33,9 +32,8 @@ export const useGroupChatButton = ({
       onClick: handleToggleGroupChat,
       title: showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
       'aria-label': showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open'),
-      disabled: !canOpenGroupChat && !showGroupChat,
     }),
-    [showGroupChat, canOpenGroupChat, handleToggleGroupChat, t],
+    [showGroupChat, handleToggleGroupChat, t],
   )
 
   // 处理对话面板点击，切换输入目标到智能体

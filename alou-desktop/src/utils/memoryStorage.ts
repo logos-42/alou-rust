@@ -4,6 +4,9 @@
  * 支持会话持久化和数据恢复
  */
 
+// 引入 NodeJS 类型
+import type { Timeout } from 'node:timers';
+
 // ==================== 类型定义 ====================
 
 /**
@@ -69,7 +72,7 @@ class MemoryStorage {
   private maxItems: number = 1000 // 最大存储项目数
   private maxAge: number = 24 * 60 * 60 * 1000 // 24小时过期时间
   private cleanupInterval: number = 5 * 60 * 1000 // 5分钟清理一次过期数据
-  private cleanupTimer: NodeJS.Timeout | null = null
+  private cleanupTimer: Timeout | null = null
 
   constructor() {
     // 启动定期清理

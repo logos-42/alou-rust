@@ -24,9 +24,9 @@ export default defineConfig({
         target: 'http://127.0.0.1:8787', // 代理到本地开发服务器
         changeOrigin: true,
         secure: false,
-        configure: (proxy, options) => {
+        configure: (_proxy, _options) => {
           // 添加CORS头
-          proxy.on('proxyRes', (proxyRes, req, res) => {
+          _proxy.on('proxyRes', (proxyRes, req, res) => {
             // 添加CORS头
             const origin = req.headers.origin
             if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {

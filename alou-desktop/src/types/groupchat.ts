@@ -270,9 +270,10 @@ export enum GroupChatErrorCode {
 }
 
 /**
- * 群聊错误接口
+ * 群聊错误数据接口
+ * 用于 toJSON() 返回类型
  */
-export interface GroupChatError {
+export interface GroupChatErrorData {
   /** 错误代码 */
   code: GroupChatErrorCode | string
   /** 错误消息 */
@@ -309,7 +310,7 @@ export class GroupChatError extends Error {
     this.timestamp = Date.now()
   }
 
-  toJSON(): GroupChatError {
+  toJSON(): GroupChatErrorData {
     return {
       code: this.code,
       message: this.message,

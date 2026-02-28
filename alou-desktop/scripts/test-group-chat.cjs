@@ -72,7 +72,7 @@ async function testGroupChat() {
   // 场景1: 用户@Alou 提问
   console.log(`\n${MAGENTA}--- 场景1: 用户@Alou 提问 ---${RESET}`);
   
-  let chatHistory = [
+  const chatHistory = [
     {
       role: 'system',
       content: `你是 Alou，在群聊中。用户会@你提问。

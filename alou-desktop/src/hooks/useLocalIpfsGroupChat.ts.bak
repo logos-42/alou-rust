@@ -166,13 +166,6 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
       throw new Error('服务未初始化或IPFS不可用')
     }
 
-    // 检查是否有本地身份
-    if (!localIdentity) {
-      const errorMsg = '请先连接钱包或创建身份'
-      setError(errorMsg)
-      throw new Error(errorMsg)
-    }
-
     try {
       setIsLoading(true)
       setError(null)
@@ -191,7 +184,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
     } finally {
       setIsLoading(false)
     }
-  }, [isInitialized, isIpfsAvailable, localIdentity])
+  }, [isInitialized, isIpfsAvailable])
 
   // 加入群聊
   const joinGroup = useCallback(async (groupId: string, topic?: string | null): Promise<LocalGroup> => {
@@ -225,7 +218,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
     } finally {
       setIsLoading(false)
     }
-  }, [isInitialized, isIpfsAvailable, localIdentity])
+  }, [isInitialized, isIpfsAvailable])
 
   // 切换到指定群聊
   const switchToGroup = useCallback(async (groupId: string): Promise<void> => {

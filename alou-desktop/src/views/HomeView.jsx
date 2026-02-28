@@ -1,7 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import AgentChat from '@/components/AgentChat'
-import autonomousLoopService from '@/services/autonomousLoopService'
 
 const HomeView = () => {
   const navigate = useNavigate()

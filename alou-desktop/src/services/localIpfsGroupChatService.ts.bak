@@ -541,6 +541,11 @@ class LocalIpfsGroupChatService {
    * @param groupId - 群聊ID
    * @param topic - 群聊主题（可选）
    * @returns 加入的群聊信息
+  /**
+   * 加入群聊
+   * @param groupId - 群聊 ID
+   * @param topic - 群聊主题（可选）
+   * @returns 加入的群聊信息
    */
   async joinGroup(groupId: string, topic?: string | null): Promise<LocalGroup> {
     this.log(LogLevel.INFO, '加入群聊:', { groupId })
@@ -550,15 +555,12 @@ class LocalIpfsGroupChatService {
     }
 
     // 1. 首先尝试从内存获取群聊
-    let group: LocalGroup | undefined = this.groups.get(groupId)
+    let group = this.groups.get(groupId)
     
     // 2. 如果内存中没有，尝试从 KV 加载
     if (!group) {
       this.log(LogLevel.INFO, '内存中未找到群聊，尝试从 KV 加载:', { groupId })
-      const groupFromKV = await this.loadGroupFromKV(groupId)
-      if (groupFromKV) {
-        group = groupFromKV
-      }
+      group = await this.loadGroupFromKV(groupId)
     }
     
     // 3. 如果 KV 中也没有，创建新的群聊对象（用于加入外部创建的群聊）
@@ -616,15 +618,10 @@ class LocalIpfsGroupChatService {
 
     } catch (error: any) {
       this.log(LogLevel.ERROR, '加入群聊失败:', { groupId, error: error.message })
-      throw new Error(`加入群聊失败: ${error.message}`)
+      throw new Error(`加入群聊失败：${error.message}`)
     }
   }
 
-  /**
-   * 订阅群聊消息
-   * @param groupId - 群聊ID
-   * @param topic - 群聊主题
-   * @returns 取消订阅函数
    */
   async subscribeToGroup(groupId: string, topic: string): Promise<UnsubscribeFunction> {
     if (this.subscriptions.has(groupId)) {
@@ -829,9 +826,6 @@ class LocalIpfsGroupChatService {
         ipfs_api_url: DEFAULT_IPFS_API
       })
 
-      this.log(LogLevel.INFO, 'IPFS 发布成功，准备保存消息:', { messageId: messageObj.id })
-
-      // IPFS 发布成功后才保存
       // 保存到内存
       this.saveMessageToMemory(messageObj.groupId, messageObj)
       
@@ -856,7 +850,7 @@ class LocalIpfsGroupChatService {
       return true
 
     } catch (error: any) {
-      this.log(LogLevel.ERROR, '发送消息失败，不保存到本地:', { 
+      this.log(LogLevel.ERROR, '发送消息失败，加入重试队列:', { 
         messageId: messageObj.id, 
         error: error.message 
       })
@@ -1117,10 +1111,6 @@ class LocalIpfsGroupChatService {
   }
 
   /**
-   * 从 Tauri KV 存储加载群聊数据
-   */
-  
-  /**
    * 从 Tauri KV 存储加载单个群聊
    * @param groupId - 群聊 ID
    * @returns 加载的群聊信息，如果不存在则返回 null
@@ -1152,7 +1142,10 @@ class LocalIpfsGroupChatService {
     }
   }
 
-async loadGroupsFromKV(): Promise<void> {
+  /**
+   * 从 Tauri KV 存储加载群聊数据
+   */
+  async loadGroupsFromKV(): Promise<void> {
     try {
       const keys: string[] = await invoke('kv_keys', { prefix: 'group:' })
       this.log(LogLevel.INFO, '从KV加载群聊数据:', { count: keys.length })

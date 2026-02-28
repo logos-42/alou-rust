@@ -35,6 +35,7 @@ export const NetworkStatus = () => {
 
     // 初始状态检查
     if (!navigator.onLine) {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       handleOffline()
     }
 

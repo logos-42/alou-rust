@@ -108,6 +108,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   useEffect(() => {
     if (!activeChannelId) {
       loadedChannelRef.current = null
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setShowGroupChat(false)
       return
     }
@@ -120,15 +121,18 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     const { actions, activeActionId: storedActiveActionId } = loadChannelGroupChats(activeChannelId)
     if (!activeGroupId) {
       if (storedActiveActionId) {
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setActiveGroupId(storedActiveActionId)
         return
       }
       const firstDiapGroup = diapGroupChat.groups.find(isGroupInActiveChannel)
       if (firstDiapGroup) {
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setActiveGroupId(firstDiapGroup.groupId)
         return
       }
       if (actions.length > 0) {
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setActiveGroupId(actions[0].action_id)
       }
     }
@@ -450,6 +454,18 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     return actions.find((action) => action.action_id === activeGroupId) || getActiveAction(activeChannelId)
   }, [activeChannelId, activeGroupId, getActions, getActiveAction])
 
+  // 检查是否可以打开群聊 - 基于实际状态验证
+  const canOpenGroupChat = useMemo(() => {
+    // 检查是否有活跃的群聊
+    const hasActiveGroup = activeGroupId && typeof activeGroupId === 'string' && activeGroupId.startsWith('local_group_')
+    // 检查 IPFS 是否可用
+    const isIpfsReady = diapGroupChat.isInitialized && diapGroupChat.isIpfsAvailable
+    // 检查身份是否存在
+    const hasIdentity = localIdentity !== null
+    
+    return hasActiveGroup && isIpfsReady && hasIdentity
+  }, [activeGroupId, diapGroupChat.isInitialized, diapGroupChat.isIpfsAvailable, localIdentity])
+
   return {
     // 状态
     showGroupChat,
@@ -477,8 +493,8 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     deleteGroupChat,
     setSplitPosition,
     hasActiveAction: !!activeGroupId,
-    // 允许无频道时也能打开群聊（会自动创建或使用默认群聊）
-    canOpenGroupChat: true,
+    // 基于实际状态验证是否可以打开群聊
+    canOpenGroupChat,
 
     // 兼容原有接口
     getActions,

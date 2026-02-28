@@ -3,6 +3,7 @@
  * 使用 IPFS PubSub 或 WebSocket 实现实时消息传递
  */
 import { invoke } from '@tauri-apps/api/core'
+import type { Timeout } from 'node:timers'
 
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 
@@ -102,7 +103,7 @@ export type MessageCallback = (message: PubSubMessage) => void
 
 class PubSubService {
   private subscriptions: Map<string, Set<MessageCallback>>
-  private pollingIntervals: Map<string, NodeJS.Timeout>
+  private pollingIntervals: Map<string, Timeout>
   private lastMessageTimestamp: Map<string, number>
   private isConnected: boolean
   private localIdentity: LocalIdentity | null

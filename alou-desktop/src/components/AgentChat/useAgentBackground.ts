@@ -21,8 +21,10 @@ export const useAgentBackground = (activeChannelId: string | null = null) => {
     if (typeof localStorage !== 'undefined') {
       const storageKey = getBackgroundStorageKey(activeChannelId)
       const stored = localStorage.getItem(storageKey) || ''
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setChatBackground(stored)
     } else {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setChatBackground('')
     }
   }, [activeChannelId, getBackgroundStorageKey])

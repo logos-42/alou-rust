@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react'
 import { useSubscription } from '@/hooks/useSubscription'
-import subscriptionService from '@/services/subscriptionService'
 import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
 import './SubscriptionView.css'
@@ -9,7 +8,6 @@ const SubscriptionView = () => {
   const { t } = useI18n()
   const { subscription, trial, plans, loading, isPremium, isTrial, daysRemaining, trialDaysRemaining, refresh } = useSubscription()
   const walletAddress = useAuthStore((state) => state.walletAddress)
-  const userId = useAuthStore((state) => state.userId) || walletAddress
   const [selectedPlan, setSelectedPlan] = useState(null)
   const [paymentStatus, setPaymentStatus] = useState(null)
 

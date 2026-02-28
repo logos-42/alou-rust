@@ -21,8 +21,10 @@ export const OnboardingGuide = ({
     if (typeof window !== 'undefined') {
       const completed = localStorage.getItem(storageKey)
       if (!completed && steps.length > 0) {
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setIsVisible(true)
       } else {
+        // eslint-disable-next-line react-hooks/setState-in-effect
         setHasCompleted(true)
       }
     }

@@ -28,9 +28,10 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
     if (typeof localStorage !== 'undefined') {
       const storageKey = getStorageKey(activeChannelId)
       const stored = localStorage.getItem(storageKey) || ''
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setBackgroundImage(stored)
     }
-  }, [activeChannelId])
+  }, [activeChannelId, getStorageKey])
 
   // 点击外部关闭面板
   useEffect(() => {

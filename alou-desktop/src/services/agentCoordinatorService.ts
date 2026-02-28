@@ -603,9 +603,14 @@ class AgentCoordinatorService {
 
     try {
       await pubsubService.publish(assignmentMessage.topic, assignmentMessage);
+      this.log('任务分配消息发送成功:', { taskId: task.id, agentId: agent.id });
     } catch (error: any) {
       this.log('发送任务分配消息失败:', { error: error.message });
     }
+
+    // 发送任务分配后，更新任务状态为已分配
+    this.updateTaskStatus(task.id, TaskStatus.ASSIGNED, null, undefined);
+    this.log('任务状态已更新为已分配:', { taskId: task.id, assignee: agent.id });
   }
 
   /**
@@ -778,8 +783,11 @@ class AgentCoordinatorService {
 
   /**
    * 广播消息给所有智能体
+   * @param fromAgentId 发送方智能体ID
+   * @param message 消息内容
+   * @param excludeAgentId 排除的智能体ID（可选）
    */
-  async broadcastToAgents(message: string, excludeAgentId: string | null = null): Promise<Array<{ agentId: string; success: boolean }>> {
+  async broadcastToAgents(fromAgentId: string, message: string, excludeAgentId: string | null = null): Promise<Array<{ agentId: string; success: boolean }>> {
     const agents = Array.from(this.registeredAgents.values()).filter(
       a => a.status !== AgentStatus.OFFLINE
     );
@@ -788,7 +796,7 @@ class AgentCoordinatorService {
     for (const agent of agents) {
       if (agent.id === excludeAgentId) continue;
 
-      const success = await this.sendAgentMessage(excludeAgentId || '', agent.id, message);
+      const success = await this.sendAgentMessage(fromAgentId, agent.id, message);
       results.push({ agentId: agent.id, success });
     }
 

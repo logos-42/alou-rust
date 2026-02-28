@@ -143,6 +143,7 @@ export const useI18n = (): UseI18nReturn => {
 
   useEffect(() => {
     initLanguageInternal()
+    // eslint-disable-next-line react-hooks/setState-in-effect
     setLang(currentLanguage)
 
     const listener: LanguageListener = (nextLang) => setLang(nextLang)

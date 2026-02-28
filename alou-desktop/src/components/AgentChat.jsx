@@ -600,7 +600,6 @@ const AgentChat = () => {
   const { ConversationPanelWrapper } = useGroupChatButton({
     showConversationPanel,
     showGroupChat,
-    canOpenGroupChat,
     openGroupChat,
     closeGroupChat,
   })

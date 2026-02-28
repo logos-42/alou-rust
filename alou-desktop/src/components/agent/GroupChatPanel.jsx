@@ -480,14 +480,14 @@ const GroupChatPanel = ({
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="输入消息..."
-              disabled={isInitialized && isLoading}
+              placeholder={isIpfsAvailable ? "输入消息..." : "IPFS 不可用"}
+              disabled={!isIpfsAvailable || isLoading}
             />
             <button
               type="button"
               className="send-button"
               onClick={handleSendMessage}
-              disabled={!messageInput.trim() || (isInitialized && isLoading)}
+              disabled={!messageInput.trim() || (isInitialized && isLoading) || !isIpfsAvailable}
               title="发送消息 (Enter)"
             >
               {(isInitialized && isLoading) ? '...' : '→'}

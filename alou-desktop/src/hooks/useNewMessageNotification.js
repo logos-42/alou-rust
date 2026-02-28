@@ -31,6 +31,7 @@ export const useNewMessageNotification = (options = {}) => {
     }
 
     if (browserNotification && 'Notification' in window) {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setPermission(Notification.permission)
     }
   }, [soundEnabled, soundUrl, browserNotification])

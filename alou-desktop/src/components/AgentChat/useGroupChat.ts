@@ -66,7 +66,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
 
   const subscriptionRef = useRef<NodeJS.Timeout | null>(null)
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const lastTimestampRef = useRef<number>(Date.now())
+  const lastTimestampRef = useRef<number>(0)
   const unsubscribeMessagesRef = useRef<(() => void) | null>(null)
   const unsubscribeStatusRef = useRef<(() => void) | null>(null)
 

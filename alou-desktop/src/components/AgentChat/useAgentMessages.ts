@@ -9,6 +9,7 @@ import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
 import type { ClusterActionStore } from '@/stores/clusterActionStore.types'
+import clusterActionStore from '@/stores/clusterActionStore'
 
 // ── Tauri 进度事件类型 ──────────────────────────────────────────
 interface AgentProgressPayload {
@@ -256,7 +257,7 @@ export const useAgentMessages = ({
   }, [conversationOverlayRef])
 
   // 使用子Hook（在所有依赖函数定义之后）
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const { pollAsyncTask: _pollAsyncTask, cancelPolling } = useAsyncTaskPolling({
     appendMessage: (message: unknown, agentId: string) => appendMessage(message as Message, agentId),
     scrollToBottom,
@@ -369,7 +370,7 @@ export const useAgentMessages = ({
     recordInteraction('user_message', { content: text, agentId: targetAgentId })
     scrollToBottom()
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const contextSnapshot = contextEventsRef.current?.splice(0, contextEventsRef.current.length) || []
     void contextSnapshot // clear context events even though not passed to local AI
 
@@ -470,9 +471,9 @@ export const useAgentMessages = ({
           id: localApiConfig.id || 'primary',
           provider: localApiConfig.provider,
           api_key: localApiConfig.api_key,
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+           
           base_url: localApiConfig.base_url != null ? localApiConfig.base_url : null,
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+           
           model: localApiConfig.model != null ? localApiConfig.model : null,
           is_active: true,
         },
@@ -795,8 +796,7 @@ export const useAgentMessages = ({
         console.log('[useAgentMessages] 智能体回复群聊消息，同步到群聊:', groupId, lastMessage)
         
         try {
-          const store = require('@/stores/clusterActionStore') as { default: ClusterActionStore }
-          const { addGroupChatMessage } = store.default
+          const { addGroupChatMessage } = clusterActionStore
           const groupReplyMessage = {
             id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             type: 'agent' as const,
@@ -882,7 +882,7 @@ export const useAgentMessages = ({
       }
     }
   // 只挂载一次；通过 onAutoCreateAgentRef 访问最新回调
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [])
 
   // ── 监听 Rust 发来的 agent:progress 进度事件 ──────────────────────────────
@@ -940,7 +940,7 @@ export const useAgentMessages = ({
       if (unlisten) unlisten()
     }
   // 只需要挂载一次，通过 ref 访问最新的 activeChannelId
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [conversationOverlayRef])
 
   // 用 ref 持有最新的 activeChannelId，供 listen 闭包使用（避免陈旧闭包）
@@ -1003,7 +1003,7 @@ export const useAgentMessages = ({
       }
     }
   // 只挂载一次；通过 ref 获取最新 activeChannelId
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, [])
 
   /**

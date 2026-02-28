@@ -434,15 +434,6 @@ export interface WalletSyncStatus {
   error?: string;
 }
 
-// 通用服务响应类型
-export interface ServiceResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-  timestamp: string;
-}
-
 // 分页请求类型
 export interface ServicePaginationParams {
   page?: number;

@@ -313,9 +313,16 @@ export const useMultiAgentChat = ({
 
   /**
    * 广播消息给所有智能体
+   * @param fromAgentId 发送方智能体 ID
+   * @param message 消息内容
+   * @param excludeAgentId 排除的智能体 ID（可选）
    */
-  const broadcastToAgents = useCallback(async (message: any, excludeAgentId: string | null = null): Promise<any> => {
-    return agentCoordinatorService.broadcastToAgents(message, excludeAgentId)
+  const broadcastToAgents = useCallback(async (
+    fromAgentId: string,
+    message: any,
+    excludeAgentId: string | null = null
+  ): Promise<any> => {
+    return agentCoordinatorService.broadcastToAgents(fromAgentId, message, excludeAgentId)
   }, [])
 
   /**

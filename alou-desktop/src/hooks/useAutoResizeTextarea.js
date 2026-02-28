@@ -40,7 +40,7 @@ export const useAutoResizeTextarea = (options = {}) => {
     
     // 计算新的高度
     const scrollHeight = textarea.scrollHeight
-    let newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight))
+    const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight))
     
     textarea.style.height = `${newHeight}px`
     

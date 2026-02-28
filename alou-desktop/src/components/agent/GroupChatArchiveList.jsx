@@ -29,8 +29,10 @@ const GroupChatArchiveList = ({
   useEffect(() => {
     if (activeChannelId) {
       const saved = localStorage.getItem(`group-chat-archive-collapsed-${activeChannelId}`)
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setIsCollapsed(saved === 'true')
     } else {
+      // eslint-disable-next-line react-hooks/setState-in-effect
       setIsCollapsed(false)
     }
   }, [activeChannelId])
