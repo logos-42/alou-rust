@@ -28,6 +28,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.39",
     "@mcp-ui/client": "^6.0.0",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-fs": "^2.4.5",
     "@walletconnect/ethereum-provider": "^2.23.5",
     "@walletconnect/types": "^2.23.5",
     "axios": "^1.13.5",

@@ -58,7 +58,7 @@ pub async fn add_tool_routes(
     router
         .route("/api/tools/execute", post(execute_tool))
         .route("/api/tools/list", get(list_tools))
-        .route("/api/tools/:tool_id/execute", post(execute_tool_by_id))
+        .route("/api/tools/{tool_id}/execute", post(execute_tool_by_id))
         .layer(cors)
 }
 
