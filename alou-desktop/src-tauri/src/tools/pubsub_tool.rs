@@ -61,6 +61,51 @@ pub enum PubSubOperation {
         /// 是否持久化 (可选，默认为 true)
         persistent: Option<bool>,
     },
+    
+    /// 创建群聊
+    #[serde(rename = "create_group")]
+    CreateGroup {
+        /// 群聊名称
+        group_name: String,
+        /// 群聊描述 (可选)
+        description: Option<String>,
+        /// 初始成员列表 (可选)
+        members: Option<Vec<String>>,
+    },
+    
+    /// 加入群聊
+    #[serde(rename = "join_group")]
+    JoinGroup {
+        /// 群聊 ID 或主题
+        group_id: String,
+    },
+    
+    /// 离开群聊
+    #[serde(rename = "leave_group")]
+    LeaveGroup {
+        /// 群聊 ID 或主题
+        group_id: String,
+    },
+    
+    /// 发送群聊消息
+    #[serde(rename = "send_group_message")]
+    SendGroupMessage {
+        /// 群聊 ID 或主题
+        group_id: String,
+        /// 消息内容
+        message: String,
+    },
+    
+    /// 获取群聊信息
+    #[serde(rename = "get_group_info")]
+    GetGroupInfo {
+        /// 群聊 ID
+        group_id: String,
+    },
+    
+    /// 列出所有群聊
+    #[serde(rename = "list_groups")]
+    ListGroups {},
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +140,8 @@ pub struct PubSubClient {
     topics: HashMap<String, TopicData>,
     message_history: HashMap<String, Vec<PubSubMessage>>,
     node_id: String,
+    groups: HashMap<String, GroupInfo>,
+    group_messages: HashMap<String, Vec<GroupMessage>>,
 }
 
 #[derive(Clone, Debug)]
@@ -117,12 +164,35 @@ struct PubSubMessage {
     tags: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GroupInfo {
+    group_id: String,
+    group_name: String,
+    topic: String,
+    description: Option<String>,
+    members: Vec<String>,
+    created_at: i64,
+    created_by: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct GroupMessage {
+    id: String,
+    group_id: String,
+    sender: String,
+    content: String,
+    message_type: String,
+    timestamp: i64,
+}
+
 impl PubSubClient {
     pub fn new() -> Self {
         Self {
             topics: HashMap::new(),
             message_history: HashMap::new(),
             node_id: format!("pubsub_node_{}", Uuid::new_v4().to_string()[..8].to_uppercase()),
+            groups: HashMap::new(),
+            group_messages: HashMap::new(),
         }
     }
 
@@ -223,6 +293,103 @@ impl PubSubClient {
         self.message_history.insert(name.to_string(), Vec::new());
         
         Ok(())
+    }
+    
+    // ============ 群聊相关方法 ============
+    
+    pub async fn create_group(
+        &mut self,
+        group_name: String,
+        description: Option<String>,
+        members: Option<Vec<String>>,
+    ) -> Result<GroupInfo, String> {
+        let group_id = format!("group_{}", Uuid::new_v4().to_string()[..8].to_uppercase());
+        let topic = format!("diap/group/{}", group_id);
+        
+        let group_info = GroupInfo {
+            group_id: group_id.clone(),
+            group_name: group_name.clone(),
+            topic: topic.clone(),
+            description: description.clone(),
+            members: members.unwrap_or_default(),
+            created_at: chrono::Utc::now().timestamp(),
+            created_by: self.node_id.clone(),
+        };
+        
+        // 存储群聊信息
+        self.groups.insert(group_id.clone(), group_info.clone());
+        
+        // 创建对应的 topic
+        self.create_topic(&topic, description, true).await?;
+        
+        // 初始化群聊消息列表
+        self.group_messages.insert(group_id.clone(), Vec::new());
+        
+        Ok(group_info)
+    }
+    
+    pub async fn join_group(&mut self, group_id: &str) -> Result<GroupInfo, String> {
+        if let Some(group) = self.groups.get(group_id) {
+            Ok(group.clone())
+        } else {
+            // 尝试作为 topic 查找
+            if group_id.starts_with("diap/group/") {
+                let group_id_from_topic = group_id.strip_prefix("diap/group/").unwrap_or(group_id);
+                if let Some(group) = self.groups.get(group_id_from_topic) {
+                    return Ok(group.clone());
+                }
+            }
+            Err(format!("Group '{}' not found", group_id))
+        }
+    }
+    
+    pub async fn leave_group(&mut self, group_id: &str) -> Result<(), String> {
+        if self.groups.contains_key(group_id) {
+            self.groups.remove(group_id);
+            self.group_messages.remove(group_id);
+            Ok(())
+        } else {
+            Err(format!("Group '{}' not found", group_id))
+        }
+    }
+    
+    pub async fn send_group_message(
+        &mut self,
+        group_id: &str,
+        message: String,
+    ) -> Result<String, String> {
+        // 确保群聊存在
+        if !self.groups.contains_key(group_id) {
+            return Err(format!("Group '{}' not found", group_id));
+        }
+        
+        let group_msg = GroupMessage {
+            id: format!("gm_{}", Uuid::new_v4().to_string()[..8].to_uppercase()),
+            group_id: group_id.to_string(),
+            sender: self.node_id.clone(),
+            content: message.clone(),
+            message_type: "chat".to_string(),
+            timestamp: chrono::Utc::now().timestamp(),
+        };
+        
+        // 添加到群聊消息历史
+        self.group_messages.entry(group_id.to_string()).or_insert_with(Vec::new).push(group_msg.clone());
+        
+        // 同时发布到 topic
+        let topic = format!("diap/group/{}", group_id);
+        let _ = self.publish(&topic, message, Some("group_chat".to_string()), None).await;
+        
+        Ok(group_msg.id)
+    }
+    
+    pub async fn get_group_info(&self, group_id: &str) -> Result<GroupInfo, String> {
+        self.groups.get(group_id)
+            .cloned()
+            .ok_or_else(|| format!("Group '{}' not found", group_id))
+    }
+    
+    pub async fn list_groups(&self) -> Vec<GroupInfo> {
+        self.groups.values().cloned().collect()
     }
 }
 
@@ -424,6 +591,161 @@ impl PubSubTool {
                     }
                 }
             }
+
+            // ============ 群聊操作 ============
+            
+            PubSubOperation::CreateGroup { group_name, description, members } => {
+                match client.create_group(group_name.clone(), description, members).await {
+                    Ok(group) => {
+                        Ok(PubSubResult {
+                            success: true,
+                            message: format!("Successfully created group: {}", group_name),
+                            data: Some(serde_json::json!({
+                                "group_id": group.group_id,
+                                "group_name": group.group_name,
+                                "topic": group.topic,
+                                "members": group.members,
+                                "created_at": group.created_at
+                            })),
+                            output: Some(format!("Created new group '{}' with ID: {}, topic: {}", group_name, group.group_id, group.topic)),
+                        })
+                    }
+                    Err(e) => {
+                        Ok(PubSubResult {
+                            success: false,
+                            message: format!("Failed to create group: {}", e),
+                            data: None,
+                            output: Some(format!("Error creating group: {}", e)),
+                        })
+                    }
+                }
+            }
+
+            PubSubOperation::JoinGroup { group_id } => {
+                match client.join_group(&group_id).await {
+                    Ok(group) => {
+                        Ok(PubSubResult {
+                            success: true,
+                            message: format!("Successfully joined group: {}", group.group_name),
+                            data: Some(serde_json::json!({
+                                "group_id": group.group_id,
+                                "group_name": group.group_name,
+                                "topic": group.topic,
+                                "members": group.members
+                            })),
+                            output: Some(format!("Joined group '{}' (ID: {})", group.group_name, group.group_id)),
+                        })
+                    }
+                    Err(e) => {
+                        Ok(PubSubResult {
+                            success: false,
+                            message: format!("Failed to join group: {}", e),
+                            data: None,
+                            output: Some(format!("Error joining group: {}", e)),
+                        })
+                    }
+                }
+            }
+
+            PubSubOperation::LeaveGroup { group_id } => {
+                match client.leave_group(&group_id).await {
+                    Ok(_) => {
+                        Ok(PubSubResult {
+                            success: true,
+                            message: format!("Successfully left group: {}", group_id),
+                            data: Some(serde_json::json!({
+                                "group_id": group_id
+                            })),
+                            output: Some(format!("Left group: {}", group_id)),
+                        })
+                    }
+                    Err(e) => {
+                        Ok(PubSubResult {
+                            success: false,
+                            message: format!("Failed to leave group: {}", e),
+                            data: None,
+                            output: Some(format!("Error leaving group: {}", e)),
+                        })
+                    }
+                }
+            }
+
+            PubSubOperation::SendGroupMessage { group_id, message } => {
+                match client.send_group_message(&group_id, message.clone()).await {
+                    Ok(message_id) => {
+                        Ok(PubSubResult {
+                            success: true,
+                            message: format!("Successfully sent message to group"),
+                            data: Some(serde_json::json!({
+                                "group_id": group_id,
+                                "message_id": message_id,
+                                "message": message
+                            })),
+                            output: Some(format!("Sent message to group '{}': {}", group_id, message)),
+                        })
+                    }
+                    Err(e) => {
+                        Ok(PubSubResult {
+                            success: false,
+                            message: format!("Failed to send message: {}", e),
+                            data: None,
+                            output: Some(format!("Error sending message: {}", e)),
+                        })
+                    }
+                }
+            }
+
+            PubSubOperation::GetGroupInfo { group_id } => {
+                match client.get_group_info(&group_id).await {
+                    Ok(group) => {
+                        Ok(PubSubResult {
+                            success: true,
+                            message: format!("Successfully got group info: {}", group.group_name),
+                            data: Some(serde_json::json!({
+                                "group_id": group.group_id,
+                                "group_name": group.group_name,
+                                "topic": group.topic,
+                                "description": group.description,
+                                "members": group.members,
+                                "created_at": group.created_at,
+                                "created_by": group.created_by
+                            })),
+                            output: Some(format!("Group '{}': {} members", group.group_name, group.members.len())),
+                        })
+                    }
+                    Err(e) => {
+                        Ok(PubSubResult {
+                            success: false,
+                            message: format!("Failed to get group info: {}", e),
+                            data: None,
+                            output: Some(format!("Error getting group info: {}", e)),
+                        })
+                    }
+                }
+            }
+
+            PubSubOperation::ListGroups {} => {
+                let groups = client.list_groups().await;
+                let groups_json: Vec<Value> = groups.iter().map(|g| {
+                    serde_json::json!({
+                        "group_id": g.group_id,
+                        "group_name": g.group_name,
+                        "topic": g.topic,
+                        "members": g.members,
+                        "created_at": g.created_at
+                    })
+                }).collect();
+
+                Ok(PubSubResult {
+                    success: true,
+                    message: format!("Successfully listed {} groups", groups_json.len()),
+                    data: Some(serde_json::json!({
+                        "groups": groups_json,
+                        "count": groups_json.len()
+                    })),
+                    output: Some(format!("Found {} groups", groups_json.len())),
+                })
+            }
         }
     }
 }
@@ -488,7 +810,7 @@ impl ToolExecutor for PubSubTool {
     }
 
     fn help(&self) -> String {
-        "PubSub Tool for publish-subscribe messaging. Actions: publish, subscribe, subscriber_count, list_topics, get_history, create_persistent_topic".to_string()
+        "PubSub Tool for publish-subscribe messaging. Actions: publish, subscribe, subscriber_count, list_topics, get_history, create_persistent_topic, create_group, join_group, leave_group, send_group_message, get_group_info, list_groups".to_string()
     }
 }
 

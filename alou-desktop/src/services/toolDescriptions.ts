@@ -6,17 +6,19 @@ export const TOOL_DESCRIPTIONS = {
   // 网络通信类工具
   iroh: {
     name: "Iroh P2P网络工具",
-    description: "基于Iroh协议的P2P网络通信工具，用于安全的点对点数据传输和同步",
-    categories: ["network", "p2p", "data-sync"],
+    description: "基于Iroh协议的P2P网络通信工具，用于安全的点对点数据传输和群聊",
+    categories: ["network", "p2p", "data-sync", "group_chat"],
     usage: [
       "创建安全的P2P连接",
       "在节点间同步数据",
-      "建立去中心化通信通道"
+      "创建P2P群聊",
+      "加入/离开P2P群聊",
+      "发送P2P群聊消息"
     ],
     parameters: {
       action: {
         type: "string",
-        description: "操作类型：create_doc, open_doc, set, get, list_entries, get_node_id, connect_to_node, share_doc_ticket"
+        description: "操作类型：create_doc, open_doc, set, get, list_entries, get_node_id, connect_to_node, share_doc_ticket, create_group, join_group, leave_group, send_group_message, get_group_info, list_groups"
       }
     }
   },
@@ -40,17 +42,19 @@ export const TOOL_DESCRIPTIONS = {
   
   pubsub: {
     name: "发布-订阅工具",
-    description: "发布-订阅消息系统，支持主题管理和消息传递",
-    categories: ["communication", "pubsub", "messaging"],
+    description: "发布-订阅消息系统，支持主题管理和群聊功能",
+    categories: ["communication", "pubsub", "messaging", "group_chat"],
     usage: [
       "发布消息到主题",
       "订阅主题接收消息",
-      "管理订阅者"
+      "创建群聊",
+      "加入/离开群聊",
+      "发送群聊消息"
     ],
     parameters: {
       action: {
         type: "string",
-        description: "操作类型：publish, subscribe, subscriber_count, list_topics, get_history, create_persistent_topic"
+        description: "操作类型：publish, subscribe, subscriber_count, list_topics, get_history, create_persistent_topic, create_group, join_group, leave_group, send_group_message, get_group_info, list_groups"
       }
     }
   },

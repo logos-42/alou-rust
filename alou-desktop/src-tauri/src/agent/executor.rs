@@ -454,14 +454,17 @@ impl RalphLoopExecutor {
             "pubsub" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "action": { "type": "string", "enum": ["publish", "subscribe", "subscriber_count", "list_topics", "get_history", "create_persistent_topic"], "description": "PubSub操作类型" },
+                    "action": { "type": "string", "enum": ["publish", "subscribe", "subscriber_count", "list_topics", "get_history", "create_persistent_topic", "create_group", "join_group", "leave_group", "send_group_message", "get_group_info", "list_groups"], "description": "PubSub 操作类型" },
                     "topic": { "type": "string", "description": "主题名称（除list_topics外都需要）" },
-                    "message": { "type": "string", "description": "消息内容（publish需要）" },
+                    "message": { "type": "string", "description": "消息内容（publish/send_group_message 需要）" },
                     "message_type": { "type": "string", "description": "消息类型（publish可选）" },
                     "tags": { "type": "array", "items": { "type": "string" }, "description": "消息标签（publish可选）" },
                     "limit": { "type": "integer", "description": "消息数量限制（subscribe/get_history可选，默认10）" },
-                    "description": { "type": "string", "description": "主题描述（create_persistent_topic可选）" },
-                    "persistent": { "type": "boolean", "description": "是否持久化（create_persistent_topic可选，默认true）" }
+                    "description": { "type": "string", "description": "主题/群聊描述（create_persistent_topic/create_group 可选）" },
+                    "persistent": { "type": "boolean", "description": "是否持久化（create_persistent_topic可选，默认true）" },
+                    "group_name": { "type": "string", "description": "群聊名称（create_group 需要）" },
+                    "members": { "type": "array", "items": { "type": "string" }, "description": "初始成员列表（create_group 可选）" },
+                    "group_id": { "type": "string", "description": "群聊 ID（join_group/leave_group/send_group_message/get_group_info 需要）" }
                 },
                 "required": ["action"]
             }),
@@ -482,13 +485,18 @@ impl RalphLoopExecutor {
             "iroh" => serde_json::json!({
                 "type": "object",
                 "properties": {
-                    "action": { "type": "string", "enum": ["create_doc", "open_doc", "set", "get", "list_entries", "get_node_id", "connect_to_node", "share_doc_ticket"], "description": "Iroh操作类型" },
+                    "action": { "type": "string", "enum": ["create_doc", "open_doc", "set", "get", "list_entries", "get_node_id", "connect_to_node", "share_doc_ticket", "create_group", "join_group", "leave_group", "send_group_message", "get_group_info", "list_groups"], "description": "Iroh操作类型" },
                     "name": { "type": "string", "description": "文档名称（create_doc可选）" },
                     "doc_id": { "type": "string", "description": "文档ID（open_doc/set/get/list_entries/share_doc_ticket需要）" },
                     "key": { "type": "string", "description": "键（set/get需要）" },
                     "value": { "type": "string", "description": "值（set需要）" },
                     "peer_id": { "type": "string", "description": "对等节点ID（connect_to_node需要）" },
-                    "addr": { "type": "string", "description": "节点地址（connect_to_node可选）" }
+                    "addr": { "type": "string", "description": "节点地址（connect_to_node可选）" },
+                    "group_name": { "type": "string", "description": "群聊名称（create_group 需要）" },
+                    "group_id": { "type": "string", "description": "群聊 ID（join_group/leave_group/send_group_message/get_group_info 需要）" },
+                    "description": { "type": "string", "description": "群聊描述（create_group 可选）" },
+                    "members": { "type": "array", "items": { "type": "string" }, "description": "成员列表（create_group 可选）" },
+                    "message": { "type": "string", "description": "消息内容（send_group_message 需要）" }
                 },
                 "required": ["action"]
             }),
@@ -567,9 +575,9 @@ impl RalphLoopExecutor {
             AiTool { name: "agent_document".to_string(), description: "读取或更新自己的身份文档（SOUL.md, MEMORY.md, AGENTS.md 等）。用 update 更新 MEMORY.md 来跨会话记忆重要信息。这是你的长期记忆系统，可以记录重要的用户偏好、项目信息、学到的知识等。".to_string(), parameters: Self::get_tool_parameters("agent_document") },
             AiTool { name: "tool_creation".to_string(), description: "动态工具创建：创建、更新、删除自定义工具".to_string(), parameters: Self::get_tool_parameters("tool_creation") },
             AiTool { name: "rollback".to_string(), description: "文件快照与回滚：创建快照、恢复到之前状态".to_string(), parameters: Self::get_tool_parameters("rollback") },
-            AiTool { name: "pubsub".to_string(), description: "发布订阅消息系统：发布消息、订阅主题".to_string(), parameters: Self::get_tool_parameters("pubsub") },
+            AiTool { name: "pubsub".to_string(), description: "发布订阅消息系统：发布消息、订阅主题、创建和管理群聊".to_string(), parameters: Self::get_tool_parameters("pubsub") },
             AiTool { name: "message_passing".to_string(), description: "消息队列：发送和接收异步消息".to_string(), parameters: Self::get_tool_parameters("message_passing") },
-            AiTool { name: "iroh".to_string(), description: "Iroh P2P文件传输：分享和获取文件".to_string(), parameters: Self::get_tool_parameters("iroh") },
+            AiTool { name: "iroh".to_string(), description: "Iroh P2P文件传输和群聊：分享文件、创建P2P群聊、管理成员".to_string(), parameters: Self::get_tool_parameters("iroh") },
             AiTool { name: "ipfs_archive".to_string(), description: "IPFS归档管理：归档文件到IPFS、提取、固定".to_string(), parameters: Self::get_tool_parameters("ipfs_archive") },
             AiTool { name: "browser".to_string(), description: "浏览器自动化：导航、点击、输入、截图、执行JS".to_string(), parameters: Self::get_tool_parameters("browser") },
             AiTool { name: "ui_control".to_string(), description: "UI控制：显示通知、更新状态、打开对话框".to_string(), parameters: Self::get_tool_parameters("ui_control") },
