@@ -123,4 +123,15 @@ node_modules
 tauri_build*.log
 tauri_debug.log
 test-*.js
-test_*.js
+test_*.js-e 
+# Build outputs
+dist/
+*.dmg
+*.app
+
+# Archive states
+REPOSITORY_ARCHIVE_STATE.md
+REPO_ARCHIVE_STATE.md
+
+# DMG scripts
+alou-desktop/src-tauri/build-dmg-manual.sh
