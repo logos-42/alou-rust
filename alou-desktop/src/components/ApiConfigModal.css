@@ -10,7 +10,8 @@
 
 .api-config-modal {
   width: min(600px, calc(100vw - 40px));
-  max-height: 85vh;
+  max-height: 90vh;
+  min-height: 500px;
   margin: 20px;
   background: #000000;
   color: #f1f5f9;
@@ -105,7 +106,7 @@
   padding: 24px 28px;
   flex: 1;
   overflow-y: auto;
-  min-height: 0;
+  min-height: 320px;
 }
 
 /* 滚动条样式 - 灰色模式 */
@@ -146,7 +147,11 @@
 }
 
 .api-config-modal__field {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+}
+
+.api-config-modal__field:last-child {
+  margin-bottom: 0;
 }
 
 .api-config-modal__field label {
