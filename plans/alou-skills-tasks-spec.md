@@ -2,52 +2,138 @@
 
 ## 基于人月神话原则的智能体系统架构
 
-> 人月神话核心教义：Brooks法则 - "Adding manpower to a late software project makes it later"。本规范通过赋予Agent自主性和能动性，将"人月"转化为"Agent月"。
+> 人月神话核心教义：Brooks法则 - "Adding manpower to a late software project makes it later"。本规范通过赋予Agent自主性和能动性，实现真正的敏捷开发。
 
 ---
 
-## 一、架构概览
+## 一、完整架构概览
 
-### 1.1 核心组件分布
+### 1.1 核心组件分布 (已实现)
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        Frontend (TypeScript)                │
-│  alou-desktop/src/types/skills.ts                           │
-│  alou-desktop/src/types/tasks.ts                           │
-│  alou-desktop/src/services/*                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend - alou-edge (Rust)               │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Task System (主要实现)                               │   │
-│  │  - spec.rs: TaskSpec 定义                           │   │
-│  │  - cluster_action.rs: Task, ClusterAction           │   │
-│  │  - task_orchestrator.rs: 任务编排引擎                │   │
-│  │  - cluster_executor.rs: 集群执行器                  │   │
-│  │  - batch_processor.rs: 批处理                        │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Skill System (主要实现)                              │   │
-│  │  - skill_loader.rs: 技能加载                         │   │
-│  │  - skill_executor.rs: 技能执行                       │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        alou-desktop/src-tauri/src/agent/                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  swarm.rs (513行) - 多Agent协作                                        │  │
+│  │  - AgentInstance: Agent实例                                          │  │
+│  │  - AgentRole: Coordinator/Worker/Specialist                          │  │
+│  │  - TaskPlan: 任务分解计划                                             │  │
+│  │  - Subtask: 子任务(含依赖关系)                                        │  │
+│  │  - SwarmCoordinator: 任务编排与执行                                    │  │
+│  │  - SwarmEvent: 事件通知                                               │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  autonomy.rs (19543字符) - Agent自主性框架                              │  │
+│  │  - AutonomyConfig: 自主性配置                                         │  │
+│  │  - auto_discover_skills: 自动发现技能                                 │  │
+│  │  - auto_select_tools: 自动选择工具                                    │  │
+│  │  - auto_decompose_tasks: 自动分解复杂任务                             │  │
+│  │  - auto_coordinate_swarm: 自动协调Swarm                              │  │
+│  │  - autonomy_level: 0.0(手动) -> 1.0(完全自主)                        │  │
+│  │  - ConfirmationRule: 敏感操作确认规则                                 │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐  │
+│  │  task.rs - 任务管理                                                   │  │
+│  │  executor.rs (51142字符) - 任务执行器                                 │  │
+│  │  memory.rs - Agent记忆                                               │  │
+│  │  role.rs - Agent角色定义                                             │  │
+│  └─────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        alou-edge/src/agent/ (Rust)                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  spec.rs: TaskSpec 定义                                                     │
+│  cluster_action.rs: Task, TaskStatus, ClusterAction                        │
+│  task_orchestrator.rs: 顺序/并行/条件执行                                    │
+│  cluster_executor.rs: 集群执行器                                            │
+│  batch_processor.rs: 批处理                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        alou-desktop/src/ (TypeScript)                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  types/skills.ts: SkillDefinition, SkillMetadata, SkillContext             │
+│  types/tasks.ts: Task, ExecutionMode, AgentSwarm, SwarmCoordination       │
+│  services/taskQueue.ts: 任务队列                                            │
+│  services/agentCoordinatorService.ts: Agent协调服务                          │
+│  services/autonomousAgentService.ts: 自主执行服务                            │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 二、Skills 规范
+## 二、已实现的核心功能
 
-### 2.1 文件格式
+### 2.1 Swarm 多Agent协作 (swarm.rs)
 
-Skills 存储于 `~/.alou/williw/skills/` 或项目 `./skills/`
+```rust
+// Agent角色
+pub enum AgentRole {
+    Coordinator,  // 领导者 - 任务分解
+    Worker,      // 执行者 - 执行子任务
+    Specialist(String), // 专家角色
+}
 
-### 2.2 SKILL.md 格式 (复用现有类型)
+// Agent状态
+pub enum AgentStatus {
+    Idle,
+    Busy(String),   // 执行中的任务ID
+    Offline,
+    Error(String),
+}
+
+// 任务计划
+pub struct TaskPlan {
+    pub task_id: String,
+    pub subtasks: Vec<Subtask>,
+    pub dependencies: TaskDependencyGraph,
+    pub assigned_agents: HashMap<String, String>,
+}
+
+// 子任务
+pub struct Subtask {
+    pub id: String,
+    pub parent_task_id: String,
+    pub description: String,
+    pub assigned_agent: Option<String>,
+    pub dependencies: Vec<String>,
+    pub estimated_duration_secs: u64,
+    pub priority: Priority,
+    pub status: TaskStatus,
+}
+```
+
+### 2.2 Agent自主性框架 (autonomy.rs)
+
+```rust
+// 自主性配置
+pub struct AutonomyConfig {
+    pub auto_discover_skills: bool,      // 自动发现技能
+    pub auto_select_tools: bool,        // 自动选择工具
+    pub auto_decompose_tasks: bool,     // 自动分解任务
+    pub auto_coordinate_swarm: bool,     // 自动协调Swarm
+    pub max_autonomous_iterations: u32,  // 最大自主迭代
+    pub autonomy_level: f32,             // 自主级别 0.0-1.0
+}
+
+// 预设模式
+impl AutonomyConfig {
+    pub fn fully_autonomous() -> Self { ... }  // 完全自主
+    pub fn conservative() -> Self { ... }       // 保守模式
+}
+```
+
+---
+
+## 三、Skills 规范
+
+### 3.1 SKILL.md 格式
 
 ```yaml
 ---
@@ -56,7 +142,7 @@ description: 技能描述
 version: 1.0.0
 license: MIT
 
-# 渐进式披露级别 (Progressive Disclosure Level)
+# 渐进式披露级别
 pdl:
   level: 1
   reveal_on: [action:execute, intent:analyze]
@@ -66,8 +152,6 @@ capabilities:
   - type: tool
     name: filesystem
     operations: [read, write, list]
-  - type: skill
-    name: code-analyzer
 
 # 允许的工具
 allowed_tools:
@@ -78,105 +162,39 @@ allowed_tools:
 # 依赖
 dependencies:
   runtime: [python>=3.8]
-  python: [requests, pandas]
+  python: [requests]
 
-# 参数定义 (JSON Schema)
+# 参数定义
 parameters:
   type: object
   properties:
     input:
       type: string
-      description: 输入数据
   required: [input]
 
 # 指令
 instructions: |
-  ## 使用指南
   1. 分析需求
   2. 选择工具
   3. 执行并验证
-
-# 示例
-examples:
-  - name: 基础分析
-    input: {file: data.csv}
-    expected: {rows: 1000}
-
-# 元数据
-metadata:
-  category: data-analysis
-  tags: [analytics, ml]
-  difficulty: intermediate
 ```
 
-### 2.3 Skills 类型定义
-
-复用现有文件 [`alou-desktop/src/types/skills.ts`](alou-desktop/src/types/skills.ts):
+### 3.2 复用现有类型
 
 ```typescript
 import {
-  SkillDefinition,    // 技能定义
-  SkillMetadata,      // 技能元数据
-  SkillContext,      // 执行上下文
-  SkillResult,       // 执行结果
-  SkillParameters    // 参数定义
+  SkillDefinition,
+  SkillMetadata,
+  SkillContext,
+  SkillResult,
 } from '../types/skills';
 ```
 
 ---
 
-## 三、Task 规范 (Rust 实现)
+## 四、Task 规范
 
-### 3.1 现有 Rust 实现
-
-Task 系统主要在 `alou-edge/src/agent/` 中实现:
-
-| 文件 | 职责 |
-|------|------|
-| [`spec.rs`](alou-edge/src/agent/spec.rs) | TaskSpec 定义 |
-| [`cluster_action.rs`](alou-edge/src/agent/cluster_action.rs) | Task, TaskStatus, ClusterAction |
-| [`task_orchestrator.rs`](alou-edge/src/agent/task_orchestrator.rs) | 任务编排引擎 |
-| [`cluster_executor.rs`](alou-edge/src/agent/cluster_executor.rs) | 集群执行器 |
-| [`batch_processor.rs`](alou-edge/src/agent/batch_processor.rs) | 批处理 |
-
-### 3.2 现有 Task 类型 (Rust)
-
-```rust
-// alou-edge/src/agent/cluster_action.rs
-
-pub struct Task {
-    pub task_id: String,
-    pub task_type: String,
-    pub description: String,
-    pub input: Value,
-    pub output: Option<Value>,
-    pub status: TaskStatus,
-    pub dependencies: Vec<TaskDependency>,
-    pub assigned_agent: Option<AgentAssignment>,
-    pub created_at: i64,
-    pub started_at: Option<i64>,
-    pub completed_at: Option<i64>,
-    pub error: Option<String>,
-    pub retry_count: u32,
-    pub max_retries: u32,
-}
-
-pub enum TaskStatus {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-    Skipped,
-}
-
-pub enum DependencyType {
-    Sequential,    // 顺序执行
-    Parallel,      // 并行执行
-    Conditional { condition: String },
-}
-```
-
-### 3.3 TASK.md 文件格式
+### 4.1 TASK.md 格式
 
 ```yaml
 ---
@@ -198,9 +216,7 @@ steps:
     type: parallel
     parallel_tasks:
       - task: data-clean
-        agent: cleaner-1
       - task: data-validate
-        agent: validator-1
 
   - id: step_2
     name: 生成报告
@@ -210,78 +226,19 @@ steps:
     timeout_ms: 30000
     retry:
       max_attempts: 3
-      strategy: exponential
-      base_delay_ms: 1000
 
-# Swarm 配置
+# Swarm配置
 swarm:
-  strategy: broadcast | round_robin | capability_based | consensus
+  strategy: broadcast | round_robin | capability_based
   min_agents: 2
   max_agents: 10
-  timeout_ms: 60000
-  
+
   roles:
     - name: coordinator
-      responsibility: 任务分发与结果汇总
       required: true
     - name: worker
-      responsibility: 执行具体子任务
       required: true
       count: 3
-
-  consensus:
-    enabled: true
-    threshold: 0.7
-
-# 验证规则
-validation:
-  rules:
-    - id: output_format
-      type: output_format
-      severity: error
-```
-
----
-
-## 四、Task 执行引擎 (复用现有)
-
-### 4.1 任务编排 (Rust)
-
-[`task_orchestrator.rs`](alou-edge/src/agent/task_orchestrator.rs) 已实现:
-
-```rust
-pub enum WorkflowType {
-    Sequential,   // 顺序执行
-    Parallel,     // 并行执行
-    Conditional { condition: String },
-}
-
-// 使用方式
-let orchestrator = TaskOrchestrator::new();
-let workflow = orchestrator.build_workflow(&tasks)?;
-
-// 顺序执行
-orchestrator.execute_sequential(&mut tasks, executor).await?;
-
-// 并行执行  
-orchestrator.execute_parallel(&mut tasks, executor).await?;
-
-// 条件分支
-orchestrator.execute_conditional(&mut cond_task, &mut true_branch, &mut false_branch, executor, evaluator).await?;
-```
-
-### 4.2 集群执行 (Rust)
-
-[`cluster_executor.rs`](alou-edge/src/agent/cluster_executor.rs) 已实现:
-
-```rust
-// 执行集群行动
-let result = cluster_executor
-    .execute_cluster_action(action, wallet_address, chain)
-    .await?;
-
-// 合并多个 Agent 结果
-let merged = cluster_executor.merge_results(&task_results)?;
 ```
 
 ---
@@ -292,75 +249,45 @@ let merged = cluster_executor.merge_results(&task_results)?;
 
 ```
 ~/.alou/williw/
-├── skills/                    # 全局技能库
-│   ├── _core/                # 核心技能
-│   ├── _community/          # 社区技能
-│   └── _custom/             # 用户自定义技能
+├── skills/                    # 技能库
+│   ├── _core/
+│   ├── _community/
+│   └── _custom/
 ├── tasks/                    # 任务库
-│   ├── _templates/          # 任务模板
-│   └── _archived/           # 已完成任务
-├── agents/                   # Agent 配置
+│   ├── _templates/
+│   └── _archived/
+├── agents/                   # Agent配置
 └── config.yaml              # 全局配置
 ```
 
-### 5.2 项目本地
-
-```
-project/
-├── skills/
-├── tasks/
-├── .alou/
-└── williw.config.yaml
-```
-
 ---
 
-## 六、与现有系统集成
-
-### 6.1 现有 Rust 组件
+## 六、现有实现总结
 
 | 组件 | 位置 | 状态 |
 |------|------|------|
-| TaskSpec | alou-edge/src/agent/spec.rs | ✅ 已有 |
-| Task | alou-edge/src/agent/cluster_action.rs | ✅ 已有 |
-| TaskOrchestrator | alou-edge/src/agent/task_orchestrator.rs | ✅ 已有 |
-| ClusterExecutor | alou-edge/src/agent/cluster_executor.rs | ✅ 已有 |
-| BatchProcessor | alou-edge/src/agent/batch_processor.rs | ✅ 已有 |
+| SwarmCoordinator | alou-desktop/src-tauri/src/agent/swarm.rs | ✅ 已实现 |
+| AutonomyConfig | alou-desktop/src-tauri/src/agent/autonomy.rs | ✅ 已实现 |
+| TaskManager | alou-desktop/src-tauri/src/agent/task.rs | ✅ 已实现 |
+| RalphLoopExecutor | alou-desktop/src-tauri/src/agent/executor.rs | ✅ 已实现 |
+| TaskOrchestrator | alou-edge/src/agent/task_orchestrator.rs | ✅ 已实现 |
+| ClusterExecutor | alou-edge/src/agent/cluster_executor.rs | ✅ 已实现 |
 
-### 6.2 现有 TypeScript 组件
+### 人月神话原则实现
 
-| 组件 | 位置 | 状态 |
-|------|------|------|
-| Task types | alou-desktop/src/types/tasks.ts | ✅ 已有 |
-| Skill types | alou-desktop/src/types/skills.ts | ✅ 已有 |
-| TaskQueue | alou-desktop/src/services/taskQueue.ts | ✅ 已有 |
-| AgentCoordinator | alou-desktop/src/services/agentCoordinatorService.ts | ✅ 已有 |
-
-### 6.3 需要实现
-
-1. **SKILL.md 解析器**: 解析 YAML 为 SkillDefinition
-2. **TASK.md 解析器**: 解析 YAML 为 TaskSpec
-3. **williw CLI 工具**: 全局 skills/tasks 管理
-4. **Rust 技能加载**: alou-edge 中实现技能加载器
+1. **渐进式披露 (Progressive Disclosure)**: PDL级别控制信息展示
+2. **自治权 (Autonomy)**: autonomy_level 控制Agent自主程度
+3. **并行性 (Parallelism)**: TaskPlan + Subtask 支持并行执行
+4. **可组合性 (Composability)**: Swarm协调多个Agent协作
 
 ---
 
-## 七、总结
+## 七、需要补充的部分
 
-项目已有完善的 Task 系统实现 (Rust):
-
-- **TaskSpec**: 任务规格定义
-- **Task**: 任务实体
-- **TaskOrchestrator**: 顺序/并行/条件执行
-- **ClusterExecutor**: 多 Agent 协作执行
-- **BatchProcessor**: 批量处理
-
-需要补充:
-
-1. **SKILL.md 文件格式** - 技能定义
-2. **TASK.md 文件格式** - 任务定义
-3. **williw 目录结构** - 全局 skills/tasks
-4. **解析器** - 将文件转换为 Rust/TS 类型
+1. **williw 目录结构**: 创建 `~/.alou/williw/`
+2. **SKILL.md 解析器**: 将YAML解析为SkillDefinition
+3. **TASK.md 解析器**: 将YAML解析为TaskSpec
+4. **技能文件示例**: 创建示例skills目录
 
 ---
 
