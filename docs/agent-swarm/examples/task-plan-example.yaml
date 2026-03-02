@@ -1,0 +1,251 @@
+version: "2.0"
+plan:
+  id: "code-review-pipeline-001"
+  name: "全面代码审查与重构"
+  objective: "对代码库进行全面的质量分析、安全扫描和性能评估，生成综合报告并自动修复发现的问题"
+  description: |
+    这是一个展示 Agent Swarm 并行执行能力的示例任务计划。
+    该计划执行以下流程：
+    1. 三个独立的分析任务并行执行（代码质量、安全扫描、性能分析）
+    2. 待所有分析完成后，自动生成综合报告
+    3. 根据分析结果，执行可选的自动修复任务
+  tasks:
+    # ========================================
+    # 并行分析任务组（第1阶段）
+    # ========================================
+    
+    - id: "analyze-code-quality"
+      name: "代码质量分析"
+      description: "分析代码风格、复杂度、重复代码、最佳实践遵守情况"
+      type: "agent-task"
+      agent: "code-quality-analyzer"
+      dependencies: []
+      timeout: "10m"
+      retry:
+        maxAttempts: 2
+        onFailure: "continue"
+      inputs:
+        sourcePath: "${WORKSPACE}/src"
+        configFile: "${WORKSPACE}/.eslintrc.json"
+        rules:
+          - "complexity"
+          - "duplication"
+          - "maintainability"
+          - "best-practices"
+      outputs:
+        - name: "qualityReport"
+          path: "${OUTPUT_DIR}/quality-report.json"
+        - name: "complexityScore"
+          path: "${OUTPUT_DIR}/complexity-score.json"
+        - name: "issuesList"
+          path: "${OUTPUT_DIR}/quality-issues.json"
+
+    - id: "analyze-security"
+      name: "安全扫描"
+      description: "扫描代码中的安全漏洞、依赖风险、敏感信息泄露"
+      type: "agent-task"
+      agent: "security-scanner"
+      dependencies: []
+      timeout: "15m"
+      retry:
+        maxAttempts: 3
+        onFailure: "abort"
+      inputs:
+        sourcePath: "${WORKSPACE}"
+        scanTypes:
+          - "sast"                    # 静态应用安全测试
+          - "dependency-check"        # 依赖漏洞检查
+          - "secrets-detection"       # 敏感信息检测
+          - "owasp-top-10"            # OWASP Top 10
+      outputs:
+        - name: "securityReport"
+          path: "${OUTPUT_DIR}/security-report.json"
+        - name: "vulnerabilities"
+          path: "${OUTPUT_DIR}/vulnerabilities.json"
+        - name: "riskScore"
+          path: "${OUTPUT_DIR}/security-risk-score.json"
+
+    - id: "analyze-performance"
+      name: "性能分析"
+      description: "分析代码性能瓶颈、内存泄漏、算法复杂度"
+      type: "agent-task"
+      agent: "performance-analyzer"
+      dependencies: []
+      timeout: "12m"
+      retry:
+        maxAttempts: 2
+        onFailure: "continue"
+      inputs:
+        sourcePath: "${WORKSPACE}/src"
+        benchmarks:
+          - "cpu-usage"
+          - "memory-usage"
+          - "io-operations"
+          - "algorithm-complexity"
+        thresholds:
+          maxMemoryMB: 512
+          maxExecutionTimeMs: 1000
+      outputs:
+        - name: "performanceReport"
+          path: "${OUTPUT_DIR}/performance-report.json"
+        - name: "bottlenecks"
+          path: "${OUTPUT_DIR}/performance-bottlenecks.json"
+        - name: "optimizationSuggestions"
+          path: "${OUTPUT_DIR}/optimizations.json"
+
+    # ========================================
+    # 依赖任务（第2阶段）
+    # ========================================
+    
+    - id: "generate-report"
+      name: "生成综合报告"
+      description: "整合所有分析结果，生成一份完整的代码审查报告"
+      type: "agent-task"
+      agent: "report-generator"
+      dependencies:
+        - "analyze-code-quality"
+        - "analyze-security"
+        - "analyze-performance"
+      timeout: "5m"
+      retry:
+        maxAttempts: 2
+        onFailure: "continue"
+      inputs:
+        qualityReport: "${OUTPUT_DIR}/quality-report.json"
+        securityReport: "${OUTPUT_DIR}/security-report.json"
+        performanceReport: "${OUTPUT_DIR}/performance-report.json"
+        template: "comprehensive-review"
+        format: "markdown"
+      outputs:
+        - name: "comprehensiveReport"
+          path: "${OUTPUT_DIR}/comprehensive-code-review-report.md"
+        - name: "executiveSummary"
+          path: "${OUTPUT_DIR}/executive-summary.md"
+        - name: "actionItems"
+          path: "${OUTPUT_DIR}/action-items.json"
+
+    # ========================================
+    # 条件任务（第3阶段）
+    # ========================================
+    
+    - id: "auto-fix-issues"
+      name: "自动修复问题"
+      description: "根据分析结果自动修复代码中的可自动修复问题"
+      type: "agent-task"
+      agent: "code-refactorer"
+      dependencies:
+        - "generate-report"
+      condition:
+        expression: "${AUTO_FIX_ENABLED} == 'true'"
+      timeout: "20m"
+      retry:
+        maxAttempts: 1
+        onFailure: "continue"
+      inputs:
+        actionItems: "${OUTPUT_DIR}/action-items.json"
+        autoFixTypes:
+          - "formatting"
+          - "unused-imports"
+          - "simple-refactoring"
+          - "dependency-updates"
+        dryRun: "${DRY_RUN:-false}"
+      outputs:
+        - name: "fixReport"
+          path: "${OUTPUT_DIR}/auto-fix-report.json"
+        - name: "modifiedFiles"
+          path: "${OUTPUT_DIR}/modified-files.txt"
+
+    - id: "create-pull-request"
+      name: "创建代码变更PR"
+      description: "如果执行了自动修复，创建 Pull Request 提交变更"
+      type: "agent-task"
+      agent: "git-integrator"
+      dependencies:
+        - "auto-fix-issues"
+      condition:
+        expression: "${AUTO_FIX_ENABLED} == 'true' && ${DRY_RUN} != 'true'"
+      timeout: "5m"
+      inputs:
+        modifiedFiles: "${OUTPUT_DIR}/modified-files.txt"
+        branchName: "auto-fix/code-review-${TIMESTAMP}"
+        commitMessage: "chore: 自动修复代码审查发现的问题"
+        prTitle: "[Auto-Fix] 代码审查问题修复"
+        prDescription: |
+          此 PR 包含根据代码审查自动生成的修复：
+          
+          - 代码质量问题修复
+          - 安全漏洞修复
+          - 性能优化建议实现
+          
+          详细报告：${OUTPUT_DIR}/comprehensive-code-review-report.md
+      outputs:
+        - name: "pullRequestUrl"
+          path: "${OUTPUT_DIR}/pr-url.txt"
+
+  # ========================================
+  # 执行策略配置
+  # ========================================
+  strategy:
+    type: "parallel-pipeline"
+    maxConcurrency: 4
+    description: |
+      并行流水线策略：
+      Phase 1: analyze-code-quality, analyze-security, analyze-performance (并行执行)
+      Phase 2: generate-report (等待 Phase 1 完成)
+      Phase 3: auto-fix-issues, create-pull-request (条件执行)
+
+  # ========================================
+  # 变量定义
+  # ========================================
+  variables:
+    WORKSPACE:
+      description: "代码工作目录"
+      default: "."
+    OUTPUT_DIR:
+      description: "输出目录"
+      default: "./reports"
+    AUTO_FIX_ENABLED:
+      description: "是否启用自动修复"
+      default: "false"
+    DRY_RUN:
+      description: "是否仅模拟执行，不实际修改文件"
+      default: "false"
+    TIMESTAMP:
+      description: "时间戳"
+      default: "${date +%Y%m%d-%H%M%S}"
+
+  # ========================================
+  # 通知配置
+  # ========================================
+  notifications:
+    onSuccess:
+      - channel: "slack"
+        webhook: "${SLACK_WEBHOOK_URL}"
+        message: "✅ 代码审查完成！报告：${OUTPUT_DIR}/comprehensive-code-review-report.md"
+      - channel: "email"
+        to: "${NOTIFICATION_EMAIL}"
+        subject: "代码审查报告 - ${REPO_NAME}"
+        attachments:
+          - "${OUTPUT_DIR}/comprehensive-code-review-report.md"
+          - "${OUTPUT_DIR}/executive-summary.md"
+    onFailure:
+      - channel: "slack"
+        webhook: "${SLACK_WEBHOOK_URL}"
+        message: "❌ 代码审查失败，请检查日志"
+
+  # ========================================
+  # 钩子函数
+  # ========================================
+  hooks:
+    prePlan:
+      - name: "prepare-environment"
+        command: |
+          mkdir -p ${OUTPUT_DIR}
+          echo "开始执行代码审查计划..."
+          echo "工作目录: ${WORKSPACE}"
+          echo "输出目录: ${OUTPUT_DIR}"
+    postPlan:
+      - name: "cleanup"
+        command: |
+          echo "代码审查计划执行完成"
+          ls -la ${OUTPUT_DIR}/

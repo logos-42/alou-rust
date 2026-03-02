@@ -1,12 +1,20 @@
 //! Tauri Commands
 //!
 //! 提供给前端调用的 Tauri 命令
+//! 
+//! # New Commands (Skills & Task System)
+//! 
+//! - Skills: discover, load, execute, search
+//! - Tasks: create, decompose, execute_swarm, get_status
+//! - Agent: configure_autonomy, register_agent, get_agent_status
 
 use super::ai_client::AiClient;
 use super::config::{ApiConfig, UserApiConfig};
 use super::executor::RalphLoopExecutor;
 use super::streaming::StreamingExecutor;
 use super::task::{TaskFinalResult, TaskManager};
+use super::swarm::{SwarmCoordinator, AgentInstance, AgentRole, TaskPlan};
+use super::autonomy::{AgentAutonomy, AutonomyConfig, ConfirmationRule};
 use std::sync::Arc;
 
 /// Tauri 命令：执行 Agent 任务（同步返回结果）

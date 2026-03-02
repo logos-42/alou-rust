@@ -28,7 +28,8 @@ pub mod git_helper;
 pub mod agent_creator;
 pub mod task_queue;             // 任务队列系统核心
 pub mod task_queue_tool;        // 任务队列Tauri工具
-pub mod skill_auto_selector;      // Skills自动选择器核心
+pub mod task_system;            // Task 系统（支持 Agent Swarm）
+pub mod skill_auto_selector;      // Skills 自动选择器核心
 pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
 pub mod autonomous_executor;       // 自主执行引擎
 pub mod autonomous_executor_tool;  // 自主执行器Tauri工具

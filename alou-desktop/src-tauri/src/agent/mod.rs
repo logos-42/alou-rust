@@ -1,6 +1,14 @@
 //! Agent 模块
 //!
 //! 提供 AI Agent 的核心功能，包括 API 调用、任务管理、Ralph Loop 执行等
+//! 
+//! # Architecture
+//! 
+//! Following "The Mythical Man-Month" principles:
+//! - **Conceptual Integrity**: Unified agent design
+//! - **Clear Interfaces**: Well-defined task and skill contracts
+//! - **Agent Autonomy**: Independent decision-making capabilities
+//! - **Swarm Coordination**: Multi-agent parallel execution
 
 pub mod config;
 pub mod ai_client;
@@ -12,6 +20,8 @@ pub mod commands;
 pub mod error;
 pub mod role;
 pub mod memory;
+pub mod swarm;        // Multi-agent swarm coordination
+pub mod autonomy;     // Agent autonomy framework
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -49,3 +59,5 @@ pub use memory::{
     MemoryManager, Memory, MemoryType, Importance,
     UserPreference, BehaviorPattern, MemoryConfig,
 };
+pub use swarm::{SwarmCoordinator, AgentInstance, AgentRole, AgentStatus, TaskPlan, Subtask, SwarmEvent};
+pub use autonomy::{AgentAutonomy, AutonomyConfig, ConfirmationRule};

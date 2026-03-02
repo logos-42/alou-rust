@@ -2,6 +2,13 @@
 //!
 //! 实现标准 Agent Skills 协议支持
 //! 支持 SKILL.md 格式、Progressive Disclosure 和脚本执行
+//! 
+//! # Design Principles (from "The Mythical Man-Month")
+//! 
+//! 1. **Conceptual Integrity**: Single unified design for all skills
+//! 2. **Clear Interfaces**: Well-defined skill manifests and execution contexts
+//! 3. **Progressive Disclosure**: Load only what's needed, when needed
+//! 4. **Agent Autonomy**: Enable agents to discover and use skills independently
 
 use super::{ToolExecutor, ToolMetadata, ToolResult, ToolError, ExecutionContext, ToolCategory, ToolStatus, ToolPriority};
 use async_trait::async_trait;

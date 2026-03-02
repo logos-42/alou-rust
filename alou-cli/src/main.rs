@@ -9,6 +9,7 @@
 
 mod api;
 mod commands;
+pub mod swarm;
 
 use std::env;
 
