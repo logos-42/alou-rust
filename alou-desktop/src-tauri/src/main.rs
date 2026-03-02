@@ -9,6 +9,7 @@ mod ipfs_api;
 mod ipfs_commands;
 mod ipfs_node;
 mod ipfs;
+mod ipfs_repair;  // 新增 IPFS 修复模块
 mod ipns_verified;  // 新增验证过的IPNS解决方案
 mod kubo;
 mod kv_commands;  // 新增KV存储模块

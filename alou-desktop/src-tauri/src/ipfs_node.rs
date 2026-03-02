@@ -11,6 +11,7 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use crate::ipfs_api::test_ipfs_api_ready;
+use crate::ipfs_repair::{check_and_get_repair_info, IpfsRepairInfo};
 use crate::kubo::{binary_name, ensure_kubo_binary};
 use crate::utils::app_data_dir;
 
@@ -41,6 +42,11 @@ pub async fn stop_ipfs_node(
     } else {
         Ok("IPFS node was not running".to_string())
     }
+}
+
+#[tauri::command]
+pub fn get_ipfs_repair_info(error_message: String) -> IpfsRepairInfo {
+    check_and_get_repair_info(&error_message)
 }
 
 #[tauri::command]
@@ -147,9 +153,15 @@ pub async fn launch_ipfs_node(
     let app_data_dir = app_data_dir(app)?;
     let kubo_bin = app_data_dir.join("kubo").join(binary_name());
     if !kubo_bin.exists() {
-        return Err(format!(
+        let error_msg = format!(
             "Kubo binary not found. Please download it first using download_kubo_binary command. Expected at: {:?}",
             kubo_bin
+        );
+        let repair_info = check_and_get_repair_info(&error_msg);
+        return Err(format!(
+            "{}\n\n[REPAIR_INFO]: {}",
+            error_msg,
+            serde_json::to_string(&repair_info).unwrap_or_default()
         ));
     }
 
@@ -181,7 +193,7 @@ pub async fn launch_ipfs_node(
             }
             
             if !is_our_instance {
-                return Err(format!(
+                let error_msg = format!(
                     "检测到另一个 IPFS 实例正在运行，端口 5001 已被占用。\n\
                     这可能是 IPFS Desktop 或其他 IPFS 守护进程。\n\
                     \n\
@@ -191,6 +203,12 @@ pub async fn launch_ipfs_node(
                     3. 然后重试启动 IPFS 节点\n\
                     \n\
                     注意：Alou 可以使用已运行的 IPFS 实例，但建议使用 Alou 自己的实例以避免冲突。"
+                );
+                let repair_info = check_and_get_repair_info(&error_msg);
+                return Err(format!(
+                    "{}\n\n[REPAIR_INFO]: {}",
+                    error_msg,
+                    serde_json::to_string(&repair_info).unwrap_or_default()
                 ));
             }
         }
