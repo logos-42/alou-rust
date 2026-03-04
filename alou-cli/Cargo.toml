@@ -57,3 +57,7 @@ futures = "0.3"
 # 系统信息
 sysinfo = "0.30"
 rand = "0.10.0"
+
+# TUI界面
+ratatui = "0.26"
+crossterm = "0.27"

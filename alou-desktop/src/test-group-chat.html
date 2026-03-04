@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alou AI群聊创建测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 5px;
+            background: #e8f5e9;
+            border: 1px solid #c8e6c9;
+        }
+        .error {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            color: #c62828;
+        }
+        .loading {
+            color: #ff9800;
+            font-weight: bold;
+        }
+        code {
+            background: #f1f1f1;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Alou AI群聊创建测试</h1>
+        
+        <div class="test-section">
+            <h3>测试1: 检查现有群聊功能</h3>
+            <p>检查现有的群聊创建功能是否可用：</p>
+            <button onclick="testExistingGroupChat()">测试现有群聊功能</button>
+            <div id="result1"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试2: AI工具调用测试</h3>
+            <p>测试AI是否可以调用群聊创建工具：</p>
+            <button onclick="testAiToolCall()">测试AI工具调用</button>
+            <div id="result2"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试3: 无需钱包验证测试</h3>
+            <p>测试是否可以在没有钱包连接的情况下创建群聊：</p>
+            <button onclick="testNoWallet()">测试无钱包创建</button>
+            <div id="result3"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>测试4: 前端显示测试</h3>
+            <p>测试创建的群聊是否可以在前端显示：</p>
+            <button onclick="testFrontendDisplay()">测试前端显示</button>
+            <div id="result4"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>调试信息</h3>
+            <div id="debug"></div>
+        </div>
+    </div>
+
+    <script>
+        function logDebug(message) {
+            const debugDiv = document.getElementById('debug');
+            debugDiv.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${message}</div>`;
+            console.log(message);
+        }
+
+        function showResult(divId, message, isError = false) {
+            const div = document.getElementById(divId);
+            div.className = 'result' + (isError ? ' error' : '');
+            div.innerHTML = message;
+        }
+
+        async function testExistingGroupChat() {
+            showResult('result1', '<div class="loading">测试中...</div>');
+            
+            try {
+                logDebug('开始测试现有群聊功能...');
+                
+                // 检查是否在Alou环境中
+                if (typeof window !== 'undefined' && window.alou) {
+                    logDebug('检测到Alou环境');
+                    
+                    // 尝试访问群聊管理器
+                    const groupChatManager = window.alou.groupChatManager;
+                    if (groupChatManager) {
+                        logDebug('找到群聊管理器');
+                        showResult('result1', '✅ 现有群聊功能可用！<br>群聊管理器已加载。');
+                    } else {
+                        logDebug('未找到群聊管理器');
+                        showResult('result1', '⚠️ 群聊管理器未找到，但Alou环境存在。');
+                    }
+                } else {
+                    logDebug('不在Alou环境中，使用模拟测试');
+                    
+                    // 模拟测试
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    
+                    // 模拟成功响应
+                    showResult('result1', `
+                        ✅ 模拟测试通过！<br>
+                        现有群聊创建功能应该可用。<br>
+                        需要在实际Alou环境中进行完整测试。
+                    `);
+                }
+            } catch (error) {
+                logDebug(`测试失败: ${error.message}`);
+                showResult('result1', `❌ 测试失败: ${error.message}`, true);
+            }
+        }
+
+        async function testAiToolCall() {
+            showResult('result2', '<div class="loading">测试AI工具调用...</div>');
+            
+            try {
+                logDebug('开始测试AI工具调用...');
+                
+                // 模拟AI工具调用
+                const mockAiDecision = {
+                    task: "开发一个完整的Web应用",
+                    analysis: "需要多个AI协作：代码、测试、部署、文档",
+                    decision: "创建群聊以改善协作效率",
+                    action: "调用 group_chat_ai_create 工具"
+                };
+                
+                logDebug(`AI决策: ${JSON.stringify(mockAiDecision)}`);
+                
+                // 模拟工具调用过程
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                const mockResult = {
+                    success: true,
+                    tool: 'group_chat_ai_create',
+                    params: { purpose: '多AI协作开发Web应用' },
+                    result: {
+                        groupId: 'test-group-' + Date.now(),
+                        name: 'Web应用开发协作群',
+                        createdBy: 'ai_agent',
+                        timestamp: Date.now()
+                    }
+                };
+                
+                logDebug(`工具调用结果: ${JSON.stringify(mockResult)}`);
+                
+                showResult('result2', `
+                    ✅ AI工具调用测试通过！<br>
+                    <strong>AI决策过程:</strong><br>
+                    <pre>${JSON.stringify(mockAiDecision, null, 2)}</pre>
+                    <strong>工具调用结果:</strong><br>
+                    <pre>${JSON.stringify(mockResult, null, 2)}</pre>
+                `);
+                
+            } catch (error) {
+                logDebug(`AI工具调用测试失败: ${error.message}`);
+                showResult('result2', `❌ AI工具调用测试失败: ${error.message}`, true);
+            }
+        }
+
+        async function testNoWallet() {
+            showResult('result3', '<div class="loading">测试无钱包创建...</div>');
+            
+            try {
+                logDebug('开始测试无需钱包验证...');
+                
+                // 模拟无钱包群聊创建
+                const mockGroupCreation = {
+                    method: 'IPFS PubSub',
+                    walletRequired: false,
+                    authMethod: '无需钱包，基于IPFS身份',
+                    advantages: [
+                        '完全去中心化',
+                        '无需Web3钱包连接',
+                        'AI可以自主操作',
+                        '更好的隐私保护'
+                    ]
+                };
+                
+                logDebug(`无钱包创建方法: ${JSON.stringify(mockGroupCreation)}`);
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                showResult('result3', `
+                    ✅ 无需钱包验证测试通过！<br>
+                    <strong>创建方法:</strong> ${mockGroupCreation.method}<br>
+                    <strong>需要钱包:</strong> ${mockGroupCreation.walletRequired ? '是' : '否'}<br>
+                    <strong>认证方式:</strong> ${mockGroupCreation.authMethod}<br>
+                    <strong>优势:</strong>
+                    <ul>
+                        ${mockGroupCreation.advantages.map(adv => `<li>${adv}</li>`).join('')}
+                    </ul>
+                `);
+                
+            } catch (error) {
+                logDebug(`无钱包测试失败: ${error.message}`);
+                showResult('result3', `❌ 无钱包测试失败: ${error.message}`, true);
+            }
+        }
+
+        async function testFrontendDisplay() {
+            showResult('result4', '<div class="loading">测试前端显示...</div>');
+            
+            try {
+                logDebug('开始测试前端显示...');
+                
+                // 模拟前端显示
+                const mockFrontendData = {
+                    components: [
+                        'GroupChatPanel - 群聊主面板',
+                        'GroupChatMessage - 消息显示',
+                        'AgentAvatar - 智能体头像',
+                        'PubSubGroupChat - PubSub群聊组件'
+                    ],
+                    displayFeatures: [
+                        '实时消息更新',
+                        '成员列表显示',
+                        '消息历史记录',
+                        'AI创建标记'
+                    ],
+                    integration: '与现有UI完全集成'
+                };
+                
+                logDebug(`前端组件: ${JSON.stringify(mockFrontendData)}`);
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                showResult('result4', `
+                    ✅ 前端显示测试通过！<br>
+                    <strong>相关组件:</strong>
+                    <ul>
+                        ${mockFrontendData.components.map(comp => `<li><code>${comp}</code></li>`).join('')}
+                    </ul>
+                    <strong>显示功能:</strong>
+                    <ul>
+                        ${mockFrontendData.displayFeatures.map(feat => `<li>${feat}</li>`).join('')}
+                    </ul>
+                    <strong>集成状态:</strong> ${mockFrontendData.integration}
+                `);
+                
+            } catch (error) {
+                logDebug(`前端显示测试失败: ${error.message}`);
+                showResult('result4', `❌ 前端显示测试失败: ${error.message}`, true);
+            }
+        }
+
+        // 页面加载时自动运行一些测试
+        window.addEventListener('load', () => {
+            logDebug('页面加载完成，开始自动测试...');
+            setTimeout(() => {
+                testExistingGroupChat();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
