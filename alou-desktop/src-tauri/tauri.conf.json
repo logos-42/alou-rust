@@ -29,7 +29,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+<<<<<<< Updated upstream
+    "targets": ["app", "dmg"],
+=======
+    "targets": ["app", "dmg"],
+>>>>>>> Stashed changes
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -44,6 +48,11 @@
     "longDescription": "Alou Desktop - A desktop application for Web3 AI agents with DIAP integration",
     "resources": ["kubo/*"],
     "externalBin": [],
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "10.13"
+    },
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
