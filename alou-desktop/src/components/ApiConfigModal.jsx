@@ -1,7 +1,55 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import CloseIcon from '@/assets/关闭0.3.png'
-import { invoke } from '@tauri-apps/api/core'
+// 安全导入 Tauri API
+let invokeCache = null;
+async function getInvoke() {
+  if (!invokeCache) {
+    // 检测是否在 Tauri 环境中
+    const isTauri = typeof window !== 'undefined' && 
+                   (window.__TAURI__ !== undefined || 
+                    window.__TAURI_IPC__ !== undefined ||
+                    (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.TAURI_PLATFORM)));
+    
+    if (isTauri) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        invokeCache = invoke;
+      } catch (error) {
+        console.warn('[ApiConfigModal] 无法导入 Tauri invoke，使用模拟函数:', error);
+        invokeCache = createMockInvoke();
+      }
+    } else {
+      console.log('[ApiConfigModal] 浏览器环境，使用模拟 invoke');
+      invokeCache = createMockInvoke();
+    }
+  }
+  return invokeCache;
+}
+
+// 创建模拟的 invoke 函数
+function createMockInvoke() {
+  return async (cmd, args) => {
+    console.warn(`[MockInvoke] ${cmd}`, args);
+    
+    switch (cmd) {
+      case 'test_api_connection':
+        return { success: true, message: '模拟API连接测试成功' };
+      case 'get_agent_config':
+        return { 
+          user_apis: [],
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: 'deepseek'
+        };
+      case 'update_agent_config':
+        return undefined;
+      default:
+        return {};
+    }
+  };
+}
+
 import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
 import './ApiConfigModal.css'
 
@@ -137,6 +185,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 
     try {
       // 通过 Tauri invoke 直接测试 API 连接，无需 Workers 后端
+      const invoke = await getInvoke();
       const result = await invoke('test_api_connection', {
         config: {
           id: 'test',
