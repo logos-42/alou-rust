@@ -39,10 +39,8 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
           !error.response
 
         if (isConnectionError) {
-          console.warn(
-            '[AgentChat] 后端服务器不可用，应用将在本地模式下运行。',
-          )
-          // 后端不可用时，设置为本地模式
+          // 后端不可用时不显示警告，静默切换到本地模式
+          console.log('[AgentChat] 后端不可用，使用本地模式')
           setConnectionStatus('local')
         } else {
           console.error('Connection check failed:', error)
@@ -89,12 +87,8 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
         const lastErrorTime = window.__lastCreateSessionError || 0
 
         if (isConnectionError) {
-          if (now - lastErrorTime > 10000) {
-            window.__lastCreateSessionError = now
-            console.warn(
-              '[AgentChat] 后端服务器不可用，使用本地会话模式。',
-            )
-          }
+          // 后端不可用时不显示警告，静默生成本地会话
+          console.log('[AgentChat] 后端不可用，使用本地会话模式')
           
           // 后端不可用时，生成本地会话ID
           const localSessionId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`

@@ -70,9 +70,9 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         const ipfsAvailable = await localIpfsGroupChatService.checkIpfsAvailability()
         setIsIpfsAvailable(ipfsAvailable)
         
+        // IPFS不可用时不显示错误，静默降级到内存模式
         if (!ipfsAvailable) {
-          setError('IPFS节点不可用，请确保IPFS节点正在运行')
-          return
+          console.log('[useLocalIpfsGroupChat] IPFS不可用，使用内存模式')
         }
 
         // 获取本地身份（简化版本，不依赖DIAP）
@@ -91,12 +91,12 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
             localIpfsGroupChatService.setLocalIdentity(identity)
             hasValidIdentity = true
           } else {
-            // 身份为空，提示用户设置身份
-            setError('请先在设置中创建身份（钱包地址或用户ID）才能使用群聊功能')
+            // 身份为空，静默处理，不显示错误
+            console.log('[useLocalIpfsGroupChat] 用户未设置身份，群聊功能将在设置身份后可用')
           }
         } catch (identityError: any) {
           console.warn('[useLocalIpfsGroupChat] 获取本地身份失败:', identityError)
-          setError('获取身份信息失败，请刷新页面重试')
+          // 静默处理身份获取失败，不显示错误提示
         }
 
         // 如果身份无效，仍然可以加载群聊但不能发送消息
@@ -132,22 +132,17 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         const ipfsAvailable = await localIpfsGroupChatService.checkIpfsAvailability()
         setIsIpfsAvailable(ipfsAvailable)
 
-        // 状态变化时更新错误提示
+        // 状态变化时仅记录日志，不显示错误提示
         if (!ipfsAvailable && wasAvailable) {
-          console.warn('[useLocalIpfsGroupChat] IPFS连接已断开')
-          setError('IPFS节点已断开连接，请检查IPFS节点是否正在运行')
+          console.log('[useLocalIpfsGroupChat] IPFS连接已断开，切换到内存模式')
         } else if (ipfsAvailable && !wasAvailable) {
           console.log('[useLocalIpfsGroupChat] IPFS连接已恢复')
-          // 清除之前的IPFS断开错误
-          if (error?.includes('IPFS')) {
-            setError(null)
-          }
         }
       } catch (error) {
         console.error('[useLocalIpfsGroupChat] IPFS健康检查失败:', error)
         if (isIpfsAvailable) {
           setIsIpfsAvailable(false)
-          setError('IPFS连接检查失败，请检查IPFS节点状态')
+          // 静默处理，不显示错误提示
         }
       }
     }
