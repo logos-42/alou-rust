@@ -91,7 +91,7 @@ export const useAgentPersistence = ({
       const agentData: Agent = {
         ...agentMetadata,
         sessionId,
-        id: agentMetadata.id || agentMetadata.ipns || agentMetadata.cid || `agent_${Date.now()}`,
+        id: agentMetadata.id || agentMetadata.ipns || agentMetadata.cid || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       }
       
       addAgentToStore(agentData)

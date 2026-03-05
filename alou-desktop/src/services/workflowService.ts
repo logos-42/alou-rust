@@ -93,6 +93,13 @@ export interface ExecutionControlResult {
  */
 export interface WorkflowStatusResult {
   success: boolean
+  data?: {
+    status: string
+    progress: number
+    current_step?: string
+    result?: any
+    error?: string
+  }
   workflow?: any
   status?: string
   steps?: any[]
@@ -409,16 +416,20 @@ export class WorkflowService {
   async getWorkflowStatus(workflowId: string): Promise<WorkflowStatusResult> {
     try {
       const result = await invoke<{
-        workflow: any
-        status: string
-        steps: any[]
+        data: {
+          status: string
+          progress: number
+          current_step?: string
+          result?: any
+          error?: string
+        }
       }>('get_workflow_status', { workflowId })
 
       return {
         success: true,
-        workflow: result.workflow,
-        status: result.status,
-        steps: result.steps || []
+        data: result.data,
+        status: result.data.status,
+        workflow: result.data
       }
     } catch (error) {
       console.error('[WorkflowService] 获取工作流状态失败:', error)

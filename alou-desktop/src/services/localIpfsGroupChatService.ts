@@ -834,10 +834,6 @@ class LocalIpfsGroupChatService {
     topic?: string | null,
     waitForAck: boolean = false
   ): Promise<boolean> {
-    if (!this.ipfsAvailable) {
-      throw new Error('IPFS节点不可用，无法发送消息')
-    }
-
     if (!this.localIdentity) {
       throw new Error('未设置本地身份，无法发送消息')
     }
@@ -864,20 +860,32 @@ class LocalIpfsGroupChatService {
     this.log(LogLevel.INFO, '发送消息:', { 
       messageId: messageObj.id, 
       groupId: messageObj.groupId,
-      type: messageObj.type 
+      type: messageObj.type,
+      ipfsAvailable: this.ipfsAvailable
     })
 
     try {
-      // 发布到IPFS PubSub
-      await invoke('ipfs_pubsub_publish', {
-        topic: messageObj.topic,
-        message: JSON.stringify(messageObj.toJSON()),
-        ipfs_api_url: DEFAULT_IPFS_API
-      })
+      // 如果 IPFS 可用，发布到 IPFS PubSub
+      if (this.ipfsAvailable) {
+        try {
+          await invoke('ipfs_pubsub_publish', {
+            topic: messageObj.topic,
+            message: JSON.stringify(messageObj.toJSON()),
+            ipfs_api_url: DEFAULT_IPFS_API
+          })
+          this.log(LogLevel.INFO, 'IPFS 发布成功:', { messageId: messageObj.id })
+        } catch (ipfsError: any) {
+          this.log(LogLevel.WARN, 'IPFS 发布失败，降级到内存模式:', { 
+            messageId: messageObj.id, 
+            error: ipfsError.message 
+          })
+          // 继续执行，保存到内存和 KV
+        }
+      } else {
+        this.log(LogLevel.INFO, 'IPFS 不可用，使用内存模式:', { messageId: messageObj.id })
+      }
 
-      this.log(LogLevel.INFO, 'IPFS 发布成功，准备保存消息:', { messageId: messageObj.id })
-
-      // IPFS 发布成功后才保存
+      // 无论 IPFS 是否可用，都保存到本地
       // 保存到内存
       this.saveMessageToMemory(messageObj.groupId, messageObj)
       
@@ -893,22 +901,27 @@ class LocalIpfsGroupChatService {
       // 标记为已发送
       messageObj.delivered = true
 
-      // 如果需要等待确认
-      if (waitForAck) {
+      // 如果需要等待确认（仅在 IPFS 可用时）
+      if (waitForAck && this.ipfsAvailable) {
         await this.waitForAck(messageObj.id)
       }
 
-      this.log(LogLevel.INFO, '消息发送成功:', { messageId: messageObj.id })
+      this.log(LogLevel.INFO, '消息发送成功:', { 
+        messageId: messageObj.id,
+        mode: this.ipfsAvailable ? 'IPFS' : '内存'
+      })
       return true
 
     } catch (error: any) {
-      this.log(LogLevel.ERROR, '发送消息失败，不保存到本地:', { 
+      this.log(LogLevel.ERROR, '发送消息失败:', { 
         messageId: messageObj.id, 
         error: error.message 
       })
       
-      // 加入重试队列
-      this.addToRetryQueue(messageObj)
+      // 如果 IPFS 可用，加入重试队列
+      if (this.ipfsAvailable) {
+        this.addToRetryQueue(messageObj)
+      }
       
       throw new Error(`发送消息失败: ${error.message}`)
     }

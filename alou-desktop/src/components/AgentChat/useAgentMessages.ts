@@ -8,7 +8,6 @@ import { getSystemPromptForAgent } from './utils/agentPrompts'
 import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
-import type { ClusterActionStore } from '@/stores/clusterActionStore.types'
 import clusterActionStore from '@/stores/clusterActionStore'
 
 // ── Tauri 进度事件类型 ──────────────────────────────────────────
@@ -590,6 +589,11 @@ export const useAgentMessages = ({
     walletAddress,
   ])
 
+  // 更新 ref，使事件处理器可以访问最新的 sendMessageToAgent
+  useEffect(() => {
+    sendMessageToAgentRef.current = sendMessageToAgent
+  }, [sendMessageToAgent])
+
 
   // 向后兼容的 sendMessage（发送到当前活动智能体）
   // 当没有选中智能体时，任何文本消息都会触发"用对话创建智能体"流程
@@ -761,37 +765,42 @@ export const useAgentMessages = ({
     }
   }, [messagesByChannel, activeChannelId, selectedAgent, saveMessagesToIpfs])
   
+  // 创建 ref 来存储 sendMessageToAgent，以便在事件处理器中使用
+  const sendMessageToAgentRef = useRef<((targetAgentId: string, text: string, targetAgent: Agent | null) => Promise<void>) | null>(null)
 
   // 监听群聊消息事件
   useEffect(() => {
-    const handleAgentGroupMessage = (event: Event) => {
+    const handleAgentGroupMessage = async (event: Event) => {
       const customEvent = event as CustomEvent<{ agentId: string; message: GroupChatMessage }>
       const { agentId, message } = customEvent.detail
       
-      if (selectedAgent && selectedAgent.id === agentId) {
-        console.log('[useAgentMessages] 智能体收到群聊消息:', agentId, message)
-        
-        const agentMessage: Message = {
-          id: `group_msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          type: 'user',
-          content: message.content || message.text || '',
-          timestamp: message.timestamp || Date.now(),
-          source: 'group-chat',
-          metadata: {
-            groupId: message.groupId,
-            fromName: message.fromName,
-            originalMessage: message,
-            isGroupChatMessage: true,
-          }
+      // 关键修复：移除 selectedAgent 检查，让所有智能体都能接收群聊消息
+      // 即使智能体未被选中，也应该能够处理群聊消息
+      console.log('[useAgentMessages] 智能体收到群聊消息:', agentId, message)
+      
+      const messageContent = message.content || message.text || ''
+      if (!messageContent.trim()) {
+        console.warn('[useAgentMessages] 群聊消息内容为空，跳过')
+        return
+      }
+      
+      // 检查智能体是否正在执行
+      if (isAgentLoading(agentId)) {
+        console.log('[useAgentMessages] 智能体正在执行中，跳过群聊消息:', agentId)
+        return
+      }
+      
+      // 使用 ref 中的 sendMessageToAgent 函数来触发智能体响应
+      if (sendMessageToAgentRef.current) {
+        console.log('[useAgentMessages] 触发智能体处理群聊消息:', agentId, messageContent.slice(0, 50))
+        try {
+          // 调用 sendMessageToAgent 让智能体处理消息
+          await sendMessageToAgentRef.current(agentId, messageContent, null)
+        } catch (error) {
+          console.error('[useAgentMessages] 智能体处理群聊消息失败:', agentId, error)
         }
-        
-        appendMessage(agentMessage, agentId)
-        
-        if (!isAgentLoading(agentId)) {
-          setTimeout(() => {
-            console.log('[useAgentMessages] 触发智能体处理群聊消息:', agentId)
-          }, 100)
-        }
+      } else {
+        console.warn('[useAgentMessages] sendMessageToAgent 未初始化，无法处理群聊消息')
       }
     }
     
@@ -800,7 +809,7 @@ export const useAgentMessages = ({
     return () => {
       window.removeEventListener('agent-group-message', handleAgentGroupMessage)
     }
-  }, [selectedAgent, appendMessage, isAgentLoading])
+  }, [isAgentLoading])
 
   // 监听智能体消息变化，如果是群聊消息的回复，则同步到群聊
   useEffect(() => {
@@ -817,7 +826,7 @@ export const useAgentMessages = ({
         console.log('[useAgentMessages] 智能体回复群聊消息，同步到群聊:', groupId, lastMessage)
         
         try {
-          const { addGroupChatMessage } = clusterActionStore
+          const { addGroupChatMessage } = clusterActionStore.getState()
           const groupReplyMessage = {
             id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             type: 'agent' as const,

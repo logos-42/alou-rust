@@ -91,15 +91,29 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
             localIpfsGroupChatService.setLocalIdentity(identity)
             hasValidIdentity = true
           } else {
-            // 身份为空，静默处理，不显示错误
-            console.log('[useLocalIpfsGroupChat] 用户未设置身份，群聊功能将在设置身份后可用')
+            // 创建默认身份，允许用户使用群聊功能
+            const defaultIdentity: LocalIdentity = {
+              did: `user_${Date.now()}`,
+              name: '本地用户'
+            }
+            setLocalIdentity(defaultIdentity)
+            localIpfsGroupChatService.setLocalIdentity(defaultIdentity)
+            hasValidIdentity = true
+            console.log('[useLocalIpfsGroupChat] 使用默认身份，群聊功能可用')
           }
         } catch (identityError: any) {
-          console.warn('[useLocalIpfsGroupChat] 获取本地身份失败:', identityError)
-          // 静默处理身份获取失败，不显示错误提示
+          console.warn('[useLocalIpfsGroupChat] 获取本地身份失败，使用默认身份:', identityError)
+          // 创建默认身份作为降级方案
+          const defaultIdentity: LocalIdentity = {
+            did: `user_${Date.now()}`,
+            name: '本地用户'
+          }
+          setLocalIdentity(defaultIdentity)
+          localIpfsGroupChatService.setLocalIdentity(defaultIdentity)
+          hasValidIdentity = true
         }
 
-        // 如果身份无效，仍然可以加载群聊但不能发送消息
+        // 移除身份无效的警告，因为我们总是会创建默认身份
         if (!hasValidIdentity) {
           console.warn('[useLocalIpfsGroupChat] 身份无效，无法创建/加入群聊')
         }
@@ -107,7 +121,38 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         // 加载已有的群聊
         await localIpfsGroupChatService.loadGroupsFromKV()
         const loadedGroups = localIpfsGroupChatService.getAllGroups()
-        setGroups(loadedGroups)
+        
+        // 同步 Iroh 群聊
+        try {
+          const { irohGroupChatService } = await import('@/services/irohGroupChatService')
+          const irohGroups = await irohGroupChatService.listGroups()
+          
+          // 将 Iroh 群聊转换为 LocalGroup 格式
+          const convertedIrohGroups = irohGroups.map(irohGroup => ({
+            groupId: irohGroup.group_id,
+            groupName: irohGroup.group_name,
+            topic: irohGroup.ticket,
+            description: irohGroup.description || '',
+            members: irohGroup.members,
+            createdAt: irohGroup.created_at,
+            createdBy: irohGroup.created_by,
+            isPublic: true,
+            metadata: {
+              type: 'iroh_group',
+              ticket: irohGroup.ticket
+            }
+          }))
+          
+          // 合并本地群聊和 Iroh 群聊
+          const allGroups = [...loadedGroups, ...convertedIrohGroups]
+          setGroups(allGroups)
+          
+          console.log('[useLocalIpfsGroupChat] 已同步 Iroh 群聊:', irohGroups.length)
+        } catch (irohError) {
+          console.warn('[useLocalIpfsGroupChat] 同步 Iroh 群聊失败:', irohError)
+          // 即使 Iroh 同步失败，也使用本地群聊
+          setGroups(loadedGroups)
+        }
 
         setIsInitialized(true)
         console.log('[useLocalIpfsGroupChat] 初始化完成')
@@ -140,10 +185,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         }
       } catch (error) {
         console.error('[useLocalIpfsGroupChat] IPFS健康检查失败:', error)
-        if (isIpfsAvailable) {
-          setIsIpfsAvailable(false)
-          // 静默处理，不显示错误提示
-        }
+        setIsIpfsAvailable(false)
       }
     }
 
@@ -153,7 +195,7 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
     return () => {
       clearInterval(heartbeatInterval)
     }
-  }, [isInitialized, isIpfsAvailable, error])
+  }, [isInitialized]) // 移除 isIpfsAvailable 和 error 依赖，避免循环
 
   // 创建群聊
   const createGroup = useCallback(async (config: GroupConfig): Promise<LocalGroup> => {
@@ -285,8 +327,8 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
 
   // 发送消息
   const sendMessage = useCallback(async (content: string): Promise<void> => {
-    if (!activeGroup || !isInitialized || !isIpfsAvailable) {
-      throw new Error('没有活跃群聊或服务不可用')
+    if (!activeGroup || !isInitialized) {
+      throw new Error('没有活跃群聊或服务未初始化')
     }
 
     try {
@@ -345,8 +387,37 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
     try {
       await localIpfsGroupChatService.loadGroupsFromKV()
       const loadedGroups = localIpfsGroupChatService.getAllGroups()
-      setGroups(loadedGroups)
-      console.log('[useLocalIpfsGroupChat] 群聊列表已刷新')
+      
+      // 同步 Iroh 群聊
+      try {
+        const { irohGroupChatService } = await import('@/services/irohGroupChatService')
+        const irohGroups = await irohGroupChatService.listGroups()
+        
+        // 将 Iroh 群聊转换为 LocalGroup 格式
+        const convertedIrohGroups = irohGroups.map(irohGroup => ({
+          groupId: irohGroup.group_id,
+          groupName: irohGroup.group_name,
+          topic: irohGroup.ticket,
+          description: irohGroup.description || '',
+          members: irohGroup.members,
+          createdAt: irohGroup.created_at,
+          createdBy: irohGroup.created_by,
+          isPublic: true,
+          metadata: {
+            type: 'iroh_group',
+            ticket: irohGroup.ticket
+          }
+        }))
+        
+        // 合并本地群聊和 Iroh 群聊
+        const allGroups = [...loadedGroups, ...convertedIrohGroups]
+        setGroups(allGroups)
+        
+        console.log('[useLocalIpfsGroupChat] 群聊列表已刷新，包含', irohGroups.length, '个 Iroh 群聊')
+      } catch (irohError) {
+        console.warn('[useLocalIpfsGroupChat] 同步 Iroh 群聊失败:', irohError)
+        setGroups(loadedGroups)
+      }
     } catch (error: any) {
       console.error('[useLocalIpfsGroupChat] 刷新群聊列表失败:', error)
       setError(error.message)

@@ -111,7 +111,7 @@ export const useMultiAgentCoordinator = ({
       // 将智能体间消息添加到对应频道
       if (message.content) {
         appendMessage({
-          id: message.id || `agent_${Date.now()}`,
+          id: message.id || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
           type: 'assistant',
           content: message.content,
           timestamp: message.timestamp || Date.now(),

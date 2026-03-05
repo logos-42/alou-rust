@@ -203,7 +203,7 @@ export const buildChannelFromAgent = (agent: Agent | null): Channel | null => {
   }
   
   // IPNS 应该优先于 DID 作为标识符
-  const id = cleanedAgent.ipns || cleanedAgent.did || cleanedAgent.cid || `agent_${Date.now()}`
+  const id = cleanedAgent.ipns || cleanedAgent.did || cleanedAgent.cid || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   const nameFromIpns = cleanedAgent.ipns ? cleanedAgent.ipns.replace(/^\/?ipns\//, '') : null
   const nameFromDid = cleanedAgent.did ? cleanedAgent.did.split(':').filter(Boolean).slice(-1)[0] : null
   const fallbackName = cleanedAgent.cid || id

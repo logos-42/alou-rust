@@ -56,11 +56,91 @@ class SkillsService {
     try {
       // 动态导入 WorkflowSkill
       const { WorkflowSkill } = await import('../skills/WorkflowSkill')
-
       const workflowSkill = new WorkflowSkill()
-      this.skills = [workflowSkill.getDefinition()]
+      
+      // 动态导入 IpfsAutoFixSkill
+      let ipfsAutoFixSkill = null
+      try {
+        const ipfsAutoFixModule = await import('../skills/builtin/ipfs-auto-fix/skill')
+        ipfsAutoFixSkill = ipfsAutoFixModule.default
+      } catch (error) {
+        console.warn('[SkillsService] IPFS Auto-Fix Skill 加载失败:', error)
+      }
 
-      console.log('[SkillsService] 加载本地技能成功')
+      this.skills = [
+        workflowSkill.getDefinition(),
+        ...(ipfsAutoFixSkill ? [{
+          name: 'ipfs-auto-fix',
+          displayName: 'IPFS 自动修复',
+          description: 'IPFS 自动修复技能，检测和修复 IPFS 节点问题',
+          version: '1.0.0',
+          category: 'system',
+          actions: [
+            {
+              name: 'check',
+              displayName: '检查状态',
+              description: '检查 IPFS 节点状态',
+              parameters: {}
+            },
+            {
+              name: 'fix',
+              displayName: '自动修复',
+              description: '自动检测并修复 IPFS 问题',
+              parameters: {
+                autoDownload: {
+                  type: 'boolean',
+                  description: '是否自动下载 Kubo',
+                  default: true
+                },
+                maxRetries: {
+                  type: 'number',
+                  description: '最大重试次数',
+                  default: 3
+                }
+              }
+            },
+            {
+              name: 'start',
+              displayName: '启动节点',
+              description: '启动 IPFS 节点',
+              parameters: {
+                autoDownload: {
+                  type: 'boolean',
+                  description: '是否自动下载 Kubo',
+                  default: true
+                }
+              }
+            },
+            {
+              name: 'stop',
+              displayName: '停止节点',
+              description: '停止 IPFS 节点',
+              parameters: {}
+            },
+            {
+              name: 'restart',
+              displayName: '重启节点',
+              description: '重启 IPFS 节点',
+              parameters: {
+                autoDownload: {
+                  type: 'boolean',
+                  description: '是否自动下载 Kubo',
+                  default: true
+                }
+              }
+            },
+            {
+              name: 'diagnose',
+              displayName: '诊断问题',
+              description: '诊断 IPFS 问题并提供建议',
+              parameters: {}
+            }
+          ],
+          instance: ipfsAutoFixSkill
+        }] : [])
+      ]
+
+      console.log('[SkillsService] 加载本地技能成功，共', this.skills.length, '个')
     } catch (error) {
       console.error('[SkillsService] 加载本地技能失败:', error)
       this.skills = []
@@ -195,8 +275,19 @@ class SkillsService {
   async executeLocally(skillName, actionName, parameters) {
     const skillInstance = this.skillInstances.get(skillName)
 
-    if (skillInstance && typeof skillInstance[actionName] === 'function') {
-      return await skillInstance[actionName](parameters)
+    if (skillInstance) {
+      // 对于 IPFS Auto-Fix skill，使用 execute 方法
+      if (skillName === 'ipfs-auto-fix' && typeof skillInstance.execute === 'function') {
+        return await skillInstance.execute({
+          action: actionName,
+          ...parameters
+        })
+      }
+      
+      // 对于其他 skills，使用 action 方法
+      if (typeof skillInstance[actionName] === 'function') {
+        return await skillInstance[actionName](parameters)
+      }
     }
 
     // 默认实现：返回参数（用于测试）

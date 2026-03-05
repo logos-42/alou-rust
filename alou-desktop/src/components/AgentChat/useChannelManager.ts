@@ -706,7 +706,7 @@ export const useChannelManager = ({
         hasChannel: !!channel
       })
       
-      const agentId = channel ? channel.id : (agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}`)
+      const agentId = channel ? channel.id : (agentMetadata.ipns || agentMetadata.cid || agentMetadata.did || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`)
       
       console.log('[useChannelManager] 保存智能体到本地存储，使用ID:', agentId)
       console.log('[useChannelManager] 调用 addAgentToStore，参数:', {

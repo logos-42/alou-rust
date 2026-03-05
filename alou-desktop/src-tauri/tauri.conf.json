@@ -29,11 +29,7 @@
   },
   "bundle": {
     "active": true,
-<<<<<<< Updated upstream
     "targets": ["app", "dmg"],
-=======
-    "targets": ["app", "dmg"],
->>>>>>> Stashed changes
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

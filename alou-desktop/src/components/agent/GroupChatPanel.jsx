@@ -18,17 +18,6 @@ const AgentAvatar = ({ agent, onAgentClick, t }) => {
   const agentId = agent.id || agent.agent_id || agent.did
   const avatar = resolveAgentAvatar(agent)
   
-  // 调试信息
-  console.log('[AgentAvatar] 渲染智能体:', {
-    agentId,
-    originalAgent: agent,
-    resolvedAvatar: avatar,
-    hasAvatar: !!avatar,
-    avatarSource: agent.avatar ? 'agent.avatar' : 
-                  agent.avatar_url ? 'agent.avatar_url' :
-                  agent.avatar_cid ? 'agent.avatar_cid' : 'unknown'
-  })
-  
   return (
     <button
       key={agentId}
@@ -41,11 +30,6 @@ const AgentAvatar = ({ agent, onAgentClick, t }) => {
           <img 
             src={avatar} 
             alt={agent.name || agent.agent_name}
-            onLoad={() => console.log('[AgentAvatar] 头像加载成功:', avatar)}
-            onError={(e) => {
-              console.error('[AgentAvatar] 头像加载失败:', avatar, e)
-              e.target.style.display = 'none'
-            }}
           />
         ) : (
           <div style={{
@@ -130,32 +114,13 @@ const GroupChatPanel = ({
 
   // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
-    console.log('[GroupChatPanel] actualAgents 计算:', {
-      activeGroupAgents: activeGroup?.agents,
-      externalAgents: agents,
-      result: activeGroup?.agents || agents || []
-    })
     return activeGroup?.agents || agents || []
   }, [activeGroup, agents])
-
-  // 调试信息
-  useEffect(() => {
-    console.log('[GroupChatPanel] ========== 本地IPFS群聊调试信息 ==========')
-    console.log('[GroupChatPanel] isInitialized:', isInitialized)
-    console.log('[GroupChatPanel] isIpfsAvailable:', isIpfsAvailable)
-    console.log('[GroupChatPanel] localIdentity:', localIdentity?.did)
-    console.log('[GroupChatPanel] activeGroup:', activeGroup)
-    console.log('[GroupChatPanel] actualAgents 数量:', actualAgents.length)
-    console.log('[GroupChatPanel] messages 数量:', messages.length)
-    console.log('[GroupChatPanel] error:', error)
-    console.log('[GroupChatPanel] =======================================')
-  }, [isInitialized, isIpfsAvailable, localIdentity, activeGroup, actualAgents.length, messages.length, error])
 
   // 错误处理
   useEffect(() => {
     if (error) {
       console.error('[GroupChatPanel] 群聊服务错误:', error)
-      // 可以在这里显示错误提示
     }
   }, [error])
 
@@ -214,26 +179,60 @@ const GroupChatPanel = ({
 
   // 处理消息发送
   const handleSendMessage = useCallback(async () => {
-    if (!messageInput.trim() || !activeGroup) {
+    if (!messageInput.trim()) {
+      console.warn('[GroupChatPanel] 消息内容为空')
       return
     }
 
+    if (!activeGroup) {
+      console.warn('[GroupChatPanel] 没有活跃的群聊')
+      setSendError('服务不可用或没有活跃群聊，请先创建或加入群聊')
+      return
+    }
+
+    const groupId = activeGroup.groupId || activeGroup.action_id
+    if (!groupId) {
+      console.error('[GroupChatPanel] 群聊ID缺失:', activeGroup)
+      setSendError('群聊ID缺失，无法发送消息')
+      return
+    }
+
+    console.log('[GroupChatPanel] 准备发送消息:', {
+      groupId,
+      messageLength: messageInput.trim().length,
+      hasExternalCallback: !!externalOnSendMessage,
+      isInitialized,
+      isIpfsAvailable
+    })
+
     try {
       clearError()
+      setSendError(null) // 清除之前的错误
       
-      // 优先使用本地IPFS群聊服务发送消息
-      if (isInitialized && isIpfsAvailable) {
+      // 优先使用外部回调（包含智能体通知逻辑）
+      if (externalOnSendMessage && typeof externalOnSendMessage === 'function') {
+        // 参数顺序：(groupId, content)
+        console.log('[GroupChatPanel] 调用外部回调:', groupId, messageInput.trim().slice(0, 50))
+        await externalOnSendMessage(groupId, messageInput.trim())
+        console.log('[GroupChatPanel] 使用外部回调发送消息成功')
+      } else if (isInitialized && isIpfsAvailable) {
+        // 降级到本地IPFS群聊服务
+        console.log('[GroupChatPanel] 使用本地IPFS服务发送')
         await sendMessage(messageInput.trim())
-      } else if (externalOnSendMessage && typeof externalOnSendMessage === 'function') {
-        // 降级到外部回调
-        await externalOnSendMessage(activeGroup.groupId, messageInput.trim())
+        console.log('[GroupChatPanel] 使用本地IPFS服务发送消息成功')
+      } else if (isInitialized) {
+        // 内存模式：直接发送消息
+        console.log('[GroupChatPanel] 使用内存模式发送')
+        await sendMessage(messageInput.trim())
+        console.log('[GroupChatPanel] 使用内存模式发送消息成功')
       } else {
         console.warn('[GroupChatPanel] 没有可用的发送方法')
+        setSendError('群聊服务未初始化，请稍后重试')
         return
       }
       
       setMessageInput('')
-      console.log('[GroupChatPanel] 消息发送成功:', messageInput.trim())
+      console.log('[GroupChatPanel] 消息发送成功')
     } catch (error) {
       console.error('[GroupChatPanel] 发送消息失败:', error)
       setSendError(error.message || '消息发送失败，请重试')
@@ -485,14 +484,14 @@ const GroupChatPanel = ({
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={isIpfsAvailable ? "输入消息..." : "IPFS 不可用"}
-              disabled={!isIpfsAvailable || isLoading}
+              placeholder={isIpfsAvailable ? "输入消息..." : "内存模式 - 输入消息..."}
+              disabled={!isInitialized || isLoading}
             />
             <button
               type="button"
               className="send-button"
               onClick={handleSendMessage}
-              disabled={!messageInput.trim() || (isInitialized && isLoading) || !isIpfsAvailable}
+              disabled={!messageInput.trim() || !isInitialized || isLoading}
               title="发送消息 (Enter)"
             >
               {(isInitialized && isLoading) ? '...' : '→'}

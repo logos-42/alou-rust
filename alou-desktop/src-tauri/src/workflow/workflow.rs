@@ -26,6 +26,7 @@ pub struct Workflow {
     pub steps: Vec<WorkflowStep>,
     pub status: String,
     pub created_at: i64,
+    pub updated_at: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,6 +86,7 @@ pub async fn create_workflow(
         steps: request.workflow.steps,
         status: "draft".to_string(),
         created_at: chrono::Utc::now().timestamp(),
+        updated_at: chrono::Utc::now().timestamp(),
     };
 
     workflows.insert(workflow_id.clone(), workflow);
@@ -106,8 +108,12 @@ pub async fn execute_workflow(
     let workflow = workflows.get_mut(&request.workflow_id)
         .ok_or_else(|| "Workflow not found".to_string())?;
 
+    // Generate execution ID
+    let execution_id = format!("exec_{}", uuid::Uuid::new_v4().to_string());
+
     // Mark workflow as running
     workflow.status = "running".to_string();
+    workflow.updated_at = chrono::Utc::now().timestamp();
 
     // Simulate workflow execution (in real implementation, this would orchestrate the steps)
     // For now, we'll just mark all steps as completed
@@ -117,19 +123,13 @@ pub async fn execute_workflow(
     }
 
     workflow.status = "completed".to_string();
+    workflow.updated_at = chrono::Utc::now().timestamp();
 
     Ok(serde_json::json!({
-        "execution_result": {
-            "status": "completed",
-            "message": "Workflow executed successfully"
-        },
-        "step_results": workflow.steps.iter().map(|step| {
-            serde_json::json!({
-                "step_id": step.id,
-                "status": step.status,
-                "result": step.result
-            })
-        }).collect::<Vec<_>>()
+        "execution_id": execution_id,
+        "workflow_id": request.workflow_id,
+        "status": "completed",
+        "message": "Workflow executed successfully"
     }))
 }
 
@@ -144,9 +144,45 @@ pub fn get_workflow_status(
     let workflow = workflows.get(&workflow_id)
         .ok_or_else(|| "Workflow not found".to_string())?;
 
+    // Calculate progress based on completed steps
+    let total_steps = workflow.steps.len();
+    let completed_steps = workflow.steps.iter()
+        .filter(|step| step.status.as_ref().map_or(false, |s| s == "completed"))
+        .count();
+    let progress = if total_steps > 0 {
+        (completed_steps as f64 / total_steps as f64 * 100.0) as u32
+    } else {
+        0
+    };
+
+    // Get current step
+    let current_step = workflow.steps.iter()
+        .find(|step| step.status.as_ref().map_or(false, |s| s == "running"))
+        .map(|step| step.name.clone());
+
     Ok(serde_json::json!({
-        "workflow": workflow,
-        "status": workflow.status
+        "data": {
+            "status": workflow.status,
+            "progress": progress,
+            "current_step": current_step,
+            "result": if workflow.status == "completed" {
+                Some(serde_json::json!({
+                    "steps": workflow.steps.iter().map(|step| {
+                        serde_json::json!({
+                            "id": step.id,
+                            "name": step.name,
+                            "status": step.status,
+                            "result": step.result
+                        })
+                    }).collect::<Vec<_>>()
+                }))
+            } else {
+                None
+            },
+            "error": workflow.steps.iter()
+                .find(|step| step.status.as_ref().map_or(false, |s| s == "failed"))
+                .and_then(|step| step.error.clone())
+        }
     }))
 }
 
@@ -155,16 +191,7 @@ pub fn get_workflow_status(
 pub fn list_workflows(state: State<'_, WorkflowState>) -> Result<serde_json::Value, String> {
     let workflows = state.workflows.lock().map_err(|e| e.to_string())?;
 
-    let workflow_list: Vec<serde_json::Value> = workflows.values().map(|wf| {
-        serde_json::json!({
-            "id": wf.id,
-            "name": wf.name,
-            "description": wf.description,
-            "status": wf.status,
-            "step_count": wf.steps.len(),
-            "created_at": wf.created_at
-        })
-    }).collect();
+    let workflow_list: Vec<&Workflow> = workflows.values().collect();
 
     Ok(serde_json::json!({
         "workflows": workflow_list

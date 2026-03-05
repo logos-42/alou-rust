@@ -355,11 +355,52 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     try {
       await diapGroupChat.sendMessage(groupId, content)
       console.log('[useGroupChatManager] 消息发送成功:', groupId, content)
+      
+      // 关键：通知所有智能体处理群聊消息
+      const { getActiveAction } = useClusterActionStore.getState()
+      const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
+      
+      if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
+        console.log('[useGroupChatManager] 准备通知智能体:', activeAction.agents.length, '个')
+        
+        // 获取用户标识
+        const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+        const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
+        const from = walletAddress || userId || 'user'
+        
+        // 广播消息给所有参与群聊的智能体
+        const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
+        
+        for (const agentId of agentIds) {
+          try {
+            console.log('[useGroupChatManager] 通知智能体:', agentId)
+            // 触发智能体处理消息的事件
+            window.dispatchEvent(new CustomEvent('agent-group-message', {
+              detail: {
+                agentId,
+                message: {
+                  id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                  content: content,
+                  from: from,
+                  fromName: localIdentity?.name || from,
+                  timestamp: Date.now(),
+                  groupId: groupId,
+                  type: 'group_chat_message'
+                }
+              }
+            }))
+          } catch (error) {
+            console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
+          }
+        }
+      } else {
+        console.warn('[useGroupChatManager] 没有找到活跃的群聊或智能体')
+      }
     } catch (error) {
       console.error('[useGroupChatManager] 发送消息失败:', error)
       throw error
     }
-  }, [diapGroupChat])
+  }, [diapGroupChat, activeChannelId, localIdentity])
 
   // 切换群聊
   const switchGroupChat = useCallback(async (groupId) => {

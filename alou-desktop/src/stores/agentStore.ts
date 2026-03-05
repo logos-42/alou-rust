@@ -110,7 +110,7 @@ const useAgentStore = create<AgentStore>()(
                             ipnsValue || 
                             agentData.did || 
                             agentData.cid || 
-                            `agent_${Date.now()}`
+                            `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
         
         // 处理头像URL
         const avatarUrl = agentData.avatar_cid ? get().resolveIpfsUrl(agentData.avatar_cid) : (agentData.avatar_url || agentData.avatar_cid || null)
