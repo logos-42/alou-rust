@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useDiapGroupChat } from '@/hooks/useDiapGroupChat'
 import useClusterActionStore from '@/stores/clusterActionStore'
+import { parseMentions } from '@/utils/mentionParser'
 
 /**
  * useGroupChatManager - 基于DIAP PubSub的群聊管理 Hook
@@ -356,7 +357,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       await diapGroupChat.sendMessage(groupId, content)
       console.log('[useGroupChatManager] 消息发送成功:', groupId, content)
       
-      // 关键：通知所有智能体处理群聊消息
+      // 关键：通知智能体处理群聊消息（支持@提及过滤）
       const { getActiveAction } = useClusterActionStore.getState()
       const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
       
@@ -368,8 +369,29 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
         const from = walletAddress || userId || 'user'
         
-        // 广播消息给所有参与群聊的智能体
-        const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
+        // 解析@提及
+        const { mentionedAgents, cleanContent, hasMention } = parseMentions(content, activeAction.agents)
+        
+        // 确定要通知的智能体列表
+        let targetAgents = activeAction.agents
+        
+        if (hasMention && mentionedAgents.length > 0) {
+          // 如果有@提及，只通知被@的智能体
+          targetAgents = mentionedAgents
+          console.log('[useGroupChatManager] @提及检测: 只通知被@的智能体:', mentionedAgents.map(a => a.name || a.id))
+        } else if (hasMention && mentionedAgents.length === 0) {
+          // 有@但没有匹配到智能体，跳过通知
+          console.log('[useGroupChatManager] @提及但未匹配到智能体，不通知')
+          return
+        } else {
+          // 没有@，广播给所有智能体
+          console.log('[useGroupChatManager] 无@提及，广播给所有智能体')
+        }
+        
+        // 通知目标智能体
+        const agentIds = targetAgents
+          .map(agent => agent.id || agent.agent_id)
+          .filter(Boolean)
         
         for (const agentId of agentIds) {
           try {
@@ -380,12 +402,15 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
                 agentId,
                 message: {
                   id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                  content: content,
+                  content: hasMention ? cleanContent : content, // 有@时使用清理后的内容
+                  rawContent: content, // 保留原始内容
                   from: from,
                   fromName: localIdentity?.name || from,
                   timestamp: Date.now(),
                   groupId: groupId,
-                  type: 'group_chat_message'
+                  type: 'group_chat_message',
+                  isMentioned: hasMention,
+                  mentionedAgentIds: mentionedAgents.map(a => a.id)
                 }
               }
             }))

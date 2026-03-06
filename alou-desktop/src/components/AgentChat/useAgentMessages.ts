@@ -9,6 +9,7 @@ import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
 import clusterActionStore from '@/stores/clusterActionStore'
+import { parseMentions, isAgentMentioned } from '@/utils/mentionParser'
 
 // ── Tauri 进度事件类型 ──────────────────────────────────────────
 interface AgentProgressPayload {
@@ -93,6 +94,10 @@ export interface GroupChatMessage {
   content?: string
   text?: string
   timestamp?: number
+  // @提及相关字段
+  rawContent?: string // 原始消息内容（包含@）
+  isMentioned?: boolean // 是否有@提及
+  mentionedAgentIds?: string[] // 被@的智能体ID列表
 }
 
 // Hook参数类型
@@ -365,11 +370,15 @@ export const useAgentMessages = ({
    * 支持多智能体独立执行空间
    * 自动检测是否需要集群行动
    */
-  const sendMessageToAgent = useCallback(async (targetAgentId: string, text: string, targetAgent: Agent | null = null) => {
+  const sendMessageToAgent = useCallback(async (targetAgentId: string, text: string, targetAgent: Agent | null = null, options?: { groupId?: string; isGroupChat?: boolean; originalMessage?: string }) => {
     if (!text?.trim() || !targetAgentId) {
       console.warn('[useAgentMessages] 无法发送消息：缺少文本或目标智能体')
       return
     }
+
+    // 如果是群聊消息，设置 metadata
+    const isGroupChat = options?.isGroupChat || false
+    const groupId = options?.groupId
 
     // 检查该智能体是否正在执行
     if (loadingByAgent[targetAgentId]) {
@@ -382,6 +391,11 @@ export const useAgentMessages = ({
       type: 'user',
       content: String(text).trim(),
       timestamp: Date.now(),
+      metadata: isGroupChat ? {
+        isGroupChatMessage: true,
+        groupId: groupId,
+        originalMessage: options?.originalMessage
+      } : undefined
     }
 
     appendMessage(userMessage, targetAgentId)
@@ -766,7 +780,7 @@ export const useAgentMessages = ({
   }, [messagesByChannel, activeChannelId, selectedAgent, saveMessagesToIpfs])
   
   // 创建 ref 来存储 sendMessageToAgent，以便在事件处理器中使用
-  const sendMessageToAgentRef = useRef<((targetAgentId: string, text: string, targetAgent: Agent | null) => Promise<void>) | null>(null)
+  const sendMessageToAgentRef = useRef<((targetAgentId: string, text: string, targetAgent: Agent | null, options?: { groupId?: string; isGroupChat?: boolean; originalMessage?: string }) => Promise<void>) | null>(null)
 
   // 监听群聊消息事件
   useEffect(() => {
@@ -784,6 +798,45 @@ export const useAgentMessages = ({
         return
       }
       
+      // 检查消息是否包含@提及
+      if (message.isMentioned !== undefined && message.isMentioned) {
+        // 消息有@提及，检查当前智能体是否在被@列表中
+        const mentionedIds = message.mentionedAgentIds || []
+        if (!mentionedIds.includes(agentId)) {
+          console.log('[useAgentMessages] 智能体未被@，跳过处理:', agentId, '被@的智能体:', mentionedIds)
+          return
+        }
+        console.log('[useAgentMessages] 智能体被@，继续处理:', agentId)
+      } else {
+        // 如果没有@提及标记，检查原始消息是否包含@（兼容旧消息格式）
+        const { getActiveAction } = clusterActionStore.getState()
+        const activeAction = message.groupId ? 
+          (getActiveAction(null) || { agents: [] }) : 
+          { agents: [] }
+        
+        // 尝试从store获取智能体列表
+        let agentsList: any[] = []
+        try {
+          const { getActions } = clusterActionStore.getState()
+          const actions = getActions(null) || []
+          for (const action of actions) {
+            if (action.agents && Array.isArray(action.agents)) {
+              agentsList = [...agentsList, ...action.agents]
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+        
+        if (agentsList.length > 0 && messageContent.includes('@')) {
+          // 消息包含@，检查是否@了当前智能体
+          if (!isAgentMentioned(agentId, messageContent, agentsList)) {
+            console.log('[useAgentMessages] 智能体未被@（兼容检查），跳过处理:', agentId)
+            return
+          }
+        }
+      }
+      
       // 检查智能体是否正在执行
       if (isAgentLoading(agentId)) {
         console.log('[useAgentMessages] 智能体正在执行中，跳过群聊消息:', agentId)
@@ -794,8 +847,12 @@ export const useAgentMessages = ({
       if (sendMessageToAgentRef.current) {
         console.log('[useAgentMessages] 触发智能体处理群聊消息:', agentId, messageContent.slice(0, 50))
         try {
-          // 调用 sendMessageToAgent 让智能体处理消息
-          await sendMessageToAgentRef.current(agentId, messageContent, null)
+          // 调用 sendMessageToAgent 让智能体处理消息，传递群聊相关的 metadata
+          await sendMessageToAgentRef.current(agentId, messageContent, null, {
+            isGroupChat: true,
+            groupId: message.groupId,
+            originalMessage: messageContent
+          })
         } catch (error) {
           console.error('[useAgentMessages] 智能体处理群聊消息失败:', agentId, error)
         }

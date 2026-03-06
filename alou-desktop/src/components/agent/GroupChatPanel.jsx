@@ -4,6 +4,7 @@ import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
 import { useLocalIpfsGroupChat } from '@/hooks/useLocalIpfsGroupChat'
 import { resolveAgentAvatar } from '../AgentChat/agentUtils'
+import { getAgentNameList } from '@/utils/mentionParser'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -111,11 +112,100 @@ const GroupChatPanel = ({
   const [showJoinModal, setShowJoinModal] = useState(false) // 加入群聊模态框
   const [newGroupName, setNewGroupName] = useState('') // 新群聊名称
   const [joinGroupId, setJoinGroupId] = useState('') // 加入群聊 ID
+  
+  // @智能体自动补全相关状态
+  const [showMentionPopup, setShowMentionPopup] = useState(false) // 是否显示@补全弹出框
+  const [mentionSearchText, setMentionSearchText] = useState('') // @后的搜索文本
+  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0) // 当前选中的智能体索引
 
   // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
     return activeGroup?.agents || agents || []
   }, [activeGroup, agents])
+
+  // 根据搜索文本过滤智能体列表
+  const filteredAgents = useMemo(() => {
+    if (!mentionSearchText) return actualAgents
+    const searchLower = mentionSearchText.toLowerCase()
+    return actualAgents.filter(agent => {
+      const name = (agent.name || agent.display_name || agent.agent_name || agent.id || '').toLowerCase()
+      return name.includes(searchLower)
+    })
+  }, [actualAgents, mentionSearchText])
+
+  // 处理消息输入变化 - 检测@提及
+  const handleMessageInputChange = useCallback((e) => {
+    const value = e.target.value
+    setMessageInput(value)
+    
+    // 检测@符号
+    const cursorPos = e.target.selectionStart
+    const textBeforeCursor = value.slice(0, cursorPos)
+    const lastAtPos = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtPos !== -1) {
+      // 检查@后面是否有空格或其他分隔符
+      const textAfterAt = textBeforeCursor.slice(lastAtPos + 1)
+      const hasSpaceAfter = /\s/.test(textAfterAt)
+      
+      if (!hasSpaceAfter && lastAtPos >= 0) {
+        // 显示@补全弹出框
+        setShowMentionPopup(true)
+        setMentionSearchText(textAfterAt)
+        setMentionSelectedIndex(0)
+        return
+      }
+    }
+    
+    // 隐藏@补全弹出框
+    setShowMentionPopup(false)
+    setMentionSearchText('')
+  }, [])
+
+  // 选择智能体
+  const selectAgent = useCallback((agent) => {
+    const cursorPos = document.querySelector('.message-input')?.selectionStart || messageInput.length
+    const textBeforeCursor = messageInput.slice(0, cursorPos)
+    const lastAtPos = textBeforeCursor.lastIndexOf('@')
+    
+    if (lastAtPos !== -1) {
+      // 替换@和搜索文本为完整的@名称
+      const textAfterAt = textBeforeCursor.slice(lastAtPos + 1)
+      const textAfterCursor = messageInput.slice(cursorPos)
+      const agentName = agent.name || agent.display_name || agent.agent_name || agent.id || ''
+      
+      const newText = textBeforeCursor.slice(0, lastAtPos) + '@' + agentName + ' ' + textAfterCursor
+      setMessageInput(newText)
+    }
+    
+    setShowMentionPopup(false)
+    setMentionSearchText('')
+  }, [messageInput])
+
+  // 处理键盘事件 - 支持上下选择和回车确认
+  const handleMentionKeyDown = useCallback((e) => {
+    if (!showMentionPopup || filteredAgents.length === 0) return
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setMentionSelectedIndex(prev => 
+        prev < filteredAgents.length - 1 ? prev + 1 : 0
+      )
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMentionSelectedIndex(prev => 
+        prev > 0 ? prev - 1 : filteredAgents.length - 1
+      )
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      if (filteredAgents[mentionSelectedIndex]) {
+        selectAgent(filteredAgents[mentionSelectedIndex])
+      }
+    } else if (e.key === 'Escape') {
+      setShowMentionPopup(false)
+      setMentionSearchText('')
+    }
+  }, [showMentionPopup, filteredAgents, mentionSelectedIndex, selectAgent])
 
   // 错误处理
   useEffect(() => {
@@ -478,13 +568,47 @@ const GroupChatPanel = ({
       {activeGroup && (
         <div className="message-input-container">
           <div className="message-input-wrapper">
+            {/* @智能体自动补全弹出框 */}
+            {showMentionPopup && filteredAgents.length > 0 && (
+              <div className="mention-popup">
+                <div className="mention-popup-header">选择智能体</div>
+                <div className="mention-popup-list">
+                  {filteredAgents.map((agent, index) => (
+                    <div
+                      key={agent.id || agent.agent_id || index}
+                      className={`mention-popup-item ${index === mentionSelectedIndex ? 'selected' : ''}`}
+                      onClick={() => selectAgent(agent)}
+                      onMouseEnter={() => setMentionSelectedIndex(index)}
+                    >
+                      <div className="mention-agent-avatar">
+                        {agent.avatar ? (
+                          <img src={agent.avatar} alt="" />
+                        ) : (
+                          <div className="mention-agent-avatar-placeholder">
+                            {(agent.name || agent.display_name || '?').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <span className="mention-agent-name">
+                        {agent.name || agent.display_name || agent.agent_name || agent.id}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <input
               type="text"
               className="message-input"
               value={messageInput}
-              onChange={(e) => setMessageInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={isIpfsAvailable ? "输入消息..." : "内存模式 - 输入消息..."}
+              onChange={handleMessageInputChange}
+              onKeyDown={(e) => {
+                handleKeyPress(e)
+                if (showMentionPopup) {
+                  handleMentionKeyDown(e)
+                }
+              }}
+              placeholder={isIpfsAvailable ? "输入消息，使用@提及智能体..." : "内存模式 - 输入消息..."}
               disabled={!isInitialized || isLoading}
             />
             <button
