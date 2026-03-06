@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use chrono::Utc;
 use uuid::Uuid;
-use log::{info, warn, error};
+use log::info;
 
 /// 默认最大回复次数
 const DEFAULT_MAX_REPLIES_PER_MESSAGE: u32 = 3;
@@ -526,7 +526,8 @@ impl GroupCoordinator {
         if let Some(agent) = agents.get(agent_id) {
             Some(AgentDetailedInfo {
                 basic: agent.clone(),
-                // 可以在这里添加更多详细信息的获取逻辑
+                recent_messages_summary: Vec::new(),
+                collaboration_history: Vec::new(),
             })
         } else {
             None
