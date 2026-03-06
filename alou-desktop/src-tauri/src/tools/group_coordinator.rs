@@ -162,26 +162,122 @@ pub struct AgentInfo {
     pub name: String,
     /// 智能体描述
     pub description: Option<String>,
+    /// 身份ID
+    pub identity_id: Option<String>,
+    /// 身份描述/角色
+    pub identity_description: Option<String>,
+    /// Session 信息
+    pub session: Option<String>,
+    /// 技能标签
+    pub skills: Vec<String>,
     /// 是否在线
     pub online: bool,
     /// 最后活跃时间
     pub last_active: i64,
+    /// 加入群聊时间
+    pub joined_at: i64,
     /// 已发送消息数
     pub message_count: u32,
     /// 已回复次数
     pub reply_count: u32,
+    /// 历史消息统计
+    pub history_stats: AgentHistoryStats,
+}
+
+/// 智能体历史统计
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentHistoryStats {
+    /// 总消息数
+    pub total_messages: u32,
+    /// 总回复数
+    pub total_replies: u32,
+    /// 首次发言时间
+    pub first_message_at: Option<i64>,
+    /// 最后发言时间
+    pub last_message_at: Option<i64>,
+    /// 活跃天数
+    pub active_days: u32,
+}
+
+/// 智能体详细信息（用于搜索和展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentDetailedInfo {
+    /// 基本信息
+    pub basic: AgentInfo,
+    /// 最近消息摘要
+    pub recent_messages_summary: Vec<String>,
+    /// 协作历史
+    pub collaboration_history: Vec<CollaborationRecord>,
+}
+
+/// 协作记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CollaborationRecord {
+    /// 协作时间
+    pub timestamp: i64,
+    /// 协作类型
+    pub collab_type: String,
+    /// 参与的智能体ID
+    pub participants: Vec<String>,
+    /// 协作内容摘要
+    pub summary: String,
 }
 
 impl AgentInfo {
     pub fn new(id: String, name: String) -> Self {
+        let now = Utc::now().timestamp_millis();
         Self {
             id,
             name,
             description: None,
+            identity_id: None,
+            identity_description: None,
+            session: None,
+            skills: Vec::new(),
             online: true,
-            last_active: Utc::now().timestamp_millis(),
+            last_active: now,
+            joined_at: now,
             message_count: 0,
             reply_count: 0,
+            history_stats: AgentHistoryStats {
+                total_messages: 0,
+                total_replies: 0,
+                first_message_at: None,
+                last_message_at: None,
+                active_days: 1,
+            },
+        }
+    }
+
+    /// 完整信息创建
+    pub fn with_full_info(
+        id: String,
+        name: String,
+        identity_id: Option<String>,
+        identity_description: Option<String>,
+        session: Option<String>,
+    ) -> Self {
+        let now = Utc::now().timestamp_millis();
+        Self {
+            id,
+            name,
+            description: None,
+            identity_id,
+            identity_description,
+            session,
+            skills: Vec::new(),
+            online: true,
+            last_active: now,
+            joined_at: now,
+            message_count: 0,
+            reply_count: 0,
+            history_stats: AgentHistoryStats {
+                total_messages: 0,
+                total_replies: 0,
+                first_message_at: None,
+                last_message_at: None,
+                active_days: 1,
+            },
         }
     }
 }
@@ -238,8 +334,9 @@ impl GroupCoordinator {
 
     /// 切换当前群聊
     pub async fn set_current_group(&self, group_id: String) {
+        let group_id_clone = group_id.clone();
         let mut current = self.current_group_id.write().await;
-        *current = Some(group_id.clone());
+        *current = Some(group_id_clone.clone());
         
         // 初始化群聊消息列表
         let mut messages = self.group_messages.write().await;
@@ -247,20 +344,70 @@ impl GroupCoordinator {
             messages.insert(group_id, Vec::new());
         }
         
-        info!("[GroupCoordinator] 切换到群聊: {}", group_id);
+        info!("[GroupCoordinator] 切换到群聊: {}", group_id_clone);
     }
 
-    /// 注册智能体
+    /// 注册智能体（完整信息）
+    pub async fn register_agent_full(
+        &self,
+        agent_id: String,
+        name: String,
+        identity_id: Option<String>,
+        identity_description: Option<String>,
+        session: Option<String>,
+        skills: Option<Vec<String>>,
+    ) {
+        let mut agents = self.agents.write().await;
+        let now = Utc::now().timestamp_millis();
+        let agent = AgentInfo {
+            id: agent_id.clone(),
+            name: name.clone(),
+            description: None,
+            identity_id,
+            identity_description,
+            session,
+            skills: skills.unwrap_or_default(),
+            online: true,
+            last_active: now,
+            joined_at: now,
+            message_count: 0,
+            reply_count: 0,
+            history_stats: AgentHistoryStats {
+                total_messages: 0,
+                total_replies: 0,
+                first_message_at: None,
+                last_message_at: None,
+                active_days: 1,
+            },
+        };
+        agents.insert(agent_id.clone(), agent);
+        info!("[GroupCoordinator] 注册智能体: {} ({})", name, agent_id);
+    }
+
+    /// 注册智能体（简单信息）
     pub async fn register_agent(&self, agent_id: String, name: String, description: Option<String>) {
         let mut agents = self.agents.write().await;
+        let now = Utc::now().timestamp_millis();
         let agent = AgentInfo {
             id: agent_id.clone(),
             name: name.clone(),
             description,
+            identity_id: None,
+            identity_description: None,
+            session: None,
+            skills: Vec::new(),
             online: true,
-            last_active: Utc::now().timestamp_millis(),
+            last_active: now,
+            joined_at: now,
             message_count: 0,
             reply_count: 0,
+            history_stats: AgentHistoryStats {
+                total_messages: 0,
+                total_replies: 0,
+                first_message_at: None,
+                last_message_at: None,
+                active_days: 1,
+            },
         };
         agents.insert(agent_id.clone(), agent);
         info!("[GroupCoordinator] 注册智能体: {} ({})", name, agent_id);
@@ -282,6 +429,78 @@ impl GroupCoordinator {
             .filter(|a| a.online)
             .cloned()
             .collect()
+    }
+
+    /// 获取所有智能体（包括离线的）
+    pub async fn get_all_agents(&self) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        agents.values().cloned().collect()
+    }
+
+    /// 根据ID获取智能体信息
+    pub async fn get_agent_by_id(&self, agent_id: &str) -> Option<AgentInfo> {
+        let agents = self.agents.read().await;
+        agents.get(agent_id).cloned()
+    }
+
+    /// 根据名称搜索智能体
+    pub async fn search_agents_by_name(&self, name_query: &str) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        let query_lower = name_query.to_lowercase();
+        agents.values()
+            .filter(|a| a.name.to_lowercase().contains(&query_lower))
+            .cloned()
+            .collect()
+    }
+
+    /// 根据身份ID搜索智能体
+    pub async fn search_agents_by_identity(&self, identity_id: &str) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        agents.values()
+            .filter(|a| a.identity_id.as_deref() == Some(identity_id))
+            .cloned()
+            .collect()
+    }
+
+    /// 根据技能搜索智能体
+    pub async fn search_agents_by_skill(&self, skill: &str) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        let skill_lower = skill.to_lowercase();
+        agents.values()
+            .filter(|a| a.skills.iter().any(|s| s.to_lowercase().contains(&skill_lower)))
+            .cloned()
+            .collect()
+    }
+
+    /// 获取最近活跃的智能体
+    pub async fn get_recent_agents(&self, limit: usize) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        let mut agent_list: Vec<_> = agents.values().cloned().collect();
+        agent_list.sort_by(|a, b| b.last_active.cmp(&a.last_active));
+        agent_list.truncate(limit);
+        agent_list
+    }
+
+    /// 在特定时间范围内搜索活跃智能体
+    pub async fn get_agents_active_in_range(&self, start_time: i64, end_time: i64) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        agents.values()
+            .filter(|a| a.last_active >= start_time && a.last_active <= end_time)
+            .cloned()
+            .collect()
+    }
+
+    /// 构建智能体详细信息（用于搜索结果）
+    pub async fn get_agent_details(&self, agent_id: &str) -> Option<AgentDetailedInfo> {
+        let agents = self.agents.read().await;
+        if let Some(agent) = agents.get(agent_id) {
+            Some(AgentDetailedInfo {
+                basic: agent.clone(),
+                // 可以在这里添加更多详细信息的获取逻辑
+            })
+        } else {
+            None
+        }
     }
 
     /// 添加消息到群聊
@@ -393,9 +612,8 @@ impl GroupCoordinator {
         // 智能体列表
         context.push_str("=== 群聊智能体 ===\n");
         for agent in &agents {
-            context.push_str(&format!("- {} ({.name, agent.id));
+            context.push_str(&format!("- {} ({})\n", agent.name, agent.id));
         }
-        context.push('\n})\n", agent');
         
         // 消息历史
         context.push_str("=== 消息历史 ===\n");
@@ -429,11 +647,8 @@ impl GroupCoordinator {
             return true;
         }
         
-        // 用户发送的消息需要响应
-        if
-        
         // 用户发送的消息需要响应（非智能体发送）
-        if !message.sender_id.starts_with("agent_") {
+        if !message.sender_id.starts_with("agent_") && !message.sender_id.starts_with("system") {
             return true;
         }
         
