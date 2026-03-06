@@ -1,9 +1,32 @@
 import React, { useMemo } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import DOMPurify from 'dompurify'
+import { resolveAgentAvatar } from '@/components/AgentChat/agentUtils'
+import imageProxyService from '@/services/imageProxyService'
 import './GroupChatMessage.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
+
+/**
+ * 处理头像 URL（支持 IPFS 和代理）
+ */
+const processAvatarUrl = (agentData) => {
+  if (!agentData) return DEFAULT_AVATAR
+
+  // 使用 resolveAgentAvatar 解析头像
+  const avatarUrl = resolveAgentAvatar(agentData)
+
+  // 使用图片代理服务（避免 CORS 问题）
+  if (avatarUrl && !avatarUrl.startsWith('data:')) {
+    try {
+      return imageProxyService.getProxiedUrl(avatarUrl)
+    } catch (error) {
+      console.warn('[GroupChatMessage] 代理处理失败，使用原图:', error)
+    }
+  }
+
+  return avatarUrl || DEFAULT_AVATAR
+}
 
 /**
  * GroupChatMessage - 群聊消息组件
@@ -46,7 +69,13 @@ const GroupChatMessage = ({ message }) => {
     })
   }, [timestamp, currentLanguage, t])
 
-  const avatarSrc = avatar || DEFAULT_AVATAR
+  // 使用处理后的头像 URL（支持 IPFS 和代理）
+  const avatarSrc = processAvatarUrl({
+    avatar,
+    avatar_url: avatar,
+    avatar_cid: metadata?.avatar_cid,
+    diapIdentity: metadata?.diapIdentity,
+  })
   const displayName = fromName || from || t('agent.groupChat.unknown')
 
   // 格式化消息内容 - 使用 DOMPurify 防止 XSS

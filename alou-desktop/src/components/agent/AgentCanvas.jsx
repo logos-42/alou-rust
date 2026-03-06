@@ -1,4 +1,6 @@
 import React, { forwardRef, useImperativeHandle, useRef } from 'react'
+import { resolveAgentAvatar } from '@/components/AgentChat/agentUtils'
+import imageProxyService from '@/services/imageProxyService'
 import './AgentCanvas.css'
 
 const AgentCanvas = forwardRef(
@@ -321,7 +323,16 @@ const AgentCanvas = forwardRef(
               console.log('[AgentCanvas] Avatar onTouchStart (React handler)', e)
             }}
           >
-            <img src={agentProfile?.avatar} alt="agent" draggable="false" style={{ pointerEvents: 'none' }} />
+            <img
+              src={processAvatarUrl(agentProfile)}
+              alt="agent"
+              draggable="false"
+              style={{ pointerEvents: 'none' }}
+              onError={(e) => {
+                // 加载失败时使用备用头像
+                e.target.src = 'https://avatars.githubusercontent.com/u/16309930?v=4'
+              }}
+            />
           </div>
           <div className="agent-label">
             <h2>{agentProfile?.name}</h2>
@@ -335,3 +346,24 @@ const AgentCanvas = forwardRef(
 AgentCanvas.displayName = 'AgentCanvas'
 
 export default AgentCanvas
+
+/**
+ * 处理头像 URL（支持 IPFS 和代理）
+ */
+const processAvatarUrl = (agentProfile) => {
+  if (!agentProfile) return 'https://avatars.githubusercontent.com/u/16309930?v=4'
+
+  // 使用 resolveAgentAvatar 解析头像
+  const avatarUrl = resolveAgentAvatar(agentProfile)
+
+  // 使用图片代理服务（避免 CORS 问题）
+  if (avatarUrl && !avatarUrl.startsWith('data:')) {
+    try {
+      return imageProxyService.getProxiedUrl(avatarUrl)
+    } catch (error) {
+      console.warn('[AgentCanvas] 代理处理失败，使用原图:', error)
+    }
+  }
+
+  return avatarUrl
+}

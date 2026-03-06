@@ -414,6 +414,7 @@ const AgentChat = () => {
     _isAutoCreating,
     _autoCreationError,
     resetState: _resetAutoCreation,
+    clearCreatedAgents: _clearCreatedAgents,
   } = autoAgentCreator
 
   // ==================== 6. Message State Hook ====================
@@ -475,9 +476,18 @@ const AgentChat = () => {
     inviteTargetChannel,
     handleInviteToChannel,
     closeInviteModal,
-    handleDeleteChannel,
+    handleDeleteChannel: originalHandleDeleteChannel,
     handleInviteSubmit,
   } = inviteState
+
+  // 包装删除函数，在删除后清空已创建记录（允许重新创建同名智能体）
+  const handleDeleteChannel = useCallback((channel) => {
+    // 先执行删除
+    originalHandleDeleteChannel(channel)
+    // 清空已创建记录，允许重新创建同名智能体
+    _clearCreatedAgents()
+    console.log('[AgentChat] 已清空已创建智能体记录，允许重新创建同名智能体')
+  }, [originalHandleDeleteChannel, _clearCreatedAgents])
 
   // ==================== 9. Multi-Agent Coordinator ====================
   const multiAgentCoordinator = useMultiAgentCoordinator({

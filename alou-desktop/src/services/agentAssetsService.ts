@@ -1,30 +1,61 @@
 import ipfsService from './ipfsContentService'
+import avatarService from './avatarService'
 
 class AgentAssetsService {
   /**
    * 上传头像文件到 IPFS
    * @param {File} file - 头像文件
    * @param {Object} options - 上传选项
-   * @param {string} options.sessionId - 会话ID
+   * @param {string} options.sessionId - 会话 ID
    * @returns {Promise<Object>} 上传结果，包含 CID
    */
   async uploadAvatar(file, options = {}) {
     try {
       console.log('[AgentAssetsService] 开始上传头像:', file.name)
-      
-      // 使用 ipfsService 上传文件
-      const result = await ipfsService.uploadFile(file)
-      
-      console.log('[AgentAssetsService] 头像上传成功:', result.cid)
-      return {
-        cid: result.cid,
-        name: file.name,
-        size: file.size,
-        type: file.type
+
+      // 使用新的 avatarService 上传（支持 IPFS 和 base64 回退）
+      const result = await avatarService.uploadAvatar(file, options)
+
+      if (result.success) {
+        console.log('[AgentAssetsService] 头像上传成功:', {
+          cid: result.cid,
+          source: result.source,
+          url: result.avatarUrl?.substring(0, 50)
+        })
+
+        return {
+          cid: result.cid,
+          avatarUrl: result.avatarUrl,
+          source: result.source,
+          name: file.name,
+          size: file.size,
+          type: file.type
+        }
+      } else {
+        throw new Error(result.error || '头像上传失败')
       }
     } catch (error) {
       console.error('[AgentAssetsService] 头像上传失败:', error)
-      throw new Error(`头像上传失败: ${error.message}`)
+
+      // 回退到旧的 ipfsService 方式
+      try {
+        console.log('[AgentAssetsService] 尝试使用备用方式上传...')
+        const result = await ipfsService.uploadFile(file)
+
+        if (result.cid) {
+          console.log('[AgentAssetsService] 备用上传成功:', result.cid)
+          return {
+            cid: result.cid,
+            name: file.name,
+            size: file.size,
+            type: file.type
+          }
+        }
+      } catch (fallbackError) {
+        console.error('[AgentAssetsService] 备用上传也失败:', fallbackError)
+      }
+
+      throw new Error(`头像上传失败：${error.message}`)
     }
   }
 
@@ -38,15 +69,15 @@ class AgentAssetsService {
   async uploadMcpConfig(config) {
     try {
       console.log('[AgentAssetsService] 开始上传 MCP 配置:', config)
-      
+
       // 将配置转换为 JSON 字符串
       const configJson = JSON.stringify(config, null, 2)
       const blob = new Blob([configJson], { type: 'application/json' })
       const file = new File([blob], 'mcp-config.json', { type: 'application/json' })
-      
+
       // 使用 ipfsService 上传文件
       const result = await ipfsService.uploadFile(file)
-      
+
       console.log('[AgentAssetsService] MCP 配置上传成功:', result.cid)
       return {
         cid: result.cid,
@@ -55,7 +86,7 @@ class AgentAssetsService {
       }
     } catch (error) {
       console.error('[AgentAssetsService] MCP 配置上传失败:', error)
-      throw new Error(`MCP 配置上传失败: ${error.message}`)
+      throw new Error(`MCP 配置上传失败：${error.message}`)
     }
   }
 
@@ -67,11 +98,15 @@ class AgentAssetsService {
   async getAvatar(cid) {
     try {
       console.log('[AgentAssetsService] 获取头像:', cid)
-      const url = await ipfsService.getFileUrl(cid)
+
+      // 使用 avatarService 构建 IPFS URL
+      const url = avatarService.buildIpfsAvatar(cid)
+
+      console.log('[AgentAssetsService] 头像 URL 构建成功:', url)
       return url
     } catch (error) {
       console.error('[AgentAssetsService] 获取头像失败:', error)
-      throw new Error(`获取头像失败: ${error.message}`)
+      throw new Error(`获取头像失败：${error.message}`)
     }
   }
 
@@ -87,7 +122,7 @@ class AgentAssetsService {
       return JSON.parse(content)
     } catch (error) {
       console.error('[AgentAssetsService] 获取 MCP 配置失败:', error)
-      throw new Error(`获取 MCP 配置失败: ${error.message}`)
+      throw new Error(`获取 MCP 配置失败：${error.message}`)
     }
   }
 }

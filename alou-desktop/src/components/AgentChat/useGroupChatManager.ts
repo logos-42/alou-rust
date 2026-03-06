@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { useDiapGroupChat } from '@/hooks/useDiapGroupChat'
 import useClusterActionStore from '@/stores/clusterActionStore'
 import { parseMentions } from '@/utils/mentionParser'
+import { useGroupChatAutonomousAgent } from './useGroupChatAutonomousAgent'
 
 /**
  * useGroupChatManager - 基于 DIAP PubSub 的群聊管理 Hook
  * 统一管理群聊相关的状态、事件监听和 UI 控制
+ * 支持 iroh、pubsub 和 memory 三种群聊模式的自主智能体响应
  */
 export const useGroupChatManager = ({ openConversationPanel, activeChannelId, localIdentity }) => {
   // 从 store 获取集群行动相关状态
@@ -84,10 +86,65 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     },
     onMessage: (groupId, message) => {
       console.log('[useGroupChatManager] 收到 DIAP 消息:', groupId, message.content)
+      
+      // 关键改进：触发智能体自主响应
+      // 当收到新消息时，通知所有群聊中的智能体
+      try {
+        const { getActions } = useClusterActionStore.getState()
+        const actions = getActions(null) || []
+        
+        // 查找群聊对应的行动
+        const groupAction = actions.find(action => 
+          action.action_id === groupId || 
+          action.action_id === `diap_group_${groupId}`
+        )
+        
+        if (groupAction && groupAction.agents && groupAction.agents.length > 0) {
+          // 通知每个智能体处理消息
+          groupAction.agents
+            .filter(agent => agent.mode === 'agent')
+            .forEach(agent => {
+              const agentId = agent.id || agent.agent_id || agent.did
+              if (agentId) {
+                window.dispatchEvent(new CustomEvent('agent-group-message', {
+                  detail: {
+                    agentId,
+                    message: {
+                      id: message.id || `msg_${Date.now()}`,
+                      groupId,
+                      from: message.from || 'unknown',
+                      fromName: message.fromName || '群聊成员',
+                      content: message.content,
+                      timestamp: message.timestamp || Date.now(),
+                      type: 'group_chat_message',
+                      isMentioned: message.content?.includes('@'),
+                      metadata: {
+                        isGroupChat: true,
+                        groupType: 'diap_pubsub'
+                      }
+                    }
+                  }
+                }))
+              }
+            })
+          
+          console.log('[useGroupChatManager] 已通知', groupAction.agents.length, '个智能体处理消息')
+        }
+      } catch (error) {
+        console.error('[useGroupChatManager] 触发智能体响应失败:', error)
+      }
     },
     onError: (error) => {
       console.error('[useGroupChatManager] DIAP 群聊错误:', error)
     }
+  })
+
+  // 自主智能体 Hook - 支持群聊中的智能体自主响应
+  const autonomousAgent = useGroupChatAutonomousAgent({
+    enabled: true, // 启用自主响应
+    responseDelay: 500, // 响应延迟
+    mentionOnly: false, // 不只在被@时响应（允许自主判断）
+    maxConcurrentTasks: 3 // 最大并发任务数
   })
 
   // 更新 ref
@@ -451,17 +508,26 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       }
 
       // 无论哪种群聊类型，都通知智能体
-      const { getActiveAction } = useClusterActionStore.getState()
+      const { getActiveAction, getActions } = useClusterActionStore.getState()
       const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
+      
+      // 获取群聊中的所有智能体（包括非活跃的）
+      const actions = getActions(null) || []
+      const groupAction = actions.find(action => 
+        action.action_id === groupId || 
+        action.action_id === `diap_group_${groupId}` ||
+        action.action_id?.startsWith('local_group_')
+      )
+      const allAgents = groupAction?.agents || activeAction?.agents || []
 
-      if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
-        console.log('[useGroupChatManager] 准备通知智能体:', activeAction.agents.length, '个')
+      if (allAgents && allAgents.length > 0) {
+        console.log('[useGroupChatManager] 准备通知智能体:', allAgents.length, '个')
 
         // 解析@提及
-        const { mentionedAgents, cleanContent, hasMention } = parseMentions(content, activeAction.agents)
+        const { mentionedAgents, cleanContent, hasMention } = parseMentions(content, allAgents)
 
         // 确定要通知的智能体列表
-        let targetAgents = activeAction.agents
+        let targetAgents = allAgents
 
         if (hasMention && mentionedAgents.length > 0) {
           // 如果有@提及，只通知被@的智能体
@@ -473,13 +539,14 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           // 仍然返回成功，因为消息已经发送，只是没有智能体可通知
           return
         } else {
-          // 没有@，广播给所有智能体
-          console.log('[useGroupChatManager] 无@提及，广播给所有智能体')
+          // 没有@，广播给所有智能体（启用自主响应）
+          console.log('[useGroupChatManager] 无@提及，广播给所有智能体（启用自主响应）')
         }
 
         // 通知目标智能体
         const agentIds = targetAgents
-          .map(agent => agent.id || agent.agent_id)
+          .filter(agent => agent.mode === 'agent') // 只通知智能体，不通知用户
+          .map(agent => agent.id || agent.agent_id || agent.did)
           .filter(Boolean)
 
         if (agentIds.length === 0) {
@@ -487,31 +554,62 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           return
         }
 
-        for (const agentId of agentIds) {
-          try {
-            console.log('[useGroupChatManager] 通知智能体:', agentId)
-            // 触发智能体处理消息的事件
-            window.dispatchEvent(new CustomEvent('agent-group-message', {
-              detail: {
-                agentId,
-                message: {
-                  id: userMessage.id,
-                  content: hasMention ? cleanContent : content,
-                  rawContent: content,
-                  from: from,
-                  fromName: localIdentity?.name || from,
-                  timestamp: Date.now(),
-                  groupId: groupId,
-                  type: 'group_chat_message' as const,
+        // 使用自主智能体系统触发响应（如果可用）
+        if (autonomousAgent && autonomousAgent.isReady) {
+          console.log('[useGroupChatManager] 使用自主智能体系统触发响应')
+          
+          for (const agentId of agentIds) {
+            try {
+              // 使用自主智能体系统触发响应
+              await autonomousAgent.triggerAgentResponse(groupId, {
+                id: userMessage.id,
+                groupId,
+                from: from,
+                fromName: localIdentity?.name || from,
+                content: hasMention ? cleanContent : content,
+                timestamp: Date.now(),
+                type: 'user',
+                metadata: {
                   isMentioned: hasMention,
-                  mentionedAgentIds: mentionedAgents.map(a => a.id)
+                  mentionedAgentIds: mentionedAgents.map(a => a.id || a.agent_id),
+                  rawContent: content
                 }
-              }
-            }))
-            console.log('[useGroupChatManager] 智能体通知成功:', agentId)
-          } catch (error) {
-            console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
-            // 单个智能体通知失败不影响整体
+              }, agentId)
+              console.log('[useGroupChatManager] 自主智能体响应已触发:', agentId)
+            } catch (error) {
+              console.warn(`[useGroupChatManager] 触发自主智能体 ${agentId} 失败:`, error)
+            }
+          }
+        } else {
+          // 降级：直接发送事件通知
+          console.log('[useGroupChatManager] 自主智能体系统未就绪，使用事件通知')
+          
+          for (const agentId of agentIds) {
+            try {
+              console.log('[useGroupChatManager] 通知智能体:', agentId)
+              // 触发智能体处理消息的事件
+              window.dispatchEvent(new CustomEvent('agent-group-message', {
+                detail: {
+                  agentId,
+                  message: {
+                    id: userMessage.id,
+                    content: hasMention ? cleanContent : content,
+                    rawContent: content,
+                    from: from,
+                    fromName: localIdentity?.name || from,
+                    timestamp: Date.now(),
+                    groupId: groupId,
+                    type: 'group_chat_message' as const,
+                    isMentioned: hasMention,
+                    mentionedAgentIds: mentionedAgents.map(a => a.id)
+                  }
+                }
+              }))
+              console.log('[useGroupChatManager] 智能体通知成功:', agentId)
+            } catch (error) {
+              console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
+              // 单个智能体通知失败不影响整体
+            }
           }
         }
       } else {
@@ -527,7 +625,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       console.error('[useGroupChatManager] 发送消息失败:', error)
       throw error
     }
-  }, [diapGroupChat, activeChannelId, localIdentity])
+  }, [diapGroupChat, activeChannelId, localIdentity, autonomousAgent])
 
   // 切换群聊
   const switchGroupChat = useCallback(async (groupId) => {

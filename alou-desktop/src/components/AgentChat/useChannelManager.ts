@@ -820,16 +820,45 @@ export const useChannelManager = ({
     async ({ name, roleDescription, avatar_cid, avatar_url, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId, customPrompt }) => {
       // 生成唯一键用于去重检查
       const agentKey = `${name}_${roleDescription}`.toLowerCase().trim()
-      
+
       // 检查是否正在创建中（防止重复提交）
       if (creatingAgentsRef.current.has(agentKey)) {
         console.log('[useChannelManager] 智能体正在创建中，跳过重复请求:', name)
         return { success: true, skipped: true, reason: 'already_creating' }
       }
+
+      // 检查本地存储中是否已存在同名智能体（防止重复创建）
+      const existingAgents = storedAgents || []
+      const existingAgent = existingAgents.find((agent) => 
+        agent.name?.toLowerCase() === name.toLowerCase() || 
+        agent.display_name?.toLowerCase() === name.toLowerCase()
+      )
       
+      if (existingAgent) {
+        console.log('[useChannelManager] 智能体已存在，跳过创建，直接切换:', name)
+        // 切换到已存在的智能体
+        const existingChannel = buildChannelFromAgent(existingAgent)
+        if (existingChannel) {
+          setChannels((prev) => {
+            // 检查是否已在频道列表中
+            const existsInList = prev.some(c => c.id === existingChannel.id)
+            if (existsInList) {
+              // 已存在，移动到开头
+              return [existingChannel, ...prev.filter(c => c.id !== existingChannel.id)]
+            } else {
+              // 不存在，添加到开头
+              return [existingChannel, ...prev]
+            }
+          })
+          setActiveChannelId(existingChannel.id)
+        }
+        setSelectedAgent(existingAgent)
+        return { success: true, is_duplicate: true, existingAgent, existingChannel }
+      }
+
       // 标记为正在创建
       creatingAgentsRef.current.add(agentKey)
-      
+
       // 如果有 tempId，说明是后台更新，不需要显示 loading
       const isBackgroundUpdate = !!tempId
       if (!isBackgroundUpdate) {
@@ -1048,7 +1077,7 @@ export const useChannelManager = ({
         }
       }
     },
-    [preferredChain, recordInteraction, saveAgentToStorage, sessionId, setChannels, setActiveChannelId, setSelectedAgent, setChannelLoading, setChannelError],
+    [preferredChain, recordInteraction, saveAgentToStorage, sessionId, setChannels, setActiveChannelId, setSelectedAgent, setChannelLoading, setChannelError, storedAgents],
   )
 
   // 删除频道和本地存储的智能体

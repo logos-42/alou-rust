@@ -118,7 +118,7 @@ export interface UseAgentMessagesProps {
   currentMode?: 'agent' | 'alou'
   onRateLimitExceeded?: (data: { remainingRequests: number; resetTime: string | null }) => void
   onCreateAgent?: () => Promise<void>
-  onAutoCreateAgent?: (agentInfo: AgentInfo) => Promise<void>
+  onAutoCreateAgent?: (agentInfo: AgentInfo) => Promise<boolean>
 }
 
 // 智能体类型
@@ -632,7 +632,7 @@ export const useAgentMessages = ({
       }) // 不指定 channelId，使用当前默认频道
 
       // 如果有自动创建回调（父组件支持），用 AI 解析描述 → 自动创建
-      if (onAutoCreateAgent) {
+      if (wrappedAutoCreateAgent) {
         appendMessage({
           id: `system_thinking_${Date.now()}`,
           type: 'system',
@@ -653,7 +653,7 @@ export const useAgentMessages = ({
             source: 'system',
           })
 
-          await onAutoCreateAgent(agentInfo as unknown as AgentInfo)
+          await wrappedAutoCreateAgent(agentInfo as unknown as AgentInfo)
 
           appendMessage({
             id: `system_done_${Date.now()}`,
@@ -914,6 +914,38 @@ export const useAgentMessages = ({
     onAutoCreateAgentRef.current = onAutoCreateAgent
   }, [onAutoCreateAgent])
 
+  // 用 ref 跟踪前端主动触发的创建请求，避免 agent:created 事件重复处理
+  const pendingAgentCreatesRef = useRef<Set<string>>(new Set())
+
+  // 包装 onAutoCreateAgent，在调用前标记为 pending
+  const wrappedAutoCreateAgent = useCallback(async (agentInfo: AgentInfo): Promise<boolean> => {
+    const agentKey = `${agentInfo.name}_${agentInfo.roleDescription}`.toLowerCase().trim()
+    
+    // 标记为 pending
+    pendingAgentCreatesRef.current.add(agentKey)
+    console.log('[useAgentMessages] 标记前端创建请求:', agentKey)
+    
+    try {
+      if (!onAutoCreateAgentRef.current) {
+        throw new Error('onAutoCreateAgent 回调未提供')
+      }
+      
+      const result = await onAutoCreateAgentRef.current(agentInfo)
+      
+      // 创建完成后，延迟移除 pending 标记（给后端事件处理留出时间窗口）
+      setTimeout(() => {
+        pendingAgentCreatesRef.current.delete(agentKey)
+        console.log('[useAgentMessages] 移除前端创建标记:', agentKey)
+      }, 5000) // 5 秒后移除，覆盖后端事件到达的时间窗口
+      
+      return result
+    } catch (error) {
+      // 失败时立即移除标记
+      pendingAgentCreatesRef.current.delete(agentKey)
+      throw error
+    }
+  }, [])
+
   // ── 监听 Rust 发来的 agent:created 事件（agent_creator 工具创建成功后触发）────
   // Rust executor 在 agent_creator create 成功后 emit "agent:created"
   // 前端收到后调用 onAutoCreateAgent 将新 Agent 写入 Zustand 并显示在侧边栏
@@ -930,6 +962,13 @@ export const useAgentMessages = ({
         const fn = await listen<{ name: string; role_description?: string }>('agent:created', async (event) => {
           const payload = event.payload
           console.log('[useAgentMessages] 收到 agent:created 事件:', payload)
+
+          // 检查是否是前端刚触发的创建（避免重复处理）
+          const agentKey = `${payload.name}_${payload.role_description || ''}`.toLowerCase().trim()
+          if (pendingAgentCreatesRef.current.has(agentKey)) {
+            console.log('[useAgentMessages] 跳过前端已触发的创建:', payload.name)
+            return
+          }
 
           // 通过 ref 获取最新回调，避免陈旧闭包导致 "Should have a queue" React 错误
           const cb = onAutoCreateAgentRef.current
@@ -969,7 +1008,7 @@ export const useAgentMessages = ({
       }
     }
   // 只挂载一次；通过 onAutoCreateAgentRef 访问最新回调
-   
+
   }, [])
 
   // ── 监听 Rust 发来的 agent:progress 进度事件 ──────────────────────────────
