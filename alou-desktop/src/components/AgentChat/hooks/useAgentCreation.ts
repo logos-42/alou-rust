@@ -104,8 +104,8 @@ export const useAgentCreation = ({
       }
 
       // 生成文档集，构建 customPrompt
-      let customPrompt: string | null = null;
-      let documentsMap: Record<string, string> | null = null;
+      const customPrompt: string | null = null;
+      const documentsMap: Record<string, string> | null = null;
       try {
         console.log('[useAgentCreation] 开始为自动创建的智能体生成文档集...');
         // TODO: 实现文档生成逻辑

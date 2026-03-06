@@ -160,7 +160,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       setDocumentGenerationProgress(null)
 
       // 尝试上传到 IPFS（可选，失败不影响创建）
-      let documentCids = {}
+      const documentCids = {}
       // try {
       //   setDocumentGenerationProgress({ message: '上传文档到 IPFS（可选）...', stage: 'uploading' })
       //   const isRunning = await ipfsService.isNodeRunning()
@@ -320,8 +320,8 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       }
 
       // 4. 提取文档系统提示词（用于增强智能体的深度）
-      let customPrompt = null
-      let documentsMap = null
+      const customPrompt = null
+      const documentsMap = null
       // TODO: Implement buildSystemPromptFromDocuments() and extractDocumentMap() methods
       // if (useDocumentBasedCreation && agentDocuments) {
       //   try {

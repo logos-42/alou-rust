@@ -301,14 +301,8 @@ export const useChannelManager = ({
           const lastErrorTime = window.__lastLoadChannelsError || 0
 
           if (isConnectionError) {
-            if (now - lastErrorTime > 10000) {
-              window.__lastLoadChannelsError = now
-              console.warn('[AgentChat] 后端服务器不可用，使用本地存储的智能体。')
-            }
-            
             // 后端不可用时，检查本地存储是否有智能体
             if (storedAgents && storedAgents.length > 0) {
-              console.log(`[AgentChat] 从本地存储加载 ${storedAgents.length} 个智能体`)
               const localChannels = storedAgents
                 .map((agent) => buildChannelFromAgent(agent))
                 .filter(Boolean)
@@ -321,11 +315,7 @@ export const useChannelManager = ({
                   return [...newChannels, ...prev]
                 })
                 setChannelError(null)
-              } else {
-                setChannelError('后端服务器不可用，且本地无存储的智能体')
               }
-            } else {
-              setChannelError('后端服务器不可用，且本地无存储的智能体')
             }
           } else {
             if (now - lastErrorTime > 5000) {

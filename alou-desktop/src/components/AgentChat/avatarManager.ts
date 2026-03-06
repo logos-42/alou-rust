@@ -1,6 +1,7 @@
 import { resolveAgentAvatar, type Agent } from './agentUtils';
 import useAgentStore from '../../stores/agentStore';
 import imageProxyService from '../../services/imageProxyService';
+import agentAssetsService from '../../services/agentAssetsService';
 
 /**
  * 头像管理模块
@@ -219,11 +220,52 @@ class AvatarManager {
   }
 
   /**
-   * 销毁管理器
+   * 处理文件上传
+   * @param file - 上传的文件
+   * @returns 头像URL
    */
-  destroy(): void {
-    this.listeners.clear();
-    this.avatarCache.clear();
+  async processFileUpload(file: File): Promise<string> {
+    if (!file) {
+      throw new Error('请选择头像文件')
+    }
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+      throw new Error('请选择图片文件')
+    }
+
+    // 验证文件大小 (最大 5MB)
+    const maxSize = 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      throw new Error('头像文件不能超过 5MB')
+    }
+
+    try {
+      // 尝试上传到 IPFS
+      const result = await agentAssetsService.uploadAvatar(file)
+      if (result?.cid) {
+        // IPFS 上传成功，使用 IPFS URL
+        const avatarUrl = await agentAssetsService.getAvatar(result.cid)
+        console.log('[AvatarManager] 头像上传到 IPFS 成功:', result.cid)
+        return avatarUrl
+      }
+    } catch (error) {
+      console.warn('[AvatarManager] IPFS 上传失败，将使用 base64:', error)
+    }
+
+    // IPFS 不可用，使用 base64 编码
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const base64 = reader.result as string
+        console.log('[AvatarManager] 头像使用 base64 编码')
+        resolve(base64)
+      }
+      reader.onerror = () => {
+        reject(new Error('头像文件读取失败'))
+      }
+      reader.readAsDataURL(file)
+    })
   }
 }
 

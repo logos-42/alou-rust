@@ -29,24 +29,12 @@ export const useGroupChatRemoteControl = ({
   // 监听群聊面板状态，关闭时重置输入目标模式
   useEffect(() => {
     if (!showGroupChat) {
-      console.log('[useGroupChatRemoteControl] 群聊面板关闭，设置输入目标为 agent 模式')
+      console.log('[useGroupChatRemoteControl] 群聊面板关闭，设置输入目标为agent模式')
       setInputTargetMode('agent')
     } else {
       // 群聊面板打开时，强制设置为 'groupChat' 模式
-      console.log('[useGroupChatRemoteControl] 群聊面板打开，强制设置输入目标为 groupChat 模式', {
-        showGroupChat,
-        activeActionId
-      })
+      console.log('[useGroupChatRemoteControl] 群聊面板打开，强制设置输入目标为groupChat模式')
       setInputTargetMode('groupChat')
-      
-      // 关键修复：确保在设置 inputTargetMode 后，触发切换事件，让 UI 同步更新
-      // 使用 setTimeout 确保状态更新后再触发事件
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('switch-input-target', {
-          detail: { target: 'groupChat' }
-        }))
-        console.log('[useGroupChatRemoteControl] 触发切换事件到 groupChat')
-      }, 0)
     }
   }, [showGroupChat, activeActionId])
 
@@ -110,23 +98,23 @@ export const useGroupChatRemoteControl = ({
         }
 
         if (isLocalGroupChat) {
-          // 本地群聊：优先使用新的本地 IPFS 群聊服务
+          // 本地群聊：优先使用新的本地IPFS群聊服务
           try {
             // 检查是否有对应的本地群聊
             const localGroup = localIpfsGroupChatService.getGroup(actionId)
             if (localGroup) {
-              // 使用本地 IPFS 群聊服务发送消息
+              // 使用本地IPFS群聊服务发送消息
               await localIpfsGroupChatService.sendMessage(text, actionId, localGroup.topic)
-              console.log('[useGroupChatRemoteControl] 使用本地 IPFS 群聊服务发送消息成功')
+              console.log('[useGroupChatRemoteControl] 使用本地IPFS群聊服务发送消息成功')
             } else {
-              // 降级到原有的 store 方式
+              // 降级到原有的store方式
               const { addGroupChatMessage, getActiveAction } = useClusterActionStore.getState()
               addGroupChatMessage(actionId, userMessage)
-              console.log('[useGroupChatRemoteControl] 本地群聊消息已添加到 store:', actionId)
+              console.log('[useGroupChatRemoteControl] 本地群聊消息已添加到store:', actionId)
             }
           } catch (localError) {
-            console.warn('[useGroupChatRemoteControl] 本地 IPFS 群聊服务发送失败，降级到 store:', localError)
-            // 降级到原有的 store 方式
+            console.warn('[useGroupChatRemoteControl] 本地IPFS群聊服务发送失败，降级到store:', localError)
+            // 降级到原有的store方式
             const { addGroupChatMessage } = useClusterActionStore.getState()
             addGroupChatMessage(actionId, userMessage)
           }
@@ -192,12 +180,12 @@ export const useGroupChatRemoteControl = ({
               timestamp: Date.now(),
             })
             if (!success) {
-              throw new Error('pubsubService 发送失败')
+              throw new Error('pubsubService发送失败')
             }
-            console.log('[useGroupChatRemoteControl] 消息已通过 PubSub 发送到群聊:', topic)
+            console.log('[useGroupChatRemoteControl] 消息已通过PubSub发送到群聊:', topic)
           } catch (pubsubError) {
             // 降级：使用后端 API
-            console.warn('[useGroupChatRemoteControl] PubSub 发送失败，尝试使用后端 API:', pubsubError)
+            console.warn('[useGroupChatRemoteControl] PubSub发送失败，尝试使用后端API:', pubsubError)
             try {
               const apiClient = (await import('@/services/api')).default
               await apiClient.post('/pubsub/publish', {
@@ -215,13 +203,13 @@ export const useGroupChatRemoteControl = ({
                   },
                 },
               })
-              console.log('[useGroupChatRemoteControl] 消息已通过后端 API 发送到群聊:', topic)
+              console.log('[useGroupChatRemoteControl] 消息已通过后端API发送到群聊:', topic)
             } catch (apiError) {
               // 最终降级：保存到本地 store，即使远程服务都不可用
-              console.warn('[useGroupChatRemoteControl] 后端 API 也失败，降级到本地 store:', apiError)
+              console.warn('[useGroupChatRemoteControl] 后端API也失败，降级到本地store:', apiError)
               const { addGroupChatMessage } = useClusterActionStore.getState()
               addGroupChatMessage(actionId, userMessage)
-              console.log('[useGroupChatRemoteControl] 消息已保存到本地 store:', actionId)
+              console.log('[useGroupChatRemoteControl] 消息已保存到本地store:', actionId)
             }
           }
         }
@@ -244,7 +232,7 @@ export const useGroupChatRemoteControl = ({
       console.log('[useGroupChatRemoteControl] 强制设置输入目标为群聊模式')
       setInputTargetMode('groupChat')
       
-      // 触发切换事件，确保 UI 同步更新
+      // 触发切换事件，确保UI同步更新
       window.dispatchEvent(new CustomEvent('switch-input-target', {
         detail: { target: 'groupChat' }
       }))
@@ -384,3 +372,5 @@ export const useGroupChatRemoteControl = ({
     handleGroupChatPanelClick,
   }
 }
+
+

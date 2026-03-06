@@ -901,6 +901,18 @@ class LocalIpfsGroupChatService {
       // 标记为已发送
       messageObj.delivered = true
 
+      // 通知所有处理器 - 确保发送消息后立即更新UI
+      const messageHandlers = this.messageHandlers.get(messageObj.groupId)
+      if (messageHandlers) {
+        messageHandlers.forEach((handler: MessageHandler) => {
+          try {
+            handler(messageObj)
+          } catch (error: any) {
+            this.log(LogLevel.ERROR, '消息处理器错误:', { error: error.message })
+          }
+        })
+      }
+
       // 如果需要等待确认（仅在 IPFS 可用时）
       if (waitForAck && this.ipfsAvailable) {
         await this.waitForAck(messageObj.id)

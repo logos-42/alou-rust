@@ -150,7 +150,7 @@ function normalizeToolArguments(
   args: Record<string, any>
 ): Record<string, any> {
   // 复制参数以避免修改原对象
-  let normalizedArgs: Record<string, any> = { ...args }
+  const normalizedArgs: Record<string, any> = { ...args }
 
   // FileSystem Tool 参数转换
   if (toolId === 'filesystem') {

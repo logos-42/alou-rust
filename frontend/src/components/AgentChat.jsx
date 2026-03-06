@@ -604,6 +604,11 @@ const AgentChat = () => {
     const text = currentMessage.trim()
     if (!text || isLoading) return
 
+    if (!activeChannelId) {
+      console.warn('[AgentChat] 无法发送消息：没有活动频道')
+      return
+    }
+
     if (!isSessionReady) {
       await createSession()
       setSessionReady(true)
@@ -616,7 +621,7 @@ const AgentChat = () => {
       timestamp: Date.now(),
     }
 
-    appendMessage(userMessage)
+    appendMessage(userMessage, activeChannelId)
     setCurrentMessage('')
     setIsLoading(true)
     recordInteraction('user_message', { content: text })
@@ -640,6 +645,12 @@ const AgentChat = () => {
           wallet_address: walletAddress || undefined,
           chain: preferredChain || undefined,
           context_events: contextSnapshot,
+          agent_id: activeChannelId,
+          agent_info: selectedAgent ? {
+            name: selectedAgent.display_name || selectedAgent.name,
+            role_description: selectedAgent.role_description,
+            custom_prompt: selectedAgent.customPrompt,
+          } : undefined,
         }),
       })
 
@@ -660,7 +671,7 @@ const AgentChat = () => {
         timestamp: data.timestamp || Date.now(),
         source: data.source || 'alou-edge',
       }
-      appendMessage(assistantMessage)
+      appendMessage(assistantMessage, activeChannelId)
 
       if (data.session_id) {
         setSessionId(data.session_id)
@@ -672,13 +683,14 @@ const AgentChat = () => {
         content: `❌ 抱歉，发生了错误：${error instanceof Error ? error.message : '未知错误'}`,
         timestamp: Date.now(),
         source: 'error',
-      })
+      }, activeChannelId)
     } finally {
       setIsLoading(false)
       scrollToBottom()
       consoleDockRef.current?.adjustInputHeight?.()
     }
   }, [
+    activeChannelId,
     appendMessage,
     contextEventsRef,
     createSession,
@@ -689,6 +701,7 @@ const AgentChat = () => {
     preferredChain,
     recordInteraction,
     scrollToBottom,
+    selectedAgent,
     sessionId,
     setCurrentMessage,
     setIsLoading,

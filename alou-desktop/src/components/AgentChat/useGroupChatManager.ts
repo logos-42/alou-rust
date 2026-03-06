@@ -351,10 +351,73 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     }
   }, [localIdentity, activeChannelId, diapGroupChat, openConversationPanelRef, setActiveAction])
 
-  // 发送消息
+  // 发送消息 - 支持本地群聊和 DIAP 群聊
   const sendMessage = useCallback(async (groupId, content) => {
     try {
-      await diapGroupChat.sendMessage(groupId, content)
+      console.log('[useGroupChatManager] sendMessage 被调用:', { groupId, content, activeChannelId })
+      
+      // 判断是否是本地群聊
+      const isLocalGroupChat = groupId.startsWith('local_group_') || groupId.startsWith('action_')
+      
+      if (isLocalGroupChat) {
+        console.log('[useGroupChatManager] 检测到本地群聊，使用 useGroupChatRemoteControl 逻辑')
+        // 本地群聊：使用 useGroupChatRemoteControl 的逻辑
+        const { sendMessageToGroupChat } = await import('./useGroupChatRemoteControl')
+        // 注意：这里不能直接调用，因为 sendMessageToGroupChat 是 hook 内部的函数
+        // 我们需要在本地实现类似的逻辑
+        
+        // 获取用户标识
+        const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+        const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
+        const from = walletAddress || userId || 'user'
+        
+        // 创建用户消息
+        const userMessage = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: 'user',
+          from: from,
+          fromName: localIdentity?.name || from,
+          content: content,
+          timestamp: Date.now(),
+        }
+        
+        // 保存到本地 store
+        const { addGroupChatMessage } = useClusterActionStore.getState()
+        addGroupChatMessage(groupId, userMessage)
+        console.log('[useGroupChatManager] 本地群聊消息已添加到 store:', groupId)
+        
+        // 通知智能体
+        const { getActiveAction } = useClusterActionStore.getState()
+        const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
+        
+        if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
+          const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
+          
+          // 通知每个智能体
+          for (const agentId of agentIds) {
+            try {
+              window.dispatchEvent(new CustomEvent('agent-group-message', {
+                detail: {
+                  agentId,
+                  message: {
+                    ...userMessage,
+                    groupId: groupId,
+                    type: 'group_chat_message'
+                  }
+                }
+              }))
+              console.log('[useGroupChatManager] 已通知智能体:', agentId)
+            } catch (error) {
+              console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
+            }
+          }
+        }
+      } else {
+        // DIAP 群聊：使用 diapGroupChat.sendMessage
+        console.log('[useGroupChatManager] 使用 DIAP 群聊发送')
+        await diapGroupChat.sendMessage(groupId, content)
+      }
+      
       console.log('[useGroupChatManager] 消息发送成功:', groupId, content)
       
       // 关键：通知智能体处理群聊消息（支持@提及过滤）

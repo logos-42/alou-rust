@@ -92,7 +92,7 @@ export function parseMentions(message: string, agents: Agent[]): ParseResult {
   }
 
   // 清理消息内容，移除@提及部分
-  let cleanContent = message.replace(mentionRegex, '').trim()
+  const cleanContent = message.replace(mentionRegex, '').trim()
 
   return {
     mentionedAgents,
