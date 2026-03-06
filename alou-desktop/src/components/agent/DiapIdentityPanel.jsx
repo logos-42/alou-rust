@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import asyncDiapCreationService from '@/services/asyncDiapCreationService'
 import { useNavigate } from 'react-router-dom'
 import agentService from '@/services/agentService'
 import useAgentStore from '@/stores/agentStore'
@@ -32,6 +33,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   const [toastMessage, setToastMessage] = useState(null)
   const [txHash, setTxHash] = useState(null)
   const [hasTestnetKey, setHasTestnetKey] = useState(false)
+  const [diapProgress, setDiapProgress] = useState(null) // DIAP 创建进度
   
   const updateAgent = useAgentStore((state) => state.updateAgent)
   
@@ -469,15 +471,44 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       <div className="diap-panel-content">
         {!identity ? (
           <div className="diap-no-identity">
-            <p>{t('agent.diap.noIdentity')}</p>
-            <button
-              type="button"
-              className="create-identity-btn"
-              onClick={handleCreateIdentity}
-              disabled={creating}
-            >
-              {creating ? t('agent.diap.creating') : t('agent.diap.create')}
-            </button>
+            {/* DIAP 创建进度条 */}
+            {diapProgress && diapProgress.stage !== 'idle' && diapProgress.stage !== 'completed' && (
+              <div className="diap-creation-progress">
+                <div className="diap-progress-header">
+                  <span className="diap-progress-title">
+                    {diapProgress.stage === 'failed' ? '⚠️ 创建失败' : '⏳ 创建 DIAP 身份中...'}
+                  </span>
+                  <span className="diap-progress-percent">{diapProgress.progress}%</span>
+                </div>
+                <div className="diap-progress-bar">
+                  <div 
+                    className={`diap-progress-fill ${diapProgress.stage === 'failed' ? 'failed' : ''}`} 
+                    style={{ width: `${diapProgress.progress}%` }}
+                  />
+                </div>
+                <div className="diap-progress-message">
+                  {diapProgress.message}
+                  {diapProgress.error && (
+                    <span className="diap-progress-error"> - {diapProgress.error}</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 没有进度显示创建按钮 */}
+            {!diapProgress || (diapProgress.stage === 'idle' || diapProgress.stage === 'completed') ? (
+              <>
+                <p>{t('agent.diap.noIdentity')}</p>
+                <button
+                  type="button"
+                  className="create-identity-btn"
+                  onClick={handleCreateIdentity}
+                  disabled={creating}
+                >
+                  {creating ? t('agent.diap.creating') : t('agent.diap.create')}
+                </button>
+              </>
+            ) : null}
           </div>
         ) : (
           <div className="diap-identity-info">

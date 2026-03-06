@@ -677,3 +677,11 @@
   background: #4338ca;
 }
 
+/* DIAP 进度指示器样式 */
+.agent-detail-panel__diap-progress {
+  margin-bottom: 16px;
+}
+
+.agent-detail-panel__diap-progress .diap-progress-indicator {
+  max-width: 100%;
+}

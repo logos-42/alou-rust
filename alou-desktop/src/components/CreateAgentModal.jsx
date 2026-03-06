@@ -8,6 +8,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { setDiapIdentitySafe, hasDiapIdentitySafe } from '@/utils/diapIdentityManager'
 import { setDiapIdentity } from '@/utils/memoryStorage'
 import CloseIcon from '@/assets/关闭0.3.png'
+import asyncDiapCreationService from '@/services/asyncDiapCreationService'
 import CopyIcon from '@/assets/复制.png'
 import AgentDocumentsViewer from './AgentDocumentsViewer'
 import './CreateAgentModal.css'
@@ -278,25 +279,10 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       }
       console.log(`[CreateAgentModal] IPFS 可用: ${ipfsAvailable}`)
 
-      // 1. 尝试创建 DIAP Identity（需要 IPFS，失败则跳过）
-      let diapIdentity = null
-      if (ipfsAvailable) {
-        try {
-          console.log('[CreateAgentModal] 开始创建 DIAP Identity...')
-          const { default: diapIntegrationService } = await import('../services/diapIntegrationService')
-          const result = await diapIntegrationService.createCompleteDiapIdentity(sessionId, {
-            agentName: fallbackName,
-            agentDescription: finalRoleDescription,
-          })
-          diapIdentity = result.identity
-          console.log('[CreateAgentModal] DIAP Identity 创建成功:', diapIdentity?.did)
-        } catch (err) {
-          console.error('[CreateAgentModal] DIAP Identity 创建失败:', err)
-          console.warn('[CreateAgentModal] 将创建没有 DIAP Identity 的智能体')
-        }
-      } else {
-        console.log('[CreateAgentModal] IPFS 不可用，跳过 DIAP Identity 创建')
-      }
+      // 1. DIAP Identity 改为异步创建，不阻塞智能体创建流程
+      // 智能体创建完成后，在后台异步创建 DIAP 身份
+      const shouldCreateDiapAsync = ipfsAvailable
+      console.log('[CreateAgentModal] DIAP 身份将异步创建:', shouldCreateDiapAsync)
 
       // 2. 头像处理：IPFS 可用则上传，否则使用 base64 本地存储
       let avatarCid = null
@@ -368,12 +354,7 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         avatar_url: avatarCid ? null : avatarBase64, // 本地 base64 data URL（无 IPFS 时使用）
         mcp_config_cid: mcpConfigCid, // 修复：使用下划线命名与agentStore保持一致
         mcp_ports: filteredPorts, // 修复：使用下划线命名与agentStore保持一致
-        diapIdentity: diapIdentity ? {
-          did: diapIdentity.did,
-          cid: diapIdentity.cid,
-          ipns: diapIdentity.ipns || '',
-          public_key: diapIdentity.public_key
-        } : null,
+        // diapIdentity will be added asynchronously after creation
         sessionId,
         // 添加文档化配置
         useDocumentBasedCreation,
@@ -390,15 +371,35 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         name: agentData.name,
         hasAvatar: !!avatarCid,
         hasMcp: !!mcpConfigCid,
-        hasDiap: !!diapIdentity,
         hasDocuments: !!agentData.documentCids,
-        sessionId
+        sessionId,
+        willCreateDiapAsync: shouldCreateDiapAsync
       })
 
       // 5. 提交完整的智能体信息（只调用一次）
       await onSubmit(agentData)
 
-      // 6. 关闭模态框
+      // 6. 异步创建 DIAP 身份（不阻塞 UI）
+      if (shouldCreateDiapAsync) {
+        console.log('[CreateAgentModal] 启动异步 DIAP 身份创建...')
+        // 静默启动后台 DIAP 身份创建，不需要处理错误（服务内部已处理）
+        asyncDiapCreationService.startDiapCreation(
+          sessionId,
+          {
+            name: fallbackName,
+            roleDescription: finalRoleDescription,
+            avatarCid: avatarCid,
+            mcpConfigCid: mcpConfigCid,
+            customPrompt: customPrompt
+          },
+          {
+            ipfsApiUrl: DEFAULT_IPFS_API,
+            ipfsGatewayUrl: DEFAULT_IPFS_GATEWAY
+          }
+        )
+      }
+
+      // 7. 关闭模态框
       setIsLoading(false)
       onClose()
 
