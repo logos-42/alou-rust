@@ -695,7 +695,7 @@ class LocalIpfsGroupChatService {
         })
 
         if (messages && messages.length > 0) {
-          messages.forEach((msgStr: string) => {
+          for (const msgStr of messages) {
             try {
               const msgData = typeof msgStr === 'string' ? JSON.parse(msgStr) : msgStr
               const message = LocalGroupMessage.fromJSON(msgData)
@@ -708,7 +708,7 @@ class LocalIpfsGroupChatService {
               
               // 消息去重检查
               if (this.isDuplicateMessage(groupId, message)) {
-                return
+                continue
               }
               
               // 记录消息ID
@@ -717,7 +717,7 @@ class LocalIpfsGroupChatService {
               // 处理确认消息
               if (message.type === MessageTypes.ACK) {
                 this.handleAckMessage(message)
-                return
+                continue
               }
               
               // 发送确认（如果不是自己的消息且不是系统消息）
@@ -806,7 +806,7 @@ class LocalIpfsGroupChatService {
             } catch (error: any) {
               this.log(LogLevel.ERROR, '解析消息失败:', { error: error.message, msgStr })
             }
-          })
+          }
         }
       } catch (error: any) {
         // IPFS错误时静默处理，避免频繁日志
