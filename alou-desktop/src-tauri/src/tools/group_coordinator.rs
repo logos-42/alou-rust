@@ -223,6 +223,36 @@ pub struct CollaborationRecord {
     pub summary: String,
 }
 
+/// 智能体身份信息（用于搜索结果）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentIdentityInfo {
+    /// 智能体ID
+    pub id: String,
+    /// 智能体名称
+    pub name: String,
+    /// 身份ID
+    pub identity_id: Option<String>,
+    /// 身份描述
+    pub identity_description: Option<String>,
+    /// Session
+    pub session: Option<String>,
+    /// 是否在线
+    pub online: bool,
+    /// 技能列表
+    pub skills: Vec<String>,
+}
+
+/// 智能体任务匹配
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentTaskFit {
+    /// 智能体信息
+    pub agent_info: AgentInfo,
+    /// 技能匹配度 (0.0 - 1.0)
+    pub skill_match_score: f32,
+    /// 相关性原因
+    pub relevance_reason: String,
+}
+
 impl AgentInfo {
     pub fn new(id: String, name: String) -> Self {
         let now = Utc::now().timestamp_millis();
@@ -506,13 +536,21 @@ impl GroupCoordinator {
     /// 添加消息到群聊
     pub async fn add_message(&self, message: GroupChatMessage) {
         let group_id = message.group_id.clone();
+        let now = Utc::now().timestamp_millis();
         
         // 更新智能体消息计数
         if !message.sender_id.starts_with("system") {
             let mut agents = self.agents.write().await;
             if let Some(agent) = agents.get_mut(&message.sender_id) {
                 agent.message_count += 1;
-                agent.last_active = Utc::now().timestamp_millis();
+                agent.last_active = now;
+                
+                // 更新历史统计
+                if agent.history_stats.first_message_at.is_none() {
+                    agent.history_stats.first_message_at = Some(now);
+                }
+                agent.history_stats.last_message_at = Some(now);
+                agent.history_stats.total_messages += 1;
             }
         }
         
@@ -576,6 +614,8 @@ impl GroupCoordinator {
 
     /// 记录智能体回复
     pub async fn record_agent_response(&self, agent_id: &str, message_id: &str) {
+        let now = Utc::now().timestamp_millis();
+        
         // 更新回复计数
         let mut counts = self.reply_counts.write().await;
         let count = counts.entry(message_id.to_string()).or_insert(0);
@@ -585,6 +625,8 @@ impl GroupCoordinator {
         let mut agents = self.agents.write().await;
         if let Some(agent) = agents.get_mut(agent_id) {
             agent.reply_count += 1;
+            agent.history_stats.total_replies += 1;
+            agent.last_active = now;
         }
         
         info!("[GroupCoordinator] 智能体 {} 回复了消息 {}, 当前回复数: {}", 
@@ -603,20 +645,43 @@ impl GroupCoordinator {
     }
 
     /// 构建群聊上下文（用于 Ralph Loop prompt）
+    /// 包含所有智能体的详细信息，便于智能体了解群聊成员
     pub async fn build_context_prompt(&self, group_id: &str, exclude_agent_id: Option<&str>) -> String {
         let messages = self.get_displayable_messages(group_id).await;
         let agents = self.get_online_agents().await;
         
         let mut context = String::new();
         
-        // 智能体列表
+        // 智能体列表（包含详细信息）
         context.push_str("=== 群聊智能体 ===\n");
         for agent in &agents {
-            context.push_str(&format!("- {} ({})\n", agent.name, agent.id));
+            // 排除指定智能体
+            if let Some(exclude_id) = exclude_agent_id {
+                if agent.id == exclude_id {
+                    continue;
+                }
+            }
+            context.push_str(&format!("- 名称: {}\n", agent.name));
+            context.push_str(&format!("  ID: {}\n", agent.id));
+            if let Some(ref identity_id) = agent.identity_id {
+                context.push_str(&format!("  身份ID: {}\n", identity_id));
+            }
+            if let Some(ref identity_desc) = agent.identity_description {
+                context.push_str(&format!("  身份描述: {}\n", identity_desc));
+            }
+            if let Some(ref session) = agent.session {
+                context.push_str(&format!("  Session: {}\n", session));
+            }
+            if !agent.skills.is_empty() {
+                context.push_str(&format!("  技能: {}\n", agent.skills.join(", ")));
+            }
+            context.push_str(&format!("  状态: {}\n", if agent.online { "在线" } else { "离线" }));
+            context.push_str(&format!("  发言数: {}, 回复数: {}\n", agent.message_count, agent.reply_count));
+            context.push_str("\n");
         }
         
         // 消息历史
-        context.push_str("=== 消息历史 ===\n");
+        context.push_str("=== 消息历史 (最近20条) ===\n");
         for msg in messages.iter().rev().take(20) {
             // 排除指定智能体的消息
             if let Some(exclude_id) = exclude_agent_id {
@@ -624,10 +689,150 @@ impl GroupCoordinator {
                     continue;
                 }
             }
-            context.push_str(&format!("[{}]: {}\n", msg.sender_name, msg.content));
+            context.push_str(&format!("[{}] {}: {}\n", 
+                chrono::DateTime::from_timestamp_millis(msg.timestamp)
+                    .map(|dt| dt.format("%H:%M").to_string())
+                    .unwrap_or_default(),
+                msg.sender_name, 
+                msg.content));
         }
         
         context
+    }
+
+    /// 构建简洁的智能体列表（用于快速参考）
+    pub async fn build_agent_list_prompt(&self, exclude_agent_id: Option<&str>) -> String {
+        let agents = self.get_online_agents().await;
+        
+        let mut context = String::new();
+        context.push_str("群聊成员:\n");
+        for agent in &agents {
+            if let Some(exclude_id) = exclude_agent_id {
+                if agent.id == exclude_id {
+                    continue;
+                }
+            }
+            context.push_str(&format!("- {} ({})", agent.name, agent.id));
+            if let Some(ref identity_desc) = agent.identity_description {
+                context.push_str(&format!(" - {}", identity_desc));
+            }
+            context.push_str("\n");
+        }
+        
+        context
+    }
+
+    /// 搜索特定智能体的身份信息（在执行任务前使用）
+    pub async fn find_agent_identity(&self, name_query: Option<&str>, identity_id_query: Option<&str>) -> Vec<AgentIdentityInfo> {
+        let agents = self.agents.read().await;
+        
+        let mut results = Vec::new();
+        
+        for agent in agents.values() {
+            let mut matches = false;
+            
+            // 按名称搜索
+            if let Some(name_query) = name_query {
+                if agent.name.to_lowercase().contains(&name_query.to_lowercase()) {
+                    matches = true;
+                }
+            }
+            
+            // 按身份ID搜索
+            if let Some(identity_id_query) = identity_id_query {
+                if let Some(ref identity_id) = agent.identity_id {
+                    if identity_id.to_lowercase().contains(&identity_id_query.to_lowercase()) {
+                        matches = true;
+                    }
+                }
+            }
+            
+            if matches {
+                results.push(AgentIdentityInfo {
+                    id: agent.id.clone(),
+                    name: agent.name.clone(),
+                    identity_id: agent.identity_id.clone(),
+                    identity_description: agent.identity_description.clone(),
+                    session: agent.session.clone(),
+                    online: agent.online,
+                    skills: agent.skills.clone(),
+                });
+            }
+        }
+        
+        results
+    }
+
+    /// 获取特定时间范围内的智能体活动（用于任务分配）
+    pub async fn get_agents_for_task(&self, task_keywords: &[String], time_range_minutes: i64) -> Vec<AgentTaskFit> {
+        let now = Utc::now().timestamp_millis();
+        let time_threshold = now - (time_range_minutes * 60 * 1000);
+        
+        let agents = self.agents.read().await;
+        let mut task_fits = Vec::new();
+        
+        for agent in agents.values() {
+            if !agent.online {
+                continue;
+            }
+            
+            // 检查是否在时间范围内活跃
+            if agent.last_active < time_threshold {
+                continue;
+            }
+            
+            // 计算任务匹配度
+            let skill_match = if task_keywords.is_empty() {
+                1.0
+            } else {
+                let mut match_count = 0;
+                for keyword in task_keywords {
+                    if agent.skills.iter().any(|s| s.to_lowercase().contains(&keyword.to_lowercase()))
+                        || agent.name.to_lowercase().contains(&keyword.to_lowercase()) 
+                        || agent.identity_description.as_ref().map(|d| d.to_lowercase().contains(&keyword.to_lowercase())).unwrap_or(false)
+                    {
+                        match_count += 1;
+                    }
+                }
+                match_count as f32 / task_keywords.len() as f32
+            };
+            
+            task_fits.push(AgentTaskFit {
+                agent_info: agent.clone(),
+                skill_match_score: skill_match,
+                relevance_reason: Self::generate_relevance_reason(agent, task_keywords),
+            });
+        }
+        
+        // 按匹配度排序
+        task_fits.sort_by(|a, b| b.skill_match_score.partial_cmp(&a.skill_match_score).unwrap());
+        
+        task_fits
+    }
+    
+    /// 生成相关性原因
+    fn generate_relevance_reason(agent: &AgentInfo, keywords: &[String]) -> String {
+        let mut reasons = Vec::new();
+        
+        for keyword in keywords {
+            if agent.skills.iter().any(|s| s.to_lowercase().contains(&keyword.to_lowercase())) {
+                reasons.push(format!("拥有相关技能: {}", keyword));
+            }
+            if agent.name.to_lowercase().contains(&keyword.to_lowercase()) {
+                reasons.push(format!("名称包含: {}", keyword));
+            }
+            if let Some(ref desc) = agent.identity_description {
+                if desc.to_lowercase().contains(&keyword.to_lowercase()) {
+                    reasons.push(format!("身份描述匹配: {}", keyword));
+                }
+            }
+        }
+        
+        if reasons.is_empty() {
+            format!("最近活跃（{}分钟内）", keywords.len())
+        } else {
+            reasons.join(", ")
+        }
     }
 
     /// 处理新消息（判断是否需要智能体响应）
