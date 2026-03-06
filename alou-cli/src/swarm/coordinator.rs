@@ -90,6 +90,23 @@ pub struct SwarmCoordinator {
     
     /// 运行状态
     running: Arc<RwLock<bool>>,
+    
+    // ==================== 群聊协作相关字段 ====================
+    
+    /// 群聊协作是否启用
+    group_collaboration_enabled: Arc<RwLock<bool>>,
+    
+    /// 群聊消息（消息ID -> 消息）
+    group_messages: Arc<RwLock<HashMap<String, crate::swarm::types::GroupChatMessage>>>,
+    
+    /// 消息回复计数（消息ID -> 回复数）
+    message_reply_counts: Arc<RwLock<HashMap<String, u32>>>,
+    
+    /// 当前协作轮次
+    collaboration_round: Arc<RwLock<u32>>,
+    
+    /// 活跃的协作消息
+    active_collaborations: Arc<RwLock<HashMap<String, crate::swarm::types::GroupAgentCollaboration>>>,
 }
 
 /// Swarm 事件
@@ -139,6 +156,12 @@ impl SwarmCoordinator {
             agents: Arc::new(RwLock::new(HashMap::new())),
             swarms: Arc::new(RwLock::new(HashMap::new())),
             running: Arc::new(RwLock::new(false)),
+            // 群聊协作相关字段
+            group_collaboration_enabled: Arc::new(RwLock::new(false)),
+            group_messages: Arc::new(RwLock::new(HashMap::new())),
+            message_reply_counts: Arc::new(RwLock::new(HashMap::new())),
+            collaboration_round: Arc::new(RwLock::new(0)),
+            active_collaborations: Arc::new(RwLock::new(HashMap::new())),
         }
     }
     
@@ -821,6 +844,195 @@ impl SwarmCoordinator {
                 }
             }
         });
+    }
+    
+    // ==================== 群聊智能体协作方法 ====================
+    
+    /// 启用群聊协作
+    pub async fn enable_group_collaboration(&self) {
+        let mut enabled = self.group_collaboration_enabled.write().await;
+        *enabled = true;
+        println!("[Coordinator] 群聊协作已启用");
+    }
+    
+    /// 禁用群聊协作
+    pub async fn disable_group_collaboration(&self) {
+        let mut enabled = self.group_collaboration_enabled.write().await;
+        *enabled = false;
+        println!("[Coordinator] 群聊协作已禁用");
+    }
+    
+    /// 检查群聊协作是否启用
+    pub async fn is_group_collaboration_enabled(&self) -> bool {
+        let enabled = self.group_collaboration_enabled.read().await;
+        *enabled
+    }
+    
+    /// 添加群聊消息
+    pub async fn add_group_message(&self, message: crate::swarm::types::GroupChatMessage) {
+        let mut messages = self.group_messages.write().await;
+        messages.insert(message.id.clone(), message);
+    }
+    
+    /// 获取群聊消息
+    pub async fn get_group_message(&self, message_id: &str) -> Option<crate::swarm::types::GroupChatMessage> {
+        let messages = self.group_messages.read().await;
+        messages.get(message_id).cloned()
+    }
+    
+    /// 获取所有群聊消息（过滤后，只显示智能体回复）
+    pub async fn get_displayable_messages(&self) -> Vec<crate::swarm::types::GroupChatMessage> {
+        let messages = self.group_messages.read().await;
+        messages.values()
+            .filter(|msg| msg.should_display())
+            .cloned()
+            .collect()
+    }
+    
+    /// 检查智能体是否可以回复
+    pub async fn can_agent_respond(&self, agent_id: &str, message_id: &str, max_replies_per_round: u32) -> bool {
+        let enabled = self.group_collaboration_enabled.read().await;
+        if !*enabled {
+            return false;
+        }
+        
+        let counts = self.message_reply_counts.read().await;
+        let count = counts.get(message_id).unwrap_or(&0);
+        
+        *count < max_replies_per_round
+    }
+    
+    /// 记录智能体回复
+    pub async fn record_agent_response(&self, agent_id: &str, message_id: &str) {
+        let mut counts = self.message_reply_counts.write().await;
+        let count = counts.entry(message_id.to_string()).or_insert(0);
+        *count += 1;
+        
+        // 更新协作轮次
+        let mut round = self.collaboration_round.write().await;
+        *round += 1;
+        
+        println!("[Coordinator] 智能体 {} 回复了消息 {}, 当前回复数: {}", agent_id, message_id, count);
+    }
+    
+    /// 检查消息是否需要智能体响应
+    pub async fn should_agent_respond(&self, message: &crate::swarm::types::GroupChatMessage) -> bool {
+        // 系统消息不需要响应
+        if message.message_type == crate::swarm::types::GroupMessageType::System {
+            return false;
+        }
+        
+        // 检查是否@提及其他智能体
+        if !message.mentioned_agent_ids.is_empty() {
+            return true;
+        }
+        
+        // 检查是否是用户发送的消息（非智能体）
+        if !message.sender_id.starts_with("agent_") {
+            return true;
+        }
+        
+        // 智能体发送的消息，检查是否是回复
+        if message.collaboration.is_some() {
+            return true;
+        }
+        
+        false
+    }
+    
+    /// 获取群聊中的活跃智能体列表
+    pub async fn get_active_agents_in_group(&self) -> Vec<AgentInfo> {
+        let agents = self.agents.read().await;
+        agents.values()
+            .filter(|a| a.status == AgentStatus::Online || a.status == AgentStatus::Idle)
+            .cloned()
+            .collect()
+    }
+    
+    /// 获取适合处理消息的智能体
+    pub async fn get_best_agent_for_message(&self, message_content: &str) -> Option<AgentInfo> {
+        let agents = self.get_active_agents_in_group().await;
+        
+        if agents.is_empty() {
+            return None;
+        }
+        
+        let content_lower = message_content.to_lowercase();
+        
+        // 根据消息内容匹配最合适的智能体
+        let mut best_agent: Option<(AgentInfo, i32)> = None;
+        
+        for agent in agents {
+            let mut score = 0;
+            
+            // 关键词匹配
+            if content_lower.contains("代码") || content_lower.contains("code") || content_lower.contains("编程") {
+                if agent.capabilities.iter().any(|c| c.contains("code")) {
+                    score += 10;
+                }
+            }
+            if content_lower.contains("区块链") || content_lower.contains("blockchain") || content_lower.contains("转账") {
+                if agent.capabilities.iter().any(|c| c.contains("blockchain")) {
+                    score += 10;
+                }
+            }
+            if content_lower.contains("翻译") || content_lower.contains("translate") {
+                if agent.capabilities.iter().any(|c| c.contains("translation")) {
+                    score += 10;
+                }
+            }
+            if content_lower.contains("分析") || content_lower.contains("analyze") {
+                if agent.capabilities.iter().any(|c| c.contains("research")) {
+                    score += 10;
+                }
+            }
+            
+            // 空闲状态加分
+            if agent.status == AgentStatus::Idle {
+                score += 5;
+            }
+            
+            // 更新最佳智能体
+            if score > 0 {
+                match &best_agent {
+                    Some((_, best_score)) if score > *best_score => {
+                        best_agent = Some((agent, score));
+                    }
+                    None => {
+                        best_agent = Some((agent, score));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        best_agent.map(|(agent, _)| agent)
+    }
+    
+    /// 重置消息回复计数
+    pub async fn reset_message_reply_counts(&self, message_id: &str) {
+        let mut counts = self.message_reply_counts.write().await;
+        counts.remove(message_id);
+    }
+    
+    /// 清理过期的群聊消息
+    pub async fn cleanup_old_messages(&self, max_messages: usize) {
+        let mut messages = self.group_messages.write().await;
+        
+        if messages.len() > max_messages {
+            // 按时间排序，保留最新的
+            // 先在独立作用域中收集要保留的键
+            let to_keep: Vec<String> = {
+                let mut sorted: Vec<_> = messages.iter().collect();
+                sorted.sort_by(|a, b| b.1.timestamp.cmp(&a.1.timestamp));
+                sorted.iter().take(max_messages).map(|(k, _)| (*k).clone()).collect()
+            };
+            
+            // 现在 messages 的不可变借用已经释放，可以进行可变借用
+            messages.retain(|k, _| to_keep.iter().any(|x| x == k));
+            
+            println!("[Coordinator] 清理群聊消息，保留 {} 条", max_messages);
+        }
     }
 }
 

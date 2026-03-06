@@ -28,7 +28,7 @@ pub struct EventHandler {
     /// 事件接收器
     receiver: mpsc::Receiver<Event>,
     /// 事件处理线程
-    handler: thread::JoinHandle<()>,
+    handler: Option<thread::JoinHandle<()>>,
 }
 
 impl EventHandler {
@@ -75,7 +75,7 @@ impl EventHandler {
         Self {
             sender,
             receiver,
-            handler,
+            handler: Some(handler),
         }
     }
 
@@ -93,7 +93,9 @@ impl Drop for EventHandler {
             crossterm::event::KeyModifiers::NONE,
         )));
         
-        // 等待线程结束
-        let _ = self.handler.join();
+        // 等待线程结束 - 使用 take 避免 move 问题
+        if let Some(handler) = self.handler.take() {
+            let _ = handler.join();
+        }
     }
 }

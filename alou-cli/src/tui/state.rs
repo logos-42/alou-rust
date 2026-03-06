@@ -1,7 +1,6 @@
 //! TUI应用程序状态管理
 
 /// 应用程序状态
-#[derive(Debug)]
 pub struct AppState {
     /// 当前选中的标签页
     pub current_tab: usize,

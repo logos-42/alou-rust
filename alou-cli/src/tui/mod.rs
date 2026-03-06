@@ -2,10 +2,8 @@
 //! 为Alou CLI提供图形化的终端界面
 
 mod app;
-mod components;
 mod events;
 mod state;
-mod utils;
 
 pub use app::TuiApp;
 pub use events::{Event, EventHandler};

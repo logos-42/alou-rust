@@ -3,7 +3,7 @@
 //! 与 alou-desktop/src/types/tasks.ts 保持兼容的 Rust 实现
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 
 // ========== 枚举类型 ==========
@@ -870,5 +870,148 @@ mod tests {
         assert!(TaskStatus::Failed.is_terminal());
         assert!(!TaskStatus::Pending.is_terminal());
         assert!(!TaskStatus::InProgress.is_terminal());
+    }
+}
+
+// ==================== 群聊智能体协作类型 ====================
+
+/// 群聊智能体协作元数据
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupAgentCollaboration {
+    /// 消息ID
+    pub message_id: String,
+    /// 原始消息ID（用于回复链）
+    pub original_message_id: Option<String>,
+    /// 目标智能体ID
+    pub target_agent_id: Option<String>,
+    /// 是否是协作消息
+    pub is_collaboration: bool,
+    /// 协作轮次
+    pub collaboration_round: u32,
+    /// 智能体回复计数
+    pub agent_reply_counts: HashMap<String, u32>,
+    /// 已回复的智能体ID列表
+    pub responded_agent_ids: Vec<String>,
+    /// 协作状态
+    pub collaboration_status: CollaborationStatus,
+}
+
+impl Default for GroupAgentCollaboration {
+    fn default() -> Self {
+        Self {
+            message_id: String::new(),
+            original_message_id: None,
+            target_agent_id: None,
+            is_collaboration: false,
+            collaboration_round: 0,
+            agent_reply_counts: HashMap::new(),
+            responded_agent_ids: Vec::new(),
+            collaboration_status: CollaborationStatus::Pending,
+        }
+    }
+}
+
+/// 协作状态
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum CollaborationStatus {
+    /// 待处理
+    Pending,
+    /// 进行中
+    InProgress,
+    /// 已完成
+    Completed,
+    /// 超时
+    Timeout,
+    /// 已取消
+    Cancelled,
+}
+
+/// 群聊消息（用于智能体间通信）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupChatMessage {
+    /// 消息ID
+    pub id: String,
+    /// 群聊ID
+    pub group_id: String,
+    /// 发送者ID
+    pub sender_id: String,
+    /// 发送者名称
+    pub sender_name: String,
+    /// 消息内容
+    pub content: String,
+    /// 消息类型
+    pub message_type: GroupMessageType,
+    /// 时间戳
+    pub timestamp: i64,
+    /// 协作元数据
+    pub collaboration: Option<GroupAgentCollaboration>,
+    /// 是否是工具调用（用于过滤）
+    pub is_tool_call: bool,
+    /// 是否是中间步骤（用于过滤）
+    pub is_intermediate_step: bool,
+    /// @提及的智能体ID列表
+    pub mentioned_agent_ids: Vec<String>,
+}
+
+impl GroupChatMessage {
+    /// 创建新消息
+    pub fn new(group_id: String, sender_id: String, sender_name: String, content: String) -> Self {
+        Self {
+            id: format!("msg-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()),
+            group_id,
+            sender_id,
+            sender_name,
+            content,
+            message_type: GroupMessageType::Text,
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            collaboration: None,
+            is_tool_call: false,
+            is_intermediate_step: false,
+            mentioned_agent_ids: Vec::new(),
+        }
+    }
+
+    /// 检查消息是否应该显示（过滤工具调用）
+    pub fn should_display(&self) -> bool {
+        // 过滤工具调用消息
+        if self.is_tool_call {
+            return false;
+        }
+        // 过滤中间步骤
+        if self.is_intermediate_step {
+            return false;
+        }
+        // 过滤工具调用类型的消息
+        if matches!(self.message_type, GroupMessageType::ToolCall | GroupMessageType::ToolResult) {
+            return false;
+        }
+        true
+    }
+}
+
+/// 群聊消息类型
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum GroupMessageType {
+    /// 文本消息
+    Text,
+    /// 命令
+    Command,
+    /// 系统消息
+    System,
+    /// 工具调用
+    ToolCall,
+    /// 工具结果
+    ToolResult,
+    /// 智能体响应
+    AgentResponse,
+    /// 智能体加入
+    AgentJoined,
+    /// 智能体离开
+    AgentLeft,
+}
+
+impl Default for GroupMessageType {
+    fn default() -> Self {
+        Self::Text
     }
 }

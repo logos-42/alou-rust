@@ -89,6 +89,38 @@ pub struct GroupChatConfig {
     pub enabled: bool,
     pub auto_join: bool,
     pub announce_presence: bool,
+    /// Ralph Loop 协作配置
+    pub ralph_loop: RalphLoopConfig,
+}
+
+/// Ralph Loop 智能体协作配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RalphLoopConfig {
+    /// 是否启用协作
+    pub enabled: bool,
+    /// 最大并发回复数
+    pub max_concurrent_replies: usize,
+    /// 回复间隔（毫秒）
+    pub reply_interval_ms: u64,
+    /// 最大单轮回复次数
+    pub max_replies_per_round: usize,
+    /// 协作超时（毫秒）
+    pub collaboration_timeout_ms: u64,
+    /// 是否允许智能体互相调用
+    pub allow_agent_calls: bool,
+}
+
+impl Default for RalphLoopConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_concurrent_replies: 3,
+            reply_interval_ms: 2000,
+            max_replies_per_round: 5,
+            collaboration_timeout_ms: 30000,
+            allow_agent_calls: true,
+        }
+    }
 }
 
 impl Default for GroupChatConfig {
@@ -97,6 +129,7 @@ impl Default for GroupChatConfig {
             enabled: true,
             auto_join: false,
             announce_presence: true,
+            ralph_loop: RalphLoopConfig::default(),
         }
     }
 }

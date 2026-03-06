@@ -33,11 +33,13 @@ pub mod skill_auto_selector;      // Skills 自动选择器核心
 pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
 pub mod autonomous_executor;       // 自主执行引擎
 pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
+pub mod group_coordinator;         // 群聊协调器（智能体群聊协作）
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
 // ToolCategory is defined in this module, not registry
 pub use registry::{ToolRegistry, ToolDefinition};
+pub use group_coordinator::{GroupCoordinator, GroupChatMessage, GroupMessageType, AgentInfo, GroupCoordinatorConfig};
 pub use filesystem::{FileSystemTool, FileOperation};
 pub use search::{SearchTool, SearchPattern};
 pub use bash::{BashTool, CommandResult};
