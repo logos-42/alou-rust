@@ -4,7 +4,11 @@ import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
 import { useLocalIpfsGroupChat } from '@/hooks/useLocalIpfsGroupChat'
 import { resolveAgentAvatar } from '../AgentChat/agentUtils'
-import { getAgentNameList } from '@/utils/mentionParser'
+import {
+  getPartialMentionAtCursor,
+  getMentionSuggestions,
+  parseMentions
+} from '@/utils/groupchat/mentionParser'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -113,99 +117,17 @@ const GroupChatPanel = ({
   const [newGroupName, setNewGroupName] = useState('') // 新群聊名称
   const [joinGroupId, setJoinGroupId] = useState('') // 加入群聊 ID
   
-  // @智能体自动补全相关状态
-  const [showMentionPopup, setShowMentionPopup] = useState(false) // 是否显示@补全弹出框
-  const [mentionSearchText, setMentionSearchText] = useState('') // @后的搜索文本
-  const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0) // 当前选中的智能体索引
+  // @ 提令相关状态
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false)
+  const [mentionSuggestions, setMentionSuggestions] = useState([])
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0)
+  const [cursorPosition, setCursorPosition] = useState(0)
+  const inputRef = useRef(null)
 
   // 使用 activeGroup 的 agents，而不是从外部传入
   const actualAgents = useMemo(() => {
     return activeGroup?.agents || agents || []
   }, [activeGroup, agents])
-
-  // 根据搜索文本过滤智能体列表
-  const filteredAgents = useMemo(() => {
-    if (!mentionSearchText) return actualAgents
-    const searchLower = mentionSearchText.toLowerCase()
-    return actualAgents.filter(agent => {
-      const name = (agent.name || agent.display_name || agent.agent_name || agent.id || '').toLowerCase()
-      return name.includes(searchLower)
-    })
-  }, [actualAgents, mentionSearchText])
-
-  // 处理消息输入变化 - 检测@提及
-  const handleMessageInputChange = useCallback((e) => {
-    const value = e.target.value
-    setMessageInput(value)
-    
-    // 检测@符号
-    const cursorPos = e.target.selectionStart
-    const textBeforeCursor = value.slice(0, cursorPos)
-    const lastAtPos = textBeforeCursor.lastIndexOf('@')
-    
-    if (lastAtPos !== -1) {
-      // 检查@后面是否有空格或其他分隔符
-      const textAfterAt = textBeforeCursor.slice(lastAtPos + 1)
-      const hasSpaceAfter = /\s/.test(textAfterAt)
-      
-      if (!hasSpaceAfter && lastAtPos >= 0) {
-        // 显示@补全弹出框
-        setShowMentionPopup(true)
-        setMentionSearchText(textAfterAt)
-        setMentionSelectedIndex(0)
-        return
-      }
-    }
-    
-    // 隐藏@补全弹出框
-    setShowMentionPopup(false)
-    setMentionSearchText('')
-  }, [])
-
-  // 选择智能体
-  const selectAgent = useCallback((agent) => {
-    const cursorPos = document.querySelector('.message-input')?.selectionStart || messageInput.length
-    const textBeforeCursor = messageInput.slice(0, cursorPos)
-    const lastAtPos = textBeforeCursor.lastIndexOf('@')
-    
-    if (lastAtPos !== -1) {
-      // 替换@和搜索文本为完整的@名称
-      const textAfterAt = textBeforeCursor.slice(lastAtPos + 1)
-      const textAfterCursor = messageInput.slice(cursorPos)
-      const agentName = agent.name || agent.display_name || agent.agent_name || agent.id || ''
-      
-      const newText = textBeforeCursor.slice(0, lastAtPos) + '@' + agentName + ' ' + textAfterCursor
-      setMessageInput(newText)
-    }
-    
-    setShowMentionPopup(false)
-    setMentionSearchText('')
-  }, [messageInput])
-
-  // 处理键盘事件 - 支持上下选择和回车确认
-  const handleMentionKeyDown = useCallback((e) => {
-    if (!showMentionPopup || filteredAgents.length === 0) return
-    
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      setMentionSelectedIndex(prev => 
-        prev < filteredAgents.length - 1 ? prev + 1 : 0
-      )
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      setMentionSelectedIndex(prev => 
-        prev > 0 ? prev - 1 : filteredAgents.length - 1
-      )
-    } else if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault()
-      if (filteredAgents[mentionSelectedIndex]) {
-        selectAgent(filteredAgents[mentionSelectedIndex])
-      }
-    } else if (e.key === 'Escape') {
-      setShowMentionPopup(false)
-      setMentionSearchText('')
-    }
-  }, [showMentionPopup, filteredAgents, mentionSelectedIndex, selectAgent])
 
   // 错误处理
   useEffect(() => {
@@ -287,9 +209,16 @@ const GroupChatPanel = ({
       return
     }
 
+    // 解析消息中的 @ 提令
+    const parsedMessage = parseMentions(messageInput.trim(), actualAgents)
+    const messageContent = parsedMessage.cleanContent || messageInput.trim()
+    
     console.log('[GroupChatPanel] 准备发送消息:', {
       groupId,
-      messageLength: messageInput.trim().length,
+      messageLength: messageContent.length,
+      hasMentions: parsedMessage.hasMentions,
+      mentions: parsedMessage.mentions,
+      isPrivateMention: parsedMessage.isPrivateMention,
       hasExternalCallback: !!externalOnSendMessage,
       isInitialized,
       isIpfsAvailable
@@ -299,21 +228,30 @@ const GroupChatPanel = ({
       clearError()
       setSendError(null) // 清除之前的错误
       
+      // 构建消息选项，包含提令信息
+      const messageOptions = {
+        content: messageContent,
+        mentions: parsedMessage.mentions,
+        hasMentions: parsedMessage.hasMentions,
+        isPrivateMention: parsedMessage.isPrivateMention,
+        targetAgentId: parsedMessage.isPrivateMention ? parsedMessage.mentions[0]?.agentId : null
+      }
+      
       // 优先使用外部回调（包含智能体通知逻辑）
       if (externalOnSendMessage && typeof externalOnSendMessage === 'function') {
-        // 参数顺序：(groupId, content)
-        console.log('[GroupChatPanel] 调用外部回调:', groupId, messageInput.trim().slice(0, 50))
-        await externalOnSendMessage(groupId, messageInput.trim())
+        // 参数顺序：(groupId, content, options)
+        console.log('[GroupChatPanel] 调用外部回调:', groupId, messageContent.slice(0, 50), messageOptions)
+        await externalOnSendMessage(groupId, messageContent, messageOptions)
         console.log('[GroupChatPanel] 使用外部回调发送消息成功')
       } else if (isInitialized && isIpfsAvailable) {
         // 降级到本地IPFS群聊服务
         console.log('[GroupChatPanel] 使用本地IPFS服务发送')
-        await sendMessage(messageInput.trim())
+        await sendMessage(messageContent, messageOptions)
         console.log('[GroupChatPanel] 使用本地IPFS服务发送消息成功')
       } else if (isInitialized) {
         // 内存模式：直接发送消息
         console.log('[GroupChatPanel] 使用内存模式发送')
-        await sendMessage(messageInput.trim())
+        await sendMessage(messageContent, messageOptions)
         console.log('[GroupChatPanel] 使用内存模式发送消息成功')
       } else {
         console.warn('[GroupChatPanel] 没有可用的发送方法')
@@ -327,15 +265,79 @@ const GroupChatPanel = ({
       console.error('[GroupChatPanel] 发送消息失败:', error)
       setSendError(error.message || '消息发送失败，请重试')
     }
-  }, [messageInput, activeGroup, isInitialized, isIpfsAvailable, sendMessage, externalOnSendMessage, clearError])
+  }, [messageInput, activeGroup, isInitialized, isIpfsAvailable, sendMessage, externalOnSendMessage, clearError, actualAgents])
 
   // 处理键盘事件
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      // 如果显示提令建议，按 Enter 选择建议
+      if (showMentionSuggestions && mentionSuggestions.length > 0) {
+        e.preventDefault()
+        handleSelectMention(mentionSuggestions[selectedSuggestionIndex])
+        return
+      }
       e.preventDefault()
       handleSendMessage()
+    } else if (e.key === 'ArrowDown' && showMentionSuggestions) {
+      e.preventDefault()
+      setSelectedSuggestionIndex(prev => 
+        Math.min(prev + 1, mentionSuggestions.length - 1)
+      )
+    } else if (e.key === 'ArrowUp' && showMentionSuggestions) {
+      e.preventDefault()
+      setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Escape' && showMentionSuggestions) {
+      setShowMentionSuggestions(false)
+    } else if (e.key === 'Tab' && showMentionSuggestions && mentionSuggestions.length > 0) {
+      e.preventDefault()
+      handleSelectMention(mentionSuggestions[selectedSuggestionIndex])
     }
-  }, [handleSendMessage])
+  }, [handleSendMessage, showMentionSuggestions, mentionSuggestions, selectedSuggestionIndex])
+
+  // 处理输入变化 - 检测 @ 提令
+  const handleInputChange = useCallback((e) => {
+    const value = e.target.value
+    const position = e.target.selectionStart || 0
+    setCursorPosition(position)
+    setMessageInput(value)
+    
+    // 检测是否在输入 @ 提令
+    const partialMention = getPartialMentionAtCursor(value, position)
+    
+    if (partialMention !== null) {
+      // 用户正在输入 @ 提令
+      const suggestions = getMentionSuggestions(partialMention, actualAgents)
+      setMentionSuggestions(suggestions)
+      setSelectedSuggestionIndex(0)
+      setShowMentionSuggestions(suggestions.length > 0)
+    } else {
+      setShowMentionSuggestions(false)
+    }
+  }, [actualAgents])
+
+  // 选择提令建议
+  const handleSelectMention = useCallback((agent) => {
+    const partialMention = getPartialMentionAtCursor(messageInput, cursorPosition)
+    if (partialMention === null) return
+    
+    // 找到 @ 的位置并替换
+    const atIndex = messageInput.lastIndexOf('@', cursorPosition - 1)
+    if (atIndex === -1) return
+    
+    // 构建新消息：@名称 + 空格
+    const newMessage = 
+      messageInput.substring(0, atIndex) + 
+      '@' + agent.name + ' ' + 
+      messageInput.substring(cursorPosition)
+    
+    setMessageInput(newMessage)
+    setShowMentionSuggestions(false)
+    
+    // 聚焦输入框
+    if (inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [messageInput, cursorPosition])
 
   // 处理创建群聊
   const handleCreateGroup = useCallback(async () => {
@@ -568,49 +570,31 @@ const GroupChatPanel = ({
       {activeGroup && (
         <div className="message-input-container">
           <div className="message-input-wrapper">
-            {/* @智能体自动补全弹出框 */}
-            {showMentionPopup && filteredAgents.length > 0 && (
-              <div className="mention-popup">
-                <div className="mention-popup-header">选择智能体</div>
-                <div className="mention-popup-list">
-                  {filteredAgents.map((agent, index) => (
-                    <div
-                      key={agent.id || agent.agent_id || index}
-                      className={`mention-popup-item ${index === mentionSelectedIndex ? 'selected' : ''}`}
-                      onClick={() => selectAgent(agent)}
-                      onMouseEnter={() => setMentionSelectedIndex(index)}
-                    >
-                      <div className="mention-agent-avatar">
-                        {agent.avatar ? (
-                          <img src={agent.avatar} alt="" />
-                        ) : (
-                          <div className="mention-agent-avatar-placeholder">
-                            {(agent.name || agent.display_name || '?').charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <span className="mention-agent-name">
-                        {agent.name || agent.display_name || agent.agent_name || agent.id}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
             <input
+              ref={inputRef}
               type="text"
               className="message-input"
               value={messageInput}
-              onChange={handleMessageInputChange}
-              onKeyDown={(e) => {
-                handleKeyPress(e)
-                if (showMentionPopup) {
-                  handleMentionKeyDown(e)
-                }
-              }}
-              placeholder={isIpfsAvailable ? "输入消息，使用@提及智能体..." : "内存模式 - 输入消息..."}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyPress}
+              onBlur={() => setTimeout(() => setShowMentionSuggestions(false), 200)}
+              placeholder={isIpfsAvailable ? "输入消息... (使用 @ 提令智能体)" : "内存模式 - 输入消息..."}
               disabled={!isInitialized || isLoading}
             />
+            {/* @ 提令建议下拉框 */}
+            {showMentionSuggestions && mentionSuggestions.length > 0 && (
+              <div className="mention-suggestions">
+                {mentionSuggestions.map((agent, index) => (
+                  <div
+                    key={agent.id}
+                    className={`mention-suggestion-item ${index === selectedSuggestionIndex ? 'selected' : ''}`}
+                    onClick={() => handleSelectMention(agent)}
+                  >
+                    <span className="mention-agent-name">@{agent.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <button
               type="button"
               className="send-button"

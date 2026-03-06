@@ -990,3 +990,42 @@
   border-top-color: transparent;
 }
 
+
+/* @ 提令建议下拉框 */
+.mention-suggestions {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mention-suggestion-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.mention-suggestion-item:hover,
+.mention-suggestion-item.selected {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+.mention-agent-name {
+  color: #818cf8;
+  font-weight: 500;
+}
+
+.message-input-wrapper {
+  position: relative;
+}
