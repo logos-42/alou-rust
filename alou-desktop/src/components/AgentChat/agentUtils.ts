@@ -19,6 +19,71 @@ interface ToolCategory {
 
 export const fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4'
 
+// IPFS 网关列表 - 按优先级排序
+const IPFS_GATEWAYS = [
+  'https://gateway.ipfs.io/ipfs',
+  'https://ipfs.io/ipfs',
+  'https://cloudflare-ipfs.com/ipfs',
+  'https://dweb.link/ipfs',
+]
+
+// 本地 IPFS 网关（优先使用）
+const getLocalGateway = (): string => {
+  const localGateway = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
+  return `${localGateway}/ipfs`
+}
+
+/**
+ * 构建 IPFS URL
+ * @param cid - IPFS CID
+ * @param preferLocal - 是否优先使用本地网关
+ * @returns 完整的 IPFS URL
+ */
+export const buildIpfsUrl = (cid: string, preferLocal: boolean = true): string => {
+  if (!cid) return fallbackAvatar
+  
+  // 如果已经是完整 URL
+  if (cid.startsWith('http')) return cid
+  
+  // 如果是 data URL
+  if (cid.startsWith('data:')) return cid
+  
+  // 确保 CID 格式正确
+  if (!cid.startsWith('Qm') && !cid.startsWith('bafy') && !cid.startsWith('bafk')) {
+    console.warn('[buildIpfsUrl] 未知的 CID 格式:', cid)
+    return fallbackAvatar
+  }
+  
+  // 优先使用本地网关（如果在桌面环境）
+  if (preferLocal && typeof window !== 'undefined' && (window as any).__TAURI__) {
+    return `${getLocalGateway()}/${cid}`
+  }
+  
+  // 使用公共网关
+  return `${IPFS_GATEWAYS[0]}/${cid}`
+}
+
+/**
+ * 获取备用 IPFS URL 列表（用于重试）
+ * @param cid - IPFS CID
+ * @returns URL 列表
+ */
+export const getIpfsFallbackUrls = (cid: string): string[] => {
+  if (!cid || cid.startsWith('http') || cid.startsWith('data:')) return []
+  
+  const urls = []
+  
+  // 本地网关
+  urls.push(`${getLocalGateway()}/${cid}`)
+  
+  // 公共网关
+  for (const gateway of IPFS_GATEWAYS) {
+    urls.push(`${gateway}/${cid}`)
+  }
+  
+  return urls
+}
+
 // 智能体类型
 export interface Agent {
   id?: string;
@@ -113,36 +178,29 @@ export const resolveAgentAvatar = (agent: Agent | null | undefined): string => {
     return agent.avatar_url
   }
   
-  // 3. IPFS CID（支持多种格式）
+  // 3. IPFS CID（支持多种格式）- 使用新的构建函数
   const avatarCid = agent.avatarCid || agent.avatar_cid
   if (avatarCid) {
-    // 如果已经是完整 URL
-    if (avatarCid.startsWith('http')) return avatarCid
-    // 如果是 IPFS CID 格式
-    if (avatarCid.startsWith('Qm') || avatarCid.startsWith('bafy') || avatarCid.startsWith('bafk')) {
-      const resolvedUrl = `https://ipfs.io/ipfs/${avatarCid}`
-      return resolvedUrl
-    }
+    const url = buildIpfsUrl(avatarCid)
+    if (url !== fallbackAvatar) return url
   }
   
-  // 3. 从当前智能体的 diapIdentity 中获取（避免跨智能体获取）
+  // 4. 从当前智能体的 diapIdentity 中获取（避免跨智能体获取）
   if (agent.diapIdentity?.avatar_cid && 
       (agent.diapIdentity.did === agent.did || 
        agent.diapIdentity.ipns === agent.ipns || 
        agent.diapIdentity.cid === agent.cid)) {
-    const cid = agent.diapIdentity.avatar_cid
-    if (cid.startsWith('http')) return cid
-    return `https://ipfs.io/ipfs/${cid}`
+    const url = buildIpfsUrl(agent.diapIdentity.avatar_cid)
+    if (url !== fallbackAvatar) return url
   }
   
-  // 4. 从 serviceEndpoint 中获取（当前智能体的服务端点）
+  // 5. 从 serviceEndpoint 中获取（当前智能体的服务端点）
   if (agent.serviceEndpoint?.avatar_cid) {
-    const cid = agent.serviceEndpoint.avatar_cid
-    if (cid.startsWith('http')) return cid
-    return `https://ipfs.io/ipfs/${cid}`
+    const url = buildIpfsUrl(agent.serviceEndpoint.avatar_cid)
+    if (url !== fallbackAvatar) return url
   }
   
-  // 5. 从 meta 对象中获取（频道数据结构）
+  // 6. 从 meta 对象中获取（频道数据结构）
   if (agent.meta) {
     const metaAvatar = resolveAgentAvatar(agent.meta)
     // 只有当 meta 头像不属于其他智能体时才使用
@@ -151,15 +209,14 @@ export const resolveAgentAvatar = (agent: Agent | null | undefined): string => {
     }
   }
   
-  // 6. 从 did_document 的 service 中提取（当前智能体的 DID 文档）
+  // 7. 从 did_document 的 service 中提取（当前智能体的 DID 文档）
   if (agent.did_document?.service) {
     const services = agent.did_document.service
     for (const svc of services) {
       const endpoint = svc.serviceEndpoint
       if (endpoint?.avatar_cid) {
-        const cid = endpoint.avatar_cid
-        if (cid.startsWith('http')) return cid
-        return `https://ipfs.io/ipfs/${cid}`
+        const url = buildIpfsUrl(endpoint.avatar_cid)
+        if (url !== fallbackAvatar) return url
       }
     }
   }

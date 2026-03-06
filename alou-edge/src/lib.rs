@@ -29,8 +29,8 @@ use agent::{
     AgentCore, SessionManager,
 };
  use mcp::tools::{
-    AgentWalletTool, BroadcastTool, EchoTool, QueryTool, SpecEnhancedTool, TransactionTool, WalletAuthTool,
-    WalletManagerTool, WorkflowTool,
+    AgentAvatarTool, AgentWalletTool, BroadcastTool, EchoTool, QueryTool, SpecEnhancedTool, TransactionTool,
+    WalletAuthTool, WalletManagerTool, WorkflowTool,
 };
 use mcp::{McpBridge, McpConnectionPool, McpExecutor, McpRegistry};
 use middleware::SubscriptionGuard;
@@ -308,6 +308,11 @@ async fn initialize_and_handle(req: Request, env: Env) -> worker::Result<Respons
 
     registry.register(Arc::new(AgentWalletTool::new(sessions_store.clone())));
     console_log!("  ✓ Registered AgentWalletTool");
+
+    // Register AgentAvatarTool - allows agents to update their own avatar
+    let session_manager_for_avatar = SessionManager::new(sessions_store.clone());
+    registry.register(Arc::new(AgentAvatarTool::new(session_manager_for_avatar)));
+    console_log!("  ✓ Registered AgentAvatarTool");
 
     if let (Some(ref eth_rpc), Some(ref sol_rpc)) = (&eth_rpc_url, &solana_rpc_url) {
         registry.register(Arc::new(QueryTool::new(

@@ -4,8 +4,8 @@ import useClusterActionStore from '@/stores/clusterActionStore'
 import { parseMentions } from '@/utils/mentionParser'
 
 /**
- * useGroupChatManager - 基于DIAP PubSub的群聊管理 Hook
- * 统一管理群聊相关的状态、事件监听和UI控制
+ * useGroupChatManager - 基于 DIAP PubSub 的群聊管理 Hook
+ * 统一管理群聊相关的状态、事件监听和 UI 控制
  */
 export const useGroupChatManager = ({ openConversationPanel, activeChannelId, localIdentity }) => {
   // 从 store 获取集群行动相关状态
@@ -16,24 +16,25 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     getGroupChatMessages,
     getActionStatus,
     loadChannelGroupChats,
+    addAction,
   } = useClusterActionStore()
 
   // 使用 ref 跟踪已加载的频道，避免重复加载
   const loadedChannelRef = useRef(null)
   const openConversationPanelRef = useRef(openConversationPanel)
-  
+
   // 更新 ref
   useEffect(() => {
     openConversationPanelRef.current = openConversationPanel
   }, [openConversationPanel])
 
-  // DIAP群聊Hook
+  // DIAP 群聊 Hook
   const diapGroupChat = useDiapGroupChat({
     localIdentity,
     onGroupCreated: (group, agents) => {
-      console.log('[useGroupChatManager] DIAP群聊创建成功:', group.groupName)
-      
-      // 创建对应的集群行动（用于UI显示）
+      console.log('[useGroupChatManager] DIAP 群聊创建成功:', group.groupName)
+
+      // 创建对应的集群行动（用于 UI 显示）
       const actionId = `diap_group_${group.groupId}`
       const action = {
         action_id: actionId,
@@ -67,13 +68,13 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           diap_group_id: group.groupId,
           diap_topic: group.topic,
           channel: activeChannelId ? { id: activeChannelId } : null,
-          local: false // 标记为DIAP群聊，不是本地群聊
+          local: false // 标记为 DIAP 群聊，不是本地群聊
         }
       }
 
-      // 添加到store
+      // 添加到 store
       setActiveAction(actionId, activeChannelId)
-      
+
       // 触发群聊显示事件
       window.dispatchEvent(
         new CustomEvent('cluster-action-created', {
@@ -82,13 +83,13 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       )
     },
     onMessage: (groupId, message) => {
-      console.log('[useGroupChatManager] 收到DIAP消息:', groupId, message.content)
+      console.log('[useGroupChatManager] 收到 DIAP 消息:', groupId, message.content)
     },
     onError: (error) => {
-      console.error('[useGroupChatManager] DIAP群聊错误:', error)
+      console.error('[useGroupChatManager] DIAP 群聊错误:', error)
     }
   })
-  
+
   // 更新 ref
   useEffect(() => {
     openConversationPanelRef.current = openConversationPanel
@@ -151,27 +152,27 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     }
   }, [diapGroupChat.groups, activeGroupId])
 
-  // 获取当前活跃的群聊（优先从DIAP群聊查找，然后从本地store查找）
+  // 获取当前活跃的群聊（优先从 DIAP 群聊查找，然后从本地 store 查找）
   const activeGroup = useMemo(() => {
     if (!activeGroupId) return null
 
     console.log('[useGroupChatManager] 获取活跃群聊，activeGroupId:', activeGroupId)
 
-    // 先从DIAP群聊查找
+    // 先从 DIAP 群聊查找
     const diapGroup = diapGroupChat.groups.find(g => g.groupId === activeGroupId)
     if (diapGroup) {
-      console.log('[useGroupChatManager] 从DIAP找到群聊:', diapGroup)
+      console.log('[useGroupChatManager] 从 DIAP 找到群聊:', diapGroup)
       return diapGroup
     }
 
-    // 从本地store查找
+    // 从本地 store 查找
     const localActions = getActions(activeChannelId) || []
     const matchedAction = localActions.find((action) => action.action_id === activeGroupId)
     if (matchedAction) {
-      console.log('[useGroupChatManager] 从本地store找到群聊:', matchedAction)
+      console.log('[useGroupChatManager] 从本地 store 找到群聊:', matchedAction)
       return {
         groupId: matchedAction.action_id,
-        groupName: matchedAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
+        groupName: matchedAction.description?.replace('群聊：', '').split(' + ')[0] || '本地群聊',
         description: matchedAction.description,
         agents: matchedAction.agents || [],
         metadata: {
@@ -186,7 +187,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       console.log('[useGroupChatManager] 从活跃行动找到群聊:', activeAction)
       return {
         groupId: activeAction.action_id,
-        groupName: activeAction.description?.replace('群聊: ', '').split(' + ')[0] || '本地群聊',
+        groupName: activeAction.description?.replace('群聊：', '').split(' + ')[0] || '本地群聊',
         description: activeAction.description,
         agents: activeAction.agents || [],
         metadata: {
@@ -200,25 +201,32 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     return null
   }, [diapGroupChat.groups, activeGroupId, getActiveAction, getActions, activeChannelId])
 
-  // 获取当前活跃群聊的消息（优先从DIAP群聊查找，然后从本地store查找）
+  // 获取当前活跃群聊的消息（优先从 DIAP 群聊查找，然后从本地 store 查找）
   const activeGroupMessages = useMemo(() => {
-    if (!activeGroupId) return []
-    
-    // 先从DIAP群聊获取消息（仅当当前活跃群聊匹配）
+    if (!activeGroupId) {
+      console.log('[useGroupChatManager] activeGroupMessages: activeGroupId 为空')
+      return []
+    }
+
+    console.log('[useGroupChatManager] activeGroupMessages: 获取消息，activeGroupId=', activeGroupId)
+
+    // 先从 DIAP 群聊获取消息（仅当当前活跃群聊匹配）
     if (diapGroupChat.activeGroup?.groupId === activeGroupId) {
+      console.log('[useGroupChatManager] activeGroupMessages: 从 DIAP 获取，消息数量=', diapGroupChat.messages.length)
       return diapGroupChat.messages
     }
-    
-    // 从本地store获取消息
+
+    // 从本地 store 获取消息
     const messages = getGroupChatMessages(activeGroupId)
+    console.log('[useGroupChatManager] activeGroupMessages: 从本地 store 获取，消息数量=', messages?.length || 0)
     return messages || []
   }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId, getGroupChatMessages])
 
-  // 获取当前频道的群聊列表（合并DIAP群聊和本地群聊）
+  // 获取当前频道的群聊列表（合并 DIAP 群聊和本地群聊）
   const groupChatList = useMemo(() => {
     if (!activeChannelId) return []
-    
-    // 获取DIAP群聊
+
+    // 获取 DIAP 群聊
     const diapGroups = diapGroupChat.groups
       .filter(isGroupInActiveChannel)
       .map((group) => ({
@@ -231,16 +239,16 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           channel_id: activeChannelId,
         },
       }))
-    
+
     // 获取本地群聊
     const localActions = getActions(activeChannelId) || []
     const localGroups = localActions
-      .filter(action => 
-        action.action_id?.startsWith('local_group_') || 
+      .filter(action =>
+        action.action_id?.startsWith('local_group_') ||
         action.action_id?.startsWith('action_') ||
         action.metadata?.type === 'group_chat'
       )
-    
+
     // 合并群聊列表
     return [...diapGroups, ...localGroups]
   }, [activeChannelId, diapGroupChat.groups, getActions, isGroupInActiveChannel])
@@ -255,7 +263,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       }
     }
 
-    // 如果没有频道，创建一个默认频道ID
+    // 如果没有频道，创建一个默认频道 ID
     let channelId = activeChannelId
     if (!channelId) {
       channelId = `channel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -271,7 +279,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         name: `频道 ${channelId.slice(-8)}`,
       }
 
-      // 尝试使用DIAP创建群聊
+      // 尝试使用 DIAP 创建群聊
       const group = await diapGroupChat.createGroupWithAgents({
         groupName,
         description: `${channel.name} 的群聊`,
@@ -296,7 +304,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 
     } catch (error) {
       console.error('[useGroupChatManager] 创建群聊失败，尝试本地模式:', error)
-      
+
       // 降级到本地内存模式
       try {
         const localGroupId = `local_group_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -304,7 +312,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           id: channelId,
           name: `频道 ${channelId.slice(-8)}`,
         }
-        
+
         // 创建本地群聊行动
         const actionId = `local_group_${localGroupId}`
         const action = {
@@ -333,15 +341,16 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
             local: true
           }
         }
-        
-        // 保存到store
+
+        // 保存到 store
+        addAction(action)
         setActiveAction(actionId, channelId)
-        
+
         // 设置为活跃群聊
         setActiveGroupId(actionId)
         setShowGroupChat(true)
         openConversationPanelRef.current?.()
-        
+
         console.log('[useGroupChatManager] 本地群聊创建成功:', actionId)
         return { groupId: actionId, groupName, local: true }
       } catch (localError) {
@@ -349,113 +358,135 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         throw new Error('无法创建群聊，请确保应用已正常初始化')
       }
     }
-  }, [localIdentity, activeChannelId, diapGroupChat, openConversationPanelRef, setActiveAction])
+  }, [localIdentity, activeChannelId, diapGroupChat, openConversationPanelRef, setActiveAction, addAction])
 
-  // 发送消息 - 支持本地群聊和 DIAP 群聊
-  const sendMessage = useCallback(async (groupId, content) => {
+  // 发送消息 - 健壮的群聊消息发送逻辑
+  const sendMessage = useCallback(async (groupId: string, content: string, options?: {
+    mentions?: Array<{ agentId: string; agentName: string }>,
+    hasMentions?: boolean,
+    isPrivateMention?: boolean,
+    targetAgentId?: string
+  }): Promise<void> => {
+    if (!groupId) {
+      console.error('[useGroupChatManager] 群聊 ID 缺失')
+      throw new Error('群聊 ID 缺失')
+    }
+
+    if (!content || content.trim() === '') {
+      console.warn('[useGroupChatManager] 消息内容为空')
+      return
+    }
+
     try {
-      console.log('[useGroupChatManager] sendMessage 被调用:', { groupId, content, activeChannelId })
-      
-      // 判断是否是本地群聊
+      console.log('[useGroupChatManager] sendMessage 被调用:', { 
+        groupId, 
+        content: content.slice(0, 50), 
+        activeChannelId,
+        options 
+      })
+
+      // 判断群聊类型
       const isLocalGroupChat = groupId.startsWith('local_group_') || groupId.startsWith('action_')
-      
+      const isDiapGroupChat = groupId.startsWith('diap_group_') || !isLocalGroupChat
+
+      // 获取用户标识
+      const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
+      const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
+      const from = walletAddress || userId || 'user'
+
+      // 创建用户消息对象
+      const userMessage = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        type: 'user' as const,
+        from: from,
+        fromName: localIdentity?.name || from,
+        content: content,
+        timestamp: Date.now(),
+        mentions: options?.mentions || [],
+        hasMentions: options?.hasMentions || false,
+      }
+
+      let sendSuccess = false
+      let sendError: Error | null = null
+
+      // 根据群聊类型选择发送方式
       if (isLocalGroupChat) {
-        console.log('[useGroupChatManager] 检测到本地群聊，使用 useGroupChatRemoteControl 逻辑')
-        // 本地群聊：使用 useGroupChatRemoteControl 的逻辑
-        const { sendMessageToGroupChat } = await import('./useGroupChatRemoteControl')
-        // 注意：这里不能直接调用，因为 sendMessageToGroupChat 是 hook 内部的函数
-        // 我们需要在本地实现类似的逻辑
-        
-        // 获取用户标识
-        const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-        const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
-        const from = walletAddress || userId || 'user'
-        
-        // 创建用户消息
-        const userMessage = {
-          id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          type: 'user',
-          from: from,
-          fromName: localIdentity?.name || from,
-          content: content,
-          timestamp: Date.now(),
+        // === 本地群聊 ===
+        console.log('[useGroupChatManager] 检测到本地群聊，保存到本地 store')
+
+        try {
+          // 1. 保存到本地 store
+          const { addGroupChatMessage } = useClusterActionStore.getState()
+          addGroupChatMessage(groupId, userMessage)
+          console.log('[useGroupChatManager] 本地群聊消息已添加到 store:', groupId)
+          sendSuccess = true
+        } catch (error) {
+          console.error('[useGroupChatManager] 保存到本地 store 失败:', error)
+          sendError = error as Error
         }
-        
-        // 保存到本地 store
-        const { addGroupChatMessage } = useClusterActionStore.getState()
-        addGroupChatMessage(groupId, userMessage)
-        console.log('[useGroupChatManager] 本地群聊消息已添加到 store:', groupId)
-        
-        // 通知智能体
-        const { getActiveAction } = useClusterActionStore.getState()
-        const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
-        
-        if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
-          const agentIds = activeAction.agents.map(agent => agent.id || agent.agent_id).filter(Boolean)
-          
-          // 通知每个智能体
-          for (const agentId of agentIds) {
-            try {
-              window.dispatchEvent(new CustomEvent('agent-group-message', {
-                detail: {
-                  agentId,
-                  message: {
-                    ...userMessage,
-                    groupId: groupId,
-                    type: 'group_chat_message'
-                  }
-                }
-              }))
-              console.log('[useGroupChatManager] 已通知智能体:', agentId)
-            } catch (error) {
-              console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
-            }
+      }
+
+      if (isDiapGroupChat && !sendSuccess) {
+        // === DIAP 群聊 ===
+        console.log('[useGroupChatManager] 使用 DIAP 群聊发送')
+
+        try {
+          await diapGroupChat.sendMessage(groupId, content)
+          console.log('[useGroupChatManager] DIAP 群聊发送成功')
+          sendSuccess = true
+        } catch (error) {
+          console.error('[useGroupChatManager] DIAP 群聊发送失败:', error)
+          sendError = error as Error
+          // 降级：即使 DIAP 失败，也保存到本地 store
+          try {
+            const { addGroupChatMessage } = useClusterActionStore.getState()
+            addGroupChatMessage(groupId, userMessage)
+            console.log('[useGroupChatManager] 降级：消息已保存到本地 store')
+            sendSuccess = true
+            sendError = null
+          } catch (fallbackError) {
+            console.error('[useGroupChatManager] 降级保存也失败:', fallbackError)
           }
         }
-      } else {
-        // DIAP 群聊：使用 diapGroupChat.sendMessage
-        console.log('[useGroupChatManager] 使用 DIAP 群聊发送')
-        await diapGroupChat.sendMessage(groupId, content)
       }
-      
-      console.log('[useGroupChatManager] 消息发送成功:', groupId, content)
-      
-      // 关键：通知智能体处理群聊消息（支持@提及过滤）
+
+      // 无论哪种群聊类型，都通知智能体
       const { getActiveAction } = useClusterActionStore.getState()
       const activeAction = activeChannelId ? getActiveAction(activeChannelId) : null
-      
+
       if (activeAction && activeAction.agents && activeAction.agents.length > 0) {
         console.log('[useGroupChatManager] 准备通知智能体:', activeAction.agents.length, '个')
-        
-        // 获取用户标识
-        const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-        const userId = typeof window !== 'undefined' ? localStorage.getItem('user_id') : null
-        const from = walletAddress || userId || 'user'
-        
+
         // 解析@提及
         const { mentionedAgents, cleanContent, hasMention } = parseMentions(content, activeAction.agents)
-        
+
         // 确定要通知的智能体列表
         let targetAgents = activeAction.agents
-        
+
         if (hasMention && mentionedAgents.length > 0) {
           // 如果有@提及，只通知被@的智能体
           targetAgents = mentionedAgents
-          console.log('[useGroupChatManager] @提及检测: 只通知被@的智能体:', mentionedAgents.map(a => a.name || a.id))
+          console.log('[useGroupChatManager] @提及检测：只通知被@的智能体:', mentionedAgents.map(a => a.name || a.id))
         } else if (hasMention && mentionedAgents.length === 0) {
           // 有@但没有匹配到智能体，跳过通知
           console.log('[useGroupChatManager] @提及但未匹配到智能体，不通知')
+          // 仍然返回成功，因为消息已经发送，只是没有智能体可通知
           return
         } else {
           // 没有@，广播给所有智能体
           console.log('[useGroupChatManager] 无@提及，广播给所有智能体')
         }
-        
+
         // 通知目标智能体
         const agentIds = targetAgents
           .map(agent => agent.id || agent.agent_id)
           .filter(Boolean)
-        
+
+        if (agentIds.length === 0) {
+          console.warn('[useGroupChatManager] 没有可通知的智能体 ID')
+          return
+        }
+
         for (const agentId of agentIds) {
           try {
             console.log('[useGroupChatManager] 通知智能体:', agentId)
@@ -464,26 +495,34 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
               detail: {
                 agentId,
                 message: {
-                  id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-                  content: hasMention ? cleanContent : content, // 有@时使用清理后的内容
-                  rawContent: content, // 保留原始内容
+                  id: userMessage.id,
+                  content: hasMention ? cleanContent : content,
+                  rawContent: content,
                   from: from,
                   fromName: localIdentity?.name || from,
                   timestamp: Date.now(),
                   groupId: groupId,
-                  type: 'group_chat_message',
+                  type: 'group_chat_message' as const,
                   isMentioned: hasMention,
                   mentionedAgentIds: mentionedAgents.map(a => a.id)
                 }
               }
             }))
+            console.log('[useGroupChatManager] 智能体通知成功:', agentId)
           } catch (error) {
             console.warn(`[useGroupChatManager] 通知智能体 ${agentId} 失败:`, error)
+            // 单个智能体通知失败不影响整体
           }
         }
       } else {
-        console.warn('[useGroupChatManager] 没有找到活跃的群聊或智能体')
+        console.warn('[useGroupChatManager] 没有找到活跃的群聊或智能体，但消息已发送')
       }
+
+      if (!sendSuccess && sendError) {
+        throw sendError
+      }
+
+      console.log('[useGroupChatManager] 消息发送成功:', groupId, content)
     } catch (error) {
       console.error('[useGroupChatManager] 发送消息失败:', error)
       throw error
@@ -501,7 +540,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       try {
         await diapGroupChat.switchToGroup(groupId)
       } catch (error) {
-        console.warn('[useGroupChatManager] 切换DIAP群聊失败，将继续使用本地存档消息:', error)
+        console.warn('[useGroupChatManager] 切换 DIAP 群聊失败，将继续使用本地存档消息:', error)
       }
     }
     setShowGroupChat(true)
@@ -519,7 +558,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         try {
           await diapGroupChat.switchToGroup(activeGroupId)
         } catch (error) {
-          console.warn('[useGroupChatManager] 打开群聊时切换活跃DIAP群失败:', error)
+          console.warn('[useGroupChatManager] 打开群聊时切换活跃 DIAP 群失败:', error)
         }
       }
       setShowGroupChat(true)
@@ -574,7 +613,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     }
   }, [activeGroupId, closeGroupChatCompletely, groupChatList, showGroupChat])
 
-  // 获取action状态
+  // 获取 action 状态
   const actionStatus = useMemo(() => {
     if (!activeGroupId) return null
     return getActionStatus(activeGroupId) || 'Active'
@@ -584,13 +623,13 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   const deleteGroupChat = useCallback(async (groupId) => {
     try {
       await diapGroupChat.leaveGroup(groupId)
-      
+
       // 如果删除的是当前活跃群聊，清除活跃状态
       if (activeGroupId === groupId) {
         setActiveGroupId(null)
         setShowGroupChat(false)
       }
-      
+
       console.log('[useGroupChatManager] 群聊已删除:', groupId)
     } catch (error) {
       console.error('[useGroupChatManager] 删除群聊失败:', error)
@@ -600,13 +639,13 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   // 分割位置状态
   const [splitPosition, setSplitPosition] = useState(50)
 
-  // 监听DIAP群聊创建事件
+  // 监听 DIAP 群聊创建事件
   useEffect(() => {
     const handleClusterActionCreated = (event) => {
       const { actionId } = event.detail
       console.log('[useGroupChatManager] 收到群聊创建事件:', actionId)
-      
-      // 处理DIAP群聊和本地群聊
+
+      // 处理 DIAP 群聊和本地群聊
       if (actionId && (actionId.startsWith('diap_group_') || actionId.startsWith('action_') || actionId.startsWith('local_group_'))) {
         let groupId
         if (actionId.startsWith('diap_group_')) {
@@ -614,7 +653,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         } else {
           groupId = actionId
         }
-        
+
         console.log('[useGroupChatManager] 设置活跃群聊:', groupId)
         setActiveGroupId(groupId)
         if (activeChannelId) {
@@ -624,7 +663,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         openConversationPanelRef.current?.()
         if (diapGroupChat.groups.some((g) => g.groupId === groupId)) {
           diapGroupChat.switchToGroup(groupId).catch((error) => {
-            console.warn('[useGroupChatManager] 事件切换DIAP群聊失败:', error)
+            console.warn('[useGroupChatManager] 事件切换 DIAP 群聊失败:', error)
           })
         }
       }
@@ -650,7 +689,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     const isIpfsReady = diapGroupChat.isInitialized && diapGroupChat.isIpfsAvailable
     // 检查身份是否存在
     const hasIdentity = localIdentity !== null
-    
+
     return hasActiveGroup && isIpfsReady && hasIdentity
   }, [activeGroupId, diapGroupChat.isInitialized, diapGroupChat.isIpfsAvailable, localIdentity])
 
@@ -658,7 +697,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     // 状态
     showGroupChat,
     activeGroupId,
-    activeActionId: activeGroupId, // 兼容性：将activeGroupId作为activeActionId
+    activeActionId: activeGroupId, // 兼容性：将 activeGroupId 作为 activeActionId
     activeAction,
     activeGroup,
     activeGroupMessages,
@@ -667,7 +706,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     actionStatus,
     splitPosition,
 
-    // DIAP群聊状态
+    // DIAP 群聊状态
     diapGroupChat,
 
     // 操作方法
@@ -695,4 +734,3 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 }
 
 export default useGroupChatManager
-

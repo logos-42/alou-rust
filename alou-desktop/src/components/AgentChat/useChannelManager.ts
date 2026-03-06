@@ -86,6 +86,7 @@ export const useChannelManager = ({
   const searchDebounceRef = useRef(null)
   const hasLoadedFromStorageRef = useRef(false) // 防止重复从本地加载
   const resolveExistingAgentTargetRef = useRef(null) // 用于在 loadChannelList 中访问 resolveExistingAgentTarget
+  const creatingAgentsRef = useRef<Set<string>>(new Set()) // 防止重复创建同名智能体
 
   // 本地持久化
   const hasHydrated = useAgentStoreHydration()
@@ -817,6 +818,18 @@ export const useChannelManager = ({
   // 创建智能体
   const handleCreateAgentSubmit = useCallback(
     async ({ name, roleDescription, avatar_cid, avatar_url, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId, customPrompt }) => {
+      // 生成唯一键用于去重检查
+      const agentKey = `${name}_${roleDescription}`.toLowerCase().trim()
+      
+      // 检查是否正在创建中（防止重复提交）
+      if (creatingAgentsRef.current.has(agentKey)) {
+        console.log('[useChannelManager] 智能体正在创建中，跳过重复请求:', name)
+        return { success: true, skipped: true, reason: 'already_creating' }
+      }
+      
+      // 标记为正在创建
+      creatingAgentsRef.current.add(agentKey)
+      
       // 如果有 tempId，说明是后台更新，不需要显示 loading
       const isBackgroundUpdate = !!tempId
       if (!isBackgroundUpdate) {
@@ -1028,6 +1041,8 @@ export const useChannelManager = ({
         console.error('[useChannelManager] 创建智能体失败:', message)
         throw new Error(message)
       } finally {
+        // 移除正在创建标记
+        creatingAgentsRef.current.delete(agentKey)
         if (!isBackgroundUpdate) {
           setChannelLoading(false)
         }

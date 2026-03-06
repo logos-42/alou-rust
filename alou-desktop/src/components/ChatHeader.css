@@ -140,6 +140,123 @@
 
 .top-nav .user-menu {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.top-nav .user-avatar-wrapper {
+  position: relative;
+}
+
+.top-nav .user-avatar-btn {
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.top-nav .user-avatar-btn:hover {
+  border-color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.top-nav .user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.top-nav .avatar-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  background: var(--background);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-lg);
+  min-width: 220px;
+  z-index: 100;
+  overflow: hidden;
+  animation: avatar-dropdown-slide-in 0.2s ease-out;
+}
+
+@keyframes avatar-dropdown-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.top-nav .avatar-dropdown-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.top-nav .avatar-dropdown-section {
+  padding: 0.5rem;
+}
+
+.top-nav .avatar-dropdown-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.25rem 0;
+}
+
+.top-nav .avatar-menu-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0.625rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  text-align: left;
+  border-radius: 0.5rem;
+}
+
+.top-nav .avatar-menu-item:hover {
+  background: var(--secondary-color);
+}
+
+.top-nav .avatar-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.top-nav .avatar-uploading {
+  font-size: 0.75rem;
+  color: var(--primary-color);
+}
+
+.top-nav .avatar-style-label {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
 .top-nav .user-btn {
@@ -153,6 +270,11 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.top-nav .user-menu-arrow {
+  font-size: 0.625rem;
+  color: var(--text-secondary);
 }
 
 .top-nav .user-dropdown {

@@ -1,0 +1,140 @@
+.avatar-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--secondary-color);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.avatar-container:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.avatar-rounded {
+  border-radius: 50%;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+.avatar-loading-image {
+  opacity: 0.5;
+}
+
+.avatar-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--secondary-color);
+  z-index: 1;
+}
+
+.avatar-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: avatar-spin 0.8s linear infinite;
+}
+
+@keyframes avatar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.avatar-error-indicator {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-size: 12px;
+  background: var(--background);
+  border-radius: 50%;
+  padding: 2px;
+  z-index: 2;
+}
+
+/* Avatar 组 */
+.avatar-group {
+  display: flex;
+  align-items: center;
+}
+
+.avatar-group-overlap {
+  gap: 0;
+}
+
+.avatar-group-overlap .avatar-group-item {
+  margin-right: -8px;
+  border: 2px solid var(--background);
+  transition: all 0.3s ease;
+}
+
+.avatar-group-overlap .avatar-group-item:hover {
+  transform: translateY(-2px);
+  z-index: 10;
+}
+
+.avatar-group-overlap .avatar-group-item:last-child {
+  margin-right: 0;
+}
+
+.avatar-group-remaining {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--secondary-color);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 50%;
+  margin-left: -8px;
+}
+
+/* 尺寸变体 */
+.avatar-size-small {
+  width: 32px;
+  height: 32px;
+  font-size: 10px;
+}
+
+.avatar-size-medium {
+  width: 40px;
+  height: 40px;
+  font-size: 12px;
+}
+
+.avatar-size-large {
+  width: 64px;
+  height: 64px;
+  font-size: 14px;
+}
+
+/* 暗夜模式适配 */
+.app-shell.dark-mode .avatar-container {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell.dark-mode .avatar-container:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.app-shell.dark-mode .avatar-loading-spinner {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: var(--primary-color);
+}
+
+.app-shell.dark-mode .avatar-group-overlap .avatar-group-item {
+  border-color: #000000;
+}

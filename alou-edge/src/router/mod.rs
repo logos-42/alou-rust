@@ -363,6 +363,9 @@ impl Router {
             (Method::Post, "/api/agent/create") | (Method::Post, "/api/agent/create_agent") => {
                 agent::handle_create_agent(&self.session_manager, req).await
             }
+            (Method::Post, "/api/agent/update") => {
+                agent::handle_update_agent(&self.session_manager, req).await
+            }
             (Method::Post, "/api/agent/batch-create") => {
                 agent::handle_batch_create_agent(&self.session_manager, req, &env).await
             }

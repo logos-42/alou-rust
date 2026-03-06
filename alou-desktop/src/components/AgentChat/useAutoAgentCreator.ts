@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 
 /**
  * 智能体信息类型
@@ -41,6 +41,7 @@ interface UseAutoAgentCreatorReturn {
   resetState: () => void;
   hasCreatedAgent: boolean;
   isInProgress: boolean;
+  clearCreatedAgents: () => void; // 清空已创建代理记录，允许重新创建同名代理
 }
 
 /**
@@ -59,6 +60,10 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
   const [isAutoCreating, setIsAutoCreating] = useState<boolean>(false)
   const [autoCreationError, setAutoCreationError] = useState<string | null>(null)
   const [lastCreatedAgent, setLastCreatedAgent] = useState<AgentInfo | null>(null)
+  
+  // 使用 ref 跟踪正在创建和已创建的agent，防止重复创建
+  const creatingAgentsRef = useRef<Set<string>>(new Set())
+  const createdAgentsRef = useRef<Set<string>>(new Set())
 
   // ==================== 核心自动创建函数 ====================
   /**
@@ -74,6 +79,22 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
       throw new Error('创建函数未提供，无法自动创建智能体')
     }
 
+    // 生成唯一键用于去重（使用名称+角色描述的组合）
+    const agentKey = `${agentInfo.name}_${agentInfo.roleDescription}`.toLowerCase().trim()
+    
+    // 检查是否正在创建中或已创建
+    if (creatingAgentsRef.current.has(agentKey)) {
+      console.log('[useAutoAgentCreator] 智能体正在创建中，跳过重复创建:', agentInfo.name)
+      return false
+    }
+    
+    if (createdAgentsRef.current.has(agentKey)) {
+      console.log('[useAutoAgentCreator] 智能体已创建过，跳过重复创建:', agentInfo.name)
+      return false
+    }
+
+    // 标记为正在创建
+    creatingAgentsRef.current.add(agentKey)
     setIsAutoCreating(true)
     setAutoCreationError(null)
 
@@ -92,6 +113,8 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
       
       console.log('[useAutoAgentCreator] 智能体自动创建成功:', agentInfo.name)
       setLastCreatedAgent(agentInfo)
+      // 标记为已创建
+      createdAgentsRef.current.add(agentKey)
       return true
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -99,6 +122,8 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
       setAutoCreationError(message)
       throw error
     } finally {
+      // 从正在创建集合中移除
+      creatingAgentsRef.current.delete(agentKey)
       setIsAutoCreating(false)
     }
   }, [onCreateAgent])
@@ -108,6 +133,19 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
     setIsAutoCreating(false)
     setAutoCreationError(null)
     setLastCreatedAgent(null)
+    creatingAgentsRef.current.clear()
+    createdAgentsRef.current.clear()
+    console.log('[useAutoAgentCreator] 状态已重置')
+  }, [])
+
+  // ==================== 清空已创建记录 ====================
+  /**
+   * 清空已创建代理记录
+   * 用于允许重新创建同名代理（例如删除后重新创建）
+   */
+  const clearCreatedAgents = useCallback(() => {
+    createdAgentsRef.current.clear()
+    console.log('[useAutoAgentCreator] 已清空已创建代理记录')
   }, [])
 
   // ==================== 返回接口 ====================
@@ -116,13 +154,14 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
     isAutoCreating,
     autoCreationError,
     lastCreatedAgent,
-    
+
     // 核心方法
     autoCreateAgent,
-    
+
     // 工具方法
     resetState,
-    
+    clearCreatedAgents,
+
     // 状态检查
     hasCreatedAgent: !!lastCreatedAgent,
     isInProgress: isAutoCreating,

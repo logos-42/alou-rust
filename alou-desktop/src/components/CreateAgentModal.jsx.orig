@@ -1,6 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
 import agentAssetsService from '@/services/agentAssetsService'
-import avatarService from '@/services/avatarService'
 import agentService from '@/services/agentService'
 // import agentDocumentService, { AgentDocuments } from '@/services/agentDocumentService'
 import ipfsService from '@/services/ipfsService'
@@ -209,31 +208,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
     reader.readAsDataURL(file)
   }
 
-  const handleSwitchDicebearStyle = (style) => {
-    const seed = name.trim() || `agent_${Date.now()}`
-    const newAvatar = avatarService.generateDicebearAvatar(seed, style)
-    setAvatarPreview(newAvatar)
-    setAvatarFile(null)
-    setShowDicebearStyles(false)
-  }
-
-  const handleUseDefaultAvatar = () => {
-    const newAvatar = avatarService.getFallbackAvatar()
-    setAvatarPreview(newAvatar)
-    setAvatarFile(null)
-    setShowDicebearStyles(false)
-  }
-
-  const dicebearStyles = [
-    { name: 'identicon', label: '🔷 Identicon', description: '几何图案' },
-    { name: 'avataaars', label: '😊 Avataaars', description: '卡通头像' },
-    { name: 'bottts', label: '🤖 Bottts', description: '机器人' },
-    { name: 'lorelei', label: '🧚 Lorelei', description: '精灵风格' },
-    { name: 'notionists', label: '📝 Notionists', description: '简约风格' },
-    { name: 'fun-emoji', label: '😄 Fun Emoji', description: '表情符号' },
-    { name: 'shapes', label: '🔶 Shapes', description: '抽象形状' },
-  ]
-
   const handleInternalSubmit = async (event) => {
     event.preventDefault()
     setError(null)
@@ -432,67 +406,14 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
               ) : (
                 <div className="agent-modal__avatar-placeholder">{t('agent.create.avatar.preview')}</div>
               )}
-              <div className="agent-modal__avatar-actions">
-                <label className="agent-modal__upload-button">
-                  {t('agent.create.avatar.select')}
-                  <input type="file" accept="image/*" onChange={handleAvatarChange} />
-                </label>
-                <button
-                  type="button"
-                  className="agent-modal__avatar-style-btn"
-                  onClick={() => setShowDicebearStyles(!showDicebearStyles)}
-                >
-                  🎨 选择风格
-                </button>
-                <button
-                  type="button"
-                  className="agent-modal__avatar-default-btn"
-                  onClick={handleUseDefaultAvatar}
-                >
-                  🔄 默认头像
-                </button>
-              </div>
+              <label className="agent-modal__upload-button">
+                {t('agent.create.avatar.select')}
+                <input type="file" accept="image/*" onChange={handleAvatarChange} />
+              </label>
             </div>
             {avatarUploadError && (
               <div className="agent-modal__avatar-warning">
                 ⚠️ {avatarUploadError}
-              </div>
-            )}
-
-            {/* Dicebear 风格选择器 */}
-            {showDicebearStyles && (
-              <div className="agent-modal__dicebear-styles">
-                <div className="agent-modal__dicebear-header">
-                  <span>选择头像风格</span>
-                  <button
-                    type="button"
-                    className="agent-modal__dicebear-close"
-                    onClick={() => setShowDicebearStyles(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="agent-modal__dicebear-grid">
-                  {dicebearStyles.map((style) => (
-                    <button
-                      key={style.name}
-                      type="button"
-                      className="agent-modal__dicebear-style"
-                      onClick={() => handleSwitchDicebearStyle(style.name)}
-                    >
-                      <div className="agent-modal__dicebear-preview">
-                        <img
-                          src={avatarService.generateDicebearAvatar(name.trim() || 'agent', style.name)}
-                          alt={style.label}
-                        />
-                      </div>
-                      <div className="agent-modal__dicebear-info">
-                        <span className="agent-modal__dicebear-label">{style.label}</span>
-                        <span className="agent-modal__dicebear-desc">{style.description}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
           </div>

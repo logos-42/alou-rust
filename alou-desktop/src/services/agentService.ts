@@ -334,6 +334,73 @@ class AgentService {
   }
 
   /**
+   * 更新智能体头像
+   * @param sessionId - 智能体会话ID
+   * @param avatarData - 头像数据（URL 或 CID）
+   */
+  async updateAgentAvatar(
+    sessionId: string, 
+    avatarData: { avatar_url?: string; avatar_cid?: string }
+  ): Promise<ApiResponse<AgentInfo>> {
+    try {
+      console.log('[AgentService] 更新智能体头像:', sessionId);
+
+      const payload = {
+        session_id: sessionId,
+        avatar_url: avatarData.avatar_url,
+        avatar_cid: avatarData.avatar_cid,
+      };
+
+      const response = await apiClient.post('/agent/update', payload);
+      
+      if (response.success && response.data) {
+        console.log('[AgentService] 智能体头像更新成功:', sessionId);
+      }
+      
+      return response;
+    } catch (error) {
+      console.error('[AgentService] 更新智能体头像失败:', error);
+      return {
+        success: false,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * 上传智能体头像文件
+   * @param sessionId - 智能体会话ID
+   * @param file - 头像文件
+   */
+  async uploadAgentAvatar(sessionId: string, file: File): Promise<ApiResponse<AgentInfo>> {
+    try {
+      console.log('[AgentService] 上传智能体头像:', sessionId, file.name);
+
+      // Use avatarService to upload the file
+      const { default: avatarService } = await import('./avatarService');
+      const uploadResult = await avatarService.uploadAvatar(file);
+
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Failed to upload avatar');
+      }
+
+      // Update agent with the new avatar
+      return this.updateAgentAvatar(sessionId, {
+        avatar_url: uploadResult.avatarUrl,
+        avatar_cid: uploadResult.cid,
+      });
+    } catch (error) {
+      console.error('[AgentService] 上传智能体头像失败:', error);
+      return {
+        success: false,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
    * 删除智能体
    */
   async deleteAgent(agentId: string): Promise<ApiResponse<void>> {

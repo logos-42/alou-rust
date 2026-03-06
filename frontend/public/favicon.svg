@@ -1,5 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Alou Logo Favicon - 使用PNG图片作为favicon -->
-  <!-- 浏览器会自动使用PNG格式的favicon，SVG作为备用 -->
-  <image href="/favicon-32x32.png" width="32" height="32" preserveAspectRatio="xMidYMid meet"/>
-</svg>

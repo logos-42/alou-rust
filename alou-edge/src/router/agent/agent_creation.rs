@@ -297,3 +297,114 @@ pub(crate) async fn handle_create_agent_from_command(
         }
     }
 }
+
+/// Request structure for updating an agent
+#[derive(Deserialize)]
+pub(crate) struct UpdateAgentRequest {
+    pub session_id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub role_description: Option<String>,
+    #[serde(default)]
+    pub avatar_cid: Option<String>,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub mcp_config_cid: Option<String>,
+    #[serde(default)]
+    pub mcp_ports: Option<Vec<McpPortConfig>>,
+}
+
+/// Update agent metadata
+pub(crate) async fn handle_update_agent(
+    session_manager: &SessionManager,
+    req: &mut Request,
+) -> Result<Response> {
+    let body: UpdateAgentRequest = match req.json().await {
+        Ok(body) => body,
+        Err(e) => {
+            let error_response = ErrorResponse {
+                error: format!("Invalid request body: {}", e),
+            };
+            return Ok(json_response_with_status(&error_response, 400)?);
+        }
+    };
+
+    // Verify session exists
+    let session = match session_manager.get_session(&body.session_id).await {
+        Ok(session) => session,
+        Err(_) => {
+            let error_response = ErrorResponse {
+                error: format!("Session not found: {}", body.session_id),
+            };
+            return Ok(json_response_with_status(&error_response, 404)?);
+        }
+    };
+
+    // Get current agent metadata
+    let current_metadata = session_manager
+        .get_agent_metadata(&body.session_id)
+        .await
+        .unwrap_or_else(|_| json!({}));
+
+    // Build update
+    let mut updates = json!({});
+    
+    if let Some(name) = body.name {
+        updates["name"] = json!(name);
+    }
+    
+    if let Some(role_description) = body.role_description {
+        updates["role_description"] = json!(role_description);
+    }
+    
+    if let Some(avatar_cid) = body.avatar_cid {
+        updates["avatar_cid"] = json!(avatar_cid);
+        // If avatar_url is not provided, generate from CID
+        if body.avatar_url.is_none() {
+            updates["avatar_url"] = json!(format!("https://gateway.ipfs.io/ipfs/{}", avatar_cid));
+        }
+    }
+    
+    if let Some(avatar_url) = body.avatar_url {
+        updates["avatar_url"] = json!(avatar_url);
+    }
+    
+    if let Some(mcp_config_cid) = body.mcp_config_cid {
+        updates["mcp_config_cid"] = json!(mcp_config_cid);
+    }
+    
+    if let Some(mcp_ports) = body.mcp_ports {
+        updates["mcp_ports"] = json!(mcp_ports);
+    }
+
+    // Merge with existing metadata
+    let mut new_metadata = current_metadata.clone();
+    if let Some(obj) = new_metadata.as_object_mut() {
+        for (key, value) in updates.as_object().unwrap_or(&serde_json::Map::new()) {
+            obj.insert(key.clone(), value.clone());
+        }
+        obj.insert("updated_at".to_string(), json!(chrono::Utc::now().to_rfc3339()));
+    }
+
+    // Save updated metadata
+    if let Err(e) = session_manager
+        .set_agent_metadata(&body.session_id, new_metadata.clone())
+        .await
+    {
+        let error_response = ErrorResponse {
+            error: format!("Failed to update agent: {}", e),
+        };
+        return Ok(json_response_with_status(&error_response, 500)?);
+    }
+
+    let response = json!({
+        "success": true,
+        "message": "Agent updated successfully",
+        "session_id": body.session_id,
+        "agent_metadata": new_metadata,
+    });
+
+    Ok(json_response(&response)?)
+}

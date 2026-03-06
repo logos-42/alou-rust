@@ -1,3 +1,4 @@
+pub mod agent_avatar;
 pub mod agent_wallet;
 pub mod broadcast;
 pub mod contract;
@@ -13,6 +14,7 @@ pub mod workflow;
 pub use crate::agent::tools::BroadcastTool;
 pub use crate::agent::tools::QueryTool;
 pub use crate::agent::tools::TransactionTool;
+pub use agent_avatar::AgentAvatarTool;
 pub use agent_wallet::AgentWalletTool;
 pub use echo::EchoTool;
 pub use proxy::ProxyTool;

@@ -35,8 +35,10 @@ pub(crate) use agent_discovery::{
 pub(crate) use agent_creation::{
     handle_create_agent,
     handle_create_agent_internal,
-    handle_parse_creation_command,
     handle_create_agent_from_command,
+    handle_parse_creation_command,
+    handle_update_agent,
+    UpdateAgentRequest,
 };
 
 // Re-export batch handlers

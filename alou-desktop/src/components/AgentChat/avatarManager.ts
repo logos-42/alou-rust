@@ -8,7 +8,7 @@ import agentAssetsService from '../../services/agentAssetsService';
  * 集中处理头像的更新、同步和缓存
  */
 class AvatarManager {
-  private listeners = new Set<(avatarUrl: string) => void>();
+  public listeners = new Set<(agent: Agent) => void>();
   private avatarCache = new Map<string, string>();
   private readonly fallbackAvatar = 'https://avatars.githubusercontent.com/u/16309930?v=4';
 

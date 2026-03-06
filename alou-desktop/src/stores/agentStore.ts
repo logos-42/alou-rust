@@ -70,13 +70,22 @@ const useAgentStore = create<AgentStore>()(
 
         // 如果已经是完整的 URL，直接返回
         if (cid.startsWith('http')) return cid
+        
+        // 如果是 data URL，直接返回
+        if (cid.startsWith('data:')) return cid
 
         // 解析 IPFS CID 为 URL
         try {
-          return `https://ipfs.io/ipfs/${cid}`
+          // 优先使用本地网关（桌面环境）
+          const localGateway = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
+          if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+            return `${localGateway}/ipfs/${cid}`
+          }
+          // 浏览器环境使用公共网关
+          return `https://gateway.ipfs.io/ipfs/${cid}`
         } catch (error) {
           console.warn('[AgentStore] IPFS URL 解析失败:', error)
-          return `https://ipfs.io/ipfs/${cid}`
+          return `https://gateway.ipfs.io/ipfs/${cid}`
         }
       },
 

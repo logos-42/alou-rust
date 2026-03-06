@@ -57,6 +57,7 @@ interface AuthActions {
   checkAuth: () => Promise<boolean>
   fetchUser: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<User>
+  updateAvatar: (file: File) => Promise<User>
   logout: () => Promise<void>
   clearError: () => void
 }
@@ -307,6 +308,22 @@ const useAuthStore = create<AuthStore>((set, get) => ({
       return user
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to update profile'
+      set({ error: message })
+      throw error
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  updateAvatar: async (file: File): Promise<User> => {
+    set({ isLoading: true, error: null })
+    try {
+      const response = await userService.updateAvatar(file)
+      const user = response.data || response
+      set({ user })
+      return user
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to update avatar'
       set({ error: message })
       throw error
     } finally {
