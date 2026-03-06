@@ -142,9 +142,8 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   // 自主智能体 Hook - 支持群聊中的智能体自主响应
   const autonomousAgent = useGroupChatAutonomousAgent({
     enabled: true, // 启用自主响应
-    responseDelay: 500, // 响应延迟
     mentionOnly: false, // 不只在被@时响应（允许自主判断）
-    maxConcurrentTasks: 3 // 最大并发任务数
+    maxConcurrentTasks: 5 // 最大并发任务数
   })
 
   // 更新 ref

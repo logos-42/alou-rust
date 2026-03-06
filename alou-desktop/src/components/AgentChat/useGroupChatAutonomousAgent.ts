@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useClusterActionStore from '@/stores/clusterActionStore'
-import { parseMentions, isAgentMentioned } from '@/utils/mentionParser'
+import { isAgentMentioned } from '@/utils/mentionParser'
 
 /**
  * 群聊消息接口
@@ -19,7 +19,7 @@ export interface GroupChatMessage {
   content: string
   timestamp: number
   type?: 'user' | 'agent' | 'system'
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -39,7 +39,6 @@ export interface AgentConfig {
  */
 export interface UseGroupChatAutonomousAgentConfig {
   enabled?: boolean // 是否启用自主响应
-  responseDelay?: number // 响应延迟（毫秒）
   mentionOnly?: boolean // 仅在被 @ 时响应
   maxConcurrentTasks?: number // 最大并发任务数
 }
@@ -64,7 +63,6 @@ export const useGroupChatAutonomousAgent = (
 ): UseGroupChatAutonomousAgentReturn => {
   const {
     enabled = true,
-    responseDelay = 1000,
     mentionOnly = false,
     maxConcurrentTasks = 5,
   } = config
@@ -237,10 +235,8 @@ export const useGroupChatAutonomousAgent = (
         return
       }
 
-      // 添加响应延迟，模拟真实对话
-      await new Promise(resolve => setTimeout(resolve, responseDelay + Math.random() * 2000))
-
-      // 构建智能体的系统提示词，包含群聊上下文
+      // 立即触发智能体响应（无延迟）
+      console.log('[useGroupChatAutonomousAgent] 立即触发智能体响应:', agentId)
       const systemPrompt = `你是一个群聊智能体，正在参与群聊 "${groupId}"。
       
 你的角色：${agent.role_description || '助手'}
@@ -378,11 +374,12 @@ export const useGroupChatAutonomousAgent = (
       return
     }
 
-    const handleAgentGroupMessage = async (event: CustomEvent<{
-      agentId: string
-      message: GroupChatMessage
-    }>) => {
-      const { agentId, message } = event.detail
+    const handleAgentGroupMessage = async (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        agentId: string
+        message: GroupChatMessage
+      }>
+      const { agentId, message } = customEvent.detail
       
       console.log('[useGroupChatAutonomousAgent] 收到群聊消息事件:', {
         agentId,
@@ -394,13 +391,13 @@ export const useGroupChatAutonomousAgent = (
       await triggerAgentResponse(message.groupId, message, agentId)
     }
 
-    window.addEventListener('agent-group-message', handleAgentGroupMessage as EventListener)
+    window.addEventListener('agent-group-message', handleAgentGroupMessage)
 
     // 设置为就绪状态
     setIsReady(true)
 
     return () => {
-      window.removeEventListener('agent-group-message', handleAgentGroupMessage as EventListener)
+      window.removeEventListener('agent-group-message', handleAgentGroupMessage)
     }
   }, [enabled, triggerAgentResponse])
 
@@ -408,15 +405,16 @@ export const useGroupChatAutonomousAgent = (
    * 监听群聊创建和更新
    */
   useEffect(() => {
-    const handleClusterActionCreated = (event: CustomEvent<{ actionId: string }>) => {
-      const { actionId } = event.detail
+    const handleClusterActionCreated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ actionId: string }>
+      const { actionId } = customEvent.detail
       if (actionId && !activeGroups.includes(actionId)) {
         setActiveGroups(prev => [...prev, actionId])
         console.log('[useGroupChatAutonomousAgent] 新群聊已激活:', actionId)
       }
     }
 
-    window.addEventListener('cluster-action-created', handleClusterActionCreated as EventListener)
+    window.addEventListener('cluster-action-created', handleClusterActionCreated)
 
     // 初始化时加载现有群聊
     try {
@@ -437,7 +435,7 @@ export const useGroupChatAutonomousAgent = (
     }
 
     return () => {
-      window.removeEventListener('cluster-action-created', handleClusterActionCreated as EventListener)
+      window.removeEventListener('cluster-action-created', handleClusterActionCreated)
     }
   }, [activeGroups])
 

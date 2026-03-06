@@ -742,6 +742,67 @@ class LocalIpfsGroupChatService {
                   this.log(LogLevel.ERROR, '消息处理器错误:', { error: error.message })
                 }
               })
+
+              // 关键改进：触发智能体自主响应
+              // 当收到新消息时，通知群聊中的所有智能体
+              try {
+                // 动态导入 clusterActionStore 以避免循环依赖
+                const clusterActionStore = await import('@/stores/clusterActionStore').then(m => m.default)
+                const { getActions } = clusterActionStore.getState()
+                const actions = getActions(null) || []
+                
+                // 查找群聊对应的行动
+                const groupAction = actions.find(action => 
+                  action.action_id === groupId || 
+                  action.action_id?.includes(groupId)
+                )
+                
+                if (groupAction && groupAction.agents && groupAction.agents.length > 0) {
+                  // 通知每个智能体处理消息
+                  const agentCount = groupAction.agents
+                    .filter(agent => agent.mode === 'agent')
+                    .length
+                  
+                  this.log(LogLevel.INFO, '触发群聊智能体响应:', {
+                    groupId,
+                    agentCount,
+                    totalAgents: groupAction.agents.length
+                  })
+                  
+                  groupAction.agents
+                    .filter(agent => agent.mode === 'agent')
+                    .forEach(agent => {
+                      const agentId = agent.id || agent.agent_id || agent.did
+                      if (agentId && typeof window !== 'undefined') {
+                        // 触发智能体处理消息的事件
+                        window.dispatchEvent(new CustomEvent('agent-group-message', {
+                          detail: {
+                            agentId,
+                            message: {
+                              id: message.id,
+                              groupId,
+                              from: message.from,
+                              fromName: message.fromName || message.from,
+                              content: message.content,
+                              timestamp: message.timestamp,
+                              type: message.type,
+                              isMentioned: message.content?.includes('@'),
+                              metadata: {
+                                isGroupChat: true,
+                                groupType: 'local_ipfs_pubsub',
+                                topic: message.topic
+                              }
+                            }
+                          }
+                        }))
+                      }
+                    })
+                  
+                  this.log(LogLevel.INFO, '已通知', agentCount, '个智能体处理群聊消息')
+                }
+              } catch (agentError) {
+                this.log(LogLevel.WARN, '触发智能体响应失败:', { error: agentError })
+              }
             } catch (error: any) {
               this.log(LogLevel.ERROR, '解析消息失败:', { error: error.message, msgStr })
             }
