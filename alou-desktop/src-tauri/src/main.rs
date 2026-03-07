@@ -29,8 +29,12 @@ mod autonomous_loop;    // 自主循环模块
 mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
 mod tool_api;  // 工具 API 模块
+mod bot_gateway;  // Bot Gateway 模块
+mod heartbeat;  // 心跳模块
+mod cron;  // Cron 定时任务模块
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::Manager;
 
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
@@ -109,6 +113,22 @@ use crate::autonomous_loop_commands::{
     resume_autonomous_loop,
     get_autonomous_loop_state,
     add_autonomous_task,
+};
+
+// Heartbeat commands - 心跳命令
+use crate::heartbeat::{
+    start_heartbeat,
+    stop_heartbeat,
+    trigger_heartbeat_now,
+    get_heartbeat_state,
+    get_heartbeat_config,
+    update_heartbeat_config,
+    initialize_heartbeat,
+    is_heartbeat_enabled,
+    get_heartbeat_file_content,
+    write_heartbeat_file,
+    clear_heartbeat_file,
+    initialize_heartbeat_manager,
 };
 
 // Skill Auto Selector commands
@@ -356,6 +376,7 @@ fn main() {
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(create_default_bridge_manager())))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
+        .manage(initialize_heartbeat_manager())
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,
@@ -494,6 +515,25 @@ fn main() {
             handle_chat_message,
             update_respond_config,
             get_respond_config,
+            // Bot Gateway commands
+            bot_gateway::commands::get_bot_gateway_config,
+            bot_gateway::commands::update_bot_gateway_config,
+            bot_gateway::commands::test_platform_connection,
+            bot_gateway::commands::get_bot_gateway_status,
+            bot_gateway::commands::toggle_bot_gateway,
+            bot_gateway::commands::get_bot_gateway_logs,
+            // Heartbeat commands
+            start_heartbeat,
+            stop_heartbeat,
+            trigger_heartbeat_now,
+            get_heartbeat_state,
+            get_heartbeat_config,
+            update_heartbeat_config,
+            initialize_heartbeat,
+            is_heartbeat_enabled,
+            get_heartbeat_file_content,
+            write_heartbeat_file,
+            clear_heartbeat_file,
         ])
         
         // Autonomous Loop state
@@ -523,6 +563,13 @@ fn main() {
 
             // Tools are now registered synchronously in ToolBridge::new_sync
             println!("ℹ️  Tool system initialized with all tools registered");
+
+            // Initialize Bot Gateway Manager
+            let bot_gateway_manager = bot_gateway::BotGatewayManager::new(
+                bot_gateway::config::BotGatewayConfig::default(),
+                Arc::new(tokio::sync::Mutex::new(crate::tools::executor::ToolExecutionManager::new(crate::tools::ToolConfig::default()))),
+            );
+            app.manage(bot_gateway_manager);
 
             // Start wallet sync server on startup
             let app_handle = app.handle().clone();
