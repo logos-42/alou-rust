@@ -80,6 +80,75 @@ Bot Gateway 是 Alou 内置的多平台 Bot 支持模块，允许用户通过即
 
 ---
 
+### 4. 配置 Discord Bot
+
+#### 创建 Discord 应用
+1. 访问 [Discord Developer Portal](https://discord.com/developers/applications)
+2. 点击 "New Application"
+3. 在 "Bot" 页面点击 "Add Bot"
+4. 复制 Bot Token
+
+#### 邀请 Bot 到服务器
+1. 在 "OAuth2" > "URL Generator" 页面
+2. 选择 scopes: `bot`
+3. 选择权限：`Send Messages`, `Read Message History` 等
+4. 复制生成的 URL 并在浏览器打开
+5. 选择服务器并授权
+
+#### 配置步骤
+1. 在 Bot Gateway 设置中选择 "Discord" 选项卡
+2. 勾选 "启用 Discord Bot"
+3. 粘贴 Bot Token
+4. 点击 "测试连接" 验证配置
+5. 点击 "保存配置"
+
+#### 使用 Bot
+在 Discord 中与你的 Bot 对话：
+```
+!help - 查看帮助
+!status - 查看状态
+!spec list - 列出规格文档
+```
+
+---
+
+### 5. 配置 QQ Bot
+
+#### 安装 OneBot 兼容框架
+QQ Bot 需要运行 OneBot 兼容的机器人框架，如：
+- [go-cqhttp](https://github.com/Mrs4s/go-cqhttp)
+- [Lagrange.Core](https://github.com/LagrangeDev/Lagrange.Core)
+
+#### 配置 go-cqhttp
+1. 下载并运行 go-cqhttp
+2. 配置 `config.yml` 启用 WebSocket 服务端
+3. 设置访问令牌（可选）
+
+```yaml
+servers:
+  - ws:
+      address: 0.0.0.0:8080
+      access-token: "your_token"
+```
+
+#### 配置步骤
+1. 在 Bot Gateway 设置中选择 "QQ" 选项卡
+2. 勾选 "启用 QQ Bot"
+3. 填写 WebSocket URL（如：`ws://127.0.0.1:8080`）
+4. 填写 Access Token（如果配置了）
+5. 点击 "测试连接" 验证配置
+6. 点击 "保存配置"
+
+#### 使用 Bot
+在 QQ 中发送消息给 Bot 或在群中使用：
+```
+/help - 查看帮助
+/status - 查看状态
+/spec list - 列出规格文档
+```
+
+---
+
 ## 可用命令
 
 ### 通用命令
@@ -324,8 +393,8 @@ impl DiscordAdapter {
 |------|------|------|
 | Telegram | ✅ 已实现 | 消息接收/发送、命令解析、工具调用 |
 | 飞书 | ✅ 已实现 | Webhook、事件订阅、消息回复 |
-| Discord | ⏳ 计划中 | - |
-| QQ | ⏳ 计划中 | - |
+| Discord | ✅ 已实现 | Webhook、命令解析、消息回复 |
+| QQ | ✅ 已实现 | OneBot 协议、私聊/群聊、命令解析 |
 
 ---
 
