@@ -13,6 +13,8 @@ interface BotGatewayConfig {
   platforms: {
     telegram?: TelegramConfig;
     feishu?: FeishuConfig;
+    discord?: DiscordConfig;
+    qq?: QQConfig;
   };
   command_prefix: string;
 }
@@ -33,6 +35,22 @@ interface FeishuConfig {
   encrypt_key?: string;
   allowed_user_ids: string[];
   allowed_tenant_ids: string[];
+}
+
+interface DiscordConfig {
+  enabled: boolean;
+  bot_token: string;
+  allowed_user_ids: string[];
+  allowed_guild_ids: string[];
+  allowed_channel_ids: string[];
+}
+
+interface QQConfig {
+  enabled: boolean;
+  ws_url: string;
+  access_token?: string;
+  allowed_user_ids: string[];
+  allowed_group_ids: string[];
 }
 
 interface ServerStatus {
@@ -190,7 +208,7 @@ export function BotGatewaySettings() {
 
       {/* 选项卡 */}
       <div className="tabs" style={{ marginBottom: '20px' }}>
-        {(['general', 'telegram', 'feishu', 'logs'] as const).map((tab) => (
+        {(['general', 'telegram', 'feishu', 'discord', 'qq', 'logs'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -207,6 +225,8 @@ export function BotGatewaySettings() {
             {tab === 'general' && '⚙️ 通用设置'}
             {tab === 'telegram' && '📱 Telegram'}
             {tab === 'feishu' && '📧 飞书'}
+            {tab === 'discord' && '💬 Discord'}
+            {tab === 'qq' && '🐧 QQ'}
             {tab === 'logs' && '📋 日志'}
           </button>
         ))}
@@ -408,6 +428,135 @@ export function BotGatewaySettings() {
           </button>
           <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
             💡 提示：在 <a href="https://open.feishu.cn/" target="_blank" rel="noopener noreferrer">飞书开放平台</a> 创建应用获取配置
+          </p>
+        </div>
+      )}
+
+      {/* Discord 配置 */}
+      {activeTab === 'discord' && config?.platforms.discord && (
+        <div className="tab-content discord-settings">
+          <div style={{ marginBottom: '15px' }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={config.platforms.discord.enabled}
+                onChange={(e) => setConfig({ 
+                  ...config, 
+                  platforms: { 
+                    ...config.platforms, 
+                    discord: { ...config.platforms.discord!, enabled: e.target.checked } 
+                  } 
+                })}
+              />
+              启用 Discord Bot
+            </label>
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label>
+              Bot Token:
+              <input
+                type="password"
+                value={config.platforms.discord.bot_token}
+                onChange={(e) => setConfig({ 
+                  ...config, 
+                  platforms: { 
+                    ...config.platforms, 
+                    discord: { ...config.platforms.discord!, bot_token: e.target.value } 
+                  } 
+                })}
+                style={{ display: 'block', width: '100%', marginTop: '5px', padding: '8px' }}
+                placeholder="Your Discord Bot Token"
+              />
+            </label>
+          </div>
+          <button 
+            onClick={() => testConnection('discord')}
+            style={{
+              padding: '8px 16px',
+              background: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            测试连接
+          </button>
+          <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+            💡 提示：在 <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a> 创建应用获取 Bot Token
+          </p>
+        </div>
+      )}
+
+      {/* QQ 配置 */}
+      {activeTab === 'qq' && config?.platforms.qq && (
+        <div className="tab-content qq-settings">
+          <div style={{ marginBottom: '15px' }}>
+            <label>
+              <input
+                type="checkbox"
+                checked={config.platforms.qq.enabled}
+                onChange={(e) => setConfig({ 
+                  ...config, 
+                  platforms: { 
+                    ...config.platforms, 
+                    qq: { ...config.platforms.qq!, enabled: e.target.checked } 
+                  } 
+                })}
+              />
+              启用 QQ Bot (OneBot)
+            </label>
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label>
+              WebSocket URL:
+              <input
+                type="text"
+                value={config.platforms.qq.ws_url}
+                onChange={(e) => setConfig({ 
+                  ...config, 
+                  platforms: { 
+                    ...config.platforms, 
+                    qq: { ...config.platforms.qq!, ws_url: e.target.value } 
+                  } 
+                })}
+                style={{ display: 'block', width: '100%', marginTop: '5px', padding: '8px' }}
+                placeholder="ws://127.0.0.1:8080"
+              />
+            </label>
+          </div>
+          <div style={{ marginBottom: '15px' }}>
+            <label>
+              Access Token:
+              <input
+                type="password"
+                value={config.platforms.qq.access_token || ''}
+                onChange={(e) => setConfig({ 
+                  ...config, 
+                  platforms: { 
+                    ...config.platforms, 
+                    qq: { ...config.platforms.qq!, access_token: e.target.value || undefined } 
+                  } 
+                })}
+                style={{ display: 'block', width: '100%', marginTop: '5px', padding: '8px' }}
+              />
+            </label>
+          </div>
+          <button 
+            onClick={() => testConnection('qq')}
+            style={{
+              padding: '8px 16px',
+              background: '#007bff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            测试连接
+          </button>
+          <p style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+            💡 提示：需要运行 <a href="https://github.com/botuniverse/onebot" target="_blank" rel="noopener noreferrer">OneBot</a> 兼容的 QQ 机器人框架（如 go-cqhttp）
           </p>
         </div>
       )}

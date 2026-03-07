@@ -3,9 +3,11 @@
 //! 提供各平台 Bot 的 webhook 接收和消息处理功能
 
 use crate::bot_gateway::config::BotGatewayConfig;
-use crate::bot_gateway::adapters::{TelegramAdapter, FeishuAdapter};
+use crate::bot_gateway::adapters::{TelegramAdapter, FeishuAdapter, DiscordAdapter, QQAdapter};
 use crate::bot_gateway::adapters::telegram::{TelegramMessage, TelegramChatMessage};
 use crate::bot_gateway::adapters::feishu::{FeishuWebhookEvent, FeishuChallenge};
+use crate::bot_gateway::adapters::discord::{DiscordMessage, DiscordAdapter as DiscordAdapterType};
+use crate::bot_gateway::adapters::qq::{OneBotMessageEvent, QQAdapter as QQAdapterType};
 use axum::{
     extract::{State, Path},
     http::StatusCode,
@@ -41,6 +43,8 @@ pub struct ApiState {
     pub config: Arc<RwLock<BotGatewayConfig>>,
     pub telegram_adapter: Option<Arc<TelegramAdapter>>,
     pub feishu_adapter: Option<Arc<FeishuAdapter>>,
+    pub discord_adapter: Option<Arc<DiscordAdapter>>,
+    pub qq_adapter: Option<Arc<QQAdapter>>,
     pub logs: Arc<RwLock<Vec<LogEntry>>>,
     pub start_time: i64,
     pub tool_executor: Arc<tokio::sync::Mutex<crate::tools::executor::ToolExecutionManager>>,
@@ -80,6 +84,10 @@ pub fn create_router(state: Arc<ApiState>) -> Router {
         .route("/webhook/telegram", post(telegram_webhook))
         // 飞书 webhook
         .route("/webhook/feishu", post(feishu_webhook))
+        // Discord webhook
+        .route("/webhook/discord", post(discord_webhook))
+        // QQ webhook (OneBot)
+        .route("/webhook/qq", post(qq_webhook))
         // 工具执行 API（供 Bot 调用）
         .route("/api/tools/execute", post(execute_tool))
         .layer(cors)
@@ -95,12 +103,18 @@ async fn health_check() -> &'static str {
 async fn get_status(State(state): State<Arc<ApiState>>) -> Json<ServerStatus> {
     let config = state.config.read().await;
     let mut platforms = Vec::new();
-    
+
     if state.telegram_adapter.is_some() && config.platforms.telegram.as_ref().map(|c| c.enabled).unwrap_or(false) {
         platforms.push("telegram".to_string());
     }
     if state.feishu_adapter.is_some() && config.platforms.feishu.as_ref().map(|c| c.enabled).unwrap_or(false) {
         platforms.push("feishu".to_string());
+    }
+    if state.discord_adapter.is_some() && config.platforms.discord.as_ref().map(|c| c.enabled).unwrap_or(false) {
+        platforms.push("discord".to_string());
+    }
+    if state.qq_adapter.is_some() && config.platforms.qq.as_ref().map(|c| c.enabled).unwrap_or(false) {
+        platforms.push("qq".to_string());
     }
 
     Json(ServerStatus {
@@ -254,6 +268,96 @@ async fn feishu_webhook(
     Ok(Json(serde_json::json!({
         "status": "success"
     })))
+}
+
+/// Discord webhook 处理
+async fn discord_webhook(
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<DiscordMessage>,
+) -> Result<StatusCode, StatusCode> {
+    add_log(&state, "info", "收到 Discord 消息", Some("discord")).await;
+
+    // 获取 adapter
+    let adapter = match state.discord_adapter.as_ref() {
+        Some(a) => a,
+        None => {
+            add_log(&state, "error", "Discord adapter 未初始化", Some("discord")).await;
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
+
+    // 处理消息
+    if let Some(processed) = adapter.process_message(&payload) {
+        if let Some(command) = processed.command {
+            add_log(&state, "info", &format!("执行命令：{} {:?}", command, processed.args), Some("discord")).await;
+            
+            let result = execute_bot_command(
+                &state,
+                "discord",
+                &command,
+                &processed.args,
+                0,
+                0,
+                Some(&processed.user_id),
+            ).await;
+
+            // 发送响应
+            if let Err(e) = adapter.send_message(&processed.channel_id, &result).await {
+                add_log(&state, "error", &format!("发送响应失败：{}", e), Some("discord")).await;
+            }
+        }
+    }
+
+    Ok(StatusCode::OK)
+}
+
+/// QQ webhook 处理 (OneBot 协议)
+async fn qq_webhook(
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<OneBotMessageEvent>,
+) -> Result<StatusCode, StatusCode> {
+    add_log(&state, "info", "收到 QQ 消息", Some("qq")).await;
+
+    // 获取 adapter
+    let adapter = match state.qq_adapter.as_ref() {
+        Some(a) => a,
+        None => {
+            add_log(&state, "error", "QQ adapter 未初始化", Some("qq")).await;
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
+
+    // 处理消息
+    if let Some(processed) = adapter.process_message(&payload) {
+        if let Some(command) = processed.command {
+            add_log(&state, "info", &format!("执行命令：{} {:?}", command, processed.args), Some("qq")).await;
+            
+            let result = execute_bot_command(
+                &state,
+                "qq",
+                &command,
+                &processed.args,
+                0,
+                0,
+                Some(&processed.user_id.to_string()),
+            ).await;
+
+            // 发送响应
+            let send_result = if processed.is_private {
+                adapter.send_private_message(processed.user_id, &result).await
+            } else if let Some(group_id) = processed.group_id {
+                adapter.send_group_message(group_id, &result).await
+            } else {
+                Err("无法确定消息类型".to_string())
+            };
+
+            if let Err(e) = send_result {
+                add_log(&state, "error", &format!("发送响应失败：{}", e), Some("qq")).await;
+            }
+        }
+    }
+
+    Ok(StatusCode::OK)
 }
 
 /// 执行 Bot 命令
@@ -410,10 +514,20 @@ pub async fn start_server(
         Arc::new(FeishuAdapter::new(c.clone()))
     });
 
+    let discord_adapter = config.platforms.discord.as_ref().map(|c| {
+        Arc::new(DiscordAdapter::new(c.clone()))
+    });
+
+    let qq_adapter = config.platforms.qq.as_ref().map(|c| {
+        Arc::new(QQAdapter::new(c.clone()))
+    });
+
     let state = Arc::new(ApiState {
         config: Arc::new(RwLock::new(config.clone())),
         telegram_adapter,
         feishu_adapter,
+        discord_adapter,
+        qq_adapter,
         logs: Arc::new(RwLock::new(Vec::new())),
         start_time: chrono::Utc::now().timestamp(),
         tool_executor,
