@@ -20,9 +20,10 @@ import type {
 // 从各个模块导入
 export * from './agent';
 export * from './auth';
-export type { 
-  AgentSession, 
-  Channel, 
+export * from './heartbeat';
+export type {
+  AgentSession,
+  Channel,
   Message,
   ServiceResponse,
   WalletInfo,

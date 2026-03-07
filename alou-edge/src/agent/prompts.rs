@@ -1,3 +1,5 @@
+#![rustfmt::skip]
+
 //! System prompts for different agent modes
 
 /// 智能体模式类型
@@ -338,7 +340,7 @@ const WALLET_PROMPT: &str = "你是 Alou 钱包助手，由刘元杰打造的交
 使用场景示例：
 - "帮我创建一个钱包" -> 立即调用 agent_wallet 并返回细节。
 - "你有钱包吗" -> 查询 agent_wallet，展示资产与状态。
-- "切换到 Base 网络" -> 先用 wallet_manager 切换，再执行后续动作。
+- "切换到 Base 网络 " -> 先用 wallet_manager 切换，再执行后续动作。
 - "查看我的余额" -> 使用 query_blockchain 精准反馈。
 
 执行心法：
@@ -492,7 +494,7 @@ const PAYMENT_PROMPT: &str = "你是 Alou 支付助手，由刘元杰开发的 W
 - 🌐 DIAP 身份 + PubSub/Iroh 去中心化通信
 
 行动心法：
-1. 深入理解支付场景，连续追问"为什么"以确认真实目的。
+1. 深入理解支付场景，连续追问 "为什么" 以确认真实目的。
 2. 优先调用 query_blockchain、build_transaction、broadcast_transaction、wallet_manager、agent_wallet 等工具。若缺工具，思考是否能引入新 MCP 或制定替代方案。
 3. 记录操作过程与结果，复盘是否满足甚至超越用户期待。
 4. 完成后主动提供下一步建议，如监控方案、自动化想法或风险提醒。
@@ -552,7 +554,7 @@ const DEVELOPER_PROMPT: &str = "你是 Alou 开发者助手，由刘元杰打造
 - 🌐 DIAP 身份 + PubSub/Iroh 去中心化通信
 
 行动准则：
-1. 深度理解问题背景，连续追问"为什么"直达根因。
+1. 深度理解问题背景，连续追问 "为什么" 直达根因。
 2. 优先调用现有工具；若工具不足，提出扩展思路并尝试结合其他资源。
 3. 提供代码示例、原理说明与最佳实践，同时指出潜在风险与测试方案。
 4. 在完成帮助后，思考还能做什么让开发者更省心，例如提供脚手架、测试脚本或监控建议。
@@ -630,4 +632,4 @@ const CUSTOM_AGENT_BASE_PROMPT: &str = "你是一个基于 Alou 平台构建的 
 === MCP 远程 UI 组件指南 ===
 - 如需要输出 remote_dom UI，请使用 Chakra 组件标签
 - 布局优先使用 <ui-stack>、<ui-hstack>、<ui-simple-grid>
-- 输出的 remote_dom 片段必须是有效的 XML 结构";
+- 输出的 remote_dom 片段必须是有效的 XML 结构 ";

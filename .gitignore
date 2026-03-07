@@ -135,3 +135,9 @@ REPO_ARCHIVE_STATE.md
 
 # DMG scripts
 alou-desktop/src-tauri/build-dmg-manual.sh
+
+# Large archive files (keep local only)
+*.tar.gz
+*.zip
+!*.example.tar.gz
+!*.example.zip

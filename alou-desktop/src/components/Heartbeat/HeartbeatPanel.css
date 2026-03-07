@@ -1,0 +1,798 @@
+/**
+ * 心跳管理面板样式
+ * Heartbeat Panel Styles
+ */
+
+/* 主面板 */
+.heartbeat-panel {
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.heartbeat-panel.dark {
+  background: #1a1a1a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 消息提示 */
+.heartbeat-message {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.heartbeat-message.success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.heartbeat-message.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.heartbeat-panel.dark .heartbeat-message.success {
+  background: #1e4620;
+  color: #a8d5ba;
+  border-color: #2d5a3d;
+}
+
+.heartbeat-panel.dark .heartbeat-message.error {
+  background: #461e1e;
+  color: #d5a8a8;
+  border-color: #5a2d2d;
+}
+
+/* 区域 */
+.heartbeat-section {
+  margin-bottom: 1.5rem;
+}
+
+.heartbeat-section-title {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.heartbeat-panel.dark .heartbeat-section-title {
+  color: #e0e0e0;
+  border-bottom-color: #444;
+}
+
+/* 状态网格 */
+.heartbeat-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.heartbeat-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.heartbeat-panel.dark .heartbeat-status-item {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+.heartbeat-status-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.heartbeat-panel.dark .heartbeat-status-label {
+  color: #999;
+}
+
+.heartbeat-status-value {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #212529;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.heartbeat-panel.dark .heartbeat-status-value {
+  color: #e0e0e0;
+}
+
+/* 状态指示灯 */
+.heartbeat-status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.heartbeat-status-indicator.running {
+  background: #28a745;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+}
+
+.heartbeat-status-indicator.stopped {
+  background: #dc3545;
+  box-shadow: 0 0 8px rgba(220, 53, 69, 0.4);
+}
+
+.heartbeat-status-text {
+  font-weight: 600;
+}
+
+/* 控制按钮 */
+.heartbeat-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.heartbeat-btn {
+  padding: 0.625rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.heartbeat-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.heartbeat-btn-primary {
+  background: #007bff;
+  color: #ffffff;
+}
+
+.heartbeat-btn-primary:hover:not(:disabled) {
+  background: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.heartbeat-btn-stop {
+  background: #dc3545;
+}
+
+.heartbeat-btn-stop:hover:not(:disabled) {
+  background: #c82333;
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.heartbeat-btn-secondary {
+  background: #6c757d;
+  color: #ffffff;
+}
+
+.heartbeat-btn-secondary:hover:not(:disabled) {
+  background: #545b62;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.heartbeat-panel.dark .heartbeat-btn-secondary {
+  background: #4a4a4a;
+}
+
+.heartbeat-panel.dark .heartbeat-btn-secondary:hover:not(:disabled) {
+  background: #5a5a5a;
+}
+
+/* 错误显示 */
+.heartbeat-error {
+  padding: 0.75rem 1rem;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.heartbeat-panel.dark .heartbeat-error {
+  background: #461e1e;
+  color: #d5a8a8;
+  border-color: #5a2d2d;
+}
+
+/* 对话框 */
+.heartbeat-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.heartbeat-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.heartbeat-panel.dark .heartbeat-dialog {
+  background: #1a1a1a;
+}
+
+.heartbeat-dialog-health {
+  max-width: 600px;
+}
+
+.heartbeat-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.heartbeat-panel.dark .heartbeat-dialog-header {
+  border-bottom-color: #444;
+}
+
+.heartbeat-dialog-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.heartbeat-panel.dark .heartbeat-dialog-header h3 {
+  color: #e0e0e0;
+}
+
+.heartbeat-dialog-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.heartbeat-dialog-close:hover {
+  background: #f8f9fa;
+  color: #212529;
+}
+
+.heartbeat-panel.dark .heartbeat-dialog-close:hover {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.heartbeat-dialog-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.heartbeat-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e9ecef;
+  background: #f8f9fa;
+}
+
+.heartbeat-panel.dark .heartbeat-dialog-footer {
+  border-top-color: #444;
+  background: #2a2a2a;
+}
+
+/* 表单样式 */
+.heartbeat-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.heartbeat-form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.heartbeat-panel.dark .heartbeat-form-label {
+  color: #c0c0c0;
+}
+
+.heartbeat-form-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.heartbeat-form-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.heartbeat-panel.dark .heartbeat-form-input {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #e0e0e0;
+}
+
+.heartbeat-panel.dark .heartbeat-form-input:focus {
+  border-color: #007bff;
+}
+
+.heartbeat-form-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.heartbeat-panel.dark .heartbeat-form-hint {
+  color: #888;
+}
+
+.heartbeat-form-path {
+  padding: 0.625rem 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #495057;
+  word-break: break-all;
+}
+
+.heartbeat-panel.dark .heartbeat-form-path {
+  background: #2a2a2a;
+  border-color: #444;
+  color: #c0c0c0;
+}
+
+/* 开关 */
+.heartbeat-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+
+.heartbeat-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.heartbeat-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.heartbeat-switch-slider:before {
+  position: absolute;
+  content: '';
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.heartbeat-switch input:checked + .heartbeat-switch-slider {
+  background-color: #28a745;
+}
+
+.heartbeat-switch input:checked + .heartbeat-switch-slider:before {
+  transform: translateX(24px);
+}
+
+/* 健康状态 */
+.heartbeat-health-overall {
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.heartbeat-health-overall.health-status-good {
+  background: #d4edda;
+  color: #155724;
+  border: 2px solid #28a745;
+}
+
+.heartbeat-health-overall.health-status-warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 2px solid #ffc107;
+}
+
+.heartbeat-health-overall.health-status-critical {
+  background: #f8d7da;
+  color: #721c24;
+  border: 2px solid #dc3545;
+}
+
+.heartbeat-panel.dark .heartbeat-health-overall.health-status-good {
+  background: #1e4620;
+  color: #a8d5ba;
+  border-color: #2d5a3d;
+}
+
+.heartbeat-panel.dark .heartbeat-health-overall.health-status-warning {
+  background: #463d1e;
+  color: #d5c4a8;
+  border-color: #5a4d2d;
+}
+
+.heartbeat-panel.dark .heartbeat-health-overall.health-status-critical {
+  background: #461e1e;
+  color: #d5a8a8;
+  border-color: #5a2d2d;
+}
+
+.heartbeat-health-label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.heartbeat-health-value {
+  font-size: 1.25rem;
+}
+
+/* 健康检查部分 */
+.heartbeat-health-section {
+  margin-bottom: 1.5rem;
+}
+
+.heartbeat-health-section h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+.heartbeat-panel.dark .heartbeat-health-section h4 {
+  color: #e0e0e0;
+}
+
+/* 检查列表 */
+.heartbeat-checks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.heartbeat-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.heartbeat-panel.dark .heartbeat-check-item {
+  border-color: #444;
+}
+
+.heartbeat-check-item.check-passed {
+  background: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.heartbeat-check-item.check-failed {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.heartbeat-panel.dark .heartbeat-check-item.check-passed {
+  background: #1e4620;
+  border-color: #2d5a3d;
+}
+
+.heartbeat-panel.dark .heartbeat-check-item.check-failed {
+  background: #461e1e;
+  border-color: #5a2d2d;
+}
+
+.heartbeat-check-icon {
+  font-size: 1.25rem;
+  font-weight: bold;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heartbeat-check-item.check-passed .heartbeat-check-icon {
+  color: #28a745;
+}
+
+.heartbeat-check-item.check-failed .heartbeat-check-icon {
+  color: #dc3545;
+}
+
+.heartbeat-check-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.heartbeat-check-name {
+  font-weight: 500;
+  color: #212529;
+}
+
+.heartbeat-panel.dark .heartbeat-check-name {
+  color: #e0e0e0;
+}
+
+.heartbeat-check-details {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.heartbeat-panel.dark .heartbeat-check-details {
+  color: #999;
+}
+
+.heartbeat-check-recommendation {
+  font-size: 0.875rem;
+  color: #856404;
+  font-style: italic;
+}
+
+.heartbeat-panel.dark .heartbeat-check-recommendation {
+  color: #d5c4a8;
+}
+
+/* 问题列表 */
+.heartbeat-issues-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.heartbeat-issue-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-item {
+  border-color: #444;
+}
+
+.heartbeat-issue-item.severity-low {
+  background: #d1ecf1;
+  border-color: #bee5eb;
+}
+
+.heartbeat-issue-item.severity-medium {
+  background: #fff3cd;
+  border-color: #ffeaa7;
+}
+
+.heartbeat-issue-item.severity-high {
+  background: #ffe5e5;
+  border-color: #ffb3b3;
+}
+
+.heartbeat-issue-item.severity-critical {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-item.severity-low {
+  background: #1e3a46;
+  border-color: #2d5a6b;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-item.severity-medium {
+  background: #463d1e;
+  border-color: #5a4d2d;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-item.severity-high {
+  background: #461e1e;
+  border-color: #5a2d2d;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-item.severity-critical {
+  background: #461e1e;
+  border-color: #5a2d2d;
+}
+
+.heartbeat-issue-code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.heartbeat-issue-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.heartbeat-issue-description {
+  font-weight: 500;
+  color: #212529;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-description {
+  color: #e0e0e0;
+}
+
+.heartbeat-issue-fix {
+  font-size: 0.875rem;
+  color: #28a745;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-fix {
+  color: #a8d5ba;
+}
+
+.heartbeat-issue-severity {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.heartbeat-panel.dark .heartbeat-issue-severity {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .heartbeat-panel {
+    padding: 1rem;
+  }
+
+  .heartbeat-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .heartbeat-controls {
+    flex-direction: column;
+  }
+
+  .heartbeat-btn {
+    width: 100%;
+  }
+
+  .heartbeat-dialog {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .heartbeat-dialog-footer {
+    flex-direction: column;
+  }
+
+  .heartbeat-dialog-footer .heartbeat-btn {
+    width: 100%;
+  }
+}
