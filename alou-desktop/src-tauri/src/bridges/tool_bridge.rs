@@ -10,6 +10,7 @@ use crate::tools::{
     rollback::RollbackTool, pubsub_tool::PubSubTool, message_passing::MessagePassingTool,
     iroh_tool::IrohTool, ipfs_archive::IpfsArchiveTool, git_helper::GitHelperTool,
     browser_tool::BrowserTool, agent_creator::AgentCreatorTool, ui_control::UIControlTool,
+    spec_tool::SpecTool,
 };
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
@@ -175,6 +176,9 @@ impl ToolBridge {
         let ui_tool = Arc::new(UIControlTool::new(None));
         self.register_tool(ui_tool).await?;
         
+        // 注册 Spec 工具
+        let spec_tool = Arc::new(SpecTool::new());
+        self.register_tool(spec_tool).await?;
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())
     }

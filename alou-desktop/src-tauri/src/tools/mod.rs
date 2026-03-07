@@ -34,6 +34,7 @@ pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
 pub mod autonomous_executor;       // 自主执行引擎
 pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
 pub mod group_coordinator;         // 群聊协调器（智能体群聊协作）
+pub mod spec_tool;                 // Spec 规格文档管理工具
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
@@ -48,6 +49,7 @@ pub use todolist::{TodoListTool, TodoItem, TodoStatus};
 pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
 pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
 pub use tool_creation::ToolCreationTool;
+pub use spec_tool::SpecTool;
 // 从 tool_parts 直接导出定义类型和执行器
 pub use tool_parts::definitions::{ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
 pub use tool_parts::executor::{DynamicToolExecutor, DynamicToolResult};
@@ -275,6 +277,10 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册智能体创建工具
     let agent_creator_tool = Arc::new(crate::tools::agent_creator::AgentCreatorTool::new());
     registry.register(agent_creator_tool).await?;
+
+    // 注册 Spec 工具
+    let spec_tool = Arc::new(SpecTool::new());
+    registry.register(spec_tool).await?;
 
     Ok(registry)
 }
