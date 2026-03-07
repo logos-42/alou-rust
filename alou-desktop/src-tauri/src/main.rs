@@ -32,6 +32,9 @@ mod tool_api;  // 工具 API 模块
 mod bot_gateway;  // Bot Gateway 模块
 mod heartbeat;  // 心跳模块
 mod cron;  // Cron 定时任务模块
+mod soul;  // 灵魂/人格管理模块
+mod tasks;  // 任务管理模块
+mod logs;  // 日志管理模块
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -377,6 +380,7 @@ fn main() {
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(create_default_bridge_manager())))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
+        .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))
         .invoke_handler(tauri::generate_handler![
             download_kubo_binary,
             start_ipfs_node,
@@ -534,6 +538,23 @@ fn main() {
             get_heartbeat_file_content,
             write_heartbeat_file,
             clear_heartbeat_file,
+            // Cron commands
+            cron::commands::start_cron_scheduler,
+            cron::commands::stop_cron_scheduler,
+            cron::commands::pause_cron_scheduler,
+            cron::commands::resume_cron_scheduler,
+            cron::commands::get_cron_scheduler_state,
+            cron::commands::add_cron_job,
+            cron::commands::remove_cron_job,
+            cron::commands::list_cron_jobs,
+            cron::commands::run_cron_job_now,
+            cron::commands::get_cron_job_history,
+            cron::commands::get_cron_config,
+            cron::commands::update_cron_config,
+            cron::commands::clear_cron_job_history,
+            cron::commands::get_cron_config_path,
+            cron::commands::create_default_cron_config,
+            cron::commands::toggle_cron_job,
         ])
         
         // Autonomous Loop state
