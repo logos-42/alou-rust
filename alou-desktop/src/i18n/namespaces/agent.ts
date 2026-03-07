@@ -21,7 +21,7 @@ export const agent = {
     // 角色描述
     'agent.create.role.label': '角色设计说明',
     'agent.create.role.placeholder': '描述该智能体的职责、语气与工具使用策略',
-    'agent.create.role.default': 'Web3 多代理协调智能体',
+    'agent.create.role.default': 'Web4 主权智能体',
 
     // MCP 端口配置
     'agent.create.mcp.label': 'MCP 配置',
@@ -215,7 +215,7 @@ export const agent = {
     // Role Description
     'agent.create.role.label': 'Role Description',
     'agent.create.role.placeholder': 'Describe the agent\'s responsibilities, tone, and tool usage strategy',
-    'agent.create.role.default': 'Web3 Multi-Agent Coordinator',
+    'agent.create.role.default': 'Web4 Sovereign Agent',
 
     // MCP Port Configuration
     'agent.create.mcp.label': 'MCP Configuration',
