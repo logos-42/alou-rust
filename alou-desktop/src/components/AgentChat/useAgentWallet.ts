@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { walletService } from '@/services/walletService'
-import agentService from '@/services/agentService'
 import { requestMcpUiResource, MCP_UI_TARGETS } from '@/services/mcpUiService'
 import {
   defaultTransactions,
@@ -10,8 +9,9 @@ import {
   mapChainLabel,
   normalizeTransaction,
   resolveBackendChain,
+  Transaction,
 } from '@/hooks/useAgentChat'
-import { Transaction, WalletSnapshot } from '@/shared/types'
+import { WalletSnapshot } from '@/shared/types'
 
 interface UseAgentWalletOptions {
   sessionId: string
@@ -69,12 +69,12 @@ export const useAgentWallet = ({
     const normalizedActive = resolveBackendChain({ chain: activeChain }) || activeChain
 
     const normalizedAgentChain = walletSnapshot
-      ? resolveBackendChain({ chain: walletSnapshot.chain })
+      ? resolveBackendChain({ chainId: walletSnapshot.chainId })
       : null
 
     const normalizedUserChain = userWalletInfo
       ? resolveBackendChain({
-          chain: userWalletInfo.backendChain,
+          chain: userWalletInfo.backendChain || undefined,
           chainId: userWalletInfo.chainId,
         })
       : null
@@ -202,11 +202,10 @@ export const useAgentWallet = ({
 
           setWalletSnapshot({
             address: primaryWallet.address || '0x0000',
+            chainId: primaryWallet.chainId || metadata.chainId || targetChain || '0x1',
             balance: balanceString,
             balanceFiat: estimateFiatValue(balanceNumeric, tokenSymbol),
             networkLabel: mapChainLabel(normalizedChain),
-            chain: normalizedChain,
-            token: tokenSymbol,
           })
 
           if (
@@ -256,7 +255,11 @@ export const useAgentWallet = ({
       const instruction = result.instruction
 
       try {
-        const txResponse = await walletService.executeInstruction(instruction as { method: string; params: unknown[] })
+        const instructionWithType = {
+          type: 'eth_sendTransaction',
+          ...instruction,
+        }
+        const txResponse = await walletService.executeInstruction(instructionWithType as { type: string; method: string; params: unknown[] })
         const txHash =
           typeof txResponse === 'string'
             ? txResponse
@@ -338,16 +341,17 @@ export const useAgentWallet = ({
 
         updateTransactions((prev) => [normalizedTx, ...prev])
 
-        if (agentWalletChain) {
-          try {
-            await agentService.recordAgentTransaction(sessionId, agentWalletChain, {
-              ...txRecord,
-              rawValue: txParams.value,
-            })
-          } catch (error) {
-            console.error('Failed to record agent transaction:', error)
-          }
-        }
+        // TODO: 当 agentService.recordAgentTransaction 可用时启用
+        // if (agentWalletChain) {
+        //   try {
+        //     await agentService.recordAgentTransaction(sessionId, agentWalletChain, {
+        //       ...txRecord,
+        //       rawValue: txParams.value,
+        //     })
+        //   } catch (error) {
+        //     console.error('Failed to record agent transaction:', error)
+        //   }
+        // }
 
         await refreshWallet()
       } catch (error) {

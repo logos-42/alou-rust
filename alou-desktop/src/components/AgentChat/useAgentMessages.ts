@@ -9,7 +9,7 @@ import { getMessageHistory } from './utils/messageUtils'
 import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
 import clusterActionStore from '@/stores/clusterActionStore'
-import { parseMentions, isAgentMentioned } from '@/utils/mentionParser'
+import { isAgentMentioned } from '@/utils/mentionParser'
 
 // ── Tauri 进度事件类型 ──────────────────────────────────────────
 interface AgentProgressPayload {
@@ -809,16 +809,11 @@ export const useAgentMessages = ({
         console.log('[useAgentMessages] 智能体被@，继续处理:', agentId)
       } else {
         // 如果没有@提及标记，检查原始消息是否包含@（兼容旧消息格式）
-        const { getActiveAction } = clusterActionStore.getState()
-        const activeAction = message.groupId ? 
-          (getActiveAction(null) || { agents: [] }) : 
-          { agents: [] }
-        
         // 尝试从store获取智能体列表
         let agentsList: any[] = []
         try {
           const { getActions } = clusterActionStore.getState()
-          const actions = getActions(null) || []
+          const actions = getActions('') || []
           for (const action of actions) {
             if (action.agents && Array.isArray(action.agents)) {
               agentsList = [...agentsList, ...action.agents]

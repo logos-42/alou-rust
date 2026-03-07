@@ -31,17 +31,6 @@ interface ToolResult {
 }
 
 /**
- * 格式化参数用于日志输出
- */
-function formatArgsForLogging(args: Record<string, unknown>): string {
-  try {
-    return JSON.stringify(args, null, 2)
-  } catch {
-    return String(args)
-  }
-}
-
-/**
  * 转换参数格式为 Rust 后端期望的格式
  *
  * Rust 后端期望的格式：

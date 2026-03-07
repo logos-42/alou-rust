@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import agentService from '@/services/agentService';
-import asyncDiapCreationService from '@/services/asyncDiapCreationService';
 // import agentDocumentService from '@/services/agentDocumentService';
 import type { AgentInfo } from '@shared/types/services';
 

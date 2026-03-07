@@ -90,18 +90,18 @@ export interface Agent {
   name?: string;
   display_name?: string;
   avatar?: string;
-  avatar_url?: string;
-  avatar_cid?: string;
+  avatar_url?: string | null;
+  avatar_cid?: string | null;
   avatarCid?: string;
-  ipns?: string;
-  did?: string;
-  cid?: string;
+  ipns?: string | null;
+  did?: string | null;
+  cid?: string | null;
   diapIdentity?: {
     avatar_cid?: string;
     did?: string;
     ipns?: string;
     cid?: string;
-  };
+  } | null;
   serviceEndpoint?: {
     avatar_cid?: string;
   };
@@ -117,7 +117,7 @@ export interface Agent {
   agent_type?: string;
   mode?: string;
   role_description?: string;
-  sessionId?: string | null;
+  sessionId?: string | undefined;
 }
 
 // 频道类型
