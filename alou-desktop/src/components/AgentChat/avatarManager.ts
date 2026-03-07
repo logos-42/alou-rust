@@ -88,7 +88,7 @@ class AvatarManager {
       }
 
       // 通知监听器
-      this.notifyListeners(newAvatarUrl);
+      this.notifyListeners(agent);
 
       console.log('[AvatarManager] 头像更新成功:', agent.id);
     } catch (error) {
@@ -136,7 +136,7 @@ class AvatarManager {
    * @param listener - 监听器函数
    * @returns 清理函数
    */
-  addListener(listener: (avatarUrl: string) => void): () => void {
+  addListener(listener: (agent: Agent) => void): () => void {
     this.listeners.add(listener);
     
     // 返回清理函数
@@ -149,18 +149,18 @@ class AvatarManager {
    * 移除头像变更监听器
    * @param listener - 监听器函数
    */
-  removeListener(listener: (avatarUrl: string) => void): void {
+  removeListener(listener: (agent: Agent) => void): void {
     this.listeners.delete(listener);
   }
 
   /**
    * 通知所有监听器
-   * @param avatarUrl - 新头像URL
+   * @param agent - 更新头像的智能体
    */
-  private notifyListeners(avatarUrl: string): void {
+  private notifyListeners(agent: Agent): void {
     this.listeners.forEach(listener => {
       try {
-        listener(avatarUrl);
+        listener(agent);
       } catch (error) {
         console.error('[AvatarManager] 监听器执行失败:', error);
       }
