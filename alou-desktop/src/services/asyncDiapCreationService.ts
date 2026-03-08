@@ -239,6 +239,15 @@ class AsyncDiapCreationService {
       console.log('[AsyncDiapCreation] ✅ DIAP 身份创建完成:', sessionId, identity.did)
       this.completionListeners.forEach(listener => listener(sessionId, identity))
 
+      // 发射自定义事件，通知 DiapIdentityPanel 刷新显示
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('diap-identity-created', {
+          detail: { sessionId, identity }
+        })
+        window.dispatchEvent(event)
+        console.log('[AsyncDiapCreation] 📢 已发射 diap-identity-created 事件')
+      }
+
     } catch (error) {
       const errorMsg = (error as Error).message
       console.error('[AsyncDiapCreation] ❌ DIAP 身份创建失败:', sessionId, errorMsg)

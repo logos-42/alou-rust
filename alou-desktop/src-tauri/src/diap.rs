@@ -62,19 +62,19 @@ async fn provide_to_dht_direct(api_url: &str, cid: &str) -> Result<(), String> {
         .build()
         .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
     
-    let url = format!("{}/api/v0/dht/provide?arg={}", normalize_base_url(api_url), cid);
+    let url = format!("{}/api/v0/routing/provide?arg={}", normalize_base_url(api_url), cid);
     
     let response = client
         .post(&url)
         .header("User-Agent", "Alou-Desktop/1.0")
         .send()
         .await
-        .map_err(|e| format!("DHT provide 请求失败: {}", e))?;
+        .map_err(|e| format!("routing provide 请求失败: {}", e))?;
     
     if !response.status().is_success() {
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
-        return Err(format!("DHT provide 失败: {} - {}", status, text));
+        return Err(format!("routing provide 失败: {} - {}", status, text));
     }
     
     info!(target: "diap", "✅ 成功提供内容到 DHT: {}", cid);

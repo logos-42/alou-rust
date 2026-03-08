@@ -114,7 +114,7 @@ Example:
 
 fn generate_mock_tx_hash() -> String {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let bytes: Vec<u8> = (0..32).map(|_| rng.gen()).collect();
+    let mut rng = rand::rng();
+    let bytes: Vec<u8> = (0..32).map(|_| rng.random()).collect();
     format!("0x{}", hex::encode(bytes))
 }

@@ -434,7 +434,6 @@ async fn execute_tool_internal(
     tool_id: &str,
     args: serde_json::Value,
 ) -> Result<ToolExecuteResponse, String> {
-    use crate::tools::executor::ToolExecutor;
     use crate::tools::ExecutionContext;
     
     let executor_guard = state.tool_executor.lock().await;

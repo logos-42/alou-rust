@@ -49,8 +49,8 @@ impl AgentWalletTool {
 
     fn generate_wallet_address(&self) -> String {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let random_bytes: Vec<u8> = (0..20).map(|_| rng.gen()).collect();
+        let mut rng = rand::rng();
+        let random_bytes: Vec<u8> = (0..20).map(|_| rng.random()).collect();
         format!("0x{}", hex::encode(random_bytes))
     }
 

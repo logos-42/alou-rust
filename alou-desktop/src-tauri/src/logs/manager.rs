@@ -1,14 +1,13 @@
+use crate::logs::types::{LogLevel, LogStats};
+use chrono::{Duration, Local};
 /**
  * manager.rs - Logs Manager
  *
  * Handles execution log recording and log rotation for LOGS.md
  */
-
 use std::fs::{self, OpenOptions};
-use std::io::{Write, BufRead};
+use std::io::Write;
 use std::path::PathBuf;
-use chrono::{Local, Duration};
-use crate::logs::types::{LogLevel, LogStats};
 
 /// Logs Manager for handling LOGS.md
 pub struct LogsManager {
@@ -29,7 +28,11 @@ impl LogsManager {
     }
 
     /// Create a new LogsManager with custom settings
-    pub fn with_settings(base_dir: &PathBuf, max_file_size_mb: usize, max_log_files: usize) -> Self {
+    pub fn with_settings(
+        base_dir: &PathBuf,
+        max_file_size_mb: usize,
+        max_log_files: usize,
+    ) -> Self {
         let file_path = base_dir.join("LOGS.md");
         Self {
             file_path,
@@ -51,19 +54,13 @@ impl LogsManager {
     /// Append a log entry with specific level
     pub fn append_log_with_level(&self, entry: &str, level: LogLevel) -> Result<(), String> {
         if let Some(parent) = self.file_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
         }
 
         self.rotate_if_needed()?;
 
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let log_line = format!(
-            "- [{}] [{}] {}\n",
-            timestamp,
-            level.as_str(),
-            entry
-        );
+        let log_line = format!("- [{}] [{}] {}\n", timestamp, level.as_str(), entry);
 
         let mut file = OpenOptions::new()
             .create(true)
@@ -151,10 +148,7 @@ impl LogsManager {
     pub fn get_logs_by_date(&self, date: &str) -> Result<Vec<String>, String> {
         let all_logs = self.get_all_logs()?;
 
-        Ok(all_logs
-            .into_iter()
-            .filter(|l| l.contains(date))
-            .collect())
+        Ok(all_logs.into_iter().filter(|l| l.contains(date)).collect())
     }
 
     /// Get today's logs
@@ -299,7 +293,12 @@ impl LogsManager {
     /// Cleanup old rotated log files
     fn cleanup_old_rotated_logs(&self) -> Result<(), String> {
         if let Some(parent) = self.file_path.parent() {
-            let file_name_str = self.file_path.file_name().unwrap().to_string_lossy().to_string();
+            let file_name_str = self
+                .file_path
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string();
             let mut rotated_files: Vec<_> = fs::read_dir(parent)
                 .map_err(|e| format!("Failed to read directory: {}", e))?
                 .filter_map(|e| e.ok())
@@ -308,14 +307,14 @@ impl LogsManager {
                         .to_string_lossy()
                         .starts_with(file_name_str.as_str())
                 })
-                .filter(|e| {
-                    e.file_name()
-                        .to_string_lossy()
-                        .contains(".md.20")
-                })
+                .filter(|e| e.file_name().to_string_lossy().contains(".md.20"))
                 .map(|e| {
                     let path = e.path();
-                    let mtime = e.metadata().ok().map(|m| m.modified().unwrap()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+                    let mtime = e
+                        .metadata()
+                        .ok()
+                        .map(|m| m.modified().unwrap())
+                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
                     (path, mtime)
                 })
                 .collect();
