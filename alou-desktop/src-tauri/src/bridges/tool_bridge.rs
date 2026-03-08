@@ -10,7 +10,9 @@ use crate::tools::{
     rollback::RollbackTool, pubsub_tool::PubSubTool, message_passing::MessagePassingTool,
     iroh_tool::IrohTool, ipfs_archive::IpfsArchiveTool, git_helper::GitHelperTool,
     browser_tool::BrowserTool, agent_creator::AgentCreatorTool, ui_control::UIControlTool,
-    spec_tool::SpecTool,
+    spec_tool::SpecTool, agent_wallet::AgentWalletTool, wallet_manager::WalletManagerTool,
+    query_blockchain::QueryBlockchainTool, build_transaction::BuildTransactionTool,
+    broadcast_transaction::BroadcastTransactionTool,
 };
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
@@ -179,6 +181,27 @@ impl ToolBridge {
         // 注册 Spec 工具
         let spec_tool = Arc::new(SpecTool::new());
         self.register_tool(spec_tool).await?;
+        
+        // 注册 Agent 钱包工具
+        let agent_wallet_tool = Arc::new(AgentWalletTool::new());
+        self.register_tool(agent_wallet_tool).await?;
+        
+        // 注册钱包管理器工具
+        let wallet_manager_tool = Arc::new(WalletManagerTool::new());
+        self.register_tool(wallet_manager_tool).await?;
+        
+        // 注册区块链查询工具
+        let query_blockchain_tool = Arc::new(QueryBlockchainTool::new());
+        self.register_tool(query_blockchain_tool).await?;
+        
+        // 注册交易构建工具
+        let build_transaction_tool = Arc::new(BuildTransactionTool::new());
+        self.register_tool(build_transaction_tool).await?;
+        
+        // 注册交易广播工具
+        let broadcast_transaction_tool = Arc::new(BroadcastTransactionTool::new());
+        self.register_tool(broadcast_transaction_tool).await?;
+        
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())
     }

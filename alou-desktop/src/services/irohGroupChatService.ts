@@ -30,10 +30,10 @@ class IrohGroupChatService {
   async listGroups(): Promise<IrohGroup[]> {
     try {
       const result = await invoke<any>('execute_tool', {
-        toolName: 'iroh',
-        args: {
+        toolId: 'iroh',
+        args: JSON.stringify({
           action: 'list_groups'
-        }
+        })
       });
 
       if (result.success && result.data) {
@@ -53,11 +53,11 @@ class IrohGroupChatService {
   async getGroupInfo(groupId: string): Promise<IrohGroup | null> {
     try {
       const result = await invoke<any>('execute_tool', {
-        toolName: 'iroh',
-        args: {
+        toolId: 'iroh',
+        args: JSON.stringify({
           action: 'get_group_info',
           group_id: groupId
-        }
+        })
       });
 
       if (result.success && result.data) {
@@ -77,11 +77,11 @@ class IrohGroupChatService {
   async joinGroup(groupId: string): Promise<IrohGroup | null> {
     try {
       const result = await invoke<any>('execute_tool', {
-        toolName: 'iroh',
-        args: {
+        toolId: 'iroh',
+        args: JSON.stringify({
           action: 'join_group',
           group_id: groupId
-        }
+        })
       });
 
       if (result.success && result.data) {
@@ -101,12 +101,12 @@ class IrohGroupChatService {
   async sendMessage(groupId: string, message: string): Promise<boolean> {
     try {
       const result = await invoke<any>('execute_tool', {
-        toolName: 'iroh',
-        args: {
+        toolId: 'iroh',
+        args: JSON.stringify({
           action: 'send_group_message',
           group_id: groupId,
           message
-        }
+        })
       });
 
       return result.success;

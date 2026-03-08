@@ -35,26 +35,27 @@ pub mod autonomous_executor;       // 自主执行引擎
 pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
 pub mod group_coordinator;         // 群聊协调器（智能体群聊协作）
 pub mod spec_tool;                 // Spec 规格文档管理工具
+pub mod agent_wallet;             // Agent 钱包工具
+pub mod wallet_manager;           // 钱包管理器工具
+pub mod query_blockchain;         // 区块链查询工具
+pub mod build_transaction;        // 交易构建工具
+pub mod broadcast_transaction;    // 交易广播工具
 
 // 重新导出核心类型和接口
-pub use executor::{ToolExecutor, ToolResult, ToolError, ToolContext};
+pub use executor::{ToolExecutor, ToolResult, ToolError};
 // ToolCategory is defined in this module, not registry
-pub use registry::{ToolRegistry, ToolDefinition};
-pub use group_coordinator::{GroupCoordinator, GroupChatMessage, GroupMessageType, AgentInfo, GroupCoordinatorConfig};
-pub use filesystem::{FileSystemTool, FileOperation};
-pub use search::{SearchTool, SearchPattern};
-pub use bash::{BashTool, CommandResult};
-pub use plan::{PlanTool, TaskPlan, PlanStep};
-pub use todolist::{TodoListTool, TodoItem, TodoStatus};
-pub use agent_skills::{AgentSkillsTool, AgentSkill, SkillMetadata, SkillExecutionContext, SkillExecutionResult};
-pub use agent_collaboration::{AgentCollaborationTool, CollaborationSession, PubSubChatMessage, SessionStatus, MessageType, ParticipantInfo, ParticipantRole};
+pub use registry::ToolRegistry;
+pub use filesystem::FileSystemTool;
+pub use search::SearchTool;
+pub use bash::BashTool;
+pub use plan::PlanTool;
+pub use todolist::TodoListTool;
+pub use agent_skills::AgentSkillsTool;
+pub use agent_collaboration::AgentCollaborationTool;
 pub use tool_creation::ToolCreationTool;
 pub use spec_tool::SpecTool;
 // 从 tool_parts 直接导出定义类型和执行器
-pub use tool_parts::definitions::{ToolDefinition as CreatedToolDefinition, ToolType, ParameterDef, ToolUsageRecord, AgentToolUsageRecord, AgentToolRegistry};
-pub use tool_parts::executor::{DynamicToolExecutor, DynamicToolResult};
-pub use task_queue::{TaskQueueManager, Task, TaskPriority, TaskStatus, TaskResult, TaskStats, HeartbeatTask};
-pub use skill_auto_selector::{SkillAutoSelector, ToolMatch, AutoSelectConfig};
+pub use tool_parts::executor::DynamicToolExecutor;
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -81,6 +82,8 @@ pub enum ToolCategory {
     Communication,
     /// 开发工具
     Development,
+    /// Web3 / 区块链操作
+    Web3,
     /// 其他
     Other,
 }
@@ -111,6 +114,8 @@ pub enum ToolStatus {
     Executing,
     /// 出错
     Error,
+    /// 活跃/启用
+    Active,
 }
 
 /// 工具元信息

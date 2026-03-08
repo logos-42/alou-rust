@@ -76,6 +76,7 @@ export const useGroupChatAutonomousAgent = (
   const agentTasksRef = useRef<Map<string, Promise<void>>>(new Map())
   const groupAgentsRef = useRef<Map<string, AgentConfig[]>>(new Map())
   const messageQueueRef = useRef<Map<string, GroupChatMessage[]>>(new Map())
+  const activeGroupsRef = useRef<string[]>([])
 
   /**
    * 获取群聊中的所有智能体
@@ -280,7 +281,7 @@ export const useGroupChatAutonomousAgent = (
       processingMessages.set(taskKey, false)
       agentTasksRef.current.delete(taskKey)
     }
-  }, [getGroupAgents, shouldAgentRespond, responseDelay, maxConcurrentTasks, processingMessages])
+  }, [getGroupAgents, shouldAgentRespond, maxConcurrentTasks, processingMessages])
 
   /**
    * 广播消息到群聊
@@ -408,8 +409,12 @@ export const useGroupChatAutonomousAgent = (
     const handleClusterActionCreated = (event: Event) => {
       const customEvent = event as CustomEvent<{ actionId: string }>
       const { actionId } = customEvent.detail
-      if (actionId && !activeGroups.includes(actionId)) {
-        setActiveGroups(prev => [...prev, actionId])
+      if (actionId && !activeGroupsRef.current.includes(actionId)) {
+        setActiveGroups(prev => {
+          const updated = [...prev, actionId]
+          activeGroupsRef.current = updated
+          return updated
+        })
         console.log('[useGroupChatAutonomousAgent] 新群聊已激活:', actionId)
       }
     }
@@ -429,6 +434,7 @@ export const useGroupChatAutonomousAgent = (
         .map(action => action.action_id)
       
       setActiveGroups(groupIds)
+      activeGroupsRef.current = groupIds
       console.log('[useGroupChatAutonomousAgent] 已加载活跃群聊:', groupIds.length)
     } catch (error) {
       console.error('[useGroupChatAutonomousAgent] 加载群聊失败:', error)
@@ -437,7 +443,7 @@ export const useGroupChatAutonomousAgent = (
     return () => {
       window.removeEventListener('cluster-action-created', handleClusterActionCreated)
     }
-  }, [activeGroups])
+  }, [])
 
   /**
    * 定期处理消息队列
