@@ -5,7 +5,7 @@
 use super::providers;
 use super::error::{AgentError, Result};
 use async_trait::async_trait;
-use futures::stream::{BoxStream, StreamExt};
+use futures::stream::BoxStream;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

@@ -64,7 +64,7 @@ impl AsyncWorkflowExecutor {
     }
 
     /// 获取学习进度摘要
-    pub async fn get_learning_progress_summary(&self, execution_id: &str) -> String {
+    pub async fn get_learning_progress_summary(&self, _execution_id: &str) -> String {
         // 这里可以实现更复杂的学习进度分析
         // 暂时返回简化版本
         "学习中".to_string()
@@ -183,7 +183,7 @@ impl AsyncWorkflowExecutor {
     async fn generate_learning_report(&self, execution_id: &str) -> Result<String, String> {
         let patterns = self.analyze_learning_patterns(execution_id).await;
         
-        let report_prompt = format!(
+        let _report_prompt = format!(
             r#"
 基于以下学习模式数据生成学习报告：
 

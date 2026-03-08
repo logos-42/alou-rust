@@ -4,7 +4,6 @@
 
 use crate::bot_gateway::config::DiscordConfig;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Discord Bot 适配器
 pub struct DiscordAdapter {

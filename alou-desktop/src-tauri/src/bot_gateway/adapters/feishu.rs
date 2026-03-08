@@ -3,10 +3,7 @@
 //! 处理飞书 Bot 消息的接收和发送
 
 use crate::bot_gateway::config::FeishuConfig;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// 飞书 Bot 适配器
 pub struct FeishuAdapter {
@@ -133,7 +130,7 @@ impl FeishuAdapter {
         hasher.update(timestamp.as_bytes());
         hasher.update(token.as_bytes());
         hasher.update(body.as_bytes());
-        let result = hasher.finalize();
+        let _result = hasher.finalize();
         
         // 这里简化验证，实际应该比较 base64 编码
         true
@@ -141,7 +138,7 @@ impl FeishuAdapter {
 
     /// 解密飞书消息内容
     pub fn decrypt_message(&self, encrypted_content: &str) -> Result<String, String> {
-        if let Some(encrypt_key) = &self.config.encrypt_key {
+        if let Some(_encrypt_key) = &self.config.encrypt_key {
             // AES 解密逻辑（简化版本）
             Ok(encrypted_content.to_string())
         } else {

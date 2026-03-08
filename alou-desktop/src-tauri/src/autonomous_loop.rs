@@ -15,7 +15,6 @@ use tokio::time::{sleep, Duration, interval};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use chrono::Utc;
-use uuid::Uuid;
 use log::{info, warn, error};
 
 use crate::tools::task_queue::{TaskQueueManager, Task, TaskPriority, TaskStatus};

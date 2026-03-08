@@ -3,7 +3,7 @@
 //! Implements multi-agent task decomposition and parallel execution
 //! Following "The Mythical Man-Month" principles for autonomous agent coordination
 
-use super::task::{Task, TaskManager, TaskStatus, TaskMetadata, TaskEvent, TaskFinalResult};
+use super::task::{TaskManager, TaskStatus, TaskFinalResult};
 use super::ai_client::{AiClient, AiMessage};
 use super::executor::RalphLoopExecutor;
 use crate::bridges::ToolBridge;
@@ -11,9 +11,7 @@ use crate::tools::ToolRegistry;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::{Mutex, broadcast};
-use uuid::Uuid;
 
 /// Agent Status in the swarm
 #[derive(Debug, Clone, Serialize, Deserialize)]

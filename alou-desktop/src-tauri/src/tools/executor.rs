@@ -2,7 +2,7 @@
 //!
 //! 提供统一的工具执行接口，支持异步执行、超时控制、错误处理等功能
 
-use super::{ToolMetadata, ExecutionContext, ToolConfig, ToolStatus, ToolPriority, ToolCategory};
+use super::{ToolMetadata, ExecutionContext, ToolConfig, ToolPriority};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

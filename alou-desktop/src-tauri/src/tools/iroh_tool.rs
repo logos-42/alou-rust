@@ -275,7 +275,7 @@ impl IrohClient {
         self.groups.insert(group_id.clone(), group_info.clone());
         
         // 创建对应的文档用于存储群聊消息
-        let doc_id = self.create_doc(Some(format!("group_{}", group_id))).await?;
+        let _doc_id = self.create_doc(Some(format!("group_{}", group_id))).await?;
         
         // 初始化群聊消息列表
         self.group_messages.insert(group_id.clone(), Vec::new());

@@ -2,7 +2,7 @@
 
 use super::types::*;
 use super::executor::GitExecutor;
-use super::prompts::{generate_prompt, suggest_commit_message};
+use super::prompts::generate_prompt;
 use crate::tools::{ToolResult, ToolError};
 use std::collections::HashMap;
 use std::path::PathBuf;

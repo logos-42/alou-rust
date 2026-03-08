@@ -1,8 +1,5 @@
 use crate::prompts::{PromptManager, PromptContext};
-use crate::tools::{ToolRegistry, ToolExecutor, ToolResult, ExecutionContext};
-use serde_json::Value;
-use std::collections::HashMap;
-use tokio::time::{sleep, Duration};
+use crate::tools::ToolRegistry;
 use std::sync::Arc;
 
 /// 与现有系统兼容的AI助手循环控制器

@@ -2,7 +2,6 @@
 //!
 //! 自主智能体状态管理 - 仅包含状态存取函数
 
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
 

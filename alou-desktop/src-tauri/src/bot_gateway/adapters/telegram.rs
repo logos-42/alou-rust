@@ -3,10 +3,7 @@
 //! 处理 Telegram Bot 消息的接收和发送
 
 use crate::bot_gateway::config::TelegramConfig;
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Telegram Bot 适配器
 pub struct TelegramAdapter {

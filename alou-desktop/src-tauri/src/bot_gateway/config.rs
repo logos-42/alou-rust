@@ -3,7 +3,6 @@
 //! 提供各平台 Bot 的配置结构和管理功能
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Bot Gateway 主配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

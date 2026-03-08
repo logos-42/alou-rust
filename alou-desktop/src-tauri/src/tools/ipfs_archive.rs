@@ -206,7 +206,7 @@ impl IpfsArchiveTool {
     }
 
     /// 列出已固定的存档
-    async fn list_pinned(&self, archive_type: Option<ArchiveType>) -> Result<Vec<ArchiveResult>, String> {
+    async fn list_pinned(&self, _archive_type: Option<ArchiveType>) -> Result<Vec<ArchiveResult>, String> {
         // 这里应该从本地存储或IPFS获取已存档的列表
         // 简化实现，返回空列表
         Ok(vec![])

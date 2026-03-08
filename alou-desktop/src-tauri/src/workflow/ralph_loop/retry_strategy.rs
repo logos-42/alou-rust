@@ -134,7 +134,7 @@ impl AsyncWorkflowExecutor {
     }
 
     /// 获取错误重试建议
-    async fn get_retry_recommendation(&self, error: &str, iteration: u32) -> String {
+    async fn get_retry_recommendation(&self, _error: &str, iteration: u32) -> String {
         let retry_delay = self.calculate_retry_delay(iteration, 1000);
         
         format!(

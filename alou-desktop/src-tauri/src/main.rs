@@ -84,10 +84,7 @@ use crate::workflow::{
     start_workflow_event_listener,
 };
 use crate::bridges::{BridgeManager, create_default_bridge_manager};
-use crate::tools::initialize_tools;
 use crate::tools::task_queue_tool::{initialize_task_queue_tool, add_task, get_next_task, update_task_status, set_task_result, list_tasks, get_task_stats, get_task_by_id};
-use crate::prompts::PromptManager;
-use crate::context::create_default_context_manager;
 use crate::memory_manager::{
     set_memory_item, get_memory_item, remove_memory_item, clear_memory,
     get_memory_keys, get_memory_stats, archive_to_ipfs, pin_cid, unpin_cid,

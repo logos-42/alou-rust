@@ -109,7 +109,7 @@ impl ContextCompressor {
         &self,
         entries: &[ContextEntry],
         max_length: usize,
-        keep_important_ratio: f64,
+        _keep_important_ratio: f64,
     ) -> Result<Vec<ContextEntry>, Box<dyn std::error::Error>> {
         let mut compressed = Vec::new();
         let mut current_length = 0;
@@ -189,7 +189,7 @@ impl ContextCompressor {
         entries_with_weights.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
 
         // 按权重选择条目
-        for (weight, entry) in entries_with_weights {
+        for (_weight, entry) in entries_with_weights {
             if current_length >= max_length {
                 break;
             }
@@ -318,7 +318,7 @@ impl ContextCompressor {
     async fn compress_secondary(
         &self,
         current_entries: &[ContextEntry],
-        all_entries: &[ContextEntry],
+        _all_entries: &[ContextEntry],
         max_length: usize,
     ) -> Result<Vec<ContextEntry>, Box<dyn std::error::Error>> {
         let mut compressed = current_entries.to_vec();

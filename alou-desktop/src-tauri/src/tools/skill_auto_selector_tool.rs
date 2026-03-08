@@ -2,7 +2,7 @@
 //!
 //! 提供AI自动选择工具的接口
 
-use crate::tools::skill_auto_selector::{SkillAutoSelector, ToolMatch, AutoSelectConfig};
+use crate::tools::skill_auto_selector::{SkillAutoSelector, AutoSelectConfig};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;

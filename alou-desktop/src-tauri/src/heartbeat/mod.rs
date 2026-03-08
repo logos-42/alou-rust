@@ -15,7 +15,6 @@ pub mod manager;
 pub mod commands;
 
 // Re-export commonly used types
-pub use types::{HeartbeatConfig, HeartbeatState, HeartbeatResult, TokenUsage};
 pub use manager::{HeartbeatManagerState, initialize_heartbeat_manager};
 
 // Re-export commands for Tauri registration

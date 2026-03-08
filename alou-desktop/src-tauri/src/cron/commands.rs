@@ -5,7 +5,7 @@
 use tauri::State;
 use tokio::sync::Mutex;
 use std::sync::Arc;
-use crate::cron::types::{CronJob, CronJobResult, CronConfig};
+use crate::cron::types::{CronJob, CronConfig};
 use crate::cron::scheduler::{CronScheduler, SchedulerState};
 
 /// Cron 调度器状态（用于 Tauri State）

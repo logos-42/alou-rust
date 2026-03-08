@@ -3,7 +3,7 @@
 //! 将异步工作流执行器的事件与Tauri事件系统集成
 
 use super::{AsyncWorkflowExecutor, ExecutionEvent};
-use tauri::{Manager, Emitter};
+use tauri::Emitter;
 
 /// 工作流事件管理器
 pub struct WorkflowEventManager {

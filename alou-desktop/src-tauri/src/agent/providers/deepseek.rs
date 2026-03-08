@@ -3,7 +3,7 @@
 use super::super::ai_client::{AiMessage, AiProvider, AiResponse, AiTool, AiToolCall, AiStreamEvent};
 use super::super::error::{AgentError, Result};
 use async_trait::async_trait;
-use futures::stream::{BoxStream, Stream, StreamExt};
+use futures::stream::{BoxStream, StreamExt};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

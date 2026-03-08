@@ -4,15 +4,14 @@
 //! Following "The Mythical Man-Month" principles for autonomous execution
 
 use super::ai_client::{AiClient, AiMessage};
-use super::task::{TaskManager, TaskStatus};
+use super::task::TaskManager;
 use super::executor::RalphLoopExecutor;
-use super::swarm::{SwarmCoordinator, TaskPlan};
+use super::swarm::SwarmCoordinator;
 use crate::bridges::ToolBridge;
 use crate::tools::{ToolRegistry, ToolMetadata, ToolExecutor};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::path::PathBuf;
 use tokio::sync::Mutex;
 
 /// Agent Autonomy Configuration

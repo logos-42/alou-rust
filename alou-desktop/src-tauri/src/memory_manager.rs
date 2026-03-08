@@ -6,12 +6,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tauri::State;
 use tokio::runtime::Runtime;
 
 // 引入IPFS相关依赖
 use ipfs_api_backend_hyper::{IpfsApi, IpfsClient};
-use libipld::cid::Cid;
 
 /// 内存存储项
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,7 +84,7 @@ impl MemoryManager {
 
     /// 获取数据（如果在IPFS上则从IPFS检索）
     pub fn get_item(&self, key: &str) -> Option<String> {
-        let mut items = self.items.lock().unwrap();
+        let items = self.items.lock().unwrap();
 
         if let Some(item) = items.get(key) {
             // 如果数据已被归档到IPFS且不在内存中，则从IPFS检索
@@ -237,7 +235,7 @@ impl MemoryManager {
 
     /// 清空所有数据
     pub fn clear(&self, remove_archived_from_ipfs: bool) {
-        let mut items = self.items.lock().unwrap();
+        let items = self.items.lock().unwrap();
         let keys_to_remove: Vec<String> = items.keys().cloned().collect();
         let size = keys_to_remove.len();
 
@@ -323,7 +321,7 @@ impl MemoryManager {
     /// 标记项目为固定状态（不会被垃圾回收）
     pub fn pin_item(&self, key: &str) -> bool {
         let mut items = self.items.lock().unwrap();
-        if let Some(mut item) = items.get_mut(key) {
+        if let Some(item) = items.get_mut(key) {
             item.pinned = true;
             // 同时将内容固定到IPFS
             if let Some(cid) = &item.cid {
@@ -343,7 +341,7 @@ impl MemoryManager {
     /// 取消固定项目
     pub fn unpin_item(&self, key: &str) -> bool {
         let mut items = self.items.lock().unwrap();
-        if let Some(mut item) = items.get_mut(key) {
+        if let Some(item) = items.get_mut(key) {
             item.pinned = false;
             // 同时取消IPFS上的固定
             if let Some(cid) = &item.cid {

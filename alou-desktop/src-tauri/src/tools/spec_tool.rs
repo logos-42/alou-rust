@@ -77,7 +77,7 @@ impl SpecTool {
 
     /// 调用 Node.js 脚本执行 Spec 操作
     async fn call_node_script(&self, request: serde_json::Value) -> Result<serde_json::Value, ToolError> {
-        let start_time = std::time::Instant::now();
+        let _start_time = std::time::Instant::now();
 
         // 创建临时目录
         let temp_dir = std::env::temp_dir().join("alou_spec");

@@ -471,7 +471,7 @@ pub async fn test_ipns_on_public_gateway(ipns_name: String) -> Result<serde_json
 #[tauri::command]
 pub async fn get_local_diap_identity(
     ipns_name: String,
-    ipfs_api_url: Option<String>,
+    _ipfs_api_url: Option<String>,
     ipfs_gateway_url: Option<String>,
 ) -> Result<LocalDiapIdentityResponse, String> {
     info!(target: "diap", "解析 IPNS: {}", ipns_name);
@@ -541,7 +541,7 @@ pub async fn get_local_diap_identity(
 pub async fn update_local_diap_identity(
     ipns_key: String,
     cid: String,
-    ipfs_api_url: Option<String>,
+    _ipfs_api_url: Option<String>,
     ipfs_gateway_url: Option<String>,
 ) -> Result<LocalDiapIdentityResponse, String> {
     info!(target: "diap", "更新 IPNS: key={}, cid={}", ipns_key, cid);

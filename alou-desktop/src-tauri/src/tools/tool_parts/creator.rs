@@ -2,21 +2,16 @@
 //! 
 //! 负责创建新工具文件和定义文件
 
-use crate::tools::{ToolError, ToolResult, ExecutionContext, ToolMetadata, ToolCategory, ToolStatus, ToolPriority};
+use crate::tools::{ToolError, ExecutionContext};
 use crate::tools::executor::ToolExecutor;
 use crate::tools::tool_parts::definitions::{ToolDefinition, ToolType, ToolUsageRecord};
 use crate::tools::tool_parts::executor::DynamicToolExecutor;
-use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::RwLock;
 use serde_json;
 use chrono::Utc;
 
-use crate::tools::tool_parts::executor::DynamicToolResult;
 
 // 实现工具创建相关的功能
 impl crate::tools::tool_creation::ToolCreationTool {
@@ -173,7 +168,7 @@ impl crate::tools::tool_creation::ToolCreationTool {
 
         // 获取工具文件路径
         let tool_file_path = creation_result.get("tool_file").unwrap().to_string();
-        let path = Path::new(&tool_file_path);
+        let _path = Path::new(&tool_file_path);
 
         // 执行工具
         let exec_result = match tool_def.tool_type {

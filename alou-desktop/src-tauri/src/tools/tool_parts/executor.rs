@@ -3,11 +3,10 @@
 //! 负责执行动态创建的脚本工具
 
 use crate::tools::{ToolExecutor, ToolMetadata, ToolResult, ToolError, ExecutionContext, ToolCategory, ToolStatus, ToolPriority};
-use crate::tools::tool_parts::definitions::ToolType;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::process::Command;
 use chrono::Utc;
 

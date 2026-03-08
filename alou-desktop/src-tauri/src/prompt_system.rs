@@ -1,8 +1,5 @@
-use crate::prompts::{PromptManager, PromptContext};
-use crate::tools::{ToolRegistry, ToolResult, ExecutionContext};
-use serde_json::Value;
+use crate::prompts::PromptManager;
 use std::collections::HashMap;
-use tokio::time::{sleep, Duration};
 use std::sync::Arc;
 
 /// 分层提示系统 - 与现有 PromptManager 集成

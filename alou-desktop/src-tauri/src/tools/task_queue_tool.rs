@@ -5,7 +5,6 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tauri::State;
 
 use crate::tools::task_queue::{

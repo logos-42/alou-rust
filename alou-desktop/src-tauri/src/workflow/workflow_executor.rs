@@ -193,7 +193,7 @@ impl AsyncWorkflowExecutor {
         let mut completed_steps = 0;
 
         // 构建步骤依赖图
-        let dependency_graph = self.build_dependency_graph(&workflow.steps);
+        let _dependency_graph = self.build_dependency_graph(&workflow.steps);
 
         // 执行步骤（简化版本：按顺序执行，实际应该支持并发）
         for step in &workflow.steps {
@@ -311,7 +311,7 @@ impl AsyncWorkflowExecutor {
 
         // 重试循环
         while retry_count <= max_retries {
-            let attempt_start = chrono::Utc::now().timestamp();
+            let _attempt_start = chrono::Utc::now().timestamp();
 
             match self.execute_step_logic(step, execution_id, api_key, agent_info).await {
                 Ok(result) => {

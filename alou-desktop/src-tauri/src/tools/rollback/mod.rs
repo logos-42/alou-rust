@@ -10,7 +10,7 @@
 use super::{ToolExecutor, ToolMetadata, ToolCategory, ToolPriority, ToolStatus, ExecutionContext, ToolResult, ToolError};
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::fs;
 use chrono::Utc;
@@ -18,7 +18,7 @@ use chrono::Utc;
 pub mod types;
 pub mod storage;
 
-use types::{Snapshot, SnapshotType, RollbackAction, ComparisonResult, FileChange};
+use types::{Snapshot, RollbackAction};
 use storage::SnapshotStorage;
 
 /// 回滚工具主结构

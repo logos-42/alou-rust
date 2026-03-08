@@ -239,9 +239,23 @@ pub async fn ensure_kubo_binary(app: &AppHandle) -> Result<(), String> {
 
     let target_bin = kubo_dir.join(binary_name());
 
-    // 检查现有版本，如果版本不匹配则删除旧版本并下载新版本
+    // 检查现有版本，如果版本不匹配或二进制文件无效则删除旧版本并下载新版本
     if target_bin.exists() {
-        if let Some(info) = read_kubo_version(&kubo_dir) {
+        // 验证二进制文件是否有效（检查文件大小，Kubo 二进制应该 > 10MB）
+        let is_valid_binary = if let Ok(metadata) = std::fs::metadata(&target_bin) {
+            // Kubo 二进制文件应该 > 10MB，小于 1KB 的肯定是占位符或损坏文件
+            metadata.len() > 1024 * 1024
+        } else {
+            false
+        };
+
+        if !is_valid_binary {
+            log::info!("检测到无效的 Kubo 二进制文件，将重新复制");
+            std::fs::remove_file(&target_bin)
+                .map_err(|e| format!("Failed to remove invalid Kubo binary: {}", e))?;
+            let version_file = kubo_dir.join(KUBO_VERSION_FILE);
+            std::fs::remove_file(&version_file).ok();
+        } else if let Some(info) = read_kubo_version(&kubo_dir) {
             if info.version == KUBO_VERSION {
                 // 版本匹配，直接返回
                 return Ok(());

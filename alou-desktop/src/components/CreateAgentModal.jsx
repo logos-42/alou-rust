@@ -41,6 +41,9 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   const [documentGenerationProgress, setDocumentGenerationProgress] = useState(null)
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
 
+  // Dicebear 头像样式选择
+  const [showDicebearStyles, setShowDicebearStyles] = useState(false)
+
   // 解析 MCP 代码并提取工具名称
   const parseMcpCode = useCallback((code) => {
     try {

@@ -4,12 +4,12 @@
 
 use crate::bot_gateway::config::BotGatewayConfig;
 use crate::bot_gateway::adapters::{TelegramAdapter, FeishuAdapter, DiscordAdapter, QQAdapter};
-use crate::bot_gateway::adapters::telegram::{TelegramMessage, TelegramChatMessage};
+use crate::bot_gateway::adapters::telegram::TelegramMessage;
 use crate::bot_gateway::adapters::feishu::{FeishuWebhookEvent, FeishuChallenge};
-use crate::bot_gateway::adapters::discord::{DiscordMessage, DiscordAdapter as DiscordAdapterType};
-use crate::bot_gateway::adapters::qq::{OneBotMessageEvent, QQAdapter as QQAdapterType};
+use crate::bot_gateway::adapters::discord::DiscordMessage;
+use crate::bot_gateway::adapters::qq::OneBotMessageEvent;
 use axum::{
-    extract::{State, Path},
+    extract::State,
     http::StatusCode,
     response::Json,
     routing::{get, post},
@@ -366,9 +366,9 @@ async fn execute_bot_command(
     platform: &str,
     command: &str,
     args: &[String],
-    chat_id: i64,
-    message_id: u64,
-    user_id: Option<&str>,
+    _chat_id: i64,
+    _message_id: u64,
+    _user_id: Option<&str>,
 ) -> String {
     match command {
         "help" => {

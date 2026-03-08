@@ -5,9 +5,8 @@
 use super::{ToolExecutor, ToolMetadata, ToolCategory, ToolPriority, ToolStatus, ExecutionContext, ToolResult, ToolError};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// 文件系统工具
 pub struct FileSystemTool {

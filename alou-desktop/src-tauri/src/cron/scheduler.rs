@@ -5,8 +5,8 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use chrono::{DateTime, Utc};
-use crate::cron::types::{CronJob, CronJobResult, CronJobState, CronConfig};
+use chrono::Utc;
+use crate::cron::types::{CronJob, CronJobResult, CronConfig};
 use crate::cron::config::CronConfigManager;
 
 /// Cron 调度器状态
@@ -299,7 +299,7 @@ impl CronScheduler {
     ///
     /// # Returns
     /// * `Result<String, String>` - 执行结果
-    async fn execute_agent_task(&self, prompt: &str, session_id: Option<String>) -> Result<String, String> {
+    async fn execute_agent_task(&self, prompt: &str, _session_id: Option<String>) -> Result<String, String> {
         println!("[CronScheduler] 调用 Agent 系统执行任务");
         println!("[CronScheduler] Prompt: {}", prompt);
 

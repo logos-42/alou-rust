@@ -3,8 +3,7 @@
 //! 实现MD文档、prompt和skills的AI增强调研功能
 
 use super::super::AsyncWorkflowExecutor;
-use super::super::*;
-use crate::prompts::{PromptManager, PromptContext, PROMPT_MANAGER};
+use crate::prompts::{PromptContext, PROMPT_MANAGER};
 
 impl AsyncWorkflowExecutor {
     /// AI增强的文档调研（简化版，控制token消耗）
@@ -110,7 +109,7 @@ impl AsyncWorkflowExecutor {
     }
 
     /// 搜索相关prompts
-    async fn search_prompts(&self, query: &str) -> Result<Vec<serde_json::Value>, String> {
+    async fn search_prompts(&self, _query: &str) -> Result<Vec<serde_json::Value>, String> {
         // 这里可以实现prompt搜索逻辑
         // 暂时返回空数组
         Ok(vec![])
@@ -180,7 +179,7 @@ impl AsyncWorkflowExecutor {
     async fn generate_simplified_docs(
         &self,
         research_results: &serde_json::Value,
-        ai_summary: &str,
+        _ai_summary: &str,
         api_key: &str,
     ) -> Result<Vec<serde_json::Value>, String> {
         let mut simplified_docs = Vec::new();

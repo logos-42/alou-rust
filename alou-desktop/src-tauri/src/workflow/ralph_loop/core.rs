@@ -4,14 +4,9 @@
 
 use super::super::AsyncWorkflowExecutor;
 use super::super::*;
-use crate::workflow::{Workflow, WorkflowStep};
-use crate::bridges::BridgeManager;
+use crate::workflow::Workflow;
 use tokio::time::{sleep, Duration};
 
-use super::ai_decision::*;
-use super::research::*;
-use super::learning::*;
-use super::retry_strategy::*;
 
 impl AsyncWorkflowExecutor {
     /// 使用Ralph Loop执行工作流
@@ -27,7 +22,7 @@ impl AsyncWorkflowExecutor {
 
         let start_time = chrono::Utc::now().timestamp_millis() as u64;
         let mut iteration = 0;
-        let mut total_cost = 0.0;
+        let total_cost = 0.0;
 
         // 初始化执行历史（如果启用）
         if ralph_config.enable_history {
@@ -231,12 +226,12 @@ impl AsyncWorkflowExecutor {
     async fn execute_ai_decision(
         &self,
         execution_id: &str,
-        workflow: &Workflow,
+        _workflow: &Workflow,
         iteration: u32,
         iteration_result: &serde_json::Value,
         ai_decision: &str,
         api_key: &str,
-        agent_info: &Option<serde_json::Value>,
+        _agent_info: &Option<serde_json::Value>,
         ralph_config: &RalphLoopConfig,
         start_time: u64,
         total_cost: f64,
@@ -430,7 +425,7 @@ impl AsyncWorkflowExecutor {
     ) -> bool {
         if let Some(checker) = &ralph_config.completion_checker {
             // 简单的字符串匹配检查
-            if let Some(result_str) = iteration_result.to_string().to_lowercase().find(&checker.to_lowercase()) {
+            if let Some(_result_str) = iteration_result.to_string().to_lowercase().find(&checker.to_lowercase()) {
                 println!("🎯 [COMPLETION] Found completion signal '{}' in result", checker);
                 return true;
             }

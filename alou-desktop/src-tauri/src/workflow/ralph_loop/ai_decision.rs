@@ -3,7 +3,6 @@
 //! 实现AI自动决策下一步行动的逻辑
 
 use super::super::AsyncWorkflowExecutor;
-use super::super::*;
 
 impl AsyncWorkflowExecutor {
     /// AI自动决策下一步行动（集成上下文和学习进度）
@@ -62,7 +61,7 @@ impl AsyncWorkflowExecutor {
     }
 
     /// 调用AI进行决策
-    pub async fn call_ai_for_decision(&self, prompt: &str, api_key: &str) -> Result<String, String> {
+    pub async fn call_ai_for_decision(&self, prompt: &str, _api_key: &str) -> Result<String, String> {
         // 使用bridge_manager调用AI工具
         let request = crate::bridges::ToolCallRequest {
             session_id: "ralph_loop_decision".to_string(),

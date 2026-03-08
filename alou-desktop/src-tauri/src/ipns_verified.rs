@@ -142,23 +142,19 @@ async fn generate_key_with_api(
     key_name: &str,
     api_url: &str,
 ) -> Result<IpnsKeyResult, String> {
-    use reqwest::{multipart::Form, multipart::Part, Client};
+    use reqwest::Client;
     
     let client = Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
     
-    let endpoint = format!("{}/api/v0/key/gen", normalize_base_url(api_url));
-    
-    // 使用正确的multipart/form-data格式
-    let form = Form::new()
-        .part("name", Part::text(key_name.to_string()))
-        .part("type", Part::text("ed25519".to_string()));
-    
+    // IPFS key gen API 使用查询参数而不是 multipart/form-data
+    let endpoint = format!("{}/api/v0/key/gen?arg={}&type=ed25519", 
+        normalize_base_url(api_url), 
+        urlencoding::encode(key_name));
     let response = client
         .post(&endpoint)
-        .multipart(form)
         .header("User-Agent", "Alou-Desktop/1.0")
         .send()
         .await

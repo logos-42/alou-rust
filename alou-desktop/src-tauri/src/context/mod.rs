@@ -431,7 +431,7 @@ impl ContextManager {
     }
 
     /// 搜索记忆
-    pub async fn search_memory(&mut self, query: &str, memory_type: Option<MemoryType>) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
+    pub async fn search_memory(&mut self, query: &str, _memory_type: Option<MemoryType>) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
         if let Some(memory) = &mut self.memory_manager {
             let limit = 10; // 默认限制
             let entries = memory.search_similar(query, limit).await?;

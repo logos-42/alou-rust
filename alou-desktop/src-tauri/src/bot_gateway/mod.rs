@@ -81,7 +81,7 @@ impl BotGatewayManager {
         }
 
         // 启动服务器
-        let executor = self.tool_executor.lock().await;
+        let _executor = self.tool_executor.lock().await;
         let port = start_server(config.clone(), self.tool_executor.clone()).await?;
 
         // 创建关闭通道

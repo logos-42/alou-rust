@@ -5,9 +5,9 @@
  */
 
 use std::fs::{self, OpenOptions};
-use std::io::{Write, BufRead, BufReader};
+use std::io::{Write, BufRead};
 use std::path::PathBuf;
-use chrono::{DateTime, Local, Duration};
+use chrono::{Local, Duration};
 use crate::logs::types::{LogLevel, LogStats};
 
 /// Logs Manager for handling LOGS.md

@@ -5,7 +5,6 @@
 use super::{ToolExecutor, ToolMetadata, ToolResult, ToolError, ExecutionContext, ToolCategory, ToolStatus, ToolPriority};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// 智能体创建工具
 pub struct AgentCreatorTool {
@@ -211,7 +210,7 @@ impl AgentCreatorTool {
     async fn notify_frontend_agent_created(
         &self,
         config: &AgentConfig,
-        frontend_data: &FrontendAgentData,
+        _frontend_data: &FrontendAgentData,
     ) -> Result<(), String> {
         // 这里应该通过 Tauri 事件系统通知前端
         // 实际实现需要访问 AppHandle
@@ -226,7 +225,7 @@ impl AgentCreatorTool {
     }
 
     /// 获取智能体详情
-    async fn get_agent(&self, agent_id: &str) -> Result<Option<AgentConfig>, String> {
+    async fn get_agent(&self, _agent_id: &str) -> Result<Option<AgentConfig>, String> {
         // 从存储中获取智能体配置
         Ok(None)
     }
@@ -239,7 +238,7 @@ impl AgentCreatorTool {
     }
 
     /// 更新智能体
-    async fn update_agent(&self, agent_id: &str, updates: serde_json::Value) -> Result<AgentConfig, String> {
+    async fn update_agent(&self, _agent_id: &str, _updates: serde_json::Value) -> Result<AgentConfig, String> {
         // 更新智能体配置
         Err("Not implemented".to_string())
     }

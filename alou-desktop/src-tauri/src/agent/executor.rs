@@ -2,7 +2,7 @@
 //!
 //! 实现 Ralph Loop 的核心执行逻辑，支持无限迭代、工具调用、流式响应
 
-use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall, AiToolCall as ProviderToolCall};
+use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCall};
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
 use super::error::AgentError;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};

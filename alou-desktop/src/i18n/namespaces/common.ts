@@ -97,6 +97,78 @@ export const common = {
     'common.language': '语言',
     'common.language.zh': '中文',
     'common.language.en': 'English',
+
+    // Bot Gateway 设置
+    'common.gateway.title': 'Bot Gateway',
+    'common.gateway.subtitle': '配置即时通讯工具 Bot，远程调用 Alou 工具',
+    'common.gateway.enabled': '已启用',
+    'common.gateway.disabled': '已禁用',
+    'common.gateway.status': '状态',
+    'common.gateway.running': '运行中',
+    'common.gateway.stopped': '已停止',
+    'common.gateway.port': '监听端口',
+    'common.gateway.platforms': '启用平台',
+    'common.gateway.none': '无',
+    'common.gateway.configure': '配置',
+    'common.gateway.testConnection': '测试连接',
+    'common.gateway.save': '保存配置',
+    'common.gateway.saving': '保存中...',
+    'common.gateway.startService': '启动服务',
+    'common.gateway.stopService': '停止服务',
+
+    // 平台名称
+    'common.gateway.platform.telegram': 'Telegram',
+    'common.gateway.platform.feishu': '飞书',
+    'common.gateway.platform.discord': 'Discord',
+    'common.gateway.platform.qq': 'QQ',
+
+    // Telegram 配置
+    'common.gateway.telegram.enabled': '启用 Telegram Bot',
+    'common.gateway.telegram.botToken': 'Bot Token',
+    'common.gateway.telegram.tokenPlaceholder': '123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+    'common.gateway.telegram.usePolling': '使用轮询模式 (无需 Webhook)',
+    'common.gateway.telegram.allowedUserIds': '允许的用户 IDs',
+    'common.gateway.telegram.allowedChatIds': '允许的聊天 IDs',
+    'common.gateway.telegram.hint': '提示：从 BotFather 获取 Bot Token',
+
+    // 飞书配置
+    'common.gateway.feishu.enabled': '启用飞书 Bot',
+    'common.gateway.feishu.appId': 'App ID',
+    'common.gateway.feishu.appSecret': 'App Secret',
+    'common.gateway.feishu.verifyToken': '验证 Token',
+    'common.gateway.feishu.encryptKey': '加密 Key (可选)',
+    'common.gateway.feishu.appIdPlaceholder': 'cli_a1b2c3d4e5f6g7h8',
+    'common.gateway.feishu.hint': '提示：在飞书开放平台创建应用获取配置',
+
+    // Discord 配置
+    'common.gateway.discord.enabled': '启用 Discord Bot',
+    'common.gateway.discord.botToken': 'Bot Token',
+    'common.gateway.discord.tokenPlaceholder': 'Your Discord Bot Token',
+    'common.gateway.discord.allowedUserIds': '允许的用户 IDs',
+    'common.gateway.discord.allowedGuildIds': '允许的服务器 IDs',
+    'common.gateway.discord.allowedChannelIds': '允许的频道 IDs',
+    'common.gateway.discord.hint': '提示：在 Discord Developer Portal 创建应用获取 Bot Token',
+
+    // QQ 配置
+    'common.gateway.qq.enabled': '启用 QQ Bot (OneBot)',
+    'common.gateway.qq.wsUrl': 'WebSocket URL',
+    'common.gateway.qq.wsUrlPlaceholder': 'ws://127.0.0.1:8080',
+    'common.gateway.qq.accessToken': 'Access Token',
+    'common.gateway.qq.allowedUserIds': '允许的用户 IDs',
+    'common.gateway.qq.allowedGroupIds': '允许的群 IDs',
+    'common.gateway.qq.hint': '提示：需要运行 OneBot 兼容的 QQ 机器人框架（如 go-cqhttp）',
+
+    // 通用配置
+    'common.gateway.general.enabled': '启用 Bot Gateway',
+    'common.gateway.general.commandPrefix': '命令前缀',
+    'common.gateway.general.publicDomain': '公网域名 (可选)',
+
+    // 日志
+    'common.gateway.logs.title': '日志',
+    'common.gateway.logs.noLogs': '暂无日志',
+
+    // 成功消息
+    'common.gateway.success.saved': '配置已保存',
   },
   en: {
     // App basics
@@ -192,5 +264,77 @@ export const common = {
     'common.language': 'Language',
     'common.language.zh': '中文',
     'common.language.en': 'English',
+
+    // Bot Gateway Settings
+    'common.gateway.title': 'Bot Gateway',
+    'common.gateway.subtitle': 'Configure IM bots to remotely call Alou tools',
+    'common.gateway.enabled': 'Enabled',
+    'common.gateway.disabled': 'Disabled',
+    'common.gateway.status': 'Status',
+    'common.gateway.running': 'Running',
+    'common.gateway.stopped': 'Stopped',
+    'common.gateway.port': 'Port',
+    'common.gateway.platforms': 'Enabled Platforms',
+    'common.gateway.none': 'None',
+    'common.gateway.configure': 'Configure',
+    'common.gateway.testConnection': 'Test Connection',
+    'common.gateway.save': 'Save Configuration',
+    'common.gateway.saving': 'Saving...',
+    'common.gateway.startService': 'Start Service',
+    'common.gateway.stopService': 'Stop Service',
+
+    // Platform Names
+    'common.gateway.platform.telegram': 'Telegram',
+    'common.gateway.platform.feishu': 'Feishu',
+    'common.gateway.platform.discord': 'Discord',
+    'common.gateway.platform.qq': 'QQ',
+
+    // Telegram Configuration
+    'common.gateway.telegram.enabled': 'Enable Telegram Bot',
+    'common.gateway.telegram.botToken': 'Bot Token',
+    'common.gateway.telegram.tokenPlaceholder': '123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+    'common.gateway.telegram.usePolling': 'Use Polling Mode (No Webhook Required)',
+    'common.gateway.telegram.allowedUserIds': 'Allowed User IDs',
+    'common.gateway.telegram.allowedChatIds': 'Allowed Chat IDs',
+    'common.gateway.telegram.hint': 'Tip: Get Bot Token from BotFather',
+
+    // Feishu Configuration
+    'common.gateway.feishu.enabled': 'Enable Feishu Bot',
+    'common.gateway.feishu.appId': 'App ID',
+    'common.gateway.feishu.appSecret': 'App Secret',
+    'common.gateway.feishu.verifyToken': 'Verify Token',
+    'common.gateway.feishu.encryptKey': 'Encrypt Key (Optional)',
+    'common.gateway.feishu.appIdPlaceholder': 'cli_a1b2c3d4e5f6g7h8',
+    'common.gateway.feishu.hint': 'Tip: Create app in Feishu Open Platform to get credentials',
+
+    // Discord Configuration
+    'common.gateway.discord.enabled': 'Enable Discord Bot',
+    'common.gateway.discord.botToken': 'Bot Token',
+    'common.gateway.discord.tokenPlaceholder': 'Your Discord Bot Token',
+    'common.gateway.discord.allowedUserIds': 'Allowed User IDs',
+    'common.gateway.discord.allowedGuildIds': 'Allowed Guild IDs',
+    'common.gateway.discord.allowedChannelIds': 'Allowed Channel IDs',
+    'common.gateway.discord.hint': 'Tip: Create app in Discord Developer Portal to get Bot Token',
+
+    // QQ Configuration
+    'common.gateway.qq.enabled': 'Enable QQ Bot (OneBot)',
+    'common.gateway.qq.wsUrl': 'WebSocket URL',
+    'common.gateway.qq.wsUrlPlaceholder': 'ws://127.0.0.1:8080',
+    'common.gateway.qq.accessToken': 'Access Token',
+    'common.gateway.qq.allowedUserIds': 'Allowed User IDs',
+    'common.gateway.qq.allowedGroupIds': 'Allowed Group IDs',
+    'common.gateway.qq.hint': 'Tip: OneBot-compatible QQ bot framework required (e.g., go-cqhttp)',
+
+    // General Configuration
+    'common.gateway.general.enabled': 'Enable Bot Gateway',
+    'common.gateway.general.commandPrefix': 'Command Prefix',
+    'common.gateway.general.publicDomain': 'Public Domain (Optional)',
+
+    // Logs
+    'common.gateway.logs.title': 'Logs',
+    'common.gateway.logs.noLogs': 'No logs',
+
+    // Success messages
+    'common.gateway.success.saved': 'Configuration saved',
   },
 }

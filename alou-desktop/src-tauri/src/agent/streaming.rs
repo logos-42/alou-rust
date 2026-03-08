@@ -3,7 +3,7 @@
 //! 提供 Agent 执行的流式响应，支持打字机效果和实时进度更新
 
 use super::task::{TaskEvent, TaskManager};
-use futures::stream::{Stream, StreamExt};
+use futures::stream::Stream;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
@@ -82,7 +82,7 @@ impl TaskEventExt for TaskEvent {
 /// 转换为流式事件
 fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
     match event {
-        TaskEvent::TaskCreated { task_id } => StreamEvent {
+        TaskEvent::TaskCreated { task_id: _ } => StreamEvent {
             r#type: "task_created".to_string(),
             content: None,
             name: None,
@@ -92,7 +92,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: None,
             error: None,
         },
-        TaskEvent::TaskStarted { task_id } => StreamEvent {
+        TaskEvent::TaskStarted { task_id: _ } => StreamEvent {
             r#type: "task_started".to_string(),
             content: None,
             name: None,
@@ -103,7 +103,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             error: None,
         },
         TaskEvent::AiResponse {
-            task_id,
+            task_id: _,
             content,
         } => StreamEvent {
             r#type: "ai_response".to_string(),
@@ -115,7 +115,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: None,
             error: None,
         },
-        TaskEvent::ToolCallsPending { task_id, count } => StreamEvent {
+        TaskEvent::ToolCallsPending { task_id: _, count } => StreamEvent {
             r#type: "tools_pending".to_string(),
             content: None,
             name: None,
@@ -125,7 +125,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: None,
             error: None,
         },
-        TaskEvent::ToolExecuting { task_id, tool_name, arguments: _ } => StreamEvent {
+        TaskEvent::ToolExecuting { task_id: _, tool_name, arguments: _ } => StreamEvent {
             r#type: "tool_executing".to_string(),
             content: None,
             name: Some(tool_name.clone()),
@@ -136,7 +136,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             error: None,
         },
         TaskEvent::ToolCompleted {
-            task_id,
+            task_id: _,
             tool_name,
             result,
         } => StreamEvent {
@@ -154,7 +154,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             error: if result.success { None } else { result.error.clone() },
         },
         TaskEvent::TaskProgress {
-            task_id,
+            task_id: _,
             progress,
             message,
         } => StreamEvent {
@@ -167,7 +167,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: None,
             error: None,
         },
-        TaskEvent::TaskCompleted { task_id, result } => StreamEvent {
+        TaskEvent::TaskCompleted { task_id: _, result } => StreamEvent {
             r#type: "completed".to_string(),
             content: Some(result.clone()),
             name: None,
@@ -177,7 +177,7 @@ fn convert_to_stream_event(event: TaskEvent) -> StreamEvent {
             result: Some(result),
             error: None,
         },
-        TaskEvent::TaskFailed { task_id, error } => StreamEvent {
+        TaskEvent::TaskFailed { task_id: _, error } => StreamEvent {
             r#type: "failed".to_string(),
             content: None,
             name: None,

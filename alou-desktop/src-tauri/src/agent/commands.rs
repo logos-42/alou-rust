@@ -13,8 +13,6 @@ use super::config::{ApiConfig, UserApiConfig};
 use super::executor::RalphLoopExecutor;
 use super::streaming::StreamingExecutor;
 use super::task::{TaskFinalResult, TaskManager};
-use super::swarm::{SwarmCoordinator, AgentInstance, AgentRole, TaskPlan};
-use super::autonomy::{AgentAutonomy, AutonomyConfig, ConfirmationRule};
 use std::sync::Arc;
 
 /// Tauri 命令：执行 Agent 任务（同步返回结果）

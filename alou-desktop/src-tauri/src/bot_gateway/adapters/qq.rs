@@ -4,8 +4,6 @@
 
 use crate::bot_gateway::config::QQConfig;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// QQ Bot 适配器
 pub struct QQAdapter {

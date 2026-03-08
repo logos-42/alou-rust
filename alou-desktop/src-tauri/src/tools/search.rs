@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use glob::Pattern;
 use regex::Regex;
-use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
@@ -40,7 +39,7 @@ impl SearchTool {
 
     /// Grep - 文本搜索
     async fn grep(&self, pattern: &str, directory: &str, file_pattern: Option<&str>, case_sensitive: bool, max_results: Option<usize>) -> Result<Vec<GrepMatch>, ToolError> {
-        let regex = Regex::new(pattern)
+        let _regex = Regex::new(pattern)
             .map_err(|e| ToolError::InvalidArguments(format!("Invalid regex pattern: {}", e)))?;
 
         let mut matches = Vec::new();

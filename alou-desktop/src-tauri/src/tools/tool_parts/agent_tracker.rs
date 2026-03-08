@@ -5,8 +5,6 @@
 use crate::tools::ToolError;
 use crate::tools::tool_parts::definitions::{AgentToolRegistry, AgentToolUsageRecord, ToolDefinition};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tokio::fs;
 use std::path::Path;
 use serde_json;

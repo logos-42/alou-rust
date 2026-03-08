@@ -234,7 +234,7 @@ impl SystemTool {
 
     /// 获取磁盘信息
     async fn get_disk_info(&self) -> Result<ToolResult, ToolError> {
-        let system = self.system.lock().unwrap();
+        let _system = self.system.lock().unwrap();
 
         let disks: Vec<DiskInfo> = Vec::new(); // (*system).disks() not available in this version
 

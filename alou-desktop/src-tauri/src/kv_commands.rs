@@ -1,5 +1,5 @@
 // KV commands module - 本地KV存储命令
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;

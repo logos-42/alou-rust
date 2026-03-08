@@ -2,7 +2,6 @@ use crate::tools::{ToolExecutor, ToolResult, ToolError, ToolCategory};
 use crate::tools::ExecutionContext;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use tokio::time::{sleep, Duration};
 
 #[derive(Debug, Deserialize)]
