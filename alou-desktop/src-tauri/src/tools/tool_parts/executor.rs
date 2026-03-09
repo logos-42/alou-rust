@@ -48,6 +48,7 @@ impl DynamicToolExecutor {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string(), "execute".to_string()],
+                tags: vec![],
             },
         }
     }

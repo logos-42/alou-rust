@@ -176,6 +176,7 @@ impl PlanTool {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string()],
+                tags: vec!["planning".to_string(), "tasks".to_string(), "management".to_string()],
             },
             plans: Arc::new(Mutex::new(HashMap::new())),
             todos: Arc::new(Mutex::new(HashMap::new())),

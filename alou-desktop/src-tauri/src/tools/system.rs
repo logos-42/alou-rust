@@ -35,6 +35,7 @@ impl SystemTool {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["system".to_string()],
+                tags: vec![],
             },
             system: Arc::new(Mutex::new(system)),
         }

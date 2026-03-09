@@ -203,7 +203,7 @@ impl AgentCollaborationTool {
     /// 创建新的智能体协作工具
     pub fn new(ipfs_api_url: String) -> Self {
         let ipfs_client = Arc::new(IpfsClient::new(ipfs_api_url));
-        
+
         Self {
             metadata: ToolMetadata {
                 id: "agent_collaboration".to_string(),
@@ -219,6 +219,7 @@ impl AgentCollaborationTool {
                 dependencies: vec!["ipfs".to_string()],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string(), "network".to_string()],
+                tags: vec!["collaboration".to_string(), "agents".to_string(), "ipfs".to_string()],
             },
             ipfs_client,
             sessions: Arc::new(RwLock::new(HashMap::new())),

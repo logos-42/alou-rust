@@ -31,6 +31,7 @@ impl NetworkTool {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["network".to_string()],
+                tags: vec![],
             },
             client: Client::new(),
         }

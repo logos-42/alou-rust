@@ -46,6 +46,7 @@ impl RollbackTool {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string()],
+                tags: vec!["rollback".to_string(), "backup".to_string(), "filesystem".to_string()],
             },
             storage: SnapshotStorage::new(),
             snapshots: Arc::new(Mutex::new(HashMap::new())),

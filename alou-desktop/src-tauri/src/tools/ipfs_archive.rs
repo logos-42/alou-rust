@@ -89,6 +89,7 @@ impl IpfsArchiveTool {
                 dependencies: vec!["ipfs".to_string()],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string()],
+                tags: vec!["ipfs".to_string(), "archive".to_string(), "storage".to_string()],
             },
         }
     }

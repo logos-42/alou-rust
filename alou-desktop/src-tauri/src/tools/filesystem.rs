@@ -30,6 +30,7 @@ impl FileSystemTool {
                 dependencies: vec![],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["file_read".to_string(), "file_write".to_string()],
+                tags: vec![],
             },
         }
     }

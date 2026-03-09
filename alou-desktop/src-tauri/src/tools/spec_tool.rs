@@ -70,6 +70,7 @@ impl SpecTool {
                 dependencies: vec!["nodejs".to_string()],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["read".to_string(), "write".to_string()],
+                tags: vec![],
             },
             script_path,
         }

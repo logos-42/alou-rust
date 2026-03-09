@@ -41,6 +41,7 @@ impl GitHelperTool {
                 dependencies: vec!["git".to_string()],
                 platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
                 permissions: vec!["execute".to_string()],
+                tags: vec![],
             },
         }
     }

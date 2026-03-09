@@ -754,7 +754,7 @@ impl ToolExecutor for PubSubTool {
     fn metadata(&self) -> &crate::tools::ToolMetadata {
         use std::sync::OnceLock;
         static METADATA: OnceLock<crate::tools::ToolMetadata> = OnceLock::new();
-        
+
         METADATA.get_or_init(|| crate::tools::ToolMetadata {
             id: self.id.clone(),
             name: self.name.clone(),
@@ -769,6 +769,7 @@ impl ToolExecutor for PubSubTool {
             dependencies: vec!["pubsub".to_string()],
             platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
             permissions: vec!["network".to_string(), "read".to_string(), "write".to_string()],
+            tags: vec!["pubsub".to_string(), "messaging".to_string()],
         })
     }
 

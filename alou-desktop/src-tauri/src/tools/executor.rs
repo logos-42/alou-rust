@@ -29,6 +29,34 @@ pub struct ToolResult {
     pub context: Option<ExecutionContext>,
 }
 
+impl ToolResult {
+    /// 创建一个成功的结果
+    pub fn success(data: serde_json::Value) -> Self {
+        Self {
+            success: true,
+            data,
+            error: None,
+            execution_time_ms: 0,
+            output: None,
+            warnings: Vec::new(),
+            context: None,
+        }
+    }
+
+    /// 创建一个错误结果
+    pub fn error(message: String) -> Self {
+        Self {
+            success: false,
+            data: serde_json::Value::Null,
+            error: Some(message),
+            execution_time_ms: 0,
+            output: None,
+            warnings: Vec::new(),
+            context: None,
+        }
+    }
+}
+
 /// 工具错误类型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ToolError {
@@ -514,6 +542,7 @@ mod tests {
                 dependencies: vec![],
                 platforms: vec!["test".to_string()],
                 permissions: vec![],
+                tags: vec![],
             },
         });
 

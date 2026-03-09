@@ -23,7 +23,8 @@ impl QueryBlockchainTool {
             dependencies: vec![],
             platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
             permissions: vec![],
-        };
+                tags: vec![],
+            };
 
         Self { metadata }
     }

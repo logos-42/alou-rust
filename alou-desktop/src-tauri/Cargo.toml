@@ -76,8 +76,12 @@ thiserror = "2"
 ipfs-api-backend-hyper = { version = "0.6", features = ["with-send-sync"] }
 libipld = { version = "0.16", features = ["dag-cbor", "serde-codec"] }
 
-# Bot Gateway dependencies
-iroh = { version = "0.34", optional = true }
+# Bot Gateway dependencies - Iroh P2P
+iroh = "0.96"
+iroh-gossip = "0.96"
+blake3 = "1"
+futures-lite = "2"
+bytes = "1"
 
 # Required for async traits - already defined above
 # async-trait = "0.1"

@@ -577,7 +577,8 @@ impl ToolExecutor for UIControlTool {
             dependencies: vec!["tauri".to_string()],
             platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
             permissions: vec!["desktop".to_string(), "ui".to_string()],
-        })
+                tags: vec![],
+            })
     }
 
     async fn execute(&self, args: Value, _context: &ExecutionContext) -> Result<ToolResult, ToolError> {

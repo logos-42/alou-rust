@@ -34,6 +34,7 @@ pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
 pub mod autonomous_executor;       // 自主执行引擎
 pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
 pub mod group_coordinator;         // 群聊协调器（智能体群聊协作）
+pub mod adapters;                  // 群聊适配器模块
 pub mod spec_tool;                 // Spec 规格文档管理工具
 pub mod agent_wallet;             // Agent 钱包工具
 pub mod wallet_manager;           // 钱包管理器工具
@@ -88,6 +89,12 @@ pub enum ToolCategory {
     Other,
 }
 
+impl Default for ToolCategory {
+    fn default() -> Self {
+        ToolCategory::Other
+    }
+}
+
 // 工具优先级
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum ToolPriority {
@@ -99,6 +106,12 @@ pub enum ToolPriority {
     Medium = 2,
     /// 低优先级
     Low = 3,
+}
+
+impl Default for ToolPriority {
+    fn default() -> Self {
+        ToolPriority::Medium
+    }
 }
 
 // 工具状态
@@ -118,8 +131,14 @@ pub enum ToolStatus {
     Active,
 }
 
+impl Default for ToolStatus {
+    fn default() -> Self {
+        ToolStatus::Available
+    }
+}
+
 /// 工具元信息
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct ToolMetadata {
     /// 工具ID
     pub id: String,
@@ -138,15 +157,23 @@ pub struct ToolMetadata {
     /// 作者
     pub author: String,
     /// 创建时间
+    #[serde(default)]
     pub created_at: i64,
     /// 更新时间
+    #[serde(default)]
     pub updated_at: i64,
     /// 依赖项
+    #[serde(default)]
     pub dependencies: Vec<String>,
     /// 平台兼容性
+    #[serde(default)]
     pub platforms: Vec<String>,
     /// 权限要求
+    #[serde(default)]
     pub permissions: Vec<String>,
+    /// 标签
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 /// 工具执行上下文
@@ -246,6 +273,10 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册消息传递工具
     let message_passing_tool = Arc::new(crate::tools::message_passing::MessagePassingTool::new());
     registry.register(message_passing_tool).await?;
+
+    // 注册统一群聊适配器
+    let group_adapter = Arc::new(crate::tools::adapters::GroupAdapter::new());
+    registry.register(group_adapter).await?;
 
     // 注册 PubSub 工具
     let pubsub_tool = Arc::new(crate::tools::pubsub_tool::PubSubTool::new());

@@ -468,8 +468,8 @@ export interface UseGroupChatManagerReturn {
 // 工具类型
 // ============================================
 
-/** 消息处理器类型 */
-export type MessageHandler = (message: GroupChatMessage) => void
+/** 消息处理器类型 - 接受 UnifiedMessage 或 GroupChatMessage */
+export type MessageHandler = (message: UnifiedMessage | GroupChatMessage) => void
 
 /** 取消订阅函数类型 */
 export type UnsubscribeFunction = () => void
@@ -525,6 +525,231 @@ export function isAgentInfo(value: unknown): value is AgentInfo {
     'id' in value &&
     'name' in value
   )
+}
+
+// ============================================
+// 适配器相关类型（新增）
+// ============================================
+
+/**
+ * 群聊模式类型枚举
+ * 定义支持的群聊实现模式
+ */
+export enum GroupChatMode {
+  /** 内存模式 - 本地离线群聊 */
+  MEMORY = 'memory',
+  /** DIAP PubSub 模式 - 基于去中心化身份的 PubSub */
+  PUBSUB = 'pubsub',
+  /** Iroh P2P 模式 - 基于 Iroh 协议 */
+  IROH = 'iroh',
+}
+
+/**
+ * 群聊配置接口
+ * 创建群聊时的配置选项
+ */
+export interface GroupChatConfig {
+  /** 群聊名称 */
+  name: string
+  /** 群聊描述 */
+  description?: string
+  /** 初始成员 */
+  members?: AgentInfo[]
+  /** 期望的模式，'auto' 表示自动选择 */
+  mode?: GroupChatMode | 'auto'
+  /** 主题（用于 PubSub） */
+  topic?: string
+}
+
+/**
+ * 统一群聊接口
+ * 所有适配器返回的群聊信息的统一格式
+ * 
+ * 与 Rust 后端 tools/adapters/types.rs::UnifiedGroup 对齐
+ */
+export interface UnifiedGroup {
+  /** 群聊唯一标识 */
+  id: string
+  /** 群聊名称 */
+  name: string
+  /** 群聊描述 */
+  description?: string
+  /** 群聊模式 */
+  mode: GroupChatMode | string
+  /** 成员列表 */
+  members: AgentInfo[]
+  /** 创建时间（毫秒时间戳） */
+  created_at?: number
+  /** 创建时间（别名） */
+  createdAt?: number
+  /** 创建者 */
+  created_by?: string
+  /** 创建者（别名） */
+  createdBy?: string
+  /** 主题（用于 PubSub） */
+  topic?: string
+  /** Ticket（用于 Iroh） */
+  ticket?: string
+  /** 元数据 */
+  metadata?: Record<string, string>
+}
+
+/**
+ * 统一消息接口
+ * 所有适配器返回的消息的统一格式
+ */
+export interface UnifiedMessage {
+  /** 消息唯一标识 */
+  id: string
+  /** 群聊ID */
+  groupId: string
+  /** 消息类型 */
+  type: MessageType
+  /** 发送者 */
+  sender: AgentInfo
+  /** 消息内容 */
+  content: string
+  /** 时间戳 */
+  timestamp: number
+  /** 元数据 */
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * 群聊适配器接口
+ * 所有群聊适配器需要实现的统一接口
+ */
+export interface GroupChatAdapter {
+  /** 适配器类型 */
+  readonly mode: GroupChatMode
+  /** 适配器是否可用 */
+  readonly available: boolean
+
+  // 群聊管理
+  /** 创建群聊 */
+  createGroup(config: GroupChatConfig): Promise<UnifiedGroup>
+  /** 加入群聊 */
+  joinGroup(groupIdOrTicket: string): Promise<UnifiedGroup>
+  /** 离开群聊 */
+  leaveGroup(groupId: string): Promise<void>
+  /** 列出所有可访问的群聊 */
+  listGroups(): Promise<UnifiedGroup[]>
+  /** 获取群聊详情 */
+  getGroupInfo(groupId: string): Promise<UnifiedGroup | null>
+
+  // 消息通信
+  /** 发送消息 */
+  sendMessage(groupId: string, content: string, type?: MessageType): Promise<UnifiedMessage>
+  /** 订阅群聊消息 */
+  subscribe(groupId: string, handler: MessageHandler): UnsubscribeFunction
+  /** 获取历史消息 */
+  getHistory(groupId: string, limit?: number): Promise<UnifiedMessage[]>
+}
+
+/**
+ * 适配器工厂接口
+ * 用于创建和获取适配器实例
+ */
+export interface GroupChatAdapterFactory {
+  /** 获取指定模式的适配器 */
+  getAdapter(mode: GroupChatMode): GroupChatAdapter
+  /** 获取最适合当前网络状况的适配器 */
+  getBestAdapter(): Promise<GroupChatAdapter>
+  /** 检测可用的适配器 */
+  detectAvailableAdapters(): Promise<GroupChatMode[]>
+  /** 监听适配器可用性变化 */
+  onAdapterAvailabilityChange(callback: (mode: GroupChatMode, available: boolean) => void): UnsubscribeFunction
+}
+
+/**
+ * 统一协调器接口
+ * 统一管理所有群聊模式下的智能体协作
+ */
+export interface UnifiedAgentCoordinator {
+  /** 注册智能体到所有群聊 */
+  registerToAllGroups(agents: AgentInfo[]): Promise<void>
+  /** 注册智能体到指定群聊 */
+  registerToGroup(groupId: string, agent: AgentInfo): Promise<void>
+  /** 注销智能体 */
+  unregisterAgent(agentId: string): Promise<void>
+  /** 广播消息到所有群聊的智能体 */
+  broadcastToAgents(message: UnifiedMessage): Promise<void>
+  /** 获取活跃智能体列表 */
+  getActiveAgents(): AgentInfo[]
+  /** 设置是否启用自动回复 */
+  setAutoReply(enabled: boolean): void
+  /** 设置自动回复延迟 */
+  setReplyDelay(ms: number): void
+}
+
+// ============================================
+// 类型守卫函数
+// ============================================
+
+/**
+ * 检查值是否为 UnifiedGroup
+ */
+export function isUnifiedGroup(value: unknown): value is UnifiedGroup {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    'mode' in value &&
+    Object.values(GroupChatMode).includes((value as UnifiedGroup).mode)
+  )
+}
+
+/**
+ * 检查值是否为 UnifiedMessage
+ */
+export function isUnifiedMessage(value: unknown): value is UnifiedMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'groupId' in value &&
+    'content' in value
+  )
+}
+
+/**
+ * 检查群聊是否为指定模式
+ */
+export function isGroupMode(group: UnifiedGroup, mode: GroupChatMode): boolean {
+  return group.mode === mode
+}
+
+/**
+ * 获取群聊模式的显示名称
+ */
+export function getGroupModeName(mode: GroupChatMode): string {
+  switch (mode) {
+    case GroupChatMode.MEMORY:
+      return '本地群聊'
+    case GroupChatMode.PUBSUB:
+      return 'DIAP 群聊'
+    case GroupChatMode.IROH:
+      return 'Iroh 群聊'
+    default:
+      return '未知'
+  }
+}
+
+/**
+ * 获取群聊模式的图标
+ */
+export function getGroupModeIcon(mode: GroupChatMode): string {
+  switch (mode) {
+    case GroupChatMode.MEMORY:
+      return '💾'
+    case GroupChatMode.PUBSUB:
+      return '📡'
+    case GroupChatMode.IROH:
+      return '🔗'
+    default:
+      return '❓'
+  }
 }
 
 // ============================================

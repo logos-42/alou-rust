@@ -396,7 +396,7 @@ impl ToolExecutor for MessagePassingTool {
     fn metadata(&self) -> &crate::tools::ToolMetadata {
         use std::sync::OnceLock;
         static METADATA: OnceLock<crate::tools::ToolMetadata> = OnceLock::new();
-        
+
         METADATA.get_or_init(|| crate::tools::ToolMetadata {
             id: self.id.clone(),
             name: self.name.clone(),
@@ -411,6 +411,7 @@ impl ToolExecutor for MessagePassingTool {
             dependencies: vec!["iroh".to_string(), "ipfs".to_string()],
             platforms: vec!["windows".to_string(), "macos".to_string(), "linux".to_string()],
             permissions: vec!["network".to_string(), "read".to_string(), "write".to_string()],
+            tags: vec!["messaging".to_string(), "communication".to_string()],
         })
     }
 

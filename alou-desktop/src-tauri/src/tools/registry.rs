@@ -389,6 +389,7 @@ mod tests {
                 dependencies: vec![],
                 platforms: vec![],
                 permissions: vec![],
+                tags: vec![],
             },
         });
 
@@ -416,6 +417,7 @@ mod tests {
                 dependencies: vec![],
                 platforms: vec![],
                 permissions: vec![],
+                tags: vec![],
             },
         });
 
