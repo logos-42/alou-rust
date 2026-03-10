@@ -11,11 +11,7 @@
   overflow: hidden;
   position: relative;
   pointer-events: auto;
-  transition:
-    background 0.3s ease,
-    border-color 0.3s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
+  /* 移除 transition 以避免每次重渲染时触发闪烁 */
   cursor: pointer;
 }
 

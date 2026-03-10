@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
+import React, { forwardRef, useImperativeHandle, useRef, useEffect, memo } from 'react'
 import MessageList from '@/components/MessageList'
 import CloseIcon from '@/assets/关闭0.3.png'
 import EditIcon from '@/assets/修改.png'
@@ -6,7 +6,7 @@ import './AgentConversationOverlay.css'
 
 const DEFAULT_AVATAR = 'https://avatars.githubusercontent.com/u/16309930?v=4'
 
-const AgentConversationOverlay = forwardRef(
+const AgentConversationOverlay = memo(forwardRef(
   (
     {
       style,
@@ -50,42 +50,22 @@ const AgentConversationOverlay = forwardRef(
       [],
     )
 
-    // 主要的自动滚动逻辑 - 直接控制 conversation-body
-    // 优化：使用 requestAnimationFrame 和防抖来减少闪烁
+    // 自动滚动逻辑 - 使用 scrollIntoView 确保滚动到底部
     useEffect(() => {
-      const conversationBody = conversationBodyRef.current
-      if (!conversationBody) return
+      if (messages.length === 0) return
 
-      let animationFrameId = null
-      let timeoutId = null
+      // 使用 setTimeout 确保 DOM 完全渲染后再滚动
+      const timer = setTimeout(() => {
+        // 查找最后一条消息元素并滚动到可见区域
+        const messageElements = document.querySelectorAll('.message-wrapper')
+        if (messageElements.length > 0) {
+          const lastMessage = messageElements[messageElements.length - 1]
+          lastMessage.scrollIntoView({ behavior: 'auto', block: 'end', inline: 'nearest' })
+        }
+      }, 100)
 
-      const scrollToBottom = () => {
-        if (conversationBody) {
-          conversationBody.scrollTop = conversationBody.scrollHeight
-        }
-      }
-
-      // 使用 requestAnimationFrame 在下一帧滚动，避免布局抖动
-      animationFrameId = requestAnimationFrame(() => {
-        scrollToBottom()
-        
-        // 只在有新消息时执行额外的延迟滚动
-        if (messages.length > 0) {
-          timeoutId = setTimeout(() => {
-            scrollToBottom()
-          }, 100)
-        }
-      })
-
-      return () => {
-        if (animationFrameId) {
-          cancelAnimationFrame(animationFrameId)
-        }
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-        }
-      }
-    }, [messages.length, isLoading]) // 只监听消息数量变化和 loading 状态
+      return () => clearTimeout(timer)
+    }, [messages])
 
     const avatarSrc = avatar || DEFAULT_AVATAR
     const avatarAlt = typeof title === 'string' ? title : '智能体'
@@ -176,7 +156,7 @@ const AgentConversationOverlay = forwardRef(
       </div>
     )
   },
-)
+))
 
 AgentConversationOverlay.displayName = 'AgentConversationOverlay'
 

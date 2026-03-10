@@ -13,8 +13,13 @@ const ChatInput = forwardRef(
     const adjustHeight = () => {
       const textarea = textareaRef.current
       if (!textarea) return
-      textarea.style.height = 'auto'
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
+      
+      // 只在内容变化时调整高度，避免不必要的布局抖动
+      const newHeight = `${Math.min(textarea.scrollHeight, 120)}px`
+      if (textarea.style.height !== newHeight) {
+        textarea.style.height = 'auto'
+        textarea.style.height = newHeight
+      }
     }
 
     useImperativeHandle(
@@ -26,7 +31,11 @@ const ChatInput = forwardRef(
     )
 
     useEffect(() => {
-      adjustHeight()
+      // 使用 requestAnimationFrame 优化高度调整，减少布局抖动
+      const rafId = requestAnimationFrame(() => {
+        adjustHeight()
+      })
+      return () => cancelAnimationFrame(rafId)
     }, [value])
 
     useEffect(() => {
@@ -47,7 +56,7 @@ const ChatInput = forwardRef(
 
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault()
-        onSend?.()
+        onSend?.(value)  // 传递当前输入值
       }
     }
 
@@ -81,7 +90,7 @@ const ChatInput = forwardRef(
               <button
                 type="button"
                 className="send-btn"
-                onClick={onSend}
+                onClick={() => onSend?.(value)}  // 传递当前输入值
                 disabled={disabled}
                 title={t('send')}
               >

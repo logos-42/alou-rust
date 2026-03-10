@@ -139,7 +139,7 @@ export function getNextRunTime(expression: string, fromDate: Date = new Date()):
 
   // 最多查找一年内的匹配时间
   const maxIterations = 366 * 24 * 60; // 一年的分钟数
-  let iterations = 0;
+  const iterations = 0;
 
   while (iterations < maxIterations) {
     next.setMinutes(next.getMinutes() + 1);

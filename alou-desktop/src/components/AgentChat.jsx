@@ -23,6 +23,7 @@ import RateLimitModal from '@/components/RateLimitModal'
 import SkillsManager from '@/components/SkillsManager'
 import WorkflowProgress from '@/components/WorkflowProgress'
 import TranslationIcon from '@/assets/icon_翻译.png'
+import GroupIcon from '@/assets/群组.png'
 
 // Hooks
 import { useAgentUI } from './AgentChat/useAgentUI.jsx'
@@ -428,27 +429,27 @@ const AgentChat = () => {
     createSession,
     setSessionReady,
     recordInteraction,
-    handleToolCalls, // 直接传递 handleToolCalls
+    handleToolCalls,
     conversationOverlayRef,
     consoleDockRef,
     contextEventsRef,
-    currentMode, // 传递当前模式（从 channelManager 获取）
+    currentMode,
     onRateLimitExceeded: openRateLimitModal,
-    onCreateAgent: createChannel, // 传递创建智能体的回调函数（打开模态框）
-    onAutoCreateAgent: handleAutoCreateAgent, // 新增：传递自动创建智能体的回调函数
+    onCreateAgent: createChannel,
+    onAutoCreateAgent: handleAutoCreateAgent,
   })
 
   const {
     messages,
     _messagesByChannel,
     _setMessagesForChannel,
-    currentMessage,
-    setCurrentMessage,
+    // currentMessage 和 setCurrentMessage 不再从 useAgentMessages 获取
+    // 使用本地状态，避免输入时触发 useAgentMessages 重新渲染
     _isLoading,
     _setIsLoading,
-    // 多智能体独立执行空间
     _loadingByAgent,
     isAgentLoading,
+    sendMessage,
     sendMessageToAgent,
     cancelAgentExecution,
     appendMessage,
@@ -457,6 +458,11 @@ const AgentChat = () => {
     _saveMessagesToIpfs,
     _loadMessagesFromIpfs,
   } = messageState
+
+  // 输入框状态现在由 AgentConsoleDock 内部独立管理，不再触发父组件重新渲染
+
+  // 直接使用 messages，让 React 正常处理更新
+  // MessageList 组件已经使用 memo 包装，会自动跳过不必要的渲染
 
   // Update refs after messageState is defined
   useEffect(() => {
@@ -577,6 +583,12 @@ const AgentChat = () => {
     [agentPosition],
   )
 
+  // 稳定 isLoading prop，避免每次渲染时函数调用返回新值
+  const conversationIsLoading = useMemo(
+    () => isAgentLoading(activeChannelId),
+    [isAgentLoading, activeChannelId]
+  )
+
   const filteredChannels = useMemo(() => {
     let filtered = channels
 
@@ -605,12 +617,38 @@ const AgentChat = () => {
   const showConversationPanel = isConversationVisible
 
   // ==================== Group Chat Button Hook ====================
-  const { ConversationPanelWrapper } = useGroupChatButton({
+  const {
+    showGroupChat: groupChatShowGroupChat,
+    handleConversationPanelClick,
+    handleButtonClick,
+    buttonConfig,
+  } = useGroupChatButton({
     showConversationPanel,
     showGroupChat,
     openGroupChat,
     closeGroupChat,
   })
+
+  // 群聊按钮包装器 - 直接在渲染中使用，避免 hook 返回组件导致的问题
+  const ConversationPanelWrapper = ({ children }) => (
+    <div
+      className={`conversation-panel-wrapper ${groupChatShowGroupChat ? 'group-chat-active' : ''}`}
+      onClick={handleConversationPanelClick}
+    >
+      {children}
+      {/* 群聊按钮独立于对话面板显示 */}
+      <button
+        type="button"
+        className={buttonConfig.className}
+        onClick={handleButtonClick}
+        title={buttonConfig.title}
+        aria-label={buttonConfig['aria-label']}
+        disabled={buttonConfig.disabled}
+      >
+        <img src={GroupIcon} alt={groupChatShowGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
+      </button>
+    </div>
+  )
 
   // ==================== 11. Event Handlers ====================
   const eventHandlers = useAgentEventHandlers({
@@ -644,8 +682,8 @@ const AgentChat = () => {
     showGroupChat,
     activeActionId,
     activeChannelId,
-    currentMessage,
-    setCurrentMessage,
+    currentMessage: '',  // 输入框现在由 AgentConsoleDock 内部管理
+    setCurrentMessage: () => {},  // 空函数
     sendMessageToAgent,
     selectedAgent,
     isAgentLoading,
@@ -656,7 +694,7 @@ const AgentChat = () => {
     openConversationPanel,
   })
 
-  const { inputTargetMode, sendMessage, handleGroupChatPanelClick } = remoteControl
+  const { inputTargetMode, handleGroupChatPanelClick } = remoteControl
 
 
   // ==================== Bootstrap Effect ====================
@@ -830,7 +868,7 @@ const AgentChat = () => {
                         connectionStatus={connectionStatus}
                         connectionStatusLabel={connectionStatusLabel}
                         messages={messages}
-                        isLoading={isAgentLoading(activeChannelId)}
+                        isLoading={conversationIsLoading}
                         onClose={closeConversationPanel}
                         onInspectMessage={handleInspectMessage}
                         onEdit={handleEditAgent}
@@ -880,7 +918,7 @@ const AgentChat = () => {
                     connectionStatus={connectionStatus}
                     connectionStatusLabel={connectionStatusLabel}
                     messages={messages}
-                    isLoading={isAgentLoading(activeChannelId)}
+                    isLoading={conversationIsLoading}
                     onClose={closeConversationPanel}
                     onInspectMessage={handleInspectMessage}
                     onEdit={handleEditAgent}
@@ -950,12 +988,12 @@ const AgentChat = () => {
 
       <AgentConsoleDock
         ref={consoleDockRef}
-        value={currentMessage}
-        onChange={setCurrentMessage}
         isLoading={isAgentLoading(activeChannelId)}
         style={consoleDockStyle}
         showOpenButton={!showConversationPanel && messages.length > 0}
-        onSend={sendMessage}
+        onSend={(text) => {
+          sendMessage(text)  // 传递输入文本
+        }}
         onCancel={() => {
           if (activeChannelId) {
             cancelAgentExecution(activeChannelId)

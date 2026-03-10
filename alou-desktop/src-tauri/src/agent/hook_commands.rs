@@ -364,7 +364,7 @@ pub async fn agent_hook_get_history(
 
     let history = hook.get_instruction_history(req.limit).await;
 
-    let instructions = history
+    let instructions: Vec<InstructionInfo> = history
         .into_iter()
         .map(|instr| InstructionInfo {
             id: instr.id,
@@ -398,7 +398,7 @@ pub async fn agent_hook_get_pending(
 
     let pending = hook.get_pending_instructions().await;
 
-    let instructions = pending
+    let instructions: Vec<InstructionInfo> = pending
         .into_iter()
         .map(|instr| InstructionInfo {
             id: instr.id,

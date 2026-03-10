@@ -401,7 +401,8 @@ export const useAgentMessages = ({
     appendMessage(userMessage, targetAgentId)
     setAgentLoading(targetAgentId, true)
     recordInteraction('user_message', { content: text, agentId: targetAgentId })
-    scrollToBottom()
+    // 移除这里的 scrollToBottom - AgentConversationOverlay 的 useEffect 会自动滚动
+    // 重复调用会导致容器上下跳动
 
      
     const contextSnapshot = contextEventsRef.current?.splice(0, contextEventsRef.current.length) || []
@@ -577,7 +578,8 @@ export const useAgentMessages = ({
       // 清理 AbortController
       delete abortControllersByAgent.current[targetAgentId]
       setAgentLoading(targetAgentId, false)
-      scrollToBottom()
+      // 移除这里的 scrollToBottom - AgentConversationOverlay 的 useEffect 会自动滚动
+      // 重复调用会导致容器上下跳动
       consoleDockRef.current?.adjustInputHeight?.()
     }
   }, [
@@ -610,10 +612,11 @@ export const useAgentMessages = ({
 
 
   // 向后兼容的 sendMessage（发送到当前活动智能体）
-  // 当没有选中智能体时，任何文本消息都会触发"用对话创建智能体"流程
-  const sendMessage = useCallback(async () => {
-    const text = currentMessage.trim()
-    if (!text || isLoading) {
+  // 修改：接收 text 参数而不是依赖内部 currentMessage 状态
+  const sendMessage = useCallback(async (text?: string) => {
+    // 如果没有传入 text，使用内部 currentMessage（向后兼容）
+    const messageText = (text !== undefined ? text : currentMessage).trim()
+    if (!messageText || isLoading) {
       return
     }
 
@@ -626,7 +629,7 @@ export const useAgentMessages = ({
       appendMessage({
         id: `user_${Date.now()}`,
         type: 'user',
-        content: text,
+        content: messageText,
         timestamp: Date.now(),
         source: 'user',
       }) // 不指定 channelId，使用当前默认频道
@@ -715,8 +718,8 @@ export const useAgentMessages = ({
 
   const openConversationPanel = useCallback(() => {
     setConversationVisible(true)
-    scrollToBottom()
-  }, [scrollToBottom])
+    // 移除这里的 scrollToBottom - AgentConversationOverlay 的 useEffect 会自动滚动
+  }, [])
 
   const closeConversationPanel = useCallback(() => {
     setConversationVisible(false)
@@ -1013,6 +1016,8 @@ export const useAgentMessages = ({
     let unlisten: (() => void) | null = null
     // cancelled flag：防止 React 18 Strict Mode 双重挂载导致注册两个监听器
     let cancelled = false
+    // 跟踪上一个进度消息的 ID，用于更新而不是添加新消息
+    let lastProgressMsgId: string | null = null
 
     const setupListener = async () => {
       try {
@@ -1035,24 +1040,46 @@ export const useAgentMessages = ({
 
           setMessagesByChannel((prev) => {
             const channelMessages = prev[channelId] || []
-            const progressMsg: Message = {
-              id: `progress_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              type: 'system',
-              content: text,
-              timestamp: Date.now(),
-              source: 'progress',
-              agentId: channelId,
-              metadata: { progressType: payload.type, toolName: payload.tool_name },
+
+            // 如果是 tool_calling 或 tools_pending，更新最后一条进度消息（避免频繁添加新消息）
+            // 如果是 tool_done，添加新消息（表示一个工具已完成）
+            const isUpdate = payload.type === 'tool_calling' || payload.type === 'tools_pending'
+            let newMessages: Message[]
+
+            if (isUpdate && lastProgressMsgId) {
+              // 更新现有的进度消息 - 直接修改数组，避免创建新数组导致重新渲染
+              const updatedMessages = [...channelMessages]
+              const msgIndex = updatedMessages.findIndex(msg => msg.id === lastProgressMsgId)
+              if (msgIndex !== -1) {
+                updatedMessages[msgIndex] = {
+                  ...updatedMessages[msgIndex],
+                  content: text,
+                  timestamp: Date.now()
+                }
+              }
+              newMessages = updatedMessages
+            } else {
+              // 添加新的进度消息
+              const progressMsg: Message = {
+                id: `progress_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                type: 'system',
+                content: text,
+                timestamp: Date.now(),
+                source: 'progress',
+                agentId: channelId,
+                metadata: { progressType: payload.type, toolName: payload.tool_name },
+              }
+              lastProgressMsgId = progressMsg.id
+              newMessages = [...channelMessages, progressMsg]
             }
-            return { ...prev, [channelId]: [...channelMessages, progressMsg] }
+
+            return { ...prev, [channelId]: newMessages }
           })
 
-          // 滚动到底部
-          requestAnimationFrame(() => {
-            conversationOverlayRef.current?.scrollToBottom?.()
-          })
+          // 移除自动滚动 - AgentConversationOverlay 的 useEffect 已经处理了滚动
+          // 反复调用 scrollToBottom 会导致容器上下跳动
         })
-        
+
         // Strict Mode 的第一次挂载已经被取消，立即释放
         if (cancelled) {
           fn()

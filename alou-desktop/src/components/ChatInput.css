@@ -21,7 +21,7 @@
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 0.85rem;
   padding: 0.35rem 0.75rem;
-  transition: all 0.2s ease;
+  /* 移除 transition 以避免输入时闪烁 */
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
   min-height: 38px;
 }

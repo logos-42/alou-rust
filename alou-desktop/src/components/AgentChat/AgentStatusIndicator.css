@@ -1,0 +1,160 @@
+/* Agent 执行状态指示器样式 */
+
+.agent-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-radius: 20px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.agent-status-indicator:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+
+.status-dot.executing {
+  background: #4CAF50;
+  box-shadow: 0 0 8px #4CAF50;
+}
+
+.status-dot.paused {
+  background: #FFC107;
+  box-shadow: 0 0 8px #FFC107;
+}
+
+.status-dot.cancelled {
+  background: #F44336;
+  box-shadow: 0 0 8px #F44336;
+}
+
+.status-dot.completed {
+  background: #2196F3;
+  box-shadow: 0 0 8px #2196F3;
+}
+
+.status-dot.failed {
+  background: #9C27B0;
+  box-shadow: 0 0 8px #9C27B0;
+}
+
+.status-dot.idle {
+  background: #9E9E9E;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+.status-text {
+  color: var(--text-primary, #333);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pending-badge {
+  background: linear-gradient(135deg, #FF5722, #FF7043);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  animation: bounce 1s infinite;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.pending-badge:hover {
+  transform: scale(1.1);
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.status-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-color, #ddd);
+}
+
+.action-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.action-btn:hover {
+  background: var(--bg-hover, rgba(0, 0, 0, 0.05));
+  transform: scale(1.1);
+}
+
+.action-btn:active {
+  transform: scale(0.95);
+}
+
+.pause-btn:hover {
+  background: rgba(255, 193, 7, 0.2);
+}
+
+.cancel-btn:hover {
+  background: rgba(244, 67, 54, 0.2);
+}
+
+/* 暗色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .agent-status-indicator {
+    background: var(--bg-secondary, #2a2a2a);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .agent-status-indicator:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .status-text {
+    color: var(--text-primary, #eee);
+  }
+
+  .action-btn:hover {
+    background: var(--bg-hover, rgba(255, 255, 255, 0.1));
+  }
+}

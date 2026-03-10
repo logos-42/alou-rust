@@ -14,7 +14,7 @@
   width: 100%;
   height: 100%;
   position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  /* 移除 transition 以避免每次重渲染时触发 */
   cursor: pointer;
 }
 
@@ -65,11 +65,9 @@
   flex-direction: column;
   box-shadow: var(--shadow);
   pointer-events: auto;
-  transition:
-    background 0.3s ease,
-    border-color 0.3s ease;
   position: relative;
   overflow: hidden;
+  /* 移除 transition 以避免每次重渲染时触发闪烁 */
 }
 
 /* 当有背景图片时，添加半透明遮罩以确保内容可读性 */
@@ -138,6 +136,9 @@
   border: 1px dashed rgba(15, 23, 42, 0.08);
   padding: 1rem;
   background: rgba(255, 255, 255, 0.65);
+  /* 优化：减少重绘重排导致的抖动 */
+  contain: content;
+  transform: translateZ(0);
 }
 
 .app-shell.dark-mode .conversation-panel.embedded .conversation-body {
@@ -323,7 +324,7 @@
   background: #9ca3af; /* 中灰色滚动条 */
   border-radius: 4px;
   border: 1px solid #f1f3f4;
-  transition: background 0.2s ease;
+  /* 移除 transition 以避免闪烁 */
 }
 
 .app-shell.dark-mode .conversation-body::-webkit-scrollbar-thumb {

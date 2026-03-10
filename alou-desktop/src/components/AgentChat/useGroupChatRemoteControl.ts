@@ -33,22 +33,28 @@ export const useGroupChatRemoteControl = ({
       setInputTargetMode('agent')
     } else {
       // 群聊面板打开时，强制设置为 'groupChat' 模式
-      console.log('[useGroupChatRemoteControl] 群聊面板打开，强制设置输入目标为 groupChat 模式', {
-        showGroupChat,
-        activeActionId
+      // 只在模式不等于 groupChat 时才更新，避免不必要的状态变化
+      setInputTargetMode(prevMode => {
+        if (prevMode !== 'groupChat') {
+          console.log('[useGroupChatRemoteControl] 群聊面板打开，强制设置输入目标为 groupChat 模式', {
+            showGroupChat,
+            activeActionId
+          })
+          
+          // 使用 setTimeout 确保状态更新后再触发事件
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('switch-input-target', {
+              detail: { target: 'groupChat' }
+            }))
+            console.log('[useGroupChatRemoteControl] 触发切换事件到 groupChat')
+          }, 0)
+          
+          return 'groupChat'
+        }
+        return prevMode
       })
-      setInputTargetMode('groupChat')
-      
-      // 关键修复：确保在设置 inputTargetMode 后，触发切换事件，让 UI 同步更新
-      // 使用 setTimeout 确保状态更新后再触发事件
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('switch-input-target', {
-          detail: { target: 'groupChat' }
-        }))
-        console.log('[useGroupChatRemoteControl] 触发切换事件到 groupChat')
-      }, 0)
     }
-  }, [showGroupChat, activeActionId])
+  }, [showGroupChat]) // 移除 activeActionId 依赖，避免输入时反复触发
 
   // 监听输入目标切换事件 - 只添加一次，避免内存泄漏
   useEffect(() => {

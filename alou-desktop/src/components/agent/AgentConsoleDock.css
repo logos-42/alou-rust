@@ -7,6 +7,9 @@
   gap: 0.3rem;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  /* 优化：减少重绘重排导致的抖动 */
+  contain: layout style;
+  transform: translateZ(0);
 }
 
 /* 暗夜模式 - 纯黑色底部输入框 */

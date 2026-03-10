@@ -1,6 +1,6 @@
 [package]
 name = "alou-cli"
-version = "0.1.10"
+version = "0.2.1"
 edition = "2021"
 description = "Alou AI Agent CLI Tool - 终端命令行工具"
 authors = ["Alou Team"]

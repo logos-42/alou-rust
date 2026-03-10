@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useEffect, memo } from 'react'
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
 import LoadingIcon from '@/assets/加载0.2.png'
@@ -115,24 +115,30 @@ const MessageList = forwardRef(
     }
   }, [])
 
-  const renderedMessages = useMemo(
-    () =>
-      messages.map((message) => {
-        // 判断是否为新消息
-        const isNew = !renderedMessageIds.current.has(message.id)
-        if (isNew) {
-          renderedMessageIds.current.add(message.id)
-        }
-        return {
-          ...message,
-          html: formatMessage(message.content),
-          formattedTime: formatTime(message.timestamp),
-          formattedSource: message.source ? sourceMap[message.source] || message.source : null,
-          isNew,
-        }
-      }),
-    [messages],
-  )
+  // 跟踪上一条消息的 ID，用于判断是否有新消息
+  const prevLastMessageIdRef = useRef(null)
+
+  const renderedMessages = useMemo(() => {
+    const lastMessage = messages[messages.length - 1]
+    const lastMessageId = lastMessage?.id || null
+    
+    // 检查是否有新消息（通过比较最后一条消息的 ID）
+    const hasNewMessage = lastMessageId && lastMessageId !== prevLastMessageIdRef.current
+    
+    // 更新上一条消息 ID
+    if (hasNewMessage) {
+      prevLastMessageIdRef.current = lastMessageId
+    }
+    
+    return messages.map((message, index) => ({
+      ...message,
+      html: formatMessage(message.content),
+      formattedTime: formatTime(message.timestamp),
+      formattedSource: message.source ? sourceMap[message.source] || message.source : null,
+      // 只有最后一条消息是新消息
+      isNew: hasNewMessage && index === messages.length - 1,
+    }))
+  }, [messages])
 
   // 移除了自动滚动逻辑，由父容器 AgentConversationOverlay 统一控制
 

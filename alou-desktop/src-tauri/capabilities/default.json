@@ -60,6 +60,7 @@
     "http:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "dialog:default"
+    "dialog:default",
+    "core:webview:allow-internal-toggle-devtools"
   ]
 }

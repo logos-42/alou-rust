@@ -1,7 +1,39 @@
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, memo } from 'react'
 import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import GroupIcon from '@/assets/群组.png'
+
+// 对话面板包装器组件 - 提取为独立组件以控制重新渲染
+const ConversationPanelWrapperComponent = memo(({ 
+  children, 
+  showGroupChat, 
+  handleConversationPanelClick,
+  buttonConfig,
+  handleButtonClick,
+  t
+}) => {
+  return (
+    <div
+      className={`conversation-panel-wrapper ${showGroupChat ? 'group-chat-active' : ''}`}
+      onClick={handleConversationPanelClick}
+    >
+      {children}
+      {/* 群聊按钮独立于对话面板显示 */}
+      <button
+        type="button"
+        className={buttonConfig.className}
+        onClick={handleButtonClick}
+        title={buttonConfig.title}
+        aria-label={buttonConfig['aria-label']}
+        disabled={buttonConfig.disabled}
+      >
+        <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
+      </button>
+    </div>
+  )
+})
+
+ConversationPanelWrapperComponent.displayName = 'ConversationPanelWrapper'
 
 /**
  * useGroupChatButton - 群聊按钮 Hook
@@ -85,36 +117,11 @@ export const useGroupChatButton = ({
     handleToggleGroupChat()
   }, [handleToggleGroupChat])
   
-  // 包装对话面板的包装器组件 - 使用稳定的函数引用
-  const ConversationPanelWrapper = useMemo(
-    () =>
-      ({ children }) => {
-        return (
-          <div
-            className={`conversation-panel-wrapper ${showGroupChat ? 'group-chat-active' : ''}`}
-            onClick={handleConversationPanelClick}
-          >
-            {children}
-            {/* 群聊按钮独立于对话面板显示 */}
-            <button 
-              type="button" 
-              className={buttonConfig.className}
-              onClick={handleButtonClick}
-              title={buttonConfig.title}
-              aria-label={buttonConfig['aria-label']}
-              disabled={buttonConfig.disabled}
-            >
-              <img src={GroupIcon} alt={showGroupChat ? t('agent.groupChat.close') : t('agent.groupChat.open')} />
-            </button>
-          </div>
-        )
-      },
-    [buttonConfig, showGroupChat, t, handleConversationPanelClick, handleButtonClick],
-  )
-
   return {
     buttonConfig,
-    ConversationPanelWrapper,
+    showGroupChat,
+    handleConversationPanelClick,
+    handleButtonClick,
   }
 }
 

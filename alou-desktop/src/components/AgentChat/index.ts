@@ -8,6 +8,10 @@ export { useAgentDrag } from './useAgentDrag';
 export { useAgentUI } from './useAgentUI.jsx';
 export { useChannelManager } from './useChannelManager';
 export { useAgentPersistence } from './useAgentPersistence';
+export { useAgentHookIntegration } from './useAgentHookIntegration';
+
+// Export components
+export { AgentStatusIndicator } from './AgentStatusIndicator';
 
 // Export utility functions
 export {
