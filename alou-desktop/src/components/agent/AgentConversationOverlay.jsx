@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useEffect, memo } from 'react'
+import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
 import MessageList from '@/components/MessageList'
 import CloseIcon from '@/assets/关闭0.3.png'
 import EditIcon from '@/assets/修改.png'
@@ -50,19 +50,16 @@ const AgentConversationOverlay = memo(forwardRef(
       [],
     )
 
-    // 自动滚动逻辑 - 使用 scrollIntoView 确保滚动到底部
+    // 自动滚动逻辑 - 滚动到容器底部
     useEffect(() => {
       if (messages.length === 0) return
 
-      // 使用 setTimeout 确保 DOM 完全渲染后再滚动
       const timer = setTimeout(() => {
-        // 查找最后一条消息元素并滚动到可见区域
-        const messageElements = document.querySelectorAll('.message-wrapper')
-        if (messageElements.length > 0) {
-          const lastMessage = messageElements[messageElements.length - 1]
-          lastMessage.scrollIntoView({ behavior: 'auto', block: 'end', inline: 'nearest' })
+        const container = conversationBodyRef.current
+        if (container) {
+          container.scrollTop = container.scrollHeight
         }
-      }, 100)
+      }, 150)
 
       return () => clearTimeout(timer)
     }, [messages])
