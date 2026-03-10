@@ -385,19 +385,6 @@ impl RalphLoopExecutor {
                 },
                 "required": ["action"]
             }),
-            "agent_collaboration" => serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "action": { "type": "string", "enum": ["create_session", "join_session", "leave_session", "send_message", "get_messages", "list_sessions", "get_session_info", "update_session", "delete_session"], "description": "协作操作类型" },
-                    "session_id": { "type": "string", "description": "会话ID（除create_session/list_sessions外都需要）" },
-                    "session_name": { "type": "string", "description": "会话名称（create_session需要）" },
-                    "description": { "type": "string", "description": "会话描述（create_session/update_session可选）" },
-                    "agent_id": { "type": "string", "description": "Agent ID（join_session/leave_session需要）" },
-                    "message": { "type": "string", "description": "消息内容（send_message需要）" },
-                    "limit": { "type": "integer", "description": "消息数量限制（get_messages可选）" }
-                },
-                "required": ["action"]
-            }),
             "agent_creator" => serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -570,7 +557,6 @@ impl RalphLoopExecutor {
             AiTool { name: "plan".to_string(), description: "任务计划管理：创建计划、添加步骤、追踪进度".to_string(), parameters: Self::get_tool_parameters("plan") },
             AiTool { name: "todolist".to_string(), description: "待办事项管理：添加、完成、删除、更新待办".to_string(), parameters: Self::get_tool_parameters("todolist") },
             AiTool { name: "agent_skills".to_string(), description: "Agent技能管理：discover=扫描可用技能，list=列出已发现的技能，load=加载技能完整内容，execute=执行技能，search=搜索技能。技能是可复用的代码模块，可以自动发现和调用。你应该主动使用discover发现新技能，并在合适的时候execute执行它们。".to_string(), parameters: Self::get_tool_parameters("agent_skills") },
-            AiTool { name: "agent_collaboration".to_string(), description: "多Agent协作：创建会话、发送消息、协同工作".to_string(), parameters: Self::get_tool_parameters("agent_collaboration") },
             AiTool { name: "agent_creator".to_string(), description: "Agent创建管理：创建、更新、删除、克隆Agent".to_string(), parameters: Self::get_tool_parameters("agent_creator") },
             AiTool { name: "agent_document".to_string(), description: "读取或更新自己的身份文档（SOUL.md, MEMORY.md, AGENTS.md 等）。用 update 更新 MEMORY.md 来跨会话记忆重要信息。这是你的长期记忆系统，可以记录重要的用户偏好、项目信息、学到的知识等。".to_string(), parameters: Self::get_tool_parameters("agent_document") },
             AiTool { name: "tool_creation".to_string(), description: "动态工具创建：创建、更新、删除自定义工具".to_string(), parameters: Self::get_tool_parameters("tool_creation") },

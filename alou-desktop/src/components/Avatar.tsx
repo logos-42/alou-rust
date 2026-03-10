@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react'
 import avatarService from '@/services/avatarService'
 import imageProxyService from '@/services/imageProxyService'
+import useAgentStore from '@/stores/agentStore'
 import './Avatar.css'
 
 /**
@@ -57,6 +58,17 @@ const Avatar: React.FC<AvatarProps> = ({
     // 清理无效头像
     if (!avatarUrl || avatarUrl.includes('undefined') || avatarUrl.includes('null')) {
       avatarUrl = fallback || avatarService.getFallbackAvatar()
+    }
+
+    // 检测是否是 IPFS CID（需要解析为 URL）
+    if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('data:') && 
+        (avatarUrl.startsWith('Qm') || avatarUrl.startsWith('bafy') || avatarUrl.startsWith('bafk'))) {
+      // 这是一个 IPFS CID，使用 agentStore 的解析函数
+      try {
+        avatarUrl = useAgentStore.getState().resolveIpfsUrl(avatarUrl) || avatarUrl
+      } catch (error) {
+        console.warn('[Avatar] IPFS URL 解析失败，使用原图:', error)
+      }
     }
 
     // 使用代理（避免 CORS 问题）

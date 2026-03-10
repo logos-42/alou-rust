@@ -22,6 +22,8 @@ pub mod role;
 pub mod memory;
 pub mod swarm;        // Multi-agent swarm coordination
 pub mod autonomy;     // Agent autonomy framework
+pub mod agent_hook;   // Agent Hook system for real-time instruction injection
+pub mod hook_commands; // Tauri commands for Agent Hook
 
 use std::sync::Arc;
 use tokio::sync::RwLock;

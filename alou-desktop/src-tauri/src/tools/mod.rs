@@ -14,7 +14,6 @@ pub mod system;
 pub mod plan;
 pub mod todolist;
 pub mod agent_skills;
-pub mod agent_collaboration;
 pub mod tool_creation;
 pub mod tool_parts;
 pub mod iroh_tool;
@@ -41,6 +40,7 @@ pub mod wallet_manager;           // 钱包管理器工具
 pub mod query_blockchain;         // 区块链查询工具
 pub mod build_transaction;        // 交易构建工具
 pub mod broadcast_transaction;    // 交易广播工具
+// pub mod notification;             // 通知工具（工具执行过程中的消息通知）- 暂时注释，文件不存在
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError};
@@ -52,11 +52,13 @@ pub use bash::BashTool;
 pub use plan::PlanTool;
 pub use todolist::TodoListTool;
 pub use agent_skills::AgentSkillsTool;
-pub use agent_collaboration::AgentCollaborationTool;
 pub use tool_creation::ToolCreationTool;
 pub use spec_tool::SpecTool;
 // 从 tool_parts 直接导出定义类型和执行器
 pub use tool_parts::executor::DynamicToolExecutor;
+
+// 导出通知工具类型 - 暂时注释，等待模块创建
+// pub use notification::{NotificationTool, NotificationLevel, NotificationType};
 
 // 工具分类枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -253,10 +255,6 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     let agent_skills_tool = Arc::new(AgentSkillsTool::new()?);
     registry.register(agent_skills_tool).await?;
 
-    // 注册智能体协作工具（使用 IPFS PubSub）
-    let ipfs_api_url = std::env::var("IPFS_API_URL").unwrap_or_else(|_| "http://127.0.0.1:5001".to_string());
-    let agent_collab_tool = Arc::new(AgentCollaborationTool::new(ipfs_api_url));
-    registry.register(agent_collab_tool).await?;
 
     // 注册工具创建和记录工具
     let tool_creation_tool = Arc::new(ToolCreationTool::new());
@@ -317,6 +315,7 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     // 注册 Spec 工具
     let spec_tool = Arc::new(SpecTool::new());
     registry.register(spec_tool).await?;
+
 
     Ok(registry)
 }

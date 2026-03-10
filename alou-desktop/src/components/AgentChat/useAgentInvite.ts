@@ -3,6 +3,7 @@ import clusterActionService from '@/services/clusterActionService'
 import useClusterActionStore from '@/stores/clusterActionStore'
 import { useDiapGroupChat } from '@/hooks/useDiapGroupChat'
 import type { Channel, Agent } from './agentUtils'
+import { normalizeAgent, getAgentName } from '@/utils/agentNameUtils'
 
 interface UseAgentInviteOptions {
   deleteChannel: (channel: Channel) => void
@@ -157,7 +158,9 @@ export const useAgentInvite = ({
       const { addAction, setActiveAction } = useClusterActionStore.getState()
       
       // 构建群聊描述
-      const agentNames = agents.map(a => a.display_name || a.name || 'Agent').join(', ')
+      // 标准化所有智能体数据，确保名称一致
+const normalizedAgents = agents.map(a => normalizeAgent(a))
+const agentNames = normalizedAgents.map(a => getAgentName(a)).join(', ')
       const groupDescription = `群聊: ${channel.name || 'Unknown'} + ${agentNames}`
 
       // 内联的本地群聊创建函数

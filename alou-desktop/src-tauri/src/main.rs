@@ -99,6 +99,20 @@ use crate::agent::commands::{
     test_api_connection, get_available_providers, health_check,
 };
 
+// Agent Hook commands
+use crate::agent::hook_commands::{
+    agent_hook_inject,
+    agent_hook_inject_high_priority,
+    agent_hook_pause,
+    agent_hook_resume,
+    agent_hook_cancel,
+    agent_hook_get_status,
+    agent_hook_get_history,
+    agent_hook_get_pending,
+    agent_hook_clear_queue,
+    agent_hook_create,
+};
+
 // Autonomous Agent commands - 状态管理函数
 use crate::autonomous_agent::{
     get_autonomous_agent_state, 
@@ -482,6 +496,17 @@ fn main() {
             test_api_connection,
             get_available_providers,
             health_check,
+            // Agent Hook commands
+            agent_hook_inject,
+            agent_hook_inject_high_priority,
+            agent_hook_pause,
+            agent_hook_resume,
+            agent_hook_cancel,
+            agent_hook_get_status,
+            agent_hook_get_history,
+            agent_hook_get_pending,
+            agent_hook_clear_queue,
+            agent_hook_create,
             // Task Queue commands
             add_task,
             get_next_task,

@@ -205,13 +205,6 @@ impl SkillAutoSelector {
         self.tool_descriptions.insert("agent_skills".to_string(),
             "Agent Skills工具：管理和执行AI技能".to_string());
 
-        // Agent协作工具
-        self.tool_keywords.insert("agent_collaboration".to_string(), vec![
-            "协作".to_string(), "合作".to_string(), "协同".to_string(),
-            "collaboration".to_string(), "cooperate".to_string(), "team".to_string(),
-        ]);
-        self.tool_descriptions.insert("agent_collaboration".to_string(),
-            "Agent协作工具：多智能体协同工作".to_string());
 
         // 工具创建工具
         self.tool_keywords.insert("tool_creation".to_string(), vec![
@@ -470,7 +463,6 @@ fn tool_descriptions_get(tool_id: &str) -> Option<String> {
         "agent" => Some("AI智能体".to_string()),
         "rollback" => Some("操作回滚".to_string()),
         "agent_skills" => Some("Agent Skills".to_string()),
-        "agent_collaboration" => Some("Agent协作".to_string()),
         "tool_creation" => Some("工具创建".to_string()),
         "iroh" => Some("Iroh P2P".to_string()),
         "message_passing" => Some("消息传递".to_string()),

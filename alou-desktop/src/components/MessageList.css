@@ -8,8 +8,12 @@
 
 .message-wrapper {
   display: flex;
-  animation: message-fade-in 0.3s ease;
   padding: 0.35rem clamp(0.5rem, 2vw, 1.5rem);
+  /* 移除默认动画，只在消息首次进入时通过 JS 添加动画类 */
+}
+
+.message-wrapper.message-enter {
+  animation: message-fade-in 0.3s ease;
 }
 
 .message-wrapper.user {

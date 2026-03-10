@@ -12,6 +12,7 @@ use iroh_gossip::net::Gossip;
 use iroh_gossip::net::GOSSIP_ALPN;
 use iroh::Endpoint;
 use iroh::protocol::Router;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action")]
@@ -125,6 +126,7 @@ pub struct IrohClient {
     group_messages: HashMap<String, Vec<IrohGroupMessage>>,
     group_senders: HashMap<String, GossipSender>,
     group_receivers: HashMap<String, Arc<Mutex<GossipReceiver>>>,
+    data_dir: Option<PathBuf>,
 }
 
 impl IrohClient {
@@ -140,7 +142,13 @@ impl IrohClient {
             group_messages: HashMap::new(),
             group_senders: HashMap::new(),
             group_receivers: HashMap::new(),
+            data_dir: None,
         }
+    }
+
+    pub fn with_data_dir(mut self, data_dir: PathBuf) -> Self {
+        self.data_dir = Some(data_dir);
+        self
     }
     
     pub async fn init(&mut self) -> Result<(), String> {
@@ -168,6 +176,11 @@ impl IrohClient {
         self.gossip = Some(gossip);
         self.router = Some(router);
 
+        // Load persisted groups from disk
+        if let Err(e) = self.load_groups_from_disk().await {
+            log::warn!("Failed to load groups from disk: {}", e);
+        }
+
         Ok(())
     }
     
@@ -177,7 +190,92 @@ impl IrohClient {
         }
         Ok(())
     }
-    
+
+    /// Get the data directory for persistence
+    fn get_data_dir(&self) -> Option<PathBuf> {
+        self.data_dir.clone().or_else(|| {
+            // Default to app data directory
+            dirs::data_local_dir().map(|p| p.join("alou").join("iroh"))
+        })
+    }
+
+    /// Save groups to disk
+    async fn save_groups_to_disk(&self) -> Result<(), String> {
+        let data_dir = match self.get_data_dir() {
+            Some(dir) => dir,
+            None => return Ok(()), // No data dir, skip persistence
+        };
+
+        // Create directory if it doesn't exist
+        if let Err(e) = std::fs::create_dir_all(&data_dir) {
+            log::warn!("Failed to create data directory: {}", e);
+            return Ok(());
+        }
+
+        let groups_file = data_dir.join("iroh_groups.json");
+        let messages_file = data_dir.join("iroh_messages.json");
+
+        // Save groups
+        let groups_json = serde_json::to_string_pretty(&self.groups).unwrap_or_default();
+        if let Err(e) = tokio::fs::write(&groups_file, &groups_json).await {
+            log::warn!("Failed to save groups: {}", e);
+        }
+
+        // Save messages
+        let messages_json = serde_json::to_string_pretty(&self.group_messages).unwrap_or_default();
+        if let Err(e) = tokio::fs::write(&messages_file, &messages_json).await {
+            log::warn!("Failed to save messages: {}", e);
+        }
+
+        log::info!("Saved {} groups to disk", self.groups.len());
+        Ok(())
+    }
+
+    /// Load groups from disk
+    async fn load_groups_from_disk(&mut self) -> Result<(), String> {
+        let data_dir = match self.get_data_dir() {
+            Some(dir) => dir,
+            None => return Ok(()), // No data dir, skip persistence
+        };
+
+        let groups_file = data_dir.join("iroh_groups.json");
+        let messages_file = data_dir.join("iroh_messages.json");
+
+        // Load groups
+        if groups_file.exists() {
+            match tokio::fs::read_to_string(&groups_file).await {
+                Ok(content) => {
+                    match serde_json::from_str(&content) {
+                        Ok(loaded_groups) => {
+                            self.groups = loaded_groups;
+                            log::info!("Loaded {} groups from disk", self.groups.len());
+                        }
+                        Err(e) => log::warn!("Failed to parse groups file: {}", e),
+                    }
+                }
+                Err(e) => log::warn!("Failed to read groups file: {}", e),
+            }
+        }
+
+        // Load messages
+        if messages_file.exists() {
+            match tokio::fs::read_to_string(&messages_file).await {
+                Ok(content) => {
+                    match serde_json::from_str(&content) {
+                        Ok(loaded_messages) => {
+                            self.group_messages = loaded_messages;
+                            log::info!("Loaded messages for {} groups from disk", self.group_messages.len());
+                        }
+                        Err(e) => log::warn!("Failed to parse messages file: {}", e),
+                    }
+                }
+                Err(e) => log::warn!("Failed to read messages file: {}", e),
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn get_node_id(&self) -> &str {
         &self.node_id
     }
@@ -308,6 +406,11 @@ impl IrohClient {
         };
         messages.push(sys_msg);
 
+        // Save to disk for persistence
+        if let Err(e) = self.save_groups_to_disk().await {
+            log::warn!("Failed to save group to disk: {}", e);
+        }
+
         let group_id_clone = group_id.clone();
         let receiver = self.group_receivers.get(&group_id[..]).cloned().unwrap();
         tokio::spawn(async move {
@@ -395,6 +498,11 @@ impl IrohClient {
         };
         messages.push(join_msg);
 
+        // Save to disk for persistence
+        if let Err(e) = self.save_groups_to_disk().await {
+            log::warn!("Failed to save group to disk: {}", e);
+        }
+
         let group_id_clone = group_id.to_string();
         let receiver = self.group_receivers.get(&group_id[..]).cloned().unwrap();
         tokio::spawn(async move {
@@ -439,6 +547,12 @@ impl IrohClient {
             self.group_senders.remove(group_id);
             self.group_receivers.remove(group_id);
             log::info!("Left Iroh group: {}", group_id);
+            
+            // Save to disk after removing group
+            if let Err(e) = self.save_groups_to_disk().await {
+                log::warn!("Failed to save groups to disk: {}", e);
+            }
+            
             Ok(())
         } else {
             Err(format!("Group '{}' not found", group_id))
@@ -477,9 +591,14 @@ impl IrohClient {
             .map_err(|e| format!("Failed to broadcast message: {}", e))?;
 
         self.group_messages.entry(group_id.to_string()).or_insert_with(Vec::new).push(msg.clone());
-        
+
+        // Save messages to disk for persistence
+        if let Err(e) = self.save_groups_to_disk().await {
+            log::warn!("Failed to save message to disk: {}", e);
+        }
+
         log::debug!("Sent message to group {}: {}", group_id, msg.id);
-        
+
         Ok(msg.id)
     }
     
@@ -513,10 +632,19 @@ impl Default for IrohClient {
 impl IrohTool {
     async fn execute_impl(&self, args: Value) -> Result<IrohToolResult, Box<dyn std::error::Error>> {
         static CLIENT: std::sync::OnceLock<Arc<RwLock<IrohClient>>> = std::sync::OnceLock::new();
-        let client = CLIENT.get_or_init(|| Arc::new(RwLock::new(IrohClient::new())));
         
+        // Initialize client with data directory on first use
+        let client = CLIENT.get_or_init(|| {
+            let data_dir = dirs::data_local_dir()
+                .map(|p| p.join("alou").join("iroh"))
+                .unwrap_or_else(|| std::path::PathBuf::from("./alou-iroh"));
+            
+            let client = IrohClient::new().with_data_dir(data_dir);
+            Arc::new(RwLock::new(client))
+        });
+
         let mut client = client.write().await;
-        
+
         let operation: IrohOperation = serde_json::from_value(args)?;
         
         match operation {

@@ -230,7 +230,26 @@ class ToolService {
 
   constructor() {
     this.localTools = new Set([
-      'filesystem', 'search', 'bash', 'plan', 'skills'
+      // 基础工具
+      'filesystem', 'search', 'bash', 'plan', 'todolist',
+      // 网络和系统工具
+      'network', 'system',
+      // 浏览器和 UI 工具
+      'browser', 'ui_control',
+      // P2P 和通信工具
+      'pubsub', 'iroh', 'message_passing', 'group_adapter',
+      // Agent 相关工具
+      'skills', 'agent_skills', 'agent_collaboration', 'agent_creator', 'agent_wallet',
+      // Git 和版本控制
+      'git_helper', 'rollback',
+      // 工具开发相关
+      'tool_creation', 'dynamic_tool_executor',
+      // IPFS 相关
+      'ipfs_archive',
+      // 文档和规格
+      'spec',
+      // 区块链/Web3 工具
+      'wallet_manager', 'query_blockchain', 'build_transaction', 'broadcast_transaction'
     ])
     this.complexTools = new Set([
       'network_scan', 'large_file_process', 'long_running_task'
@@ -457,6 +476,39 @@ class ToolService {
       // working_dir 可选，默认为 null
       if (n.working_dir === undefined) {
         n.working_dir = null
+      }
+    }
+
+    // PubSub Tool 参数格式转换
+    if (toolId === 'pubsub') {
+      // PubSub 工具需要 action 字段来指定操作类型
+      // 如果没有 action 字段，尝试从其他字段推断
+      if (!n.action) {
+        // 根据其他字段推断 action
+        if (n.topic && n.message) {
+          n.action = 'publish'
+        } else if (n.topic && n.limit !== undefined) {
+          n.action = 'subscribe'
+        } else if (n.topic) {
+          n.action = 'list_topics'
+        } else if (n.group_name) {
+          n.action = 'create_group'
+        } else if (n.group_id && n.message) {
+          n.action = 'send_group_message'
+        } else {
+          n.action = 'list_topics' // 默认操作
+        }
+      }
+
+      // 确保必要的默认值
+      if (n.action === 'publish' && n.message_type === undefined) {
+        n.message_type = 'text'
+      }
+      if (n.action === 'subscribe' && n.limit === undefined) {
+        n.limit = 10
+      }
+      if (n.action === 'create_persistent_topic' && n.persistent === undefined) {
+        n.persistent = true
       }
     }
 

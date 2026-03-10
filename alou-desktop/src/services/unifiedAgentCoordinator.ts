@@ -1,5 +1,5 @@
 /**
- * 统一智能体协调器 - 集成群聊适配器
+ * 统一智能体协调器 - 集成群聊适配器（支持 Session 隔离）
  *
  * 统一管理所有群聊模式下的智能体消息分发和协调
  * 支持 Memory、PubSub、Iroh 三种群聊模式
@@ -10,6 +10,8 @@
  * - 消息分发到智能体
  * - 智能体自动回复
  * - 跨群聊智能体协调
+ * - 持久化存储（与 agentStore 集成）
+ * - Session 隔离（多页面并行支持）
  *
  * @module services/unifiedAgentCoordinator
  */
@@ -32,24 +34,28 @@ import {
   IrohGroupChatAdapter,
 } from '../adapters/groupChatAdapter'
 
+import useAgentStore, { useAgentStoreHydration } from '../stores/agentStore'
+
 /**
  * 智能体消息处理器类型
  */
 export type AgentMessageHandler = (message: UnifiedMessage, agentId: string) => void | Promise<void>
 
 /**
- * 智能体注册信息
+ * 智能体注册信息（添加 session 绑定）
  */
 export interface RegisteredAgent {
   agent: AgentInfo
+  sessionId: string
   groups: Set<string>
   handler?: AgentMessageHandler
 }
 
 /**
- * 群聊订阅信息
+ * 群聊订阅信息（添加 session 绑定）
  */
 export interface GroupSubscription {
+  sessionId: string
   groupId: string
   mode: GroupChatMode
   unsubscribe: () => void
@@ -57,7 +63,7 @@ export interface GroupSubscription {
 }
 
 /**
- * 统一智能体协调器配置
+ * 统一智能体协调器配置（添加 sessionId）
  */
 export interface AgentCoordinatorConfig {
   /** 是否启用自动回复 */
@@ -70,29 +76,41 @@ export interface AgentCoordinatorConfig {
   autoSubscribe?: boolean
   /** 消息处理器 */
   onMessage?: (message: UnifiedMessage) => void
+  /** 是否从 agentStore 恢复智能体 */
+  restoreFromStore?: boolean
+  /** Session ID（用于多页面隔离） */
+  sessionId?: string
 }
 
 /**
  * 统一智能体协调器类
  *
  * 负责：
- * - 智能体注册/注销
- * - 群聊订阅管理
+ * - 智能体注册/注销（支持 Session 隔离）
+ * - 群聊订阅管理（支持 Session 隔离）
  * - 消息分发到智能体
  * - 智能体自动回复
  * - 跨群聊智能体协调
+ *
+ * Session 隔离机制：
+ * - 每个 session 有独立的智能体列表
+ * - 每个 session 有独立的群聊订阅
+ * - 消息只在同一 session 内分发
  */
 export class UnifiedAgentCoordinator {
   private static instance: UnifiedAgentCoordinator | null = null
 
-  // 注册的智能体
+  // Session ID（用于隔离）
+  public readonly sessionId: string
+
+  // 注册的智能体（按 session 隔离）
   private registeredAgents: Map<string, RegisteredAgent> = new Map()
 
-  // 群聊到智能体的映射
-  private groupAgents: Map<string, Set<string>> = new Map()
+  // 群聊到智能体的映射（按 session 隔离）
+  private groupAgents: Map<string, Map<string, Set<string>>> = new Map() // sessionId -> (groupId -> Set<agentId>)
 
-  // 群聊订阅管理
-  private groupSubscriptions: Map<string, GroupSubscription> = new Map()
+  // 群聊订阅管理（按 session 隔离）
+  private groupSubscriptions: Map<string, GroupSubscription> = new Map() // key: `${sessionId}::${groupId}`
 
   // 配置
   private config: Required<AgentCoordinatorConfig>
@@ -100,22 +118,35 @@ export class UnifiedAgentCoordinator {
   // 事件监听器清理函数
   private cleanupFunctions: Array<() => void> = []
 
+  // 是否已恢复持久化数据
+  private hasRestored: boolean = false
+
   private constructor(config: AgentCoordinatorConfig = {}) {
+    this.sessionId = config.sessionId || `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+    
     this.config = {
       autoReply: false,
       replyDelay: 1000,
       debug: false,
       autoSubscribe: true,
       onMessage: () => {}, // 默认空函数
+      restoreFromStore: true, // 默认启用从 store 恢复
+      sessionId: this.sessionId,
       ...config,
     }
 
-    // 设置全局事件监听
+    // 设置全局事件监听（带 session 过滤）
     this.setupGlobalListeners()
+
+    // 从 agentStore 恢复智能体（仅恢复当前 session 的）
+    if (this.config.restoreFromStore) {
+      this.restoreAgentsFromStore()
+    }
   }
 
   /**
-   * 获取单例实例
+   * 获取单例实例（已废弃，建议使用 SessionManager）
+   * @deprecated 请使用 SessionManager.getOrCreateSession() 代替
    */
   static getInstance(config?: AgentCoordinatorConfig): UnifiedAgentCoordinator {
     if (!this.instance) {
@@ -135,13 +166,25 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 设置全局事件监听
+   * 创建带 Session ID 的协调器（推荐方式）
+   */
+  static createWithSession(config: AgentCoordinatorConfig = {}): UnifiedAgentCoordinator {
+    return new UnifiedAgentCoordinator(config)
+  }
+
+  /**
+   * 设置全局事件监听（带 session 过滤）
    */
   private setupGlobalListeners(): void {
-    // 监听 agent-group-message 事件
+    // 监听 agent-group-message 事件（带 session 过滤）
     const handleAgentGroupMessage = (event: Event) => {
       const customEvent = event as CustomEvent
-      const { agentId, message } = customEvent.detail
+      const { agentId, message, sessionId } = customEvent.detail
+
+      // 只处理当前 session 的消息
+      if (sessionId && sessionId !== this.sessionId) {
+        return
+      }
 
       if (agentId && message) {
         this.dispatchToAgent(agentId, message)
@@ -154,7 +197,70 @@ export class UnifiedAgentCoordinator {
     })
 
     if (this.config.debug) {
-      console.log('[AgentCoordinator] 全局事件监听已设置')
+      console.log('[AgentCoordinator] 全局事件监听已设置，sessionId:', this.sessionId)
+    }
+  }
+
+  /**
+   * 从 agentStore 恢复智能体
+   */
+  private async restoreAgentsFromStore(): Promise<void> {
+    try {
+      // 等待 agentStore hydration 完成
+      const waitForHydration = (): Promise<void> => {
+        return new Promise((resolve) => {
+          if (useAgentStore.getState()._hasHydrated) {
+            resolve()
+            return
+          }
+
+          const unsubscribe = useAgentStore.subscribe((state) => {
+            if (state._hasHydrated) {
+              unsubscribe()
+              resolve()
+            }
+          })
+        })
+      }
+
+      await waitForHydration()
+
+      const agents = useAgentStore.getState().agents
+      if (!agents || agents.length === 0) {
+        if (this.config.debug) {
+          console.log('[AgentCoordinator] agentStore 中没有智能体，跳过恢复')
+        }
+        return
+      }
+
+      // 将 agentStore 中的智能体转换为 AgentInfo 并注册
+      for (const agent of agents) {
+        const agentInfo: AgentInfo = {
+          id: agent.id,
+          name: agent.name || agent.display_name || '未命名智能体',
+          mode: 'agent',
+          avatar: agent.avatar_url || undefined,
+          sessionId: agent.sessionId,
+          // 保留额外的元数据
+          metadata: {
+            ipns: agent.ipns,
+            cid: agent.cid,
+            did: agent.did,
+            diapIdentity: agent.diapIdentity,
+          },
+        }
+
+        // 注册智能体（不传入 handler，因为 handler 是运行时逻辑）
+        await this.registerAgent(agentInfo, undefined, false)
+      }
+
+      this.hasRestored = true
+
+      if (this.config.debug) {
+        console.log('[AgentCoordinator] 已从 agentStore 恢复', agents.length, '个智能体')
+      }
+    } catch (error) {
+      console.error('[AgentCoordinator] 从 agentStore 恢复智能体失败:', error)
     }
   }
 
@@ -163,11 +269,15 @@ export class UnifiedAgentCoordinator {
   // ============================================================================
 
   /**
-   * 注册智能体
+   * 注册智能体（带 Session 绑定）
+   * @param agent 智能体信息
+   * @param handler 消息处理器
+   * @param persistToStore 是否持久化到 agentStore（默认 true）
    */
   async registerAgent(
     agent: AgentInfo,
-    handler?: AgentMessageHandler
+    handler?: AgentMessageHandler,
+    persistToStore: boolean = true
   ): Promise<void> {
     if (this.registeredAgents.has(agent.id)) {
       console.warn('[AgentCoordinator] 智能体已注册:', agent.id)
@@ -176,22 +286,50 @@ export class UnifiedAgentCoordinator {
 
     const registeredAgent: RegisteredAgent = {
       agent,
+      sessionId: this.sessionId,
       groups: new Set(),
       handler,
     }
 
     this.registeredAgents.set(agent.id, registeredAgent)
 
-    // 自动将智能体注册到所有已订阅的群聊
+    // 持久化到 agentStore（使用 session 隔离的存储）
+    if (persistToStore && typeof window !== 'undefined') {
+      try {
+        const store = useAgentStore.getState()
+        store.addAgent({
+          id: agent.id,
+          sessionId: agent.sessionId || this.sessionId,
+          name: agent.name,
+          display_name: agent.name,
+          avatar_url: agent.avatar,
+          agent_type: 'ai_agent_sdk',
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        })
+        if (this.config.debug) {
+          console.log('[AgentCoordinator] 智能体已持久化到 agentStore:', agent.id, 'sessionId:', this.sessionId)
+        }
+      } catch (error) {
+        console.error('[AgentCoordinator] 持久化到 agentStore 失败:', error)
+      }
+    }
+
+    // 自动将智能体注册到所有已订阅的群聊（当前 session 的）
     if (this.config.autoSubscribe) {
-      for (const [groupId] of this.groupSubscriptions) {
-        await this.registerToGroup(groupId, agent)
+      for (const [key] of this.groupSubscriptions) {
+        // 只处理当前 session 的订阅
+        if (key.startsWith(this.sessionId + '::')) {
+          const groupId = key.substring(this.sessionId.length + 2)
+          await this.registerToGroup(groupId, agent)
+        }
       }
     }
 
     if (this.config.debug) {
       console.log('[AgentCoordinator] 智能体已注册:', {
         id: agent.id,
+        sessionId: this.sessionId,
         name: agent.name,
         mode: agent.mode,
       })
@@ -213,7 +351,7 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 注册智能体到指定群聊
+   * 注册智能体到指定群聊（带 Session 隔离）
    */
   async registerToGroup(groupId: string, agent: AgentInfo): Promise<void> {
     // 如果智能体未注册，先注册
@@ -221,12 +359,17 @@ export class UnifiedAgentCoordinator {
       await this.registerAgent(agent)
     }
 
-    // 添加到群聊的智能体列表
-    if (!this.groupAgents.has(groupId)) {
-      this.groupAgents.set(groupId, new Set())
+    // 添加到群聊的智能体列表（当前 session 的）
+    if (!this.groupAgents.has(this.sessionId)) {
+      this.groupAgents.set(this.sessionId, new Map())
+    }
+    
+    const sessionGroupAgents = this.groupAgents.get(this.sessionId)!
+    if (!sessionGroupAgents.has(groupId)) {
+      sessionGroupAgents.set(groupId, new Set())
     }
 
-    this.groupAgents.get(groupId)!.add(agent.id)
+    sessionGroupAgents.get(groupId)!.add(agent.id)
 
     // 更新智能体的群聊列表
     const registeredAgent = this.registeredAgents.get(agent.id)
@@ -236,6 +379,7 @@ export class UnifiedAgentCoordinator {
 
     if (this.config.debug) {
       console.log('[AgentCoordinator] 智能体已添加到群聊:', {
+        sessionId: this.sessionId,
         agentId: agent.id,
         groupId,
       })
@@ -243,9 +387,9 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 注销智能体
+   * 注销智能体（带 Session 隔离）
    */
-  async unregisterAgent(agentId: string): Promise<void> {
+  async unregisterAgent(agentId: string, removeFromStore: boolean = true): Promise<void> {
     const registeredAgent = this.registeredAgents.get(agentId)
 
     if (!registeredAgent) {
@@ -253,16 +397,32 @@ export class UnifiedAgentCoordinator {
       return
     }
 
-    // 从所有群聊中移除
-    for (const [groupId, agents] of this.groupAgents) {
-      agents.delete(agentId)
+    // 从所有群聊中移除（当前 session 的）
+    const sessionGroupAgents = this.groupAgents.get(this.sessionId)
+    if (sessionGroupAgents) {
+      for (const [groupId, agents] of sessionGroupAgents) {
+        agents.delete(agentId)
+      }
+    }
+
+    // 从 agentStore 移除（只移除当前 session 的）
+    if (removeFromStore && typeof window !== 'undefined') {
+      try {
+        const store = useAgentStore.getState()
+        store.removeAgent(agentId)
+        if (this.config.debug) {
+          console.log('[AgentCoordinator] 智能体已从 agentStore 移除:', agentId, 'sessionId:', this.sessionId)
+        }
+      } catch (error) {
+        console.error('[AgentCoordinator] 从 agentStore 移除失败:', error)
+      }
     }
 
     // 移除智能体
     this.registeredAgents.delete(agentId)
 
     if (this.config.debug) {
-      console.log('[AgentCoordinator] 智能体已注销:', agentId)
+      console.log('[AgentCoordinator] 智能体已注销:', agentId, 'sessionId:', this.sessionId)
     }
   }
 
@@ -271,19 +431,36 @@ export class UnifiedAgentCoordinator {
   // ============================================================================
 
   /**
-   * 订阅群聊消息
+   * 生成 session 隔离的订阅 key
+   */
+  private getSubscriptionKey(groupId: string): string {
+    return `${this.sessionId}::${groupId}`
+  }
+
+  /**
+   * 从订阅 key 解析 groupId
+   */
+  private parseGroupIdFromKey(key: string): string {
+    const parts = key.split('::')
+    return parts.length > 1 ? parts.slice(1).join('::') : key
+  }
+
+  /**
+   * 订阅群聊消息（带 Session 隔离）
    */
   async subscribeToGroup(groupId: string, mode?: GroupChatMode): Promise<void> {
+    const subscriptionKey = this.getSubscriptionKey(groupId)
+
     // 检查是否已订阅
-    if (this.groupSubscriptions.has(groupId)) {
-      console.log('[AgentCoordinator] 群聊已订阅:', groupId)
+    if (this.groupSubscriptions.has(subscriptionKey)) {
+      console.log('[AgentCoordinator] 群聊已订阅:', groupId, 'sessionId:', this.sessionId)
       return
     }
 
     try {
       // 获取适配器
       let adapter = mode ? groupChatAdapterFactory.getAdapter(mode) : null
-      
+
       if (!adapter) {
         // 尝试获取最佳适配器
         adapter = await getBestAvailableAdapter()
@@ -294,18 +471,20 @@ export class UnifiedAgentCoordinator {
         this.handleGroupMessage(groupId, message)
       })
 
-      // 记录订阅
+      // 记录订阅（使用 session 隔离的 key）
       const subscription: GroupSubscription = {
+        sessionId: this.sessionId,
         groupId,
         mode: adapter.mode,
         unsubscribe,
         active: true,
       }
 
-      this.groupSubscriptions.set(groupId, subscription)
+      this.groupSubscriptions.set(subscriptionKey, subscription)
 
       if (this.config.debug) {
         console.log('[AgentCoordinator] 群聊订阅成功:', {
+          sessionId: this.sessionId,
           groupId,
           mode: adapter.mode,
         })
@@ -316,28 +495,33 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 取消订阅群聊
+   * 取消订阅群聊（带 Session 隔离）
    */
   unsubscribeFromGroup(groupId: string): void {
-    const subscription = this.groupSubscriptions.get(groupId)
+    const subscriptionKey = this.getSubscriptionKey(groupId)
+    const subscription = this.groupSubscriptions.get(subscriptionKey)
 
     if (subscription) {
       subscription.unsubscribe()
       subscription.active = false
-      this.groupSubscriptions.delete(groupId)
+      this.groupSubscriptions.delete(subscriptionKey)
 
       if (this.config.debug) {
-        console.log('[AgentCoordinator] 群聊取消订阅:', groupId)
+        console.log('[AgentCoordinator] 群聊取消订阅:', {
+          sessionId: this.sessionId,
+          groupId,
+        })
       }
     }
   }
 
   /**
-   * 处理群聊消息
+   * 处理群聊消息（带 Session 隔离）
    */
   private handleGroupMessage(groupId: string, message: UnifiedMessage | GroupChatMessage): void {
     if (this.config.debug) {
       console.log('[AgentCoordinator] 收到群聊消息:', {
+        sessionId: this.sessionId,
         groupId,
         messageId: 'id' in message ? message.id : 'unknown',
         type: message.type,
@@ -354,8 +538,8 @@ export class UnifiedAgentCoordinator {
       }
     }
 
-    // 分发到群聊中的智能体
-    const agentIds = this.groupAgents.get(groupId)
+    // 分发到群聊中的智能体（当前 session 的）
+    const agentIds = this.getGroupAgentsForSession(groupId)
     if (agentIds) {
       for (const agentId of agentIds) {
         this.dispatchToAgent(agentId, message as UnifiedMessage)
@@ -364,19 +548,39 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 获取所有已订阅的群聊
+   * 获取当前 session 的群聊智能体映射
    */
-  getSubscribedGroups(): string[] {
-    return Array.from(this.groupSubscriptions.keys())
+  private getGroupAgentsForSession(groupId: string): Set<string> | undefined {
+    return this.groupAgents.get(this.sessionId)?.get(groupId)
   }
 
   /**
-   * 获取群聊订阅状态
+   * 设置当前 session 的群聊智能体映射
+   */
+  private setGroupAgentsForSession(groupId: string, agentIds: Set<string>): void {
+    if (!this.groupAgents.has(this.sessionId)) {
+      this.groupAgents.set(this.sessionId, new Map())
+    }
+    this.groupAgents.get(this.sessionId)!.set(groupId, agentIds)
+  }
+
+  /**
+   * 获取所有已订阅的群聊（带 Session 隔离）
+   */
+  getSubscribedGroups(): string[] {
+    return Array.from(this.groupSubscriptions.values())
+      .filter(s => s.sessionId === this.sessionId)
+      .map(s => s.groupId)
+  }
+
+  /**
+   * 获取群聊订阅状态（带 Session 隔离）
    */
   getGroupSubscriptionStatus(groupId: string): { subscribed: boolean; mode?: GroupChatMode } {
-    const subscription = this.groupSubscriptions.get(groupId)
+    const subscriptionKey = this.getSubscriptionKey(groupId)
+    const subscription = this.groupSubscriptions.get(subscriptionKey)
     return {
-      subscribed: !!subscription && subscription.active,
+      subscribed: !!subscription && subscription.active && subscription.sessionId === this.sessionId,
       mode: subscription?.mode,
     }
   }
@@ -451,25 +655,30 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 获取群聊中的活跃智能体
+   * 获取群聊中的活跃智能体（带 Session 隔离）
    */
   getActiveAgents(groupId?: string): AgentInfo[] {
     const agents: AgentInfo[] = []
 
-    if (groupId && this.groupAgents.has(groupId)) {
-      // 获取指定群聊的智能体
-      const agentIds = this.groupAgents.get(groupId)!
+    if (groupId) {
+      // 获取指定群聊的智能体（当前 session 的）
+      const agentIds = this.getGroupAgentsForSession(groupId)
 
-      for (const agentId of agentIds) {
-        const registeredAgent = this.registeredAgents.get(agentId)
-        if (registeredAgent) {
-          agents.push(registeredAgent.agent)
+      if (agentIds) {
+        for (const agentId of agentIds) {
+          const registeredAgent = this.registeredAgents.get(agentId)
+          if (registeredAgent) {
+            agents.push(registeredAgent.agent)
+          }
         }
       }
     } else {
-      // 获取所有智能体
-      for (const registeredAgent of this.registeredAgents.values()) {
-        agents.push(registeredAgent.agent)
+      // 获取所有智能体（当前 session 的）
+      for (const [agentId, registeredAgent] of this.registeredAgents.entries()) {
+        // 只返回当前 session 的智能体
+        if (registeredAgent.sessionId === this.sessionId) {
+          agents.push(registeredAgent.agent)
+        }
       }
     }
 
@@ -548,30 +757,57 @@ export class UnifiedAgentCoordinator {
   }
 
   /**
-   * 获取所有已订阅的群聊
+   * 获取所有已订阅的群聊（带 Session 隔离）
    */
   getAllSubscribedGroups(): { groupId: string; mode: GroupChatMode }[] {
-    return Array.from(this.groupSubscriptions.values()).map((s) => ({
-      groupId: s.groupId,
-      mode: s.mode,
-    }))
+    return Array.from(this.groupSubscriptions.values())
+      .filter(s => s.sessionId === this.sessionId)
+      .map((s) => ({
+        groupId: s.groupId,
+        mode: s.mode,
+      }))
   }
 
   /**
-   * 获取协调器状态
+   * 获取协调器状态（带 Session 信息）
    */
   getStatus(): {
+    sessionId: string
     registeredAgents: number
     subscribedGroups: number
     autoReply: boolean
     debug: boolean
+    hasRestored: boolean
   } {
+    // 只统计当前 session 的数据
+    const sessionAgentCount = Array.from(this.registeredAgents.values())
+      .filter(ra => ra.sessionId === this.sessionId).length
+    
+    const sessionSubscriptionCount = Array.from(this.groupSubscriptions.values())
+      .filter(s => s.sessionId === this.sessionId).length
+
     return {
-      registeredAgents: this.registeredAgents.size,
-      subscribedGroups: this.groupSubscriptions.size,
+      sessionId: this.sessionId,
+      registeredAgents: sessionAgentCount,
+      subscribedGroups: sessionSubscriptionCount,
       autoReply: this.config.autoReply,
       debug: this.config.debug,
+      hasRestored: this.hasRestored,
     }
+  }
+
+  /**
+   * 手动触发从 agentStore 恢复智能体
+   */
+  async restoreFromStore(): Promise<void> {
+    await this.restoreAgentsFromStore()
+  }
+
+  /**
+   * 检查是否已完成恢复
+   */
+  hasRestoredFromStore(): boolean {
+    return this.hasRestored
   }
 
   // ============================================================================
@@ -579,47 +815,60 @@ export class UnifiedAgentCoordinator {
   // ============================================================================
 
   /**
-   * 销毁协调器，清理资源
+   * 销毁协调器，清理资源（带 Session 隔离）
    */
   destroy(): void {
-    // 取消所有群聊订阅
-    for (const [groupId, subscription] of this.groupSubscriptions) {
-      if (subscription.active) {
+    console.log('[AgentCoordinator] 销毁协调器，sessionId:', this.sessionId)
+
+    // 取消所有群聊订阅（当前 session 的）
+    for (const [key, subscription] of this.groupSubscriptions) {
+      if (subscription.sessionId === this.sessionId && subscription.active) {
         subscription.unsubscribe()
       }
     }
-    this.groupSubscriptions.clear()
+
+    // 只删除当前 session 的订阅
+    for (const key of this.groupSubscriptions.keys()) {
+      if (key.startsWith(this.sessionId + '::')) {
+        this.groupSubscriptions.delete(key)
+      }
+    }
 
     // 调用所有清理函数
     this.cleanupFunctions.forEach((cleanup) => cleanup())
     this.cleanupFunctions = []
 
-    // 清空数据
+    // 清空数据（当前 session 的）
     this.registeredAgents.clear()
-    this.groupAgents.clear()
+    this.groupAgents.delete(this.sessionId)
 
     if (this.config.debug) {
-      console.log('[AgentCoordinator] 协调器已销毁')
+      console.log('[AgentCoordinator] 协调器已销毁，sessionId:', this.sessionId)
     }
   }
 }
 
 // ============================================================================
-// 导出单例和便捷函数
+// 导出单例和便捷函数（支持 Session）
 // ============================================================================
 
-// 导出单例
+// 导出单例（已废弃，建议使用 SessionManager）
+/**
+ * @deprecated 请使用 SessionManager 代替
+ */
 export const agentCoordinator = UnifiedAgentCoordinator.getInstance()
 
 /**
- * 注册智能体
+ * 注册智能体（使用默认单例，不推荐用于多页面场景）
+ * @deprecated 多页面场景请使用 SessionManager.registerAgentForSession
  */
 export function registerAgent(agent: AgentInfo, handler?: AgentMessageHandler): Promise<void> {
   return agentCoordinator.registerAgent(agent, handler)
 }
 
 /**
- * 注册智能体到群聊
+ * 注册智能体到群聊（使用默认单例，不推荐用于多页面场景）
+ * @deprecated 多页面场景请使用 SessionManager.registerAgentForSession + registerToGroup
  */
 export function registerToGroup(groupId: string, agent: AgentInfo): Promise<void> {
   return agentCoordinator.registerToGroup(groupId, agent)
@@ -628,12 +877,13 @@ export function registerToGroup(groupId: string, agent: AgentInfo): Promise<void
 /**
  * 注销智能体
  */
-export function unregisterAgent(agentId: string): Promise<void> {
-  return agentCoordinator.unregisterAgent(agentId)
+export function unregisterAgent(agentId: string, removeFromStore?: boolean): Promise<void> {
+  return agentCoordinator.unregisterAgent(agentId, removeFromStore)
 }
 
 /**
- * 订阅群聊消息
+ * 订阅群聊消息（使用默认单例，不推荐用于多页面场景）
+ * @deprecated 多页面场景请使用 SessionManager.subscribeToGroupForSession
  */
 export function subscribeToGroup(groupId: string, mode?: GroupChatMode): Promise<void> {
   return agentCoordinator.subscribeToGroup(groupId, mode)
@@ -679,4 +929,11 @@ export function setReplyDelay(ms: number): void {
  */
 export function getCoordinatorStatus(): ReturnType<typeof agentCoordinator.getStatus> {
   return agentCoordinator.getStatus()
+}
+
+/**
+ * 创建带 Session ID 的协调器（推荐方式）
+ */
+export function createSessionCoordinator(config: AgentCoordinatorConfig = {}): UnifiedAgentCoordinator {
+  return UnifiedAgentCoordinator.createWithSession(config)
 }

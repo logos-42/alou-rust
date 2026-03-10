@@ -21,7 +21,23 @@ const App = () => {
       }
     }
 
+    const autoFixAvatars = async () => {
+      // 等待一小段时间，确保 store 已经 hydration
+      await new Promise(resolve => setTimeout(resolve, 500))
+      try {
+        // @ts-ignore - 工具已加载到 window
+        if (window.AlouAvatarProtection) {
+          // @ts-ignore
+          const fixedCount = await window.AlouAvatarProtection.autoFixAvatarUrls()
+          console.log(`[App] 启动时自动修复了 ${fixedCount} 个头像 URL`)
+        }
+      } catch (error) {
+        console.warn('[App] 自动修复头像失败', error)
+      }
+    }
+
     ensureIpfs()
+    autoFixAvatars()
 
     return () => {
       cancelled = true

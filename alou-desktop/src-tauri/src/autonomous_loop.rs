@@ -12,6 +12,7 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration, interval};
+use tokio::task::JoinHandle;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use chrono::Utc;
@@ -82,11 +83,32 @@ impl Default for AutonomousLoopState {
     }
 }
 
+/// 任务执行结果
+#[derive(Debug, Clone)]
+pub struct TaskExecutionResult {
+    pub success: bool,
+    pub output: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub duration_ms: u64,
+}
+
 /// 自主智能体主循环
 pub struct AutonomousLoop {
     state: Arc<Mutex<AutonomousLoopState>>,
     task_queue: Arc<Mutex<TaskQueueManager>>,
     tool_registry: Arc<Mutex<ToolRegistry>>,
+    current_task_handle: Arc<Mutex<Option<JoinHandle<TaskExecutionResult>>>>,
+}
+
+impl Clone for AutonomousLoop {
+    fn clone(&self) -> Self {
+        Self {
+            state: Arc::clone(&self.state),
+            task_queue: Arc::clone(&self.task_queue),
+            tool_registry: Arc::clone(&self.tool_registry),
+            current_task_handle: Arc::clone(&self.current_task_handle),
+        }
+    }
 }
 
 impl AutonomousLoop {
@@ -99,6 +121,7 @@ impl AutonomousLoop {
             state: Arc::new(Mutex::new(AutonomousLoopState::default())),
             task_queue,
             tool_registry,
+            current_task_handle: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -141,14 +164,21 @@ impl AutonomousLoop {
     /// 暂停主循环
     pub async fn pause(&self) -> Result<(), String> {
         let mut state = self.state.lock().await;
-        
+
         if !state.is_running {
             return Err("自主循环未运行".to_string());
         }
-        
+
         state.is_paused = true;
-        info!("⏸️ Alou 自主循环已暂停");
         
+        // 取消当前正在执行的任务
+        if let Some(handle) = self.current_task_handle.lock().await.take() {
+            handle.abort();
+            info!("🚫 已取消当前执行的任务");
+        }
+        
+        info!("⏸️ Alou 自主循环已暂停");
+
         Ok(())
     }
 
@@ -175,12 +205,12 @@ impl AutonomousLoop {
     /// 主循环
     async fn run_main_loop(&self) {
         info!("🔄 Alou 主循环开始运行");
-        
+
         let mut heartbeat_interval = interval(Duration::from_secs(30));
         let mut task_check_interval = interval(Duration::from_secs(10));
         let mut memory_save_interval = interval(Duration::from_secs(60));
         let mut progress_report_interval = interval(Duration::from_secs(300));
-        
+
         loop {
             // 检查是否停止
             {
@@ -188,34 +218,40 @@ impl AutonomousLoop {
                 if !state.is_running {
                     break;
                 }
+                // 如果已暂停，跳过所有操作，只等待
+                if state.is_paused {
+                    drop(state);
+                    sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
             }
-            
+
             tokio::select! {
                 // 心跳检查
                 _ = heartbeat_interval.tick() => {
                     self.heartbeat_check().await;
                 }
-                
+
                 // 任务检查
                 _ = task_check_interval.tick() => {
                     self.task_check_and_execute().await;
                 }
-                
+
                 // 记忆保存
                 _ = memory_save_interval.tick() => {
                     self.memory_save().await;
                 }
-                
+
                 // 进度汇报
                 _ = progress_report_interval.tick() => {
                     self.progress_report().await;
                 }
-                
+
                 // 定期休眠
                 _ = sleep(Duration::from_secs(5)) => {}
             }
         }
-        
+
         info!("🔚 Alou 主循环已结束");
     }
 
@@ -277,8 +313,42 @@ impl AutonomousLoop {
             queue.update_status(&task.id, TaskStatus::InProgress).await;
         }
         
-        // 执行任务（这里可以调用 AgentExecutor 或工具）
-        let result = self.run_task_workflow(task.clone()).await;
+        // 在单独的任务中执行，以便可以被取消
+        let loop_ref = self.clone();
+        let task_clone = task.clone();
+        let handle = tokio::spawn(async move {
+            loop_ref.run_task_workflow(task_clone).await
+        });
+
+        // 保存 handle 以便可以被取消
+        *self.current_task_handle.lock().await = Some(handle);
+
+        // 等待任务完成
+        let result = if let Some(h) = self.current_task_handle.lock().await.as_mut() {
+            match h.await {
+                Ok(result) => result,
+                Err(e) => {
+                    // 任务被取消
+                    info!("🚫 任务被取消：{}", task.title);
+                    TaskExecutionResult {
+                        success: false,
+                        output: None,
+                        error: Some(format!("任务被取消：{}", e)),
+                        duration_ms: 0,
+                    }
+                }
+            }
+        } else {
+            TaskExecutionResult {
+                success: false,
+                output: None,
+                error: Some("任务 handle 丢失".to_string()),
+                duration_ms: 0,
+            }
+        };
+
+        // 清除 handle
+        *self.current_task_handle.lock().await = None;
         
         // 更新任务状态
         {
@@ -502,12 +572,4 @@ impl AutonomousLoop {
         
         info!("📥 新任务已添加: {}", title);
     }
-}
-
-/// 任务执行结果
-struct TaskExecutionResult {
-    success: bool,
-    output: Option<serde_json::Value>,
-    error: Option<String>,
-    duration_ms: u64,
 }

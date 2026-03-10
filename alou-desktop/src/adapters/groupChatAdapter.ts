@@ -286,11 +286,12 @@ export class DefaultGroupChatAdapterFactory implements GroupChatAdapterFactory {
     try {
       const available = await BaseAdapter.detectAvailableModes()
 
-      if (available.includes(GroupChatMode.IROH)) {
-        return this.getAdapter(GroupChatMode.IROH)
-      }
+      // 优先使用 PubSub (IPFS 节点)
       if (available.includes(GroupChatMode.PUBSUB)) {
         return this.getAdapter(GroupChatMode.PUBSUB)
+      }
+      if (available.includes(GroupChatMode.IROH)) {
+        return this.getAdapter(GroupChatMode.IROH)
       }
     } catch {
       // 降级到 Memory

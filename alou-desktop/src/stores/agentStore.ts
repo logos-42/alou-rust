@@ -1,8 +1,15 @@
 import { create } from 'zustand'
+import { getAgentName } from '@/utils/agentNameUtils'
 import { persist, createJSONStorage, PersistOptions } from 'zustand/middleware'
+import * as sessionDb from '@/utils/sessionStorage'
 
 /**
  * 智能体元数据接口
+ *
+ * 注意：为优化存储空间，以下字段不会被持久化：
+ * - diapIdentity (可能包含大量协作数据)
+ * - documents (文档内容应存储在 IPFS)
+ * - mcp_ports (端口配置可能很大)
  */
 export interface AgentMetadata {
   id: string
@@ -55,7 +62,71 @@ interface AgentStoreActions {
 
 type AgentStore = AgentStoreState & AgentStoreActions
 
-const STORAGE_KEY = 'alou_agents'
+/**
+ * 获取 session 隔离的存储 key
+ * @param sessionId - Session ID（可选，不提供则使用默认 key）
+ */
+export function getAgentStoreKey(sessionId?: string): string {
+  if (!sessionId) {
+    return 'alou_agents_global'
+  }
+  return `alou_agents_${sessionId}`
+}
+
+/**
+ * 获取当前 session ID
+ * 从 URL hash 或 sessionStorage 中获取
+ */
+function getCurrentSessionId(): string | undefined {
+  // 尝试从 URL hash 获取
+  const hash = window.location.hash
+  const match = hash.match(/session=([^&]+)/)
+  if (match && match[1]) {
+    return decodeURIComponent(match[1])
+  }
+
+  // 尝试从 sessionStorage 获取（比 localStorage 更适合临时 session）
+  const stored = sessionStorage.getItem('alou_current_session')
+  return stored || undefined
+}
+
+/**
+ * 创建 IndexedDB 存储适配器（用于 zustand persist）
+ */
+function createIndexedDBStorage(sessionId?: string) {
+  const storeKey = getAgentStoreKey(sessionId)
+
+  return {
+    getItem: async (name: string): Promise<string | null> => {
+      try {
+        const value = await sessionDb.get(name)
+        return value ? JSON.stringify(value) : null
+      } catch (error) {
+        console.error('[AgentStore IndexedDB] getItem 失败:', error)
+        return null
+      }
+    },
+
+    setItem: async (name: string, value: string): Promise<void> => {
+      try {
+        const parsed = JSON.parse(value)
+        await sessionDb.set(name, parsed, { sessionId })
+      } catch (error) {
+        console.error('[AgentStore IndexedDB] setItem 失败:', error)
+        throw error
+      }
+    },
+
+    removeItem: async (name: string): Promise<void> => {
+      try {
+        await sessionDb.deleteByKey(name)
+      } catch (error) {
+        console.error('[AgentStore IndexedDB] removeItem 失败:', error)
+        throw error
+      }
+    },
+  }
+}
 
 const useAgentStore = create<AgentStore>()(
   persist(
@@ -70,7 +141,7 @@ const useAgentStore = create<AgentStore>()(
 
         // 如果已经是完整的 URL，直接返回
         if (cid.startsWith('http')) return cid
-        
+
         // 如果是 data URL，直接返回
         if (cid.startsWith('data:')) return cid
 
@@ -98,11 +169,8 @@ const useAgentStore = create<AgentStore>()(
       addAgent: (agentData: Partial<AgentMetadata>): AgentMetadata => {
         const agents = get().agents
         const now = Date.now()
-        
-        // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性
-        // 1. 如果传入的 id 已经存在，优先使用它（通常是 channel.id）
-        // 2. 否则，按照 buildChannelFromAgent 的逻辑生成：ipns || did || cid || timestamp
-        // 注意：需要过滤 mock IPNS（与 buildChannelFromAgent 保持一致）
+
+        // 重要：使用与 buildChannelFromAgent 相同的 ID 生成逻辑，确保一致性
         const mockIpns = 'k51qzi5uq'
         let ipnsValue = agentData.ipns || agentData.diapIdentity?.ipns || null
         const isMockIpns = ipnsValue && (
@@ -113,29 +181,30 @@ const useAgentStore = create<AgentStore>()(
         if (isMockIpns) {
           ipnsValue = null // 过滤掉 mock IPNS
         }
-        
-        // 使用与 buildChannelFromAgent 相同的ID生成逻辑
-        const generatedId = agentData.id || 
-                            ipnsValue || 
-                            agentData.did || 
-                            agentData.cid || 
+
+        const generatedId = agentData.id ||
+                            ipnsValue ||
+                            agentData.did ||
+                            agentData.cid ||
                             `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-        
-        // 处理头像URL
+
+        // 处理头像 URL
         const avatarUrl = agentData.avatar_cid ? get().resolveIpfsUrl(agentData.avatar_cid) : (agentData.avatar_url || agentData.avatar_cid || null)
-        
+
         console.log('[AgentStore] 创建/更新智能体头像信息:', {
           name: agentData.name,
           hasAvatarCid: !!agentData.avatar_cid,
           avatar_cid: agentData.avatar_cid,
           resolvedAvatarUrl: avatarUrl?.substring(0, 100)
         })
-        
+
         const newAgent: AgentMetadata = {
           id: generatedId,
           sessionId: agentData.sessionId,
-          name: agentData.name || agentData.display_name || '未命名智能体',
-          display_name: agentData.display_name || agentData.name || '未命名智能体',
+          // 使用统一名称函数，确保名称一致性
+name: getAgentName(agentData) || '未命名智能体',
+          // 与 name 字段保持一致
+display_name: getAgentName(agentData) || '未命名智能体',
           role_description: agentData.role_description || '',
           avatar_cid: agentData.avatar_cid || null,
           avatar_url: avatarUrl,
@@ -152,12 +221,12 @@ const useAgentStore = create<AgentStore>()(
           created_at: agentData.created_at || now,
           updated_at: now,
         }
-        
-        // 检查是否已存在（根据id或sessionId）
+
+        // 检查是否已存在（根据 id 或 sessionId）
         const existingIndex = agents.findIndex(
           a => a.id === newAgent.id || a.sessionId === newAgent.sessionId
         )
-        
+
         let updatedAgents: AgentMetadata[]
         if (existingIndex >= 0) {
           // 更新现有智能体 - 保护现有头像
@@ -174,7 +243,7 @@ const useAgentStore = create<AgentStore>()(
           // 添加新智能体
           updatedAgents = [newAgent, ...agents]
         }
-        
+
         set({ agents: updatedAgents })
         return newAgent
       },
@@ -185,63 +254,72 @@ const useAgentStore = create<AgentStore>()(
         const index = agents.findIndex(
           a => a.id === idOrSessionId || a.sessionId === idOrSessionId
         )
-        
+
         if (index < 0) {
-          console.warn(`[AgentStore] 未找到智能体: ${idOrSessionId}`)
+          console.warn(`[AgentStore] 未找到智能体：${idOrSessionId}`)
           return null
         }
-        
+
         const updatedAgents = [...agents]
         const existingAgent = updatedAgents[index]
-        
+
         // 处理头像更新：如果提供了 avatar_cid，需要重新解析为 URL
         let finalAvatarUrl = updates.avatar_url || existingAgent.avatar_url
         if (updates.avatar_cid) {
           finalAvatarUrl = get().resolveIpfsUrl(updates.avatar_cid)
         }
-        
+
         updatedAgents[index] = {
           ...existingAgent,
           ...updates,
-          avatar_cid: updates.avatar_cid || existingAgent.avatar_cid,
+          avatar_cid: updates.avatar_cid !== undefined ? updates.avatar_cid : existingAgent.avatar_cid,
           avatar_url: finalAvatarUrl,
           updated_at: Date.now(),
         }
-        
+
         set({ agents: updatedAgents })
-        console.log(`[AgentStore] 更新智能体: ${idOrSessionId}`)
         return updatedAgents[index]
       },
 
-      // 删除智能体
+      // 移除智能体
       removeAgent: (idOrSessionId: string): AgentMetadata[] => {
         const agents = get().agents
-        const filtered = agents.filter(
+        const updatedAgents = agents.filter(
           a => a.id !== idOrSessionId && a.sessionId !== idOrSessionId
         )
-        
-        set({ agents: filtered })
-        console.log(`[AgentStore] 删除智能体: ${idOrSessionId}`)
-        return filtered
+
+        if (updatedAgents.length === agents.length) {
+          console.warn(`[AgentStore] 未找到要移除的智能体：${idOrSessionId}`)
+        } else {
+          set({ agents: updatedAgents })
+        }
+
+        return updatedAgents
       },
 
-      // 根据ID或sessionId获取智能体
+      // 获取智能体
       getAgent: (idOrSessionId: string): AgentMetadata | null => {
         const agents = get().agents
-        return agents.find(
+        const agent = agents.find(
           a => a.id === idOrSessionId || a.sessionId === idOrSessionId
-        ) || null
+        )
+        return agent || null
       },
 
-      // 根据IPNS/CID/DID获取智能体
+      // 根据 target 获取智能体
       getAgentByTarget: (target: string): AgentMetadata | null => {
         const agents = get().agents
-        return agents.find(
-          a => a.ipns === target || a.cid === target || a.did === target || a.id === target
-        ) || null
+        const agent = agents.find(
+          a => a.id === target ||
+               a.sessionId === target ||
+               a.ipns === target ||
+               a.did === target ||
+               a.cid === target
+        )
+        return agent || null
       },
 
-      // 更新智能体的单个文档，并重建 customPrompt
+      // 更新智能体文档
       updateAgentDocument: (idOrSessionId: string, docType: string, content: string): AgentMetadata | null => {
         const agents = get().agents
         const index = agents.findIndex(
@@ -249,101 +327,123 @@ const useAgentStore = create<AgentStore>()(
         )
 
         if (index < 0) {
-          console.warn(`[AgentStore] updateAgentDocument: 未找到智能体: ${idOrSessionId}`)
+          console.warn(`[AgentStore] 未找到智能体：${idOrSessionId}`)
           return null
         }
 
         const updatedAgents = [...agents]
         const existingAgent = updatedAgents[index]
 
-        // 合并新文档到 documents map
-        const updatedDocs: Record<string, string> = {
-          ...(existingAgent.documents || {}),
-          [docType.toLowerCase()]: content,
-        }
-
-        // 重建 customPrompt（按照固定顺序拼接）
-        const docOrder = ['soul', 'identity', 'capabilities', 'constraints', 'tools', 'memory', 'agents']
-        const parts: string[] = []
-        for (const key of docOrder) {
-          if (updatedDocs[key]) {
-            parts.push(`=== ${key.toUpperCase()} ===\n${updatedDocs[key]}`)
-          }
-        }
-        const newCustomPrompt = parts.join('\n\n')
+        const documents = existingAgent.documents || {}
+        documents[docType] = content
 
         updatedAgents[index] = {
           ...existingAgent,
-          documents: updatedDocs,
-          customPrompt: newCustomPrompt,
+          documents,
           updated_at: Date.now(),
         }
 
         set({ agents: updatedAgents })
-        console.log(`[AgentStore] 智能体文档已更新: ${idOrSessionId}, 文档类型: ${docType}`)
         return updatedAgents[index]
       },
 
       // 清空所有智能体
       clearAgents: () => {
         set({ agents: [] })
-        console.log('[AgentStore] 清空所有智能体')
       },
 
-      // 从网络导入智能体
+      // 导入智能体
       importAgent: (agentData: Partial<AgentMetadata>): { agent: AgentMetadata; isNew: boolean } => {
         const agents = get().agents
-        
-        const targetId = agentData.id
-        
-        // 检查是否已存在（优先使用ID匹配，因为ID是最准确的）
-        let existing: AgentMetadata | null = null
-        if (targetId) {
-          existing = agents.find(a => a.id === targetId) || null
-        }
-        
-        // 如果通过ID没找到，尝试通过 IPNS/CID/DID 匹配
-        if (!existing) {
-          const target = agentData.ipns || agentData.cid || agentData.did
-          if (target) {
-            existing = agents.find(
-              a => a.ipns === target || a.cid === target || a.did === target || a.id === target
-            ) || null
+
+        // 检查是否已存在
+        const existingAgent = agents.find(
+          a => a.id === agentData.id || a.sessionId === agentData.sessionId
+        )
+
+        if (existingAgent) {
+          // 更新现有智能体
+          const updatedAgents = [...agents]
+          const index = updatedAgents.findIndex(
+            a => a.id === existingAgent.id || a.sessionId === existingAgent.sessionId
+          )
+
+          if (index >= 0) {
+            updatedAgents[index] = {
+              ...existingAgent,
+              ...agentData,
+              updated_at: Date.now(),
+            }
+            set({ agents: updatedAgents })
+            return { agent: updatedAgents[index], isNew: false }
           }
         }
-        
-        if (existing) {
-          // 更新现有智能体（合并新数据）
-          const updated = get().addAgent({
-            ...existing,
-            ...agentData,
-            id: existing.id,
-            imported_at: Date.now(),
-            source: 'network',
-          })
-          return { agent: updated, isNew: false }
-        }
-        
-        const newAgent = get().addAgent({
+
+        // 添加新智能体
+        const now = Date.now()
+        const newAgent: AgentMetadata = {
           ...agentData,
+          id: agentData.id || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          sessionId: agentData.sessionId,
+          // 使用统一名称函数，确保名称一致性
+name: getAgentName(agentData) || '未命名智能体',
+          // 与 name 字段保持一致
+display_name: getAgentName(agentData) || '未命名智能体',
+          role_description: agentData.role_description || '',
+          avatar_cid: agentData.avatar_cid || null,
+          avatar_url: agentData.avatar_url || null,
+          mcp_config_cid: agentData.mcp_config_cid || null,
+          mcp_ports: agentData.mcp_ports || [],
+          agent_type: agentData.agent_type || 'ai_agent_sdk',
+          ipns: agentData.ipns || null,
+          cid: agentData.cid || null,
+          did: agentData.did || null,
+          diapIdentity: null,
+          customPrompt: agentData.customPrompt || null,
+          documents: agentData.documents || null,
+          messages_cid: agentData.messages_cid || null,
+          created_at: agentData.created_at || now,
+          updated_at: now,
           imported_at: Date.now(),
           source: 'network',
-        })
-        
+        }
+
+        set({ agents: [newAgent, ...agents] })
         return { agent: newAgent, isNew: true }
       },
     }),
     {
-      name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
-      partialize: (state: AgentStore) => ({ 
+      name: getAgentStoreKey(getCurrentSessionId()),
+      storage: createJSONStorage(() => createIndexedDBStorage(getCurrentSessionId())),
+      partialize: (state: AgentStore) => ({
         agents: state.agents,
-        _hasHydrated: state._hasHydrated 
+        _hasHydrated: state._hasHydrated
       }),
       onRehydrateStorage: () => (state: AgentStore | undefined, error: Error | undefined) => {
         if (error) {
           console.error('[AgentStore] Hydration 失败:', error)
         } else if (state) {
+          // 重新解析所有头像 URL（确保跨系统兼容性）
+          const updatedAgents = state.agents.map(agent => {
+            // 如果有 avatar_cid 但 avatar_url 为空、无效或使用旧网关，重新解析
+            if (agent.avatar_cid) {
+              const needsReresolve = !agent.avatar_url ||
+                agent.avatar_url.includes('undefined') ||
+                agent.avatar_url.includes('null') ||
+                agent.avatar_url.includes('gateway.ipfs.io') // 旧网关可能不可访问
+
+              if (needsReresolve) {
+                return {
+                  ...agent,
+                  avatar_url: state.resolveIpfsUrl(agent.avatar_cid),
+                }
+              }
+            }
+            return agent
+          })
+
+          state.agents = updatedAgents
+          console.log(`[AgentStore] 头像 URL 重新解析完成，共 ${updatedAgents.length} 个智能体`)
           state.setHasHydrated(true)
         }
       },
@@ -379,7 +479,7 @@ export const waitForHydration = (): Promise<void> => {
       resolve()
       return
     }
-    
+
     const unsubscribe = useAgentStore.subscribe((state: AgentStore) => {
       if (state._hasHydrated) {
         unsubscribe()
@@ -390,3 +490,109 @@ export const waitForHydration = (): Promise<void> => {
 }
 
 export default useAgentStore
+
+/**
+ * 设置当前 session ID
+ * @param sessionId - Session ID
+ */
+export async function setCurrentSessionId(sessionId: string): Promise<void> {
+  await sessionDb.set('alou_current_session', sessionId)
+  // 触发自定义事件，通知其他组件 session 已更改
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('alou:session-changed', {
+      detail: { sessionId }
+    }))
+  }
+}
+
+/**
+ * 清除当前 session ID
+ */
+export async function clearCurrentSessionId(): Promise<void> {
+  await sessionDb.deleteByKey('alou_current_session')
+}
+
+/**
+ * 获取指定 session 的所有智能体
+ * @param sessionId - Session ID
+ * @returns 智能体数组
+ */
+export async function getAgentsForSession(sessionId: string): Promise<AgentMetadata[]> {
+  const storeKey = getAgentStoreKey(sessionId)
+  try {
+    const stored = await sessionStorage.get(storeKey)
+    if (!stored) return []
+    
+    return stored.agents || []
+  } catch (error) {
+    console.error('[AgentStore] 获取 session 智能体失败:', error)
+    return []
+  }
+}
+
+/**
+ * 合并多个 session 的智能体到当前 session
+ * @param sessionIds - Session ID 数组
+ */
+export async function mergeAgentsFromSessions(sessionIds: string[]): Promise<void> {
+  const currentSessionId = getCurrentSessionId()
+  if (!currentSessionId) return
+
+  const currentStore = useAgentStore.getState()
+  const existingIds = new Set(currentStore.agents.map(a => a.id))
+
+  for (const sessionId of sessionIds) {
+    if (sessionId === currentSessionId) continue
+
+    const agents = await getAgentsForSession(sessionId)
+    for (const agent of agents) {
+      // 只添加不存在的智能体
+      if (!existingIds.has(agent.id)) {
+        currentStore.addAgent(agent)
+        existingIds.add(agent.id)
+      }
+    }
+  }
+}
+
+/**
+ * 清除指定 session 的所有数据
+ * @param sessionId - Session ID
+ */
+export async function clearSessionData(sessionId: string): Promise<void> {
+  const storeKey = getAgentStoreKey(sessionId)
+  try {
+    await sessionStorage.deleteByKey(storeKey)
+    console.log('[AgentStore] 已清除 session 数据:', sessionId)
+  } catch (error) {
+    console.error('[AgentStore] 清除 session 数据失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 获取存储使用统计
+ */
+export async function getStorageStats(): Promise<{
+  totalAgents: number
+  sessions: string[]
+  storageUsed: number
+}> {
+  try {
+    const stats = await sessionStorage.getStats()
+    const currentStore = useAgentStore.getState()
+    
+    return {
+      totalAgents: currentStore.agents.length,
+      sessions: stats.sessions,
+      storageUsed: stats.totalSize,
+    }
+  } catch (error) {
+    console.error('[AgentStore] 获取存储统计失败:', error)
+    return {
+      totalAgents: 0,
+      sessions: [],
+      storageUsed: 0,
+    }
+  }
+}

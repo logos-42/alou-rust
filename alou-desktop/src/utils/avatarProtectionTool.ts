@@ -296,18 +296,19 @@ class AvatarProtectionTool {
    */
   async restoreAvatarData(): Promise<number> {
     console.log('🔄 开始恢复头像数据...')
-    
+
     try {
       const backupData = localStorage.getItem('alou_avatar_backup')
       if (!backupData) {
         console.log('⚠️ 没有找到头像备份数据')
         return 0
       }
-      
+
       const avatarBackup: AvatarBackup[] = JSON.parse(backupData)
       const updateAgent = useAgentStore.getState().updateAgent
+      const resolveIpfsUrl = useAgentStore.getState().resolveIpfsUrl
       let restoredCount = 0
-      
+
       for (const backup of avatarBackup) {
         const currentAgent = useAgentStore.getState().agents.find(a => a.id === backup.id)
 
@@ -317,6 +318,8 @@ class AvatarProtectionTool {
           // 只恢复缺失的头像字段
           if (!currentAgent.avatar_cid && backup.avatarData.avatar_cid) {
             updates.avatar_cid = backup.avatarData.avatar_cid
+            // 同时解析为 URL
+            updates.avatar_url = resolveIpfsUrl(backup.avatarData.avatar_cid) || undefined
           }
           if (!currentAgent.avatar_url && backup.avatarData.avatar_url) {
             updates.avatar_url = backup.avatarData.avatar_url
@@ -325,18 +328,57 @@ class AvatarProtectionTool {
           // if (!currentAgent.avatar && backup.avatarData.avatar) {
           //   updates.avatar = backup.avatarData.avatar
           // }
-          
+
           if (Object.keys(updates).length > 0) {
             updateAgent(backup.id, updates)
             restoredCount++
           }
         }
       }
-      
+
       console.log(`✅ 恢复了 ${restoredCount} 个智能体的头像数据`)
       return restoredCount
     } catch (error) {
       console.error('❌ 恢复头像数据失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 自动检测并修复所有头像 URL（跨系统兼容）
+   * 在应用启动时调用，确保所有头像 URL 都是可访问的
+   */
+  async autoFixAvatarUrls(): Promise<number> {
+    console.log('🔧 开始自动修复头像 URL...')
+
+    try {
+      const agents = useAgentStore.getState().agents
+      const updateAgent = useAgentStore.getState().updateAgent
+      const resolveIpfsUrl = useAgentStore.getState().resolveIpfsUrl
+      let fixedCount = 0
+
+      for (const agent of agents) {
+        const needsFix = !agent.avatar_url || 
+          agent.avatar_url.includes('undefined') || 
+          agent.avatar_url.includes('null') ||
+          (agent.avatar_cid && agent.avatar_url?.includes('gateway.ipfs.io')) // 旧网关可能不可访问
+
+        if (needsFix && agent.avatar_cid) {
+          const newAvatarUrl = resolveIpfsUrl(agent.avatar_cid)
+          if (newAvatarUrl && newAvatarUrl !== agent.avatar_url) {
+            updateAgent(agent.id, {
+              avatar_url: newAvatarUrl,
+            })
+            fixedCount++
+            console.log(`[AvatarProtection] 修复智能体头像 URL: ${agent.name || agent.id}`)
+          }
+        }
+      }
+
+      console.log(`✅ 自动修复了 ${fixedCount} 个头像 URL`)
+      return fixedCount
+    } catch (error) {
+      console.error('❌ 自动修复头像 URL 失败:', error)
       throw error
     }
   }
@@ -375,6 +417,7 @@ if (typeof window !== 'undefined') {
     fixCorruptedAvatars: () => avatarProtectionTool.fixCorruptedAvatars(),
     backupAvatarData: () => avatarProtectionTool.backupAvatarData(),
     restoreAvatarData: () => avatarProtectionTool.restoreAvatarData(),
+    autoFixAvatarUrls: () => avatarProtectionTool.autoFixAvatarUrls(),
     getStats: () => avatarProtectionTool.getProtectionStats(),
     resetResults: () => avatarProtectionTool.resetResults(),
     help: () => {
@@ -384,6 +427,7 @@ if (typeof window !== 'undefined') {
       console.log('')
       console.log('修复功能:')
       console.log('  AlouAvatarProtection.fixCorruptedAvatars() - 修复损坏头像')
+      console.log('  AlouAvatarProtection.autoFixAvatarUrls() - 自动修复所有头像 URL（跨系统兼容）')
       console.log('')
       console.log('备份功能:')
       console.log('  AlouAvatarProtection.backupAvatarData() - 备份头像数据')
@@ -395,10 +439,11 @@ if (typeof window !== 'undefined') {
       console.groupEnd()
     }
   }
-  
+
   console.log('🛡️ AlouAvatarProtection 头像保护工具已加载!')
   console.log('💡 输入 AlouAvatarProtection.help() 查看使用帮助')
   console.log('🔍 输入 AlouAvatarProtection.checkAllAvatars() 检查头像状态')
+  console.log('🔧 输入 AlouAvatarProtection.autoFixAvatarUrls() 自动修复头像 URL')
 }
 
 export default avatarProtectionTool

@@ -283,19 +283,22 @@ impl ToolExecutor for SpecTool {
                             return Err(ToolError::InvalidArguments("update 操作必须提供 'spec_data' 字段".to_string()));
                         }
                     }
-                    "get" | "delete" | "export" => {
+                    "get" | "delete" => {
                         if args.get("spec_id").is_none() {
                             return Err(ToolError::InvalidArguments(format!("{} 操作必须提供 'spec_id' 字段", op)));
+                        }
+                    }
+                    "export" => {
+                        if args.get("spec_id").is_none() {
+                            return Err(ToolError::InvalidArguments("export 操作必须提供 'spec_id' 字段".to_string()));
+                        }
+                        if args.get("output_format").is_none() {
+                            return Err(ToolError::InvalidArguments("export 操作必须提供 'output_format' 字段".to_string()));
                         }
                     }
                     "validate" => {
                         if args.get("spec_id").is_none() && args.get("spec_data").is_none() {
                             return Err(ToolError::InvalidArguments("validate 操作必须提供 'spec_id' 或 'spec_data' 字段".to_string()));
-                        }
-                    }
-                    "export" => {
-                        if args.get("output_format").is_none() {
-                            return Err(ToolError::InvalidArguments("export 操作必须提供 'output_format' 字段".to_string()));
                         }
                     }
                     _ => {}

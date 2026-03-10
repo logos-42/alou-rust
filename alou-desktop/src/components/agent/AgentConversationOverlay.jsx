@@ -51,48 +51,41 @@ const AgentConversationOverlay = forwardRef(
     )
 
     // 主要的自动滚动逻辑 - 直接控制 conversation-body
+    // 优化：使用 requestAnimationFrame 和防抖来减少闪烁
     useEffect(() => {
       const conversationBody = conversationBodyRef.current
       if (!conversationBody) return
 
+      let animationFrameId = null
+      let timeoutId = null
+
       const scrollToBottom = () => {
-        conversationBody.scrollTop = conversationBody.scrollHeight
-      }
-
-      // 立即滚动
-      scrollToBottom()
-      
-      // 延迟滚动，确保内容渲染完成
-      setTimeout(scrollToBottom, 50)
-      
-      // 更长延迟，确保动态内容加载完成
-      setTimeout(scrollToBottom, 150)
-      
-      // 最长延迟，确保所有异步内容加载完成
-      setTimeout(scrollToBottom, 300)
-    }, [messages, isLoading])
-
-    // 专门处理新消息的滚动
-    useEffect(() => {
-      const conversationBody = conversationBodyRef.current
-      if (!conversationBody || messages.length === 0) return
-
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage && (lastMessage.type === 'assistant' || lastMessage.type === 'user')) {
-        // 对于新的用户或助手消息，强制滚动到底部
-        const forceScrollToBottom = () => {
+        if (conversationBody) {
           conversationBody.scrollTop = conversationBody.scrollHeight
         }
-        
-        // 立即执行
-        forceScrollToBottom()
-        
-        // 延迟执行，确保内容完全渲染
-        setTimeout(forceScrollToBottom, 100)
-        setTimeout(forceScrollToBottom, 250)
-        setTimeout(forceScrollToBottom, 400)
       }
-    }, [messages.length]) // 只监听消息数量变化
+
+      // 使用 requestAnimationFrame 在下一帧滚动，避免布局抖动
+      animationFrameId = requestAnimationFrame(() => {
+        scrollToBottom()
+        
+        // 只在有新消息时执行额外的延迟滚动
+        if (messages.length > 0) {
+          timeoutId = setTimeout(() => {
+            scrollToBottom()
+          }, 100)
+        }
+      })
+
+      return () => {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId)
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      }
+    }, [messages.length, isLoading]) // 只监听消息数量变化和 loading 状态
 
     const avatarSrc = avatar || DEFAULT_AVATAR
     const avatarAlt = typeof title === 'string' ? title : '智能体'

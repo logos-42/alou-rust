@@ -4,6 +4,7 @@ import GroupChatArchiveList from './GroupChatArchiveList'
 import { useI18n } from '@/hooks/useI18n'
 import { useLocalIpfsGroupChat } from '@/hooks/useLocalIpfsGroupChat'
 import { resolveAgentAvatar } from '../AgentChat/agentUtils'
+import { getAgentName } from '@/utils/agentNameUtils'
 import {
   getPartialMentionAtCursor,
   getMentionSuggestions,

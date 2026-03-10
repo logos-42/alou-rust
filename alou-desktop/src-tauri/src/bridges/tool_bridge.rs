@@ -6,7 +6,7 @@ use super::super::tools::{ToolRegistry, ToolResult, ExecutionContext, ToolConfig
 use crate::tools::executor::ToolExecutionManager;
 use crate::tools::{
     FileSystemTool, SearchTool, BashTool, PlanTool, TodoListTool, AgentSkillsTool,
-    AgentCollaborationTool, ToolCreationTool, network::NetworkTool, system::SystemTool,
+    ToolCreationTool, network::NetworkTool, system::SystemTool,
     rollback::RollbackTool, pubsub_tool::PubSubTool, message_passing::MessagePassingTool,
     iroh_tool::IrohTool, ipfs_archive::IpfsArchiveTool, git_helper::GitHelperTool,
     browser_tool::BrowserTool, agent_creator::AgentCreatorTool, ui_control::UIControlTool,
@@ -137,11 +137,6 @@ impl ToolBridge {
         let skills_tool = Arc::new(AgentSkillsTool::new()?);
         self.register_tool(skills_tool).await?;
 
-        // 注册Agent协作工具
-        let ipfs_api_url = std::env::var("IPFS_API_URL").unwrap_or_else(|_| "http://127.0.0.1:5001".to_string());
-        let collab_tool = Arc::new(AgentCollaborationTool::new(ipfs_api_url));
-        self.register_tool(collab_tool).await?;
-        
         // 注册Agent创建工具
         let agent_creator = Arc::new(AgentCreatorTool::new());
         self.register_tool(agent_creator).await?;

@@ -187,74 +187,14 @@ impl AutonomousExecutor {
 
     /// 执行计划工具
     async fn execute_plan_tool(&self, step: &serde_json::Value) -> serde_json::Value {
-        let params = step.get("params").cloned().unwrap_or(json!({}));
-        
-        // 检查是否有 action 参数
-        let action = params.get("action")
-            .and_then(|v| v.as_str())
-            .unwrap_or("create_plan");
-        
-        // 根据 action 执行不同的操作
-        match action {
-            "create_plan" => {
-                // 检查必需参数
-                let name = params.get("name").and_then(|v| v.as_str());
-                let goal = params.get("goal").and_then(|v| v.as_str());
-                
-                if name.is_none() || goal.is_none() {
-                    return json!({
-                        "success": false,
-                        "tool": "plan",
-                        "error": "缺少必需参数：name 和 goal",
-                        "message": "创建计划需要提供 name（计划名称）和 goal（计划目标）",
-                        "required_params": ["name", "goal"],
-                        "example": {
-                            "action": "create_plan",
-                            "name": "我的计划",
-                            "goal": "完成项目目标",
-                            "steps": []
-                        }
-                    });
-                }
-                
-                json!({
-                    "success": true,
-                    "tool": "plan",
-                    "action": "create_plan",
-                    "plan_name": name,
-                    "plan_goal": goal,
-                    "steps": params.get("steps").cloned().unwrap_or(json!([])),
-                    "message": format!("计划 '{}' 已创建，目标：{}", name.unwrap_or(""), goal.unwrap_or("")),
-                    "next_step": "请提供具体的计划步骤 (steps 数组)"
-                })
-            },
-            "update_step" => {
-                json!({
-                    "success": true,
-                    "tool": "plan",
-                    "action": "update_step",
-                    "params": params,
-                    "message": "计划步骤更新请求已接收"
-                })
-            },
-            "list_plans" => {
-                json!({
-                    "success": true,
-                    "tool": "plan",
-                    "action": "list_plans",
-                    "plans": [],
-                    "message": "当前没有已保存的计划"
-                })
-            },
-            _ => {
-                json!({
-                    "success": false,
-                    "tool": "plan",
-                    "error": format!("未知的 action: {}", action),
-                    "supported_actions": ["create_plan", "update_step", "list_plans"]
-                })
-            }
-        }
+        json!({
+            "success": true,
+            "tool": "plan",
+            "action": "计划创建已准备就绪",
+            "params": step.get("params").cloned().unwrap_or(json!({})),
+            "message": "工具已选择，等待执行",
+            "requires_execution": true
+        })
     }
 
     /// 执行待办工具

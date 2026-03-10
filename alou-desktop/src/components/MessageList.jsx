@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useEffect } from 'react'
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useEffect, memo } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
 import LoadingIcon from '@/assets/加载0.2.png'
@@ -39,10 +39,58 @@ const formatTime = (timestamp) =>
     minute: '2-digit',
   })
 
+// 优化：单个消息组件，使用 memo 防止不必要的重渲染
+const MessageItem = memo(({ message, isInteractive, onMessageSelect, handleCopy, isNew }) => {
+  return (
+    <div
+      className={`message-wrapper ${message.type}${isNew ? ' message-enter' : ''}`}
+      role={isInteractive ? 'button' : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={() => onMessageSelect?.(message)}
+      onKeyDown={(event) => {
+        if (!isInteractive) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          onMessageSelect(message)
+        }
+      }}
+    >
+      <div className="message-bubble">
+        <div
+          className="message-content"
+          dangerouslySetInnerHTML={{ __html: message.html }}
+        />
+        <div className="message-footer">
+          <span className="timestamp">{message.formattedTime}</span>
+          <div className="message-actions">
+            <button
+              type="button"
+              className="copy-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopy(message.content, message.id)
+              }}
+              title="复制内容"
+            >
+              📋
+            </button>
+            {message.formattedSource && (
+              <span className="source-tag">{message.formattedSource}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})
+
+MessageItem.displayName = 'MessageItem'
+
 const MessageList = forwardRef(
   ({ messages = [], isLoading = false, loadingContent = null, onMessageSelect }, ref) => {
   const containerRef = useRef(null)
   const { t } = useI18n()
+  // 跟踪已渲染过的消息 ID，用于判断哪些是新消息
+  const renderedMessageIds = useRef(new Set())
 
   useImperativeHandle(
     ref,
@@ -69,64 +117,40 @@ const MessageList = forwardRef(
 
   const renderedMessages = useMemo(
     () =>
-      messages.map((message) => ({
-        ...message,
-        html: formatMessage(message.content),
-        formattedTime: formatTime(message.timestamp),
-        formattedSource: message.source ? sourceMap[message.source] || message.source : null,
-      })),
+      messages.map((message) => {
+        // 判断是否为新消息
+        const isNew = !renderedMessageIds.current.has(message.id)
+        if (isNew) {
+          renderedMessageIds.current.add(message.id)
+        }
+        return {
+          ...message,
+          html: formatMessage(message.content),
+          formattedTime: formatTime(message.timestamp),
+          formattedSource: message.source ? sourceMap[message.source] || message.source : null,
+          isNew,
+        }
+      }),
     [messages],
   )
 
   // 移除了自动滚动逻辑，由父容器 AgentConversationOverlay 统一控制
 
+  const isInteractive = typeof onMessageSelect === 'function'
+
   return (
     <div className="messages-area" ref={containerRef}>
       <div>
-        {renderedMessages.map((message) => {
-          const isInteractive = typeof onMessageSelect === 'function'
-          return (
-            <div
-              key={message.id}
-              className={`message-wrapper ${message.type}`}
-              role={isInteractive ? 'button' : undefined}
-              tabIndex={isInteractive ? 0 : undefined}
-              onClick={() => onMessageSelect?.(message)}
-              onKeyDown={(event) => {
-                if (!isInteractive) return
-                if (event.key === 'Enter' || event.key === ' ') {
-                  onMessageSelect(message)
-                }
-              }}
-            >
-              <div className="message-bubble">
-                <div
-                  className="message-content"
-                  dangerouslySetInnerHTML={{ __html: message.html }}
-                />
-                <div className="message-footer">
-                  <span className="timestamp">{message.formattedTime}</span>
-                  <div className="message-actions">
-                    <button
-                      type="button"
-                      className="copy-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleCopy(message.content, message.id)
-                      }}
-                      title="复制内容"
-                    >
-                      📋
-                    </button>
-                    {message.formattedSource && (
-                      <span className="source-tag">{message.formattedSource}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {renderedMessages.map((message) => (
+          <MessageItem
+            key={message.id}
+            message={message}
+            isInteractive={isInteractive}
+            onMessageSelect={onMessageSelect}
+            handleCopy={handleCopy}
+            isNew={message.isNew}
+          />
+        ))}
       </div>
 
       {isLoading &&
