@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use log::{debug, info, warn, error};
 use reqwest::Client;
 use base64::{Engine as _, engine::general_purpose};
-use crate::ipns_verified::{IpfsConfig, generate_ipns_key_verified, publish_to_ipns_verified};
+use crate::ipns_verified::{IpfsConfig, generate_ipns_key_verified, publish_to_ipns_verified, detect_ipfs_cli};
 
 use crate::utils::normalize_base_url;
 
@@ -681,7 +681,7 @@ pub async fn create_diap_identity_from_did_document(
     let ipfs_config = IpfsConfig {
         api_url: api_url.clone(),
         gateway_url: gateway_url.clone(),
-        cli_path: None, // 自动检测
+        cli_path: detect_ipfs_cli(), // 检测 IPFS CLI
     };
     
     let ipns_key_result = generate_ipns_key_verified(&ipns_key_name, &ipfs_config).await

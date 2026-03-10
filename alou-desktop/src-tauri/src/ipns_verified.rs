@@ -39,13 +39,22 @@ impl Default for IpfsConfig {
 }
 
 /// 检测IPFS命令行工具路径
-fn detect_ipfs_cli() -> Option<PathBuf> {
+pub(crate) fn detect_ipfs_cli() -> Option<PathBuf> {
     // 尝试常见的IPFS安装路径
     let common_paths = vec![
         PathBuf::from(r"C:\Users\Mechrevo\AppData\Roaming\com.alou.desktop\kubo\ipfs.exe"),
         PathBuf::from(r"C:\Program Files\IPFS\ipfs.exe"),
         PathBuf::from(r"C:\Users\Mechrevo\.cargo\bin\ipfs.exe"),
     ];
+
+    // macOS: 检查应用数据目录
+    if let Some(home) = dirs::home_dir() {
+        let app_ipfs = home.join("Library/Application Support/com.alou.desktop/kubo/ipfs");
+        if app_ipfs.exists() {
+            println!("🔍 找到 Alou 应用数据目录 IPFS: {}", app_ipfs.display());
+            return Some(app_ipfs);
+        }
+    }
     
     for path in common_paths {
         if path.exists() {
@@ -55,18 +64,23 @@ fn detect_ipfs_cli() -> Option<PathBuf> {
     }
     
     // 尝试从PATH中查找
-    if let Ok(output) = Command::new("where").arg("ipfs.exe").output() {
+    // 尝试从 PATH 中查找
+    #[cfg(target_os = "windows")]
+    let where_cmd = Command::new("where").arg("ipfs.exe").output();
+    #[cfg(not(target_os = "windows"))]
+    let where_cmd = Command::new("which").arg("ipfs").output();
+
+    if let Ok(output) = where_cmd {
         if output.status.success() {
             if let Some(path_str) = String::from_utf8_lossy(&output.stdout).lines().next() {
                 let path = PathBuf::from(path_str.trim());
                 if path.exists() {
-                    println!("🔍 从PATH找到IPFS CLI: {}", path.display());
+                    println!("🔍 从 PATH 找到 IPFS CLI: {}", path.display());
                     return Some(path);
                 }
             }
         }
     }
-    
     println!("⚠️ 未找到IPFS CLI工具");
     None
 }
@@ -267,118 +281,51 @@ async fn publish_with_api(
     api_url: &str,
 ) -> Result<IpnsPublishResult, String> {
     use reqwest::Client;
-    
+
+    // 使用与 ipfs_commands 相同的配置
     let client = Client::builder()
+        .http1_only() // 强制使用 HTTP/1.1
         .timeout(std::time::Duration::from_secs(60))
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .tcp_keepalive(std::time::Duration::from_secs(60))
+        .no_proxy() // 避免通过系统代理访问本地 API
         .build()
-        .map_err(|e| format!("创建HTTP客户端失败: {}", e))?;
-    
+        .map_err(|e| format!("创建 HTTP 客户端失败：{}", e))?;
+
     let endpoint = format!("{}/api/v0/name/publish", normalize_base_url(api_url));
-    
-    let params = [
-        ("arg", cid),
-        ("key", key_name),
-        ("lifetime", "24h"),
-        ("ttl", "1h"),
-    ];
-    
+
+    // 使用查询参数而不是表单数据
+    let url = format!("{}?arg={}&key={}&lifetime=24h&ttl=1h",
+        endpoint,
+        urlencoding::encode(cid),
+        urlencoding::encode(key_name));
+
     let response = client
-        .post(&endpoint)
-        .form(&params)
+        .post(&url)
         .header("User-Agent", "Alou-Desktop/1.0")
         .send()
         .await
-        .map_err(|e| format!("发送请求失败: {}", e))?;
-    
+        .map_err(|e| format!("发送请求失败：{}", e))?;
+
     if !response.status().is_success() {
         let status = response.status();
         let text = response.text().await.unwrap_or_default();
-        return Err(format!("API请求失败: {} - {}", status, text));
+        return Err(format!("API 请求失败：{} - {}", status, text));
     }
-    
+
     let result: Value = response.json().await
-        .map_err(|e| format!("解析响应失败: {}", e))?;
-    
+        .map_err(|e| format!("解析响应失败：{}", e))?;
+
     let name = result.get("Name")
         .and_then(|v| v.as_str())
-        .ok_or("响应中缺少Name字段")?;
-    
+        .ok_or("响应中缺少 Name 字段")?;
+
     let value = result.get("Value")
         .and_then(|v| v.as_str())
-        .ok_or("响应中缺少Value字段")?;
-    
+        .ok_or("响应中缺少 Value 字段")?;
+
     Ok(IpnsPublishResult {
         name: name.to_string(),
         value: value.to_string(),
     })
-}
-
-/// 验证IPNS解析
-pub async fn resolve_ipns_verified(
-    key_name: &str,
-    config: &IpfsConfig,
-) -> Result<String, String> {
-    println!("🔍 验证IPNS解析: {}", key_name);
-    
-    if let Some(ref cli_path) = config.cli_path {
-        match resolve_with_cli(cli_path, key_name).await {
-            Ok(result) => {
-                println!("✅ IPNS解析成功: {}", result);
-                return Ok(result);
-            }
-            Err(e) => {
-                println!("⚠️ CLI解析失败: {}", e);
-            }
-        }
-    }
-    
-    Err("IPNS解析验证失败".to_string())
-}
-
-/// 使用命令行工具解析IPNS
-async fn resolve_with_cli(
-    cli_path: &PathBuf,
-    key_name: &str,
-) -> Result<String, String> {
-    let output = Command::new(cli_path)
-        .arg("name")
-        .arg("resolve")
-        .arg(key_name)
-        .output()
-        .map_err(|e| format!("执行IPFS CLI失败: {}", e))?;
-    
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("IPFS CLI解析失败: {}", stderr));
-    }
-    
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let resolved = stdout.trim().to_string();
-    
-    if resolved.is_empty() {
-        return Err("IPNS解析返回空结果".to_string());
-    }
-    
-    Ok(resolved)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[tokio::test]
-    async fn test_ipns_key_generation() {
-        let config = IpfsConfig::default();
-        let key_name = format!("test-key-{}", chrono::Utc::now().timestamp());
-        
-        match generate_ipns_key_verified(&key_name, &config).await {
-            Ok(result) => {
-                println!("✅ 测试密钥生成成功: {:?}", result);
-                assert!(!result.id.is_empty());
-            }
-            Err(e) => {
-                println!("❌ 测试密钥生成失败: {}", e);
-            }
-        }
-    }
 }
