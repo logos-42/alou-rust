@@ -1,6 +1,6 @@
 // 辅助函数：生成系统提示
 export const getSystemPromptForAgent = (
-  agentInfo: { name?: string; role_description?: string } | null,
+  agentInfo: { name?: string; role_description?: string; id?: string } | null,
   mode: 'agent' | 'alou' | 'group_chat',
   walletAddress: string | null,
   chain: string | null
@@ -376,8 +376,9 @@ Alou 的个性与价值观：
    \`\`\`
 
 3. **直接编辑文档**：也可以使用 \`filesystem\` 工具直接编辑 .md 文件
-   - 文档位置：\`~/Library/Application Support/com.alou.desktop/agent-documents/{agent_id}/\`
+   - **你的文档位置**：\`~/Library/Application Support/com.alou.desktop/agent-documents/${agentInfo?.id || 'unknown'}/\`
    - 例如：\`MEMORY.md\`, \`SOUL.md\` 等
+   - **重要**：这些文档是属于你的个人记忆，每个智能体有自己的独立文档目录
 
 ### 何时更新记忆
 
@@ -411,6 +412,9 @@ Alou 的个性与价值观：
 
 === SOUL ===
 # 核心身份
+
+**智能体 ID**: ${agentInfo?.id || 'unknown'}
+**名称**: ${agentInfo.name || '智能体'}
 
 ${agentInfo.name || '智能体'}的核心特质和价值观。
 

@@ -116,6 +116,7 @@ pub async fn execute_ai_conversation(
     message: String,
     messages: Option<Vec<serde_json::Value>>, // 完整的对话历史消息数组（role + content）
     options: Option<serde_json::Value>,
+    agent_id: Option<String>, // 智能体 ID（可选，主要用于 agent_document 工具）
     bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::bridges::BridgeManager>>>,
 ) -> std::result::Result<serde_json::Value, String> {
     log::info!("[Command] 执行 AI 对话: {}", &message[..20.min(message.len())]);
@@ -148,6 +149,9 @@ pub async fn execute_ai_conversation(
     )
     .with_app_handle(app_handle);
 
+    // 使用传入的 agent_id，如果没有则使用默认值
+    let agent_id = agent_id.unwrap_or_else(|| "conversation".to_string());
+
     // 创建任务：优先使用 messages 数组（包含完整上下文），否则退回单条消息
     use super::ai_client::AiMessage;
     let task_id = if let Some(msgs) = messages {
@@ -166,12 +170,12 @@ pub async fn execute_ai_conversation(
             })
             .collect();
         if ai_messages.is_empty() {
-            task_manager.create_task("conversation".to_string(), message).await
+            task_manager.create_task(agent_id.clone(), message).await
         } else {
-            task_manager.create_task_with_messages("conversation".to_string(), ai_messages).await
+            task_manager.create_task_with_messages(agent_id.clone(), ai_messages).await
         }
     } else {
-        task_manager.create_task("conversation".to_string(), message).await
+        task_manager.create_task(agent_id.clone(), message).await
     };
 
     // 检查是否需要流式响应

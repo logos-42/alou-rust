@@ -505,15 +505,16 @@ export const useAgentMessages = ({
           id: localApiConfig.id || 'primary',
           provider: localApiConfig.provider,
           api_key: localApiConfig.api_key,
-           
+
           base_url: localApiConfig.base_url != null ? localApiConfig.base_url : null,
-           
+
           model: localApiConfig.model != null ? localApiConfig.model : null,
           is_active: true,
         },
         message: text.trim(),       // fallback 单条消息
         messages: messagesArray,    // 完整上下文数组（优先使用）
         options: { stream: false },
+        agentId: agentInfo?.id || targetAgentId,  // 传递智能体 ID（从左侧栏获取，用于 agent_document 工具）
       })
 
       console.log('[useAgentMessages] Tauri AI 响应:', tauri_result)

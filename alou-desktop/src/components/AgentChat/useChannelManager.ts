@@ -5,6 +5,7 @@ import useClusterActionStore from '@/stores/clusterActionStore'
 import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from './agentUtils'
 import { resolveBackendChain } from '@/hooks/useAgentChat'
 import { isIpns, isCid } from '@/services/utils/ipnsUtils'
+import { agentDocumentService } from '@/services/agentDocumentService'
 
 import type { Channel } from '@/shared/types/services'
 import type { AgentInfo } from '@/types/groupchat'
@@ -149,7 +150,7 @@ export const useChannelManager = ({
           applyLatest(() => {
             if (channel) {
               // 合并而不是替换：将后端返回的频道添加到列表（如果不存在）
-              setChannels((prev: Channel[])\1 {
+              setChannels((prev: Channel[]) => {
                 const existingIds = new Set(prev.map(c => c.id))
                 if (existingIds.has(channel.id)) {
                   console.log('[useChannelManager] 后端频道已存在，跳过添加:', channel.id)
@@ -160,8 +161,8 @@ export const useChannelManager = ({
                 return [channel, ...prev]
               })
               // 只有当前没有选中的频道时才设置
-              setActiveChannelId((prev: Channel[])\1 prev || channel.id)
-              setSelectedAgent((prev: Channel[])\1 prev || metadata)
+              setActiveChannelId((prev) => prev || channel.id)
+              setSelectedAgent((prev) => prev || metadata)
             }
             // 注意：如果后端没有返回频道，保持现有列表不变（本地存储的智能体）
           })
@@ -196,7 +197,7 @@ export const useChannelManager = ({
                   console.log('[useChannelManager] 清空搜索关键词，确保频道显示')
                   setChannelKeyword('')
                   // 确保频道在列表中（resolveExistingAgentTarget 已经添加，这里只是确保状态一致）
-                  setChannels((prev: Channel[])\1 {
+                  setChannels((prev: Channel[]) => {
                     const existingIds = new Set(prev.map(c => c.id))
                     if (existingIds.has(resolvedChannel.id)) {
                       console.log('[useChannelManager] 频道已存在于列表中，跳过添加')
@@ -284,7 +285,7 @@ export const useChannelManager = ({
         }
 
         // 将远程搜索结果转换为频道格式
-        const remoteChannels = remoteAgents.map((agent: any)\1 buildChannelFromAgent(agent)).filter(Boolean)
+        const remoteChannels = remoteAgents.map((agent: any) => buildChannelFromAgent(agent)).filter(Boolean)
 
         // 合并本地和远程结果，本地结果优先，去重
         const localIds = new Set(localMatches.map(c => c.id))
@@ -332,7 +333,7 @@ export const useChannelManager = ({
             // 后端不可用时，检查本地存储是否有智能体
             if (storedAgents && storedAgents.length > 0) {
               const localChannels = storedAgents
-                .map((agent: any)\1 buildChannelFromAgent(agent))
+                .map((agent: any) => buildChannelFromAgent(agent))
                 .filter(Boolean)
               
               if (localChannels.length > 0) {
@@ -502,8 +503,8 @@ export const useChannelManager = ({
           // 更新选中的智能体信息，但保持原 channel.id 不变
           setSelectedAgent(mergedAgent)
           // 原地更新频道信息，不改变 ID，不添加新频道
-          setChannels((prev: Channel[])\1 
-            prev.map((item: Channel)\1 
+          setChannels((prev: Channel[]) => 
+            prev.map((item: Channel) => 
               item.id === channel.id 
                 ? { ...item, meta: mergedAgent, name: mergedAgent.display_name || mergedAgent.name || item.name }
                 : item
@@ -572,9 +573,9 @@ export const useChannelManager = ({
         
         console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id, 'channel.name:', channel.name)
         // 使用函数式更新确保状态正确
-        setChannels((prev: Channel[])\1 {
+        setChannels((prev: Channel[]) => {
           console.log('[useChannelManager] 当前频道列表长度:', prev.length, '当前频道IDs:', prev.map(c => c.id))
-          const others = prev.filter((item: Channel)\1 item.id !== channel.id)
+          const others = prev.filter((item: Channel) => item.id !== channel.id)
           const newChannels = [channel, ...others]
           console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name, '新频道IDs:', newChannels.map(c => c.id))
           return newChannels
@@ -582,7 +583,7 @@ export const useChannelManager = ({
         
         console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
         setActiveChannelId(channel.id)
-        setSelectedAgent(agent)
+        setSelectedAgent(channel.meta)  // 使用 channel.meta 而不是原始 agent
         
         // 清空搜索关键词，避免过滤掉新解析的频道
         console.log('[useChannelManager] 清空搜索关键词')
@@ -665,7 +666,7 @@ export const useChannelManager = ({
     // 如果本地存储有智能体，加载到 channels
     if (storedAgents && storedAgents.length > 0) {
       const localChannels = storedAgents
-        .map((agent: any)\1 {
+        .map((agent: any) => {
           const channel = buildChannelFromAgent(agent)
           if (!channel) {
             console.error(`[useChannelManager] 无法构建频道，agent:`, agent)
@@ -786,7 +787,7 @@ export const useChannelManager = ({
 
   // 切换指定频道的模式
   const handleModeChange = useCallback((channelId, mode) => {
-    setChannels((prev: Channel[])\1
+    setChannels((prev: Channel[]) =>
       prev.map((channel) =>
         channel.id === channelId
           ? {
@@ -809,8 +810,8 @@ export const useChannelManager = ({
       const channel = buildChannelFromAgent(earlyMetadata)
       if (channel) {
         // 确保 tempId 保存在 channel.meta 中用于后续匹配
-        const tempId = earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_') 
-          ? earlyMetadata.cid 
+        const tempId = earlyMetadata.cid && earlyMetadata.cid.startsWith('temp_')
+          ? earlyMetadata.cid
           : null
         if (tempId) {
           channel.tempId = tempId
@@ -818,13 +819,13 @@ export const useChannelManager = ({
             channel.meta.tempId = tempId
           }
         }
-        
-        setChannels((prev: Channel[])\1 {
+
+        setChannels((prev: Channel[]) => {
           // 如果已有相同 tempId 的频道，更新它；否则添加新频道
           if (tempId) {
-            const existingIndex = prev.findIndex((item: Channel)\1 
-              item.tempId === tempId || 
-              item.id === tempId || 
+            const existingIndex = prev.findIndex((item: Channel) =>
+              item.tempId === tempId ||
+              item.id === tempId ||
               item.meta?.tempId === tempId ||
               item.meta?.cid === tempId
             )
@@ -836,14 +837,14 @@ export const useChannelManager = ({
               return updated
             }
           }
-          
+
           // 移除可能重复的频道（相同 ID）
-          const others = prev.filter((item: Channel)\1 item.id !== channel.id)
+          const others = prev.filter((item: Channel) => item.id !== channel.id)
           console.log('[useChannelManager] 添加早期频道:', channel.id, 'tempId:', tempId)
           return [channel, ...others]
         })
         setActiveChannelId(channel.id)
-        setSelectedAgent(earlyMetadata)
+        setSelectedAgent(channel.meta)  // 使用 channel.meta 而不是原始 earlyMetadata
         console.log('[useChannelManager] 早期频道已显示，tempId:', tempId, '等待完整创建...')
       }
     },
@@ -864,17 +865,17 @@ export const useChannelManager = ({
 
       // 检查本地存储中是否已存在同名智能体（防止重复创建）
       const existingAgents = storedAgents || []
-      const existingAgent = existingAgents.find((agent: any)\1 
-        agent.name?.toLowerCase() === name.toLowerCase() || 
+      const existingAgent = existingAgents.find((agent: any) =>
+        agent.name?.toLowerCase() === name.toLowerCase() ||
         agent.display_name?.toLowerCase() === name.toLowerCase()
       )
-      
+
       if (existingAgent) {
         console.log('[useChannelManager] 智能体已存在，跳过创建，直接切换:', name)
         // 切换到已存在的智能体
         const existingChannel = buildChannelFromAgent(existingAgent)
         if (existingChannel) {
-          setChannels((prev: Channel[])\1 {
+          setChannels((prev: Channel[]) => {
             // 检查是否已在频道列表中
             const existsInList = prev.some(c => c.id === existingChannel.id)
             if (existsInList) {
@@ -959,6 +960,8 @@ export const useChannelManager = ({
           mcp_ports: mcp_ports || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_ports,
           diap_identity: diapIdentity || result.data?.agent_metadata || (result as any).agent_metadata?.diap_identity,
           sessionId,
+          // 生成 id：优先使用 ipns/did/cid，否则使用临时 id
+          id: result.data?.diap_identity?.ipns || result.data?.diap_identity?.did || result.data?.diap_identity?.cid || tempId,
         }
 
         console.log('[useChannelManager] 构建的元数据:', metadata)
@@ -980,11 +983,11 @@ export const useChannelManager = ({
           existingChannelsCount: channels.length
         })
         if (channel) {
-          setChannels((prev: Channel[])\1 {
+          setChannels((prev: Channel[])=> {
             console.log('[useChannelManager] 当前频道列表:', prev.map(c => ({ id: c.id, name: c.name })))
             
             // 查找临时频道 - 使用多种方式匹配
-            const tempIndex = prev.findIndex((item: Channel)\1 {
+            const tempIndex = prev.findIndex((item: Channel)=> {
               // 1. 通过 tempId 属性匹配
               if (tempId && item.tempId === tempId) return true
               if (tempId && item.meta?.tempId === tempId) return true
@@ -999,7 +1002,7 @@ export const useChannelManager = ({
             })
 
             // 检查是否已存在相同ID的频道（在查找临时频道之前检查）
-            const existingIndex = prev.findIndex((item: Channel)\1 item.id === channel.id)
+            const existingIndex = prev.findIndex((item: Channel)=> item.id === channel.id)
             
             console.log('[useChannelManager] 频道检查结果:', {
               newChannelId: channel.id,
@@ -1036,10 +1039,21 @@ export const useChannelManager = ({
           setActiveChannelId(channel.id)
         }
 
-        setSelectedAgent(metadata)
+        setSelectedAgent(channel.meta)  // 使用 channel.meta 而不是 metadata
 
         // 保存到本地存储
         saveAgentToStorage(metadata)
+
+        // 初始化智能体文档（将身份信息存储到记忆文档）
+        const agentId = channel.id
+        console.log('[useChannelManager] 开始初始化智能体文档:', agentId)
+        agentDocumentService.initializeAgentDocuments(agentId, {
+          name: metadata.display_name,
+          role_description: metadata.role_description,
+          id: agentId,
+        }).catch(err => {
+          console.error('[useChannelManager] 初始化智能体文档失败:', err)
+        })
 
         console.log('[useChannelManager] 智能体创建/更新完成:', metadata.did || metadata.cid)
         return result
@@ -1065,6 +1079,8 @@ export const useChannelManager = ({
             sessionId,
             status: 'local_fallback',
             error: message,
+            // 生成 id：优先使用 ipns/did/cid
+            id: diapIdentity?.ipns || diapIdentity?.did || diapIdentity?.cid || `temp_${Date.now()}`,
           }
           
           console.log('[useChannelManager] 创建本地回退元数据:', localMetadata)
@@ -1072,18 +1088,27 @@ export const useChannelManager = ({
           const localChannel = buildChannelFromAgent(localMetadata)
           if (localChannel) {
             console.log('[useChannelManager] 本地回退频道:', localChannel)
-            
-            setChannels((prev: Channel[])\1 {
-              const others = prev.filter((item: Channel)\1 item.id !== localChannel.id)
+
+            setChannels((prev: Channel[]) => {
+              const others = prev.filter((item: Channel) => item.id !== localChannel.id)
               return [localChannel, ...others]
             })
             
             setActiveChannelId(localChannel.id)
-            setSelectedAgent(localMetadata)
-            
+            setSelectedAgent(localChannel.meta)  // 使用 channel.meta
+
             // 保存到本地存储
             saveAgentToStorage(localMetadata)
-            
+
+            // 初始化智能体文档（本地回退也初始化文档）
+            agentDocumentService.initializeAgentDocuments(localChannel.id, {
+              name: localMetadata.display_name,
+              role_description: localMetadata.role_description,
+              id: localChannel.id,
+            }).catch(err => {
+              console.error('[useChannelManager] 初始化智能体文档失败（本地回退）:', err)
+            })
+
             console.log('[useChannelManager] 本地回退频道已创建:', localChannel.name)
             
             // 返回一个模拟的成功结果
@@ -1138,8 +1163,8 @@ export const useChannelManager = ({
     })
     
     // 1. 从频道列表中删除
-    setChannels((prev: Channel[])\1 {
-      const filtered = prev.filter((c: Channel)\1 c.id !== channel.id)
+    setChannels((prev: Channel[]) => {
+      const filtered = prev.filter((c: Channel) => c.id !== channel.id)
       console.log('[useChannelManager] 从频道列表删除，剩余:', filtered.length)
       return filtered
     })
@@ -1191,7 +1216,7 @@ export const useChannelManager = ({
         .then(() => {
           console.log('[useChannelManager] 已删除后端 session:', agentSessionId)
         })
-        .catch((error: any)\1 {
+        .catch((error: any) => {
           console.error('[useChannelManager] 删除后端 session 失败:', error)
         })
     }
@@ -1208,7 +1233,7 @@ export const useChannelManager = ({
 
   // 导入已解析的智能体（从 CreateAgentModal 导入）
   const handleImportAgent = useCallback(
-    async (agent: any)\1 {
+    async (agent: any) => {
       if (!agent) {
         console.error('[useChannelManager] handleImportAgent 接收到 null/undefined agent')
         throw new Error('无效的智能体数据')
@@ -1272,9 +1297,9 @@ export const useChannelManager = ({
         }
         
         console.log('[useChannelManager] 准备添加到频道列表，channel.id:', channel.id, 'channel.name:', channel.name)
-        setChannels((prev: Channel[])\1 {
+        setChannels((prev: Channel[]) => {
           console.log('[useChannelManager] 当前频道列表长度:', prev.length)
-          const others = prev.filter((item: Channel)\1 item.id !== channel.id)
+          const others = prev.filter((item: Channel) => item.id !== channel.id)
           const newChannels = [channel, ...others]
           console.log('[useChannelManager] 更新后频道列表长度:', newChannels.length, '新增的频道:', channel.name, '频道头像:', channel.avatar)
           return newChannels
@@ -1282,8 +1307,7 @@ export const useChannelManager = ({
         
         console.log('[useChannelManager] 设置活动频道 ID:', channel.id)
         setActiveChannelId(channel.id)
-        // 使用增强后的 agent 对象
-        setSelectedAgent(enrichedAgent)
+        setSelectedAgent(channel.meta)  // 使用 channel.meta 而不是 enrichedAgent
         
         // 保存到本地存储
         // 重要：使用与 buildChannelFromAgent 相同的ID生成逻辑，确保一致性

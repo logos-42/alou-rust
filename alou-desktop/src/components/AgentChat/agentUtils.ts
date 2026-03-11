@@ -311,10 +311,11 @@ export const buildChannelFromAgent = (agent: Agent | null): Channel | null => {
 
   const avatar = resolveAgentAvatar(cleanedAgent)
 
-  // 确保 meta 对象有 mode 字段（默认为 'agent'）
+  // 确保 meta 对象有 mode 字段（默认为 'agent'）和 id 字段
   const metaWithMode: Agent = {
     ...cleanedAgent,
     mode: cleanedAgent.mode || 'agent',
+    id: cleanedAgent.id || id,  // 确保 meta 有 id 字段
   }
 
   return {

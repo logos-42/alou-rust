@@ -258,8 +258,6 @@ class AgentDocumentService {
 最后更新: ${new Date().toISOString()}`,
 
       soul: `# 核心身份
-**智能体 ID**: ${agentInfo?.id || 'unknown'}
-**名称**: ${agentInfo?.name || '智能体'}
 
 ${agentInfo?.name || '智能体'}的核心特质和价值观。
 
@@ -281,8 +279,6 @@ ${agentInfo?.role_description || '专业的AI助手'}
 最后更新: ${new Date().toISOString()}`,
 
       identity: `# 身份定义
-
-**智能体 ID**: ${agentInfo?.id || 'unknown'}
 
 ## 名称
 ${agentInfo?.name || '智能体'}

@@ -517,9 +517,7 @@ fn get_memory_manager() -> &'static MemoryManager {
     static MANAGER: OnceLock<MemoryManager> = OnceLock::new();
 
     MANAGER.get_or_init(|| {
-        // 使用默认配置创建 MemoryManager
-        MemoryManager::new(1000, 50).unwrap_or_else(|_| {
-            // 如果创建失败，创建一个基本的 MemoryManager
+        let manager = MemoryManager::new(1000, 50).unwrap_or_else(|_| {
             let rt = Runtime::new().unwrap();
             let ipfs_client = IpfsClient::default();
             MemoryManager {
@@ -529,6 +527,138 @@ fn get_memory_manager() -> &'static MemoryManager {
                 ipfs_client: Arc::new(ipfs_client),
                 runtime: Arc::new(rt),
             }
-        })
+        });
+        
+        // 启动时加载 DIAP 身份
+        load_diap_identities_from_file(&manager);
+        
+        &manager
     })
+}
+
+/// 从文件加载 DIAP 身份到内存管理器
+fn load_diap_identities_from_file(manager: &MemoryManager) {
+    use std::path::PathBuf;
+    
+    // 获取应用数据目录
+    let app_data_dir = match tauri::api::path::app_data_dir(
+        &tauri::generate_context!()
+    ) {
+        Some(dir) => dir,
+        None => {
+            log::warn!("[MemoryManager] 无法获取应用数据目录");
+            return;
+        }
+    };
+    
+    let diap_file = app_data_dir.join("diap").join("identities.json");
+    
+    // 如果文件不存在，跳过加载
+    if !diap_file.exists() {
+        log::info!("[MemoryManager] DIAP 身份文件不存在，跳过加载");
+        return;
+    }
+    
+    // 读取文件
+    let content = match std::fs::read_to_string(&diap_file) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("[MemoryManager] 读取 DIAP 身份文件失败：{}", e);
+            return;
+        }
+    };
+    
+    // 解析 JSON
+    let identities: HashMap<String, String> = match serde_json::from_str(&content) {
+        Ok(i) => i,
+        Err(e) => {
+            log::error!("[MemoryManager] 解析 DIAP 身份失败：{}", e);
+            return;
+        }
+    };
+    
+    // 加载到内存
+    let mut items = manager.items.lock().unwrap();
+    for (session_id, identity) in identities {
+        let key = format!("diap_identity_{}", session_id);
+        items.insert(key, serde_json::from_str(&identity).unwrap_or_else(|_| {
+            // 如果解析失败，创建一个新的 MemoryItem
+            use std::time::{SystemTime, UNIX_EPOCH};
+            MemoryItem {
+                key: format!("diap_identity_{}", session_id),
+                value: identity,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                size: identity.len(),
+                cid: None,
+                archived: false,
+                pinned: true, // DIAP 身份默认固定
+            }
+        }));
+    }
+    
+    log::info!("[MemoryManager] 加载了 {} 个 DIAP 身份", items.len());
+}
+
+/// 保存 DIAP 身份到文件
+fn save_diap_identities_to_file(manager: &MemoryManager) {
+    use std::path::PathBuf;
+    use std::io::Write;
+    
+    // 获取应用数据目录
+    let app_data_dir = match tauri::api::path::app_data_dir(
+        &tauri::generate_context!()
+    ) {
+        Some(dir) => dir,
+        None => {
+            log::warn!("[MemoryManager] 无法获取应用数据目录");
+            return;
+        }
+    };
+    
+    let diap_dir = app_data_dir.join("diap");
+    let diap_file = diap_dir.join("identities.json");
+    
+    // 创建目录
+    if let Err(e) = std::fs::create_dir_all(&diap_dir) {
+        log::error!("[MemoryManager] 创建 DIAP 目录失败：{}", e);
+        return;
+    }
+    
+    // 收集 DIAP 身份
+    let items = manager.items.lock().unwrap();
+    let mut identities: HashMap<String, String> = HashMap::new();
+    
+    for (key, item) in items.iter() {
+        if key.starts_with("diap_identity_") {
+            let session_id = key.replace("diap_identity_", "");
+            identities.insert(session_id, item.value.clone());
+        }
+    }
+    
+    // 写入临时文件
+    let temp_file = diap_file.with_extension("json.tmp");
+    match std::fs::File::create(&temp_file) {
+        Ok(mut file) => {
+            let json = serde_json::to_string_pretty(&identities).unwrap_or_default();
+            if let Err(e) = file.write_all(json.as_bytes()) {
+                log::error!("[MemoryManager] 写入 DIAP 身份失败：{}", e);
+                let _ = std::fs::remove_file(&temp_file);
+                return;
+            }
+            let _ = file.sync_all();
+        },
+        Err(e) => {
+            log::error!("[MemoryManager] 创建 DIAP 文件失败：{}", e);
+            return;
+        }
+    }
+    
+    // 原子重命名
+    if let Err(e) = std::fs::rename(&temp_file, &diap_file) {
+        log::error!("[MemoryManager] 重命名 DIAP 文件失败：{}", e);
+        let _ = std::fs::remove_file(&temp_file);
+        return;
+    }
+    
+    log::debug!("[MemoryManager] 保存了 {} 个 DIAP 身份到 {:?}", identities.len(), diap_file);
 }
