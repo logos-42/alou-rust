@@ -5,6 +5,7 @@ use crate::utils::normalize_base_url;
 use serde_json::Value;
 use std::process::Command;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 /// IPNS密钥生成结果
 #[derive(Debug, Clone)]
@@ -26,14 +27,18 @@ pub struct IpfsConfig {
     pub api_url: String,
     pub gateway_url: String,
     pub cli_path: Option<PathBuf>,
+    pub repo_path: Option<PathBuf>,
 }
 
 impl Default for IpfsConfig {
     fn default() -> Self {
+        let cli_path = detect_ipfs_cli();
+        let repo_path = detect_ipfs_repo();
         Self {
             api_url: "http://localhost:5001".to_string(),
             gateway_url: "http://localhost:8080".to_string(),
-            cli_path: detect_ipfs_cli(),
+            cli_path,
+            repo_path,
         }
     }
 }
@@ -47,11 +52,11 @@ pub(crate) fn detect_ipfs_cli() -> Option<PathBuf> {
         PathBuf::from(r"C:\Users\Mechrevo\.cargo\bin\ipfs.exe"),
     ];
 
-    // macOS: 检查应用数据目录
+    // macOS: 检查应用数据目录 (可执行文件)
     if let Some(home) = dirs::home_dir() {
         let app_ipfs = home.join("Library/Application Support/com.alou.desktop/kubo/ipfs");
-        if app_ipfs.exists() {
-            println!("🔍 找到 Alou 应用数据目录 IPFS: {}", app_ipfs.display());
+        if app_ipfs.exists() && app_ipfs.is_file() {
+            println!("🔍 找到 Alou 应用 IPFS 可执行文件: {}", app_ipfs.display());
             return Some(app_ipfs);
         }
     }
@@ -85,6 +90,47 @@ pub(crate) fn detect_ipfs_cli() -> Option<PathBuf> {
     None
 }
 
+/// 检测IPFS repo路径
+pub(crate) fn detect_ipfs_repo() -> Option<PathBuf> {
+    // macOS: 检查 Alou 应用数据目录
+    if let Some(home) = dirs::home_dir() {
+        let app_ipfs_repo = home.join("Library/Application Support/com.alou.desktop/ipfs");
+        if app_ipfs_repo.exists() && app_ipfs_repo.is_dir() {
+            println!("🔍 找到 Alou 应用 IPFS repo: {}", app_ipfs_repo.display());
+            return Some(app_ipfs_repo);
+        }
+        
+        // 也检查 kubo 目录下的 ipfs 目录
+        let kubo_ipfs_repo = home.join("Library/Application Support/com.alou.desktop/kubo/ipfs");
+        if kubo_ipfs_repo.exists() && kubo_ipfs_repo.is_dir() {
+            println!("🔍 找到 Alou 应用 IPFS repo (kubo): {}", kubo_ipfs_repo.display());
+            return Some(kubo_ipfs_repo);
+        }
+    }
+    
+    // Windows: 检查应用数据目录
+    #[cfg(target_os = "windows")]
+    if let Some(app_data) = std::env::var_os("APPDATA") {
+        let app_ipfs_repo = PathBuf::from(app_data).join("com.alou.desktop").join("ipfs");
+        if app_ipfs_repo.exists() && app_ipfs_repo.is_dir() {
+            println!("🔍 找到 Windows IPFS repo: {}", app_ipfs_repo.display());
+            return Some(app_ipfs_repo);
+        }
+    }
+    
+    // 默认使用 ~/.ipfs
+    if let Some(home) = dirs::home_dir() {
+        let default_ipfs = home.join(".ipfs");
+        if default_ipfs.exists() && default_ipfs.is_dir() {
+            println!("🔍 找到默认 IPFS repo: {}", default_ipfs.display());
+            return Some(default_ipfs);
+        }
+    }
+    
+    println!("⚠️ 未找到 IPFS repo，使用默认路径");
+    None
+}
+
 /// 经过验证的IPNS密钥生成
 /// 优先使用命令行工具，API作为后备方案
 pub async fn generate_ipns_key_verified(
@@ -96,7 +142,8 @@ pub async fn generate_ipns_key_verified(
     // 方案1: 使用命令行工具（已验证）
     if let Some(ref cli_path) = config.cli_path {
         println!("📋 尝试使用CLI生成密钥...");
-        match generate_key_with_cli(cli_path, key_name).await {
+        let repo_path = config.repo_path.as_ref();
+        match generate_key_with_cli(cli_path, key_name, repo_path).await {
             Ok(result) => {
                 println!("✅ CLI密钥生成成功: {}", result.id);
                 return Ok(result);
@@ -125,8 +172,21 @@ pub async fn generate_ipns_key_verified(
 async fn generate_key_with_cli(
     cli_path: &PathBuf,
     key_name: &str,
+    repo_path: Option<&PathBuf>,
 ) -> Result<IpnsKeyResult, String> {
-    let output = Command::new(cli_path)
+    // 构建环境变量，包括 IPFS_PATH
+    let mut env_vars: HashMap<String, String> = HashMap::new();
+    if let Some(repo) = repo_path {
+        env_vars.insert("IPFS_PATH".to_string(), repo.to_string_lossy().to_string());
+    }
+    
+    // 获取当前环境变量并添加 IPFS_PATH
+    let mut cmd = Command::new(cli_path);
+    for (key, value) in env_vars {
+        cmd.env(&key, &value);
+    }
+    
+    let output = cmd
         .arg("key")
         .arg("gen")
         .arg(key_name)
@@ -209,7 +269,8 @@ pub async fn publish_to_ipns_verified(
     // 方案1: 使用命令行工具（已验证）
     if let Some(ref cli_path) = config.cli_path {
         println!("📋 尝试使用CLI发布...");
-        match publish_with_cli(cli_path, cid, key_name).await {
+        let repo_path = config.repo_path.as_ref();
+        match publish_with_cli(cli_path, cid, key_name, repo_path).await {
             Ok(result) => {
                 println!("✅ CLI发布成功: {}", result.value);
                 return Ok(result);
@@ -239,8 +300,20 @@ async fn publish_with_cli(
     cli_path: &PathBuf,
     cid: &str,
     key_name: &str,
+    repo_path: Option<&PathBuf>,
 ) -> Result<IpnsPublishResult, String> {
-    let output = Command::new(cli_path)
+    // 构建环境变量，包括 IPFS_PATH
+    let mut env_vars: HashMap<String, String> = HashMap::new();
+    if let Some(repo) = repo_path {
+        env_vars.insert("IPFS_PATH".to_string(), repo.to_string_lossy().to_string());
+    }
+    
+    let mut cmd = Command::new(cli_path);
+    for (key, value) in env_vars {
+        cmd.env(&key, &value);
+    }
+    
+    let output = cmd
         .arg("name")
         .arg("publish")
         .arg("--key")

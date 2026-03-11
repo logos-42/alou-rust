@@ -590,7 +590,7 @@ export class UnifiedAgentCoordinator {
   // ============================================================================
 
   /**
-   * 分发事件到智能体
+   * 分发事件到智能体（带 session ID）
    */
   dispatchToAgent(agentId: string, message: UnifiedMessage): void {
     const registeredAgent = this.registeredAgents.get(agentId)
@@ -634,9 +634,19 @@ export class UnifiedAgentCoordinator {
       this.handleAutoReply(agentId, message)
     }
 
+    // 触发全局事件（带 session ID，用于跨组件通信）
+    window.dispatchEvent(new CustomEvent('agent-group-message', {
+      detail: {
+        agentId,
+        message,
+        sessionId: this.sessionId, // 添加 session ID
+      }
+    }))
+
     if (this.config.debug) {
       console.log('[AgentCoordinator] 消息已分发到智能体:', {
         agentId,
+        sessionId: this.sessionId,
         messageType: message.type,
         content: message.content.slice(0, 50) + '...',
       })

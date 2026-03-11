@@ -164,6 +164,7 @@ class AsyncDiapCreationService {
     const ipfsGatewayUrl = options.ipfsGatewayUrl || DEFAULT_IPFS_GATEWAY
 
     task.status = 'running'
+    console.log('[AsyncDiapCreation] 🚀 开始执行 DIAP 创建流程:', sessionId)
     task.startedAt = Date.now()
     this.updateProgress(task, {
       stage: 'checking_ipfs',
@@ -418,7 +419,8 @@ class AsyncDiapCreationService {
   async getDiapIdentity(sessionId: string): Promise<DiapIdentityData | null> {
     if (hasDiapIdentity(sessionId)) {
       const identity = getDiapIdentity(sessionId)
-      if (identity && identity.did && identity.cid && identity.ipns) {
+      // DID 和 CID 是必须的，IPNS 可以为空
+      if (identity && identity.did && identity.cid) {
         return identity
       }
     }

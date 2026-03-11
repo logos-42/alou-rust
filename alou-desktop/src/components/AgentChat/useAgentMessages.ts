@@ -786,16 +786,27 @@ export const useAgentMessages = ({
   // 创建 ref 来存储 sendMessageToAgent，以便在事件处理器中使用
   const sendMessageToAgentRef = useRef<((targetAgentId: string, text: string, targetAgent: Agent | null, options?: { groupId?: string; isGroupChat?: boolean; originalMessage?: string }) => Promise<void>) | null>(null)
 
-  // 监听群聊消息事件
+  // 监听群聊消息事件（带 session 过滤）
   useEffect(() => {
     const handleAgentGroupMessage = async (event: Event) => {
-      const customEvent = event as CustomEvent<{ agentId: string; message: GroupChatMessage }>
-      const { agentId, message } = customEvent.detail
-      
+      const customEvent = event as CustomEvent<{ agentId: string; message: GroupChatMessage; sessionId?: string }>
+      const { agentId, message, sessionId: eventSessionId } = customEvent.detail
+
+      // Session 过滤：只处理当前 session 的消息
+      // 使用 sessionId prop（来自组件）
+      if (eventSessionId && eventSessionId !== sessionId) {
+        console.log('[useAgentMessages] Session 不匹配，跳过消息:', {
+          eventSessionId,
+          currentSessionId: sessionId,
+          agentId,
+        })
+        return
+      }
+
       // 关键修复：移除 selectedAgent 检查，让所有智能体都能接收群聊消息
       // 即使智能体未被选中，也应该能够处理群聊消息
       console.log('[useAgentMessages] 智能体收到群聊消息:', agentId, message)
-      
+
       const messageContent = message.content || message.text || ''
       if (!messageContent.trim()) {
         console.warn('[useAgentMessages] 群聊消息内容为空，跳过')

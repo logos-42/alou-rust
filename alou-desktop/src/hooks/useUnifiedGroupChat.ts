@@ -22,7 +22,7 @@ import {
   getAdapterForGroup,
   getBestAvailableAdapter,
 } from '@/adapters/groupChatAdapter'
-import { agentCoordinator } from '@/services/unifiedAgentCoordinator'
+import { useCoordinator } from '@/context/SessionContext'
 import useClusterActionStore from '@/stores/clusterActionStore'
 import { parseMentions } from '@/utils/mentionParser'
 
@@ -110,6 +110,9 @@ export function useUnifiedGroupChat(
     onGroupCreated,
     onMessage,
   } = options
+
+  // 从 SessionContext 获取当前 session 的 coordinator
+  const coordinator = useCoordinator()
 
   // 状态
   const [isInitialized, setIsInitialized] = useState(false)
@@ -207,6 +210,12 @@ export function useUnifiedGroupChat(
 
       const group = activeGroupRef.current
 
+      // 如果没有 coordinator，跳过
+      if (!coordinator) {
+        console.warn('[useUnifiedGroupChat] Coordinator 未初始化，跳过智能体响应')
+        return
+      }
+
       // 查找群聊中的智能体
       const agents = group.members.filter((m) => m.mode === 'agent')
 
@@ -215,17 +224,17 @@ export function useUnifiedGroupChat(
         for (const mentionedId of mentions) {
           const agent = agents.find((a) => a.id === mentionedId)
           if (agent) {
-            agentCoordinator.dispatchToAgent(agent.id, message)
+            coordinator.dispatchToAgent(agent.id, message)
           }
         }
       } else {
         // 没有提及，通知所有智能体
         for (const agent of agents) {
-          agentCoordinator.dispatchToAgent(agent.id, message)
+          coordinator.dispatchToAgent(agent.id, message)
         }
       }
     },
-    []
+    [coordinator] // 添加 coordinator 到依赖
   )
 
   /**

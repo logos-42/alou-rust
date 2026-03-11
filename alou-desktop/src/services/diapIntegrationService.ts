@@ -445,7 +445,8 @@ class DiapIntegrationService {
       // 优先从本地存储获取
       if (hasDiapIdentity(sessionId)) {
         const identity = getDiapIdentity(sessionId)
-        if (identity && identity.did && identity.cid && identity.ipns) {
+        // DID 和 CID 是必须的，IPNS 可以为空
+        if (identity && identity.did && identity.cid) {
           console.log('[DiapIntegration] 从本地存储获取DIAP身份成功')
           return { identity }
         }

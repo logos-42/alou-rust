@@ -1,12 +1,13 @@
 import { useEffect } from 'react'
 import AppRoutes from './routes/AppRoutes'
 import ErrorBoundary from './components/ErrorBoundary'
+import { SessionProvider } from '@/context/SessionContext'
 import ipfsService from './services/ipfsService'
-import '@/utils/diapIdentityCleanupTool' // 加载DIAP身份清理工具
+import '@/utils/diapIdentityCleanupTool' // 加载 DIAP 身份清理工具
 import '@/utils/avatarProtectionTool' // 加载头像保护工具
 import '@/utils/agentCreationDiagnosticTool' // 加载智能体创建诊断工具
 
-const App = () => {
+const AppContent = () => {
   useEffect(() => {
     let cancelled = false
 
@@ -45,10 +46,8 @@ const App = () => {
   }, [])
 
   return (
-    <ErrorBoundary>
-      <div className="app-container">
-        <AppRoutes />
-      </div>
+    <div className="app-container">
+      <AppRoutes />
 
       <style>{`
         .app-container {
@@ -57,6 +56,16 @@ const App = () => {
           height: 100vh;
         }
       `}</style>
+    </div>
+  )
+}
+
+const App = () => {
+  return (
+    <ErrorBoundary>
+      <SessionProvider autoInit={true} defaultConfig={{ debug: false }}>
+        <AppContent />
+      </SessionProvider>
     </ErrorBoundary>
   )
 }

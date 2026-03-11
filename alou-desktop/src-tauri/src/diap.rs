@@ -688,6 +688,7 @@ pub async fn create_diap_identity_from_did_document(
         api_url: api_url.clone(),
         gateway_url: gateway_url.clone(),
         cli_path: detect_ipfs_cli(),
+        repo_path: None, // 让 ipns_verified 自动检测
     };
     
     // 尝试生成IPNS密钥和发布，失败则不中断，继续返回CID和DID
@@ -752,6 +753,19 @@ pub async fn create_diap_identity_from_did_document(
             Err(e) => {
                 warn!(target: "diap", "⚠️ IPNS密钥生成失败，但CID和DID已生成: {}", e);
                 // IPNS密钥生成失败，返回空IPNS但保留CID和DID
+                let encrypted_node_id = match create_encrypted_node_id(&params.session_id, &key_pair.private_key).await {
+                    Ok(id) => Some(id),
+                    Err(_) => None
+                };
+                let pubsub_topics = Some(vec![
+                    format!("/topic/agent/{}", params.session_id),
+                    "/topic/global/agents".to_string(),
+                ]);
+                (String::new(), None, encrypted_node_id, pubsub_topics)
+            }
+            Err(_) => {
+                warn!(target: "diap", "⚠️ IPNS 密钥生成超时（10 秒），但 CID 和 DID 已生成");
+                // IPNS 密钥生成超时，返回空 IPNS 但保留 CID 和 DID
                 let encrypted_node_id = match create_encrypted_node_id(&params.session_id, &key_pair.private_key).await {
                     Ok(id) => Some(id),
                     Err(_) => None

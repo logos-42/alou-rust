@@ -450,9 +450,9 @@ export const setDiapIdentity = (sessionId: string, identity: DiapIdentity | stri
     parsedIdentity = identity
   }
   
-  // 验证必要字段
-  if (!parsedIdentity || !parsedIdentity.did || !parsedIdentity.cid || !parsedIdentity.ipns) {
-    console.error('[MemoryStorage] DIAP身份数据不完整:', parsedIdentity)
+  // 验证必要字段 (DID 和 CID 是必须的，IPNS 可以为空)
+  if (!parsedIdentity || !parsedIdentity.did || !parsedIdentity.cid) {
+    console.error('[MemoryStorage] DIAP身份数据不完整（缺少DID或CID）:', parsedIdentity)
     return false
   }
   

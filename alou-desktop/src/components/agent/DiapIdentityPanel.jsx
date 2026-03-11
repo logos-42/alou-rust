@@ -524,51 +524,85 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             <div className="diap-field">
               <label>{t('agent.diap.ipns')}</label>
               <div className="diap-value">
-                <code>{identity.ipns || selectedAgent?.ipns || 'N/A'}</code>
-                {(identity.ipns || selectedAgent?.ipns) && (
+                <code>{(identity?.ipns || selectedAgent?.ipns) || 'N/A'}</code>
+                {(identity?.ipns || selectedAgent?.ipns) ? (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity.ipns || selectedAgent?.ipns || '')}
+                    onClick={() => copyToClipboard(identity?.ipns || selectedAgent?.ipns || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
 
             <div className="diap-field">
               <label>{t('agent.diap.cid')}</label>
               <div className="diap-value">
-                <code>{identity.cid || selectedAgent?.cid || 'N/A'}</code>
-                {(identity.cid || selectedAgent?.cid) && (
+                <code>{(identity?.cid || selectedAgent?.cid) || 'N/A'}</code>
+                {(identity?.cid || selectedAgent?.cid) ? (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity.cid || selectedAgent?.cid || '')}
+                    onClick={() => copyToClipboard(identity?.cid || selectedAgent?.cid || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
 
             <div className="diap-field">
               <label>{t('agent.diap.did')}</label>
               <div className="diap-value">
-                <code>{identity.did || selectedAgent?.did || 'N/A'}</code>
-                {(identity.did || selectedAgent?.did) && (
+                <code>{(identity?.did || selectedAgent?.did) || 'N/A'}</code>
+                {(identity?.did || selectedAgent?.did) ? (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity.did || selectedAgent?.did || '')}
+                    onClick={() => copyToClipboard(identity?.did || selectedAgent?.did || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                )}
+                ) : null}
+              </div>
+            </div>
+
+            <div className="diap-field">
+              <label>{t('agent.diap.cid')}</label>
+              <div className="diap-value">
+                <code>{(identity?.cid || selectedAgent?.cid) || 'N/A'}</code>
+                {(identity?.cid || selectedAgent?.cid) ? (
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => copyToClipboard(identity?.cid || selectedAgent?.cid || '')}
+                    title={t('agent.diap.copy')}
+                  >
+                    <img src={CopyIcon} alt="复制" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="diap-field">
+              <label>{t('agent.diap.did')}</label>
+              <div className="diap-value">
+                <code>{(identity?.did || selectedAgent?.did) || 'N/A'}</code>
+                {(identity?.did || selectedAgent?.did) ? (
+                  <button
+                    type="button"
+                    className="copy-btn"
+                    onClick={() => copyToClipboard(identity?.did || selectedAgent?.did || '')}
+                    title={t('agent.diap.copy')}
+                  >
+                    <img src={CopyIcon} alt="复制" />
+                  </button>
+                ) : null}
               </div>
             </div>
 

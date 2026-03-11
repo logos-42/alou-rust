@@ -40,7 +40,6 @@ export interface AgentConfig {
 export interface UseGroupChatAutonomousAgentConfig {
   enabled?: boolean // 是否启用自主响应
   mentionOnly?: boolean // 仅在被 @ 时响应
-  maxConcurrentTasks?: number // 最大并发任务数
 }
 
 /**
@@ -49,14 +48,13 @@ export interface UseGroupChatAutonomousAgentConfig {
 export interface UseGroupChatAutonomousAgentReturn {
   isReady: boolean
   activeGroups: string[]
-  processingMessages: Map<string, boolean>
   triggerAgentResponse: (groupId: string, message: GroupChatMessage, agentId: string) => Promise<void>
   broadcastToGroup: (groupId: string, content: string, fromAgentId: string) => Promise<void>
   getGroupAgents: (groupId: string) => AgentConfig[]
 }
 
 /**
- * 群聊自主智能体 Hook
+ * 群聊自主智能体 Hook（无并发限制）
  */
 export const useGroupChatAutonomousAgent = (
   config: UseGroupChatAutonomousAgentConfig = {}
@@ -64,18 +62,15 @@ export const useGroupChatAutonomousAgent = (
   const {
     enabled = true,
     mentionOnly = false,
-    maxConcurrentTasks = 5,
   } = config
 
   // 状态管理
   const [isReady, setIsReady] = useState(false)
   const [activeGroups, setActiveGroups] = useState<string[]>([])
-  const [processingMessages] = useState<Map<string, boolean>>(new Map())
 
   // 引用管理
   const agentTasksRef = useRef<Map<string, Promise<void>>>(new Map())
   const groupAgentsRef = useRef<Map<string, AgentConfig[]>>(new Map())
-  const messageQueueRef = useRef<Map<string, GroupChatMessage[]>>(new Map())
   const activeGroupsRef = useRef<string[]>([])
 
   /**
@@ -183,7 +178,7 @@ export const useGroupChatAutonomousAgent = (
   }, [mentionOnly])
 
   /**
-   * 触发智能体响应
+   * 触发智能体响应（无并发限制）
    */
   const triggerAgentResponse = useCallback(async (
     groupId: string,
@@ -191,29 +186,28 @@ export const useGroupChatAutonomousAgent = (
     agentId: string
   ): Promise<void> => {
     const taskKey = `${groupId}_${agentId}_${message.id}`
-    
-    // 检查是否正在处理
-    if (processingMessages.get(taskKey)) {
-      console.log('[useGroupChatAutonomousAgent] 消息正在处理中，跳过:', taskKey)
-      return
-    }
 
-    // 检查并发任务数
-    const activeTasks = Array.from(agentTasksRef.current.values())
-      .filter(task => task !== undefined).length
-    
-    if (activeTasks >= maxConcurrentTasks) {
-      console.log('[useGroupChatAutonomousAgent] 达到最大并发任务数，消息已加入队列')
-      // 加入消息队列
-      if (!messageQueueRef.current.has(groupId)) {
-        messageQueueRef.current.set(groupId, [])
-      }
-      messageQueueRef.current.get(groupId)!.push(message)
-      return
-    }
+    // ✅ 移除正在处理检查 - 允许同一消息被多个 agent 同时处理
+    // if (processingMessages.get(taskKey)) {
+    //   console.log('[useGroupChatAutonomousAgent] 消息正在处理中，跳过:', taskKey)
+    //   return
+    // }
+
+    // ✅ 移除并发限制 - 允许所有 agent 同时响应
+    // const activeTasks = Array.from(agentTasksRef.current.values())
+    //   .filter(task => task !== undefined).length
+    // if (activeTasks >= maxConcurrentTasks) {
+    //   console.log('[useGroupChatAutonomousAgent] 达到最大并发任务数，消息已加入队列')
+    //   if (!messageQueueRef.current.has(groupId)) {
+    //     messageQueueRef.current.set(groupId, [])
+    //   }
+    //   messageQueueRef.current.get(groupId)!.push(message)
+    //   return
+    // }
 
     try {
       processingMessages.set(taskKey, true)
+      agentTasksRef.current.set(taskKey, Promise.resolve())
 
       console.log('[useGroupChatAutonomousAgent] 触发智能体响应:', {
         agentId,
@@ -224,7 +218,7 @@ export const useGroupChatAutonomousAgent = (
       // 获取智能体信息
       const agents = getGroupAgents(groupId)
       const agent = agents.find(a => a.id === agentId)
-      
+
       if (!agent) {
         console.warn('[useGroupChatAutonomousAgent] 未找到智能体:', agentId)
         return
@@ -239,7 +233,7 @@ export const useGroupChatAutonomousAgent = (
       // 立即触发智能体响应（无延迟）
       console.log('[useGroupChatAutonomousAgent] 立即触发智能体响应:', agentId)
       const systemPrompt = `你是一个群聊智能体，正在参与群聊 "${groupId}"。
-      
+
 你的角色：${agent.role_description || '助手'}
 你的名字：${agent.name}
 
@@ -281,7 +275,7 @@ export const useGroupChatAutonomousAgent = (
       processingMessages.set(taskKey, false)
       agentTasksRef.current.delete(taskKey)
     }
-  }, [getGroupAgents, shouldAgentRespond, maxConcurrentTasks, processingMessages])
+  }, [getGroupAgents, shouldAgentRespond]) // 移除 maxConcurrentTasks 和 processingMessages 依赖
 
   /**
    * 广播消息到群聊
@@ -461,7 +455,6 @@ export const useGroupChatAutonomousAgent = (
   return {
     isReady,
     activeGroups,
-    processingMessages,
     triggerAgentResponse,
     broadcastToGroup,
     getGroupAgents
