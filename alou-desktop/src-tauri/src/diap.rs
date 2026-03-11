@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use log::{debug, info, warn, error};
 use reqwest::Client;
 use base64::{Engine as _, engine::general_purpose};
-use crate::ipns_verified::{IpfsConfig, generate_ipns_key_verified, publish_to_ipns_verified, detect_ipfs_cli};
+use crate::ipns_verified::{IpfsConfig, generate_ipns_key_verified, publish_to_ipns_verified, detect_ipfs_cli, detect_ipfs_repo};
 
 use crate::utils::normalize_base_url;
 
@@ -688,7 +688,7 @@ pub async fn create_diap_identity_from_did_document(
         api_url: api_url.clone(),
         gateway_url: gateway_url.clone(),
         cli_path: detect_ipfs_cli(),
-        repo_path: None, // 让 ipns_verified 自动检测
+        repo_path: detect_ipfs_repo(), // 自动检测正确的IPFS repo路径
     };
     
     // 尝试生成IPNS密钥和发布，失败则不中断，继续返回CID和DID

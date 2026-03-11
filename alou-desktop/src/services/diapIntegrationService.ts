@@ -523,6 +523,18 @@ class DiapIntegrationService {
       throw new Error(`链上注册失败: ${(error as Error).message}`)
     }
   }
+
+  /**
+   * 创建DIAP身份（简化版本，用于UI调用）
+   */
+  async createDiapIdentity(sessionId: string): Promise<CreateDiapIdentityResult> {
+    return this.createDiapIdentityWithZKPCommand(sessionId, {
+      agentName: 'Agent',
+      agentDescription: '',
+      ipfsApiUrl: DEFAULT_IPFS_API,
+      ipfsGatewayUrl: DEFAULT_IPFS_GATEWAY,
+    })
+  }
 }
 
 // 创建单例实例

@@ -48,22 +48,21 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       setLoading(true)
       setError(null)
 
-      console.log('[DiapIdentityPanel] 开始加载 DIAP 身份，sessionId:', sessionId)
-      console.log('[DiapIdentityPanel] selectedAgent 信息:', {
-        hasSelectedAgent: !!selectedAgent,
-        agentId: selectedAgent?.id,
-        diapIdentity: !!selectedAgent?.diapIdentity,
-        ipns: selectedAgent?.ipns,
-        cid: selectedAgent?.cid,
-        did: selectedAgent?.did,
-      })
+      console.log('[DiapIdentityPanel] ========== 开始加载 DIAP 身份 ==========')
+      console.log('[DiapIdentityPanel] sessionId:', sessionId)
+      console.log('[DiapIdentityPanel] selectedAgent:', selectedAgent ? {
+        id: selectedAgent.id,
+        ipns: selectedAgent.ipns,
+        cid: selectedAgent.cid,
+        did: selectedAgent.did,
+      } : null)
 
       // 优先级 1: 从统一内存存储加载（使用 sessionId）
+      console.log('[DiapIdentityPanel] 检查统一内存存储...')
       if (await hasDiapIdentitySafe(sessionId)) {
         try {
           const storedIdentity = await getDiapIdentitySafe(sessionId)
-          console.log('[DiapIdentityPanel] ✅ 从统一内存存储加载 DIAP 身份:', sessionId)
-          console.log('[DiapIdentityPanel] 身份详情:', storedIdentity)
+          console.log('[DiapIdentityPanel] ✅ 从统一内存存储加载成功:', storedIdentity)
           setIdentity(storedIdentity)
 
           if (selectedAgent?.id) {
@@ -74,17 +73,21 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             })
           }
           setLoading(false)
+          console.log('[DiapIdentityPanel] ========== 加载完成（统一存储）==========')
           return
         } catch (parseErr) {
           console.error('[DiapIdentityPanel] 解析统一存储中的 DIAP 身份失败:', parseErr)
         }
+      } else {
+        console.log('[DiapIdentityPanel] 统一内存存储中没有此 sessionId 的身份')
       }
 
       // 优先级 2: 从 memoryStorage 加载（向后兼容）
+      console.log('[DiapIdentityPanel] 检查 memoryStorage...')
       if (hasDiapIdentity(sessionId)) {
         try {
           const identity = getDiapIdentity(sessionId)
-          console.log('[DiapIdentityPanel] ✅ 从 memoryStorage 加载 DIAP 身份:', identity)
+          console.log('[DiapIdentityPanel] ✅ 从 memoryStorage 加载成功:', identity)
           setIdentity(identity)
 
           if (selectedAgent?.id) {
@@ -95,115 +98,24 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             })
           }
           setLoading(false)
+          console.log('[DiapIdentityPanel] ========== 加载完成（memoryStorage）==========')
           return
         } catch (parseErr) {
           console.error('[DiapIdentityPanel] 解析 memoryStorage 中的 DIAP 身份失败:', parseErr)
           removeDiapIdentity(sessionId)
         }
+      } else {
+        console.log('[DiapIdentityPanel] memoryStorage 中没有此 sessionId 的身份')
       }
 
-      // 优先级 3: 从 IPNS/CID/DID 查找（如果智能体有这些标识）
-      const isTempId = (id) => id && typeof id === 'string' && id.startsWith('temp_')
-      const agentTarget = selectedAgent?.ipns ||
-                         (selectedAgent?.cid && !isTempId(selectedAgent.cid) ? selectedAgent.cid : null) ||
-                         selectedAgent?.did
-
-      if (agentTarget && !isTempId(agentTarget)) {
-        try {
-          console.log('[DiapIdentityPanel] 尝试从 IPNS/CID/DID 加载 DIAP 身份:', agentTarget)
-          const response = await diapIntegrationService.getDiapIdentity(agentTarget)
-          if (response.identity) {
-            console.log('[DiapIdentityPanel] ✅ 从 IPNS/CID/DID 加载 DIAP 身份成功:', agentTarget)
-
-            await setDiapIdentitySafe(sessionId, response.identity)
-
-            const identity = {
-              ...response.identity,
-              ipns: response.identity.ipns || selectedAgent?.ipns || null,
-              cid: response.identity.cid || selectedAgent?.cid || null,
-              did: response.identity.did || selectedAgent?.did || null,
-            }
-            console.log('[DiapIdentityPanel] 补充后的身份信息:', identity)
-            setIdentity(identity)
-
-            if (selectedAgent?.id) {
-              updateAgent(selectedAgent.id, {
-                ipns: identity.ipns,
-                cid: identity.cid,
-                did: identity.did
-              })
-            }
-            setLoading(false)
-            return
-          }
-        } catch (targetErr) {
-          console.log('[DiapIdentityPanel] 从 IPNS/CID/DID 加载失败:', targetErr.message)
-        }
-      } else if (selectedAgent?.cid && isTempId(selectedAgent.cid)) {
-        console.log('[DiapIdentityPanel] 跳过临时 ID，尝试其他方式加载')
-      }
-
-      // 优先级 4: 从旧的 localStorage 迁移数据（兼容性）
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const oldStoredIdentity = localStorage.getItem(`diap_identity_${sessionId}`)
-        if (oldStoredIdentity) {
-          try {
-            const identity = JSON.parse(oldStoredIdentity)
-            console.log('[DiapIdentityPanel] 从 localStorage 迁移 DIAP 身份到统一存储:', sessionId)
-
-            await setDiapIdentitySafe(sessionId, identity)
-            setDiapIdentity(sessionId, identity)
-
-            localStorage.removeItem(`diap_identity_${sessionId}`)
-
-            setIdentity(identity)
-            if (selectedAgent?.id) {
-              updateAgent(selectedAgent.id, {
-                ipns: identity.ipns,
-                cid: identity.cid,
-                did: identity.did
-              })
-            }
-            setLoading(false)
-            return
-          } catch (parseErr) {
-            console.warn('[DiapIdentityPanel] 解析 localStorage 数据失败:', parseErr)
-            localStorage.removeItem(`diap_identity_${sessionId}`)
-          }
-        }
-      }
-
-      // 优先级 5: 从网络加载（使用 sessionId）
-      try {
-        const response = await diapIntegrationService.getDiapIdentity(sessionId)
-        if (response.identity) {
-          setIdentity(response.identity)
-          await setDiapIdentitySafe(sessionId, response.identity)
-          console.log('[DiapIdentityPanel] DIAP 身份已同步到统一存储:', sessionId)
-
-          if (selectedAgent?.id) {
-            updateAgent(selectedAgent.id, {
-              ipns: response.identity.ipns,
-              cid: response.identity.cid,
-              did: response.identity.did
-            })
-          }
-        }
-      } catch (networkErr) {
-        const is404 = networkErr?.response?.status === 404 ||
-                     networkErr?.message?.includes('404') ||
-                     networkErr?.message?.includes('not found')
-        if (!is404) {
-          console.warn('[DiapIdentityPanel] 网络加载失败:', networkErr.message)
-        } else {
-          console.log('[DiapIdentityPanel] DIAP 身份尚未创建（正常状态）')
-        }
-      }
-
+      // 如果没有身份，显示创建按钮
+      console.log('[DiapIdentityPanel] ❌ 未找到任何 DIAP 身份，需要创建')
+      setIdentity(null)
+      setLoading(false)
+      console.log('[DiapIdentityPanel] ========== 加载完成（无身份）==========')
     } catch (error) {
       console.error('[DiapIdentityPanel] 加载 DIAP 身份失败:', error)
-      setError('加载身份信息失败，请稍后重试')
-    } finally {
+      setError(error.message)
       setLoading(false)
     }
   }, [sessionId, selectedAgent, updateAgent])
@@ -480,129 +392,110 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
         )}
       </div>
       <div className="diap-panel-content">
-        {!identity ? (
-          <div className="diap-no-identity">
-            {diapProgress && diapProgress.stage !== 'idle' && diapProgress.stage !== 'completed' && (
-              <div className="diap-creation-progress">
-                <div className="diap-progress-header">
-                  <span className="diap-progress-title">
-                    {diapProgress.stage === 'failed' ? '⚠️ 创建失败' : '⏳ 创建 DIAP 身份中...'}
-                  </span>
-                  <span className="diap-progress-percent">{diapProgress.progress}%</span>
-                </div>
-                <div className="diap-progress-bar">
-                  <div
-                    className={`diap-progress-fill ${diapProgress.stage === 'failed' ? 'failed' : ''}`}
-                    style={{ width: `${diapProgress.progress}%` }}
-                  />
-                </div>
-                <div className="diap-progress-message">
-                  {diapProgress.message}
-                  {diapProgress.error && (
-                    <span className="diap-progress-error"> - {diapProgress.error}</span>
-                  )}
-                </div>
-              </div>
-            )}
+        {/* 创建按钮 - 始终显示在顶部 */}
+        <div className="diap-create-section">
+          {!identity ? (
+            <button
+              type="button"
+              className="create-identity-btn prominent"
+              onClick={handleCreateIdentity}
+              disabled={creating}
+            >
+              {creating ? (
+                <>
+                  <span className="spinner"></span>
+                  {t('agent.diap.creating')}
+                </>
+              ) : (
+                <>
+                  <span className="icon">⚡</span>
+                  {t('agent.diap.create')}
+                </>
+              )}
+            </button>
+          ) : (
+            <div className="diap-status-badge success">
+              <span className="checkmark">✓</span>
+              {t('agent.diap.hasIdentity') || '身份已创建'}
+            </div>
+          )}
+        </div>
 
-            {!diapProgress || (diapProgress.stage === 'idle' || diapProgress.stage === 'completed') ? (
-              <>
-                <p>{t('agent.diap.noIdentity')}</p>
-                <button
-                  type="button"
-                  className="create-identity-btn"
-                  onClick={handleCreateIdentity}
-                  disabled={creating}
-                >
-                  {creating ? t('agent.diap.creating') : t('agent.diap.create')}
-                </button>
-              </>
-            ) : null}
+        {/* 进度显示 */}
+        {diapProgress && diapProgress.stage !== 'idle' && diapProgress.stage !== 'completed' && (
+          <div className="diap-creation-progress">
+            <div className="diap-progress-header">
+              <span className="diap-progress-title">
+                {diapProgress.stage === 'failed' ? '⚠️ 创建失败' : '⏳ 创建 DIAP 身份中...'}
+              </span>
+              <span className="diap-progress-percent">{diapProgress.progress}%</span>
+            </div>
+            <div className="diap-progress-bar">
+              <div
+                className={`diap-progress-fill ${diapProgress.stage === 'failed' ? 'failed' : ''}`}
+                style={{ width: `${diapProgress.progress}%` }}
+              />
+            </div>
+            <div className="diap-progress-message">
+              {diapProgress.message}
+              {diapProgress.error && (
+                <span className="diap-progress-error"> - {diapProgress.error}</span>
+              )}
+            </div>
           </div>
-        ) : (
+        )}
+
+        {/* 身份信息 - 当有身份时显示 */}
+        {identity && (
           <div className="diap-identity-info">
             <div className="diap-field">
               <label>{t('agent.diap.ipns')}</label>
               <div className="diap-value">
-                <code>{(identity?.ipns || selectedAgent?.ipns) || 'N/A'}</code>
-                {(identity?.ipns || selectedAgent?.ipns) ? (
+                <code>{(identity.ipns || selectedAgent?.ipns) || 'N/A'}</code>
+                {(identity.ipns || selectedAgent?.ipns) && (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity?.ipns || selectedAgent?.ipns || '')}
+                    onClick={() => copyToClipboard(identity.ipns || selectedAgent?.ipns || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                ) : null}
+                )}
               </div>
             </div>
 
             <div className="diap-field">
               <label>{t('agent.diap.cid')}</label>
               <div className="diap-value">
-                <code>{(identity?.cid || selectedAgent?.cid) || 'N/A'}</code>
-                {(identity?.cid || selectedAgent?.cid) ? (
+                <code>{(identity.cid || selectedAgent?.cid) || 'N/A'}</code>
+                {(identity.cid || selectedAgent?.cid) && (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity?.cid || selectedAgent?.cid || '')}
+                    onClick={() => copyToClipboard(identity.cid || selectedAgent?.cid || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                ) : null}
+                )}
               </div>
             </div>
 
             <div className="diap-field">
               <label>{t('agent.diap.did')}</label>
               <div className="diap-value">
-                <code>{(identity?.did || selectedAgent?.did) || 'N/A'}</code>
-                {(identity?.did || selectedAgent?.did) ? (
+                <code>{(identity.did || selectedAgent?.did) || 'N/A'}</code>
+                {(identity.did || selectedAgent?.did) && (
                   <button
                     type="button"
                     className="copy-btn"
-                    onClick={() => copyToClipboard(identity?.did || selectedAgent?.did || '')}
+                    onClick={() => copyToClipboard(identity.did || selectedAgent?.did || '')}
                     title={t('agent.diap.copy')}
                   >
                     <img src={CopyIcon} alt="复制" />
                   </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="diap-field">
-              <label>{t('agent.diap.cid')}</label>
-              <div className="diap-value">
-                <code>{(identity?.cid || selectedAgent?.cid) || 'N/A'}</code>
-                {(identity?.cid || selectedAgent?.cid) ? (
-                  <button
-                    type="button"
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(identity?.cid || selectedAgent?.cid || '')}
-                    title={t('agent.diap.copy')}
-                  >
-                    <img src={CopyIcon} alt="复制" />
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="diap-field">
-              <label>{t('agent.diap.did')}</label>
-              <div className="diap-value">
-                <code>{(identity?.did || selectedAgent?.did) || 'N/A'}</code>
-                {(identity?.did || selectedAgent?.did) ? (
-                  <button
-                    type="button"
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(identity?.did || selectedAgent?.did || '')}
-                    title={t('agent.diap.copy')}
-                  >
-                    <img src={CopyIcon} alt="复制" />
-                  </button>
-                ) : null}
+                )}
               </div>
             </div>
 
@@ -640,52 +533,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
               <div className="diap-field register-info">
                 <label>交易哈希</label>
                 <div className="diap-value">
-                  <p className="info-text success">
-                    ✓ 交易已广播并确认
-                  </p>
-                  <div className="encoded-call">
-                    <code>{txHash}</code>
-                    <button
-                      type="button"
-                      className="copy-btn"
-                      onClick={() => copyToClipboard(txHash)}
-                      title={t('agent.diap.copy')}
-                    >
-                      <img src={CopyIcon} alt="复制" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {registerInfo && !txHash && (
-              <div className="diap-field register-info">
-                <label>{t('agent.diap.registerTxInfo')}</label>
-                <div className="diap-value">
-                  <p className="info-text">
-                    {t('agent.diap.registerTxHint')}
-                  </p>
-                  <div className="encoded-call">
-                    <code>{registerInfo.encoded_call?.data || 'N/A'}</code>
-                    <button
-                      type="button"
-                      className="copy-btn"
-                      onClick={() => copyToClipboard(registerInfo.encoded_call?.data || '')}
-                      title={t('agent.diap.copy')}
-                    >
-                      <img src={CopyIcon} alt="复制" />
-                    </button>
-                  </div>
-                  {registerInfo.registration_fee && (
-                    <p className="info-text">
-                      {t('agent.diap.registrationFee')}: {registerInfo.registration_fee} wei
-                    </p>
-                  )}
-                  {registerInfo.min_stake_amount && (
-                    <p className="info-text">
-                      {t('agent.diap.minStakeAmount')}: {registerInfo.min_stake_amount} wei
-                    </p>
-                  )}
+                  <code className="tx-hash">{txHash}</code>
                 </div>
               </div>
             )}
