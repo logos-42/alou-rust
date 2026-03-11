@@ -5,6 +5,16 @@ All notable changes to Alou Desktop will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-03-11
+
+### 🐛 Bug 修复
+
+#### 智能体加载修复
+- **修复智能体加载重复问题** - 修复 `loadChannelList` 函数中当频道不存在于列表时未能正确返回更新后列表的 bug
+- **防止重复加载** - 添加 `hasLoadedInitialChannelsRef` 防止在组件重新渲染或 session 变化时重复加载初始频道列表
+
+---
+
 ## [0.1.10] - 2026-02-28
 
 ### 🎉 新增功能
