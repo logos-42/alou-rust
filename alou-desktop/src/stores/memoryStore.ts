@@ -392,13 +392,32 @@ export const memoryStore: MemoryStore = {
     }
   },
   
-  // DIAP群聊专用方法
+  // DIAP群聊专用方法 - 使用 localStorage 持久化
   getDiapGroups: () => {
     const groups: DiapGroupData[] = []
+    // 优先从 localStorage 加载
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('diap_group_chat_')) {
+        try {
+          const data = localStorage.getItem(key)
+          if (data) {
+            const groupId = key.replace('diap_group_chat_', '')
+            groups.push({ groupId, ...JSON.parse(data) })
+          }
+        } catch (e) {
+          console.warn('[memoryStore] 解析群聊失败:', key, e)
+        }
+      }
+    }
+    // 也检查内存存储
     for (const [key, value] of memoryStorage.entries()) {
       if (key.startsWith('diap_group_chat_')) {
         const groupId = key.replace('diap_group_chat_', '')
-        groups.push({ groupId, ...JSON.parse(value) })
+        // 避免重复添加
+        if (!groups.some(g => g.groupId === groupId)) {
+          groups.push({ groupId, ...JSON.parse(value) })
+        }
       }
     }
     return groups
@@ -406,11 +425,23 @@ export const memoryStore: MemoryStore = {
   
   setDiapGroup: (groupId: string, groupData: any) => {
     const key = `diap_group_chat_${groupId}`
+    // 同时保存到 localStorage（持久化）和 memoryStorage（内存）
+    try {
+      localStorage.setItem(key, JSON.stringify(groupData))
+    } catch (e) {
+      console.warn('[memoryStore] 保存到 localStorage 失败:', e)
+    }
     memoryStorage.setItem(key, JSON.stringify(groupData))
   },
   
   removeDiapGroup: (groupId: string) => {
     const key = `diap_group_chat_${groupId}`
+    // 同时从 localStorage 和 memoryStorage 删除
+    try {
+      localStorage.removeItem(key)
+    } catch (e) {
+      console.warn('[memoryStore] 从 localStorage 删除失败:', e)
+    }
     memoryStorage.removeItem(key)
   },
   

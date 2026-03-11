@@ -39,6 +39,7 @@ mod logs;  // 日志管理模块
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Manager;
+use tauri::menu::{Menu, Submenu, PredefinedMenuItem, MenuItem};
 
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
 use crate::kubo::download_kubo_binary;
@@ -602,6 +603,62 @@ fn main() {
             // Set window title
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title("Alou").unwrap();
+                
+                // Create menu with developer tools
+                let menu = Menu::new(app)?;
+                
+                // Add standard edit menu (macOS)
+                #[cfg(target_os = "macos")]
+                {
+                    let edit_menu = Submenu::new(app, "Edit", true)?;
+                    edit_menu.append(&PredefinedMenuItem::undo(app, None)?)?;
+                    edit_menu.append(&PredefinedMenuItem::redo(app, None)?)?;
+                    edit_menu.append(&PredefinedMenuItem::separator(app)?)?;
+                    edit_menu.append(&PredefinedMenuItem::cut(app, None)?)?;
+                    edit_menu.append(&PredefinedMenuItem::copy(app, None)?)?;
+                    edit_menu.append(&PredefinedMenuItem::paste(app, None)?)?;
+                    edit_menu.append(&PredefinedMenuItem::select_all(app, None)?)?;
+                    menu.append(&edit_menu)?;
+                }
+                
+                // Add View menu with developer tools
+                let view_menu = Submenu::new(app, "View", true)?;
+                let dev_tools_item = MenuItem::with_id(
+                    app,
+                    "devtools",
+                    "Toggle Developer Tools",
+                    true,
+                    Some("F12"),
+                )?;
+                view_menu.append(&dev_tools_item)?;
+                view_menu.append(&PredefinedMenuItem::separator(app)?)?;
+                menu.append(&view_menu)?;
+                
+                // Add Window menu
+                let window_menu = Submenu::new(app, "Window", true)?;
+                window_menu.append(&PredefinedMenuItem::minimize(app, None)?)?;
+                window_menu.append(&PredefinedMenuItem::separator(app)?)?;
+                window_menu.append(&PredefinedMenuItem::close_window(app, None)?)?;
+                menu.append(&window_menu)?;
+                
+                // Set the menu
+                app.set_menu(menu)?;
+                
+                // Handle menu events - toggle developer tools
+                let window_handle = window.clone();
+                app.on_menu_event(move |_app_handle, event| {
+                    if event.id() == "devtools" {
+                        // Get the webview from the window and toggle devtools
+                        for webview in window_handle.webview_windows().values() {
+                            if webview.is_devtools_open() {
+                                webview.close_devtools();
+                            } else {
+                                webview.open_devtools();
+                            }
+                            break;
+                        }
+                    }
+                });
             }
 
             // Tools are now registered synchronously in ToolBridge::new_sync

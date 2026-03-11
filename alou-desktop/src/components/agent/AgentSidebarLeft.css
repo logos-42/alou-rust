@@ -738,8 +738,17 @@
   opacity: 0.8;
 }
 
+.sidebar-left .channel-action-btn.delete-btn img {
+  filter: brightness(0) saturate(0);
+  opacity: 0.6;
+}
+
 .sidebar-left .channel-action-btn.delete-btn:hover {
   background: rgba(148, 163, 184, 0.25);
+}
+
+.sidebar-left .channel-action-btn.delete-btn:hover img {
+  opacity: 0.8;
 }
 
 .app-shell.dark-mode .sidebar-left .channel-action-btn {
@@ -760,8 +769,17 @@
   opacity: 0.8;
 }
 
+.app-shell.dark-mode .sidebar-left .channel-action-btn.delete-btn img {
+  filter: brightness(0) invert(1);
+  opacity: 0.6;
+}
+
 .app-shell.dark-mode .sidebar-left .channel-action-btn.delete-btn:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.app-shell.dark-mode .sidebar-left .channel-action-btn.delete-btn:hover img {
+  opacity: 0.8;
 }
 
 /* Alou Logo 样式 */

@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
+import React, { forwardRef, memo, useCallback, useImperativeHandle, useMemo, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
 import LoadingIcon from '@/assets/加载0.2.png'

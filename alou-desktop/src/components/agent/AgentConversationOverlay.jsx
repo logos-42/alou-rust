@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
+import React, { memo, forwardRef, useImperativeHandle, useRef, useEffect } from 'react'
 import MessageList from '@/components/MessageList'
 import CloseIcon from '@/assets/关闭0.3.png'
 import EditIcon from '@/assets/修改.png'
