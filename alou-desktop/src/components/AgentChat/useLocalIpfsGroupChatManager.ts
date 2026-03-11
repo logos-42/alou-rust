@@ -21,6 +21,18 @@ const STORAGE_KEYS = {
  * 群聊持久化数据结构
  */
 class PersistentLocalGroupChat {
+  groupId: string
+  groupName: string
+  description: string
+  topic: string
+  channelId: string
+  channelName: string
+  agents: any[]
+  messages: any[]
+  createdAt: number
+  lastActivity: number
+  metadata: Record<string, any>
+
   constructor({
     groupId,
     groupName,
@@ -33,6 +45,18 @@ class PersistentLocalGroupChat {
     createdAt,
     lastActivity,
     metadata = {}
+  }: {
+    groupId: string
+    groupName: string
+    description: string
+    topic: string
+    channelId: string
+    channelName: string
+    agents?: any[]
+    messages?: any[]
+    createdAt?: number
+    lastActivity?: number
+    metadata?: Record<string, any>
   }) {
     this.groupId = groupId
     this.groupName = groupName
@@ -63,8 +87,20 @@ class PersistentLocalGroupChat {
     }
   }
 
-  static fromJSON(json) {
-    return new PersistentLocalGroupChat(json)
+  static fromJSON(json: Record<string, any>) {
+    return new PersistentLocalGroupChat({
+      groupId: json.groupId,
+      groupName: json.groupName,
+      description: json.description,
+      topic: json.topic,
+      channelId: json.channelId,
+      channelName: json.channelName,
+      agents: json.agents || [],
+      messages: json.messages || [],
+      createdAt: json.createdAt,
+      lastActivity: json.lastActivity,
+      metadata: json.metadata || {}
+    })
   }
 
   // 保存到本地存储
@@ -79,7 +115,7 @@ class PersistentLocalGroupChat {
   }
 
   // 从本地存储加载
-  static load(groupId) {
+  static load(groupId: string) {
     try {
       const key = `${STORAGE_KEYS.GROUP_CHAT_PREFIX}${groupId}`
       const data = localStorage.getItem(key)
@@ -94,7 +130,7 @@ class PersistentLocalGroupChat {
   }
 
   // 删除本地存储
-  static delete(groupId) {
+  static delete(groupId: string) {
     try {
       const key = `${STORAGE_KEYS.GROUP_CHAT_PREFIX}${groupId}`
       localStorage.removeItem(key)
@@ -133,11 +169,15 @@ export const useLocalIpfsGroupChatManager = ({
   openConversationPanel,
   activeChannelId,
   localIdentity
+}: {
+  openConversationPanel: () => void
+  activeChannelId: string | null
+  localIdentity: any
 }) => {
   // 状态管理
   const [showGroupChat, setShowGroupChat] = useState(false)
-  const [activeGroupId, setActiveGroupIdState] = useState(null)
-  const [persistentGroups, setPersistentGroups] = useState([])
+  const [activeGroupId, setActiveGroupIdState] = useState<string | null>(null)
+  const [persistentGroups, setPersistentGroups] = useState<PersistentLocalGroupChat[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
   // 引用管理
@@ -162,7 +202,7 @@ export const useLocalIpfsGroupChatManager = ({
   }, [openConversationPanel])
 
   // 加载本地持久化的群聊
-  const loadPersistentGroups = useCallback(() => {
+  const loadPersistentGroups = useCallback((): void => {
     try {
       const groups = PersistentLocalGroupChat.loadAll()
       console.log('[useLocalIpfsGroupChatManager] 加载本地群聊:', groups.length)
@@ -171,7 +211,7 @@ export const useLocalIpfsGroupChatManager = ({
       // 恢复活跃群聊
       const savedActiveGroupId = localStorage.getItem(STORAGE_KEYS.ACTIVE_GROUP)
       if (savedActiveGroupId && groups.some(g => g.groupId === savedActiveGroupId)) {
-        setActiveGroupIdState(savedActiveGroupId)
+        setActiveGroupIdState(savedActiveGroupId as string)
 
         // 恢复面板显示状态
         const savedShowPanel = localStorage.getItem(STORAGE_KEYS.SHOW_PANEL)
@@ -208,7 +248,7 @@ export const useLocalIpfsGroupChatManager = ({
         // 如果频道有群聊，恢复第一个为活跃
         if (channelGroups.length > 0) {
           const firstGroup = channelGroups[0]
-          setActiveGroupIdState(firstGroup.groupId)
+          setActiveGroupIdState(firstGroup.groupId as string)
 
           // 检查是否应该显示面板
           const savedShowPanel = localStorage.getItem(`${STORAGE_KEYS.SHOW_PANEL}_${activeChannelId}`)
@@ -229,7 +269,7 @@ export const useLocalIpfsGroupChatManager = ({
   }, [activeChannelId, persistentGroups, openConversationPanel])
 
   // 创建群聊
-  const createGroupChat = useCallback(async (groupName, agents = []) => {
+  const createGroupChat = useCallback(async (groupName: string, agents: any[] = []) => {
     if (!localIdentity) {
       throw new Error('未设置本地身份，无法创建群聊')
     }
@@ -301,8 +341,8 @@ export const useLocalIpfsGroupChatManager = ({
       persistentGroup.save()
 
       // 更新状态
-      setPersistentGroups(prev => [...prev, persistentGroup])
-      setActiveGroupIdState(group.groupId)
+      setPersistentGroups((prev: PersistentLocalGroupChat[]) => [...prev, persistentGroup])
+      setActiveGroupIdState(group.groupId as string)
       setShowGroupChat(true)
 
       // 保存活跃群聊
@@ -322,7 +362,7 @@ export const useLocalIpfsGroupChatManager = ({
   }, [localIdentity, activeChannelId, getActions, localIpfsGroupChat])
 
   // 发送消息
-  const sendMessage = useCallback(async (groupId, content) => {
+  const sendMessage = useCallback(async (groupId: string, content: string) => {
     try {
       await localIpfsGroupChat.sendMessage(content)
     } catch (error) {
@@ -332,7 +372,7 @@ export const useLocalIpfsGroupChatManager = ({
   }, [localIpfsGroupChat])
 
   // 切换群聊
-  const switchGroupChat = useCallback((groupId) => {
+  const switchGroupChat = useCallback((groupId: string) => {
     if (persistentGroups.some(g => g.groupId === groupId)) {
       setActiveGroupIdState(groupId)
       localStorage.setItem(STORAGE_KEYS.ACTIVE_GROUP, groupId)
@@ -358,13 +398,13 @@ export const useLocalIpfsGroupChatManager = ({
   }, [activeChannelId])
 
   // 删除群聊
-  const deleteGroupChat = useCallback((groupId) => {
+  const deleteGroupChat = useCallback((groupId: string) => {
     try {
       // 从本地存储删除
       PersistentLocalGroupChat.delete(groupId)
 
       // 更新状态
-      setPersistentGroups(prev => prev.filter(g => g.groupId !== groupId))
+      setPersistentGroups((prev: PersistentLocalGroupChat[]) => prev.filter(g => g.groupId !== groupId))
 
       // 如果删除的是当前活跃群聊，清除活跃状态
       if (activeGroupId === groupId) {

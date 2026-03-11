@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import asyncDiapCreationService from '@/services/asyncDiapCreationService'
 import { useNavigate } from 'react-router-dom'
 import agentService from '@/services/agentService'
+import diapIntegrationService from '@/services/diapIntegrationService'
 import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
 import { invoke } from '@tauri-apps/api/core'
@@ -41,89 +42,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     navigate('/subscription')
   }
 
-  // Check if testnet private key is available
-  useEffect(() => {
-    const checkTestnetKey = async () => {
-      try {
-        await invoke('get_testnet_private_key')
-        setHasTestnetKey(true)
-      } catch (err) {
-        setHasTestnetKey(false)
-      }
-    }
-    checkTestnetKey()
-  }, [])
-
-  useEffect(() => {
-    if (sessionId) {
-      loadIdentity()
-    }
-  }, [sessionId, loadIdentity])
-
-  // 监听 DIAP 身份创建事件，立即刷新显示
-  useEffect(() => {
-    const handleDiapIdentityCreated = (event) => {
-      const { sessionId: createdSessionId, identity } = event.detail
-      console.log('[DiapIdentityPanel] 收到 DIAP 身份创建事件:', { createdSessionId, currentSessionId: sessionId })
-
-      if (createdSessionId === sessionId) {
-        console.log('[DiapIdentityPanel] 匹配当前 sessionId，立即刷新显示')
-        loadIdentity()
-      }
-    }
-
-    window.addEventListener('diap-identity-created', handleDiapIdentityCreated)
-
-    return () => {
-      window.removeEventListener('diap-identity-created', handleDiapIdentityCreated)
-    }
-  }, [sessionId, loadIdentity])
-
-  // 检查异步 DIAP 创建进度和完成状态
-  useEffect(() => {
-    if (!sessionId) return
-
-    const unsubscribeProgress = asyncDiapCreationService.subscribeProgress((sessionId, progress) => {
-      console.log('[DiapIdentityPanel] 收到进度更新:', { sessionId, stage: progress.stage, progress: progress.progress })
-      if (sessionId === sessionId) {
-        setDiapProgress(progress)
-        if (progress.stage === 'completed') {
-          console.log('[DiapIdentityPanel] DIAP 创建完成，刷新显示')
-          loadIdentity()
-        }
-      }
-    })
-
-    const checkExistingTask = async () => {
-      const task = asyncDiapCreationService.getTaskStatus(sessionId)
-      if (task) {
-        console.log('[DiapIdentityPanel] 发现 DIAP 任务:', { status: task.status, stage: task.progress.stage })
-        if (task.status === 'running' || task.status === 'pending' || task.status === 'completed') {
-          setDiapProgress(task.progress)
-          if (task.status === 'completed' && !identity) {
-            console.log('[DiapIdentityPanel] 任务已完成但未显示，刷新')
-            await loadIdentity()
-          }
-        }
-      }
-
-      if (!task && !identity) {
-        console.log('[DiapIdentityPanel] 没有进行中的任务，检查是否有已保存的 DIAP 身份')
-        const diapIdentity = await asyncDiapCreationService.getDiapIdentity(sessionId)
-        if (diapIdentity) {
-          console.log('[DiapIdentityPanel] 发现已保存的 DIAP 身份:', diapIdentity.did)
-          loadIdentity()
-        }
-      }
-    }
-
-    checkExistingTask()
-
-    return () => {
-      unsubscribeProgress()
-    }
-  }, [sessionId, loadIdentity, identity])
-
+  // loadIdentity 必须在 useEffect 之前定义，避免暂时性死区
   const loadIdentity = useCallback(async () => {
     try {
       setLoading(true)
@@ -192,7 +111,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       if (agentTarget && !isTempId(agentTarget)) {
         try {
           console.log('[DiapIdentityPanel] 尝试从 IPNS/CID/DID 加载 DIAP 身份:', agentTarget)
-          const response = await agentService.getDiapIdentity(agentTarget)
+          const response = await diapIntegrationService.getDiapIdentity(agentTarget)
           if (response.identity) {
             console.log('[DiapIdentityPanel] ✅ 从 IPNS/CID/DID 加载 DIAP 身份成功:', agentTarget)
 
@@ -256,7 +175,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
 
       // 优先级 5: 从网络加载（使用 sessionId）
       try {
-        const response = await agentService.getDiapIdentity(sessionId)
+        const response = await diapIntegrationService.getDiapIdentity(sessionId)
         if (response.identity) {
           setIdentity(response.identity)
           await setDiapIdentitySafe(sessionId, response.identity)
@@ -289,11 +208,95 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     }
   }, [sessionId, selectedAgent, updateAgent])
 
+  // Check if testnet private key is available
+  useEffect(() => {
+    const checkTestnetKey = async () => {
+      try {
+        await invoke('get_testnet_private_key')
+        setHasTestnetKey(true)
+      } catch (err) {
+        setHasTestnetKey(false)
+      }
+    }
+    checkTestnetKey()
+  }, [])
+
+  // Load identity when sessionId changes
+  useEffect(() => {
+    if (sessionId) {
+      loadIdentity()
+    }
+  }, [sessionId, loadIdentity])
+
+  // 监听 DIAP 身份创建事件，立即刷新显示
+  useEffect(() => {
+    const handleDiapIdentityCreated = (event) => {
+      const { sessionId: createdSessionId, identity } = event.detail
+      console.log('[DiapIdentityPanel] 收到 DIAP 身份创建事件:', { createdSessionId, currentSessionId: sessionId })
+
+      if (createdSessionId === sessionId) {
+        console.log('[DiapIdentityPanel] 匹配当前 sessionId，立即刷新显示')
+        loadIdentity()
+      }
+    }
+
+    window.addEventListener('diap-identity-created', handleDiapIdentityCreated)
+
+    return () => {
+      window.removeEventListener('diap-identity-created', handleDiapIdentityCreated)
+    }
+  }, [sessionId, loadIdentity])
+
+  // 检查异步 DIAP 创建进度和完成状态
+  useEffect(() => {
+    if (!sessionId) return
+
+    const unsubscribeProgress = asyncDiapCreationService.subscribeProgress((progressSessionId, progress) => {
+      console.log('[DiapIdentityPanel] 收到进度更新:', { progressSessionId, stage: progress.stage, progress: progress.progress })
+      if (progressSessionId === sessionId) {
+        setDiapProgress(progress)
+        if (progress.stage === 'completed') {
+          console.log('[DiapIdentityPanel] DIAP 创建完成，刷新显示')
+          loadIdentity()
+        }
+      }
+    })
+
+    const checkExistingTask = async () => {
+      const task = asyncDiapCreationService.getTaskStatus(sessionId)
+      if (task) {
+        console.log('[DiapIdentityPanel] 发现 DIAP 任务:', { status: task.status, stage: task.progress.stage })
+        if (task.status === 'running' || task.status === 'pending' || task.status === 'completed') {
+          setDiapProgress(task.progress)
+          if (task.status === 'completed' && !identity) {
+            console.log('[DiapIdentityPanel] 任务已完成但未显示，刷新')
+            await loadIdentity()
+          }
+        }
+      }
+
+      if (!task && !identity) {
+        console.log('[DiapIdentityPanel] 没有进行中的任务，检查是否有已保存的 DIAP 身份')
+        const diapIdentity = await asyncDiapCreationService.getDiapIdentity(sessionId)
+        if (diapIdentity) {
+          console.log('[DiapIdentityPanel] 发现已保存的 DIAP 身份:', diapIdentity.did)
+          loadIdentity()
+        }
+      }
+    }
+
+    checkExistingTask()
+
+    return () => {
+      unsubscribeProgress()
+    }
+  }, [sessionId, loadIdentity, identity])
+
   const handleCreateIdentity = async () => {
     try {
       setCreating(true)
       setError(null)
-      const response = await agentService.createDiapIdentity(sessionId)
+      const response = await diapIntegrationService.createDiapIdentity(sessionId)
       if (response.identity) {
         console.log('[DiapIdentityPanel] DIAP 身份创建成功:', response.identity)
         setIdentity(response.identity)

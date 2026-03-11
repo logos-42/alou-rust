@@ -21,6 +21,20 @@ export const useGroupChatRemoteControl = ({
   setSessionReady,
   userName,
   openConversationPanel,
+}: {
+  showGroupChat: boolean
+  activeActionId: string | null
+  activeChannelId: string | null
+  currentMessage: string
+  setCurrentMessage: (msg: string) => void
+  sendMessageToAgent: (channelId: string | null, text: string, agent: any) => Promise<void>
+  selectedAgent: any
+  isAgentLoading: (channelId: string | null) => boolean
+  isSessionReady: boolean
+  createSession: () => Promise<void>
+  setSessionReady: (ready: boolean) => void
+  userName: string
+  openConversationPanel: () => void
 }) => {
   // 输入目标模式：'agent' = 发送到智能体（遥控模式），'groupChat' = 发送到群聊
   // 只有在群聊面板打开时才启用遥控功能
@@ -58,8 +72,9 @@ export const useGroupChatRemoteControl = ({
 
   // 监听输入目标切换事件 - 只添加一次，避免内存泄漏
   useEffect(() => {
-    const handleSwitchInputTarget = (event: CustomEvent<{ target: string }>) => {
-      const { target } = event.detail
+    const handleSwitchInputTarget = (event: Event) => {
+      const customEvent = event as CustomEvent<{ target: string }>
+      const { target } = customEvent.detail
       console.log('[useGroupChatRemoteControl] 收到切换事件:', {
         target,
         currentMode: inputTargetMode,
@@ -74,18 +89,18 @@ export const useGroupChatRemoteControl = ({
       }
     }
 
-    window.addEventListener('switch-input-target', handleSwitchInputTarget)
+    window.addEventListener('switch-input-target', handleSwitchInputTarget as EventListener)
     console.log('[useGroupChatRemoteControl] 事件监听器已设置')
 
     return () => {
       console.log('[useGroupChatRemoteControl] 清理事件监听器')
-      window.removeEventListener('switch-input-target', handleSwitchInputTarget)
+      window.removeEventListener('switch-input-target', handleSwitchInputTarget as EventListener)
     }
   }, []) // 空依赖数组，只执行一次
 
   // 发送消息到群聊
   const sendMessageToGroupChat = useCallback(
-    async (text, actionId) => {
+    async (text: string, actionId: string) => {
       if (!actionId) {
         console.warn('[useGroupChatRemoteControl] 无法发送到群聊：缺少 actionId')
         return

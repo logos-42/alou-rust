@@ -375,7 +375,6 @@ async fn agent_skills(
         }
     }
 }
-
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

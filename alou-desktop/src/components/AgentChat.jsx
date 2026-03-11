@@ -1035,7 +1035,7 @@ const AgentChat = () => {
       />
 
       <DiapPanelToggle
-        sessionId={sessionId}
+        sessionId={selectedAgent?.id || selectedAgent?.sessionId || sessionId}
         selectedAgent={selectedAgent}
         isSidebarCollapsed={isSidebarCollapsed}
         isDarkMode={isDarkMode}

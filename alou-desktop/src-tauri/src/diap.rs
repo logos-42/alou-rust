@@ -670,71 +670,108 @@ pub async fn create_diap_identity_from_did_document(
     
     info!(target: "diap", "✅ DID文档已上传到IPFS: CID = {}", cid);
     
+    // 从DID文档中提取真实的DID（提前提取，确保即使IPNS失败也有DID）
+    let did = real_did_document.get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or(&format!("did:ipfs:{}", cid))
+        .to_string();
+    
     // 创建或使用提供的IPNS密钥
-    let ipns_key_name = if let Some(key) = params.ipns_key {
+    let ipns_key_name = if let Some(key) = params.ipns_key.clone() {
         key
     } else {
         format!("agent-{}", params.session_id)
     };
     
-    // 使用验证过的IPNS解决方案生成密钥
+    // 使用验证过的IPNS解决方案生成密钥（可选，失败不中断流程）
     let ipfs_config = IpfsConfig {
         api_url: api_url.clone(),
         gateway_url: gateway_url.clone(),
-        cli_path: detect_ipfs_cli(), // 检测 IPFS CLI
+        cli_path: detect_ipfs_cli(),
     };
     
-    let ipns_key_result = generate_ipns_key_verified(&ipns_key_name, &ipfs_config).await
-        .map_err(|e| format!("IPNS密钥生成失败: {}", e))?;
-    
-    info!(target: "diap", "✅ IPNS密钥生成成功: {} ({})", ipns_key_result.name, ipns_key_result.id);
-    
-    // 使用验证过的IPNS解决方案发布到IPNS
-    let ipns_publish_result = publish_to_ipns_verified(&cid, &ipns_key_name, &ipfs_config).await
-        .map_err(|e| format!("IPNS发布失败: {}", e))?;
-    
-    info!(target: "diap", "✅ IPNS发布成功: {} -> {}", ipns_publish_result.name, ipns_publish_result.value);
-    
-    // 提供内容到DHT以加速传播
-    if let Err(e) = provide_to_dht_direct(&api_url, &cid).await {
-        warn!(target: "diap", "DHT提供失败（不影响主流程）: {}", e);
-    }
-    
-    // 启用IPNS PubSub以加速传播
-    if let Err(e) = enable_ipns_pubsub(&api_url).await {
-        warn!(target: "diap", "IPNS PubSub启用失败（不影响主流程）: {}", e);
-    }
-    
-    // 主动触发公共网关查询以加速全球传播
-    let ipns_for_trigger = ipns_publish_result.value.clone();
-    tokio::spawn(async move {
-        trigger_public_gateway_query_with_retry(&ipns_for_trigger, 3, 10).await;
-    });
-    
-    // 创建加密的节点ID
-    let encrypted_node_id = create_encrypted_node_id(&params.session_id, &key_pair.private_key).await?;
-    
-    // 生成PubSub主题
-    let pubsub_topics = Some(vec![
-        format!("/topic/agent/{}", params.session_id),
-        format!("/topic/diap/{}", ipns_publish_result.value.trim_start_matches("/ipns/")),
-        "/topic/global/agents".to_string(),
-    ]);
-    
-    // 从DID文档中提取真实的DID
-    let did = real_did_document.get("id")
-        .and_then(|v| v.as_str())
-        .unwrap_or(&format!("did:ipns:{}", ipns_publish_result.value.trim_start_matches("/ipns/")))
-        .to_string();
+    // 尝试生成IPNS密钥和发布，失败则不中断，继续返回CID和DID
+    let (ipns_value, ipns_key_opt, encrypted_node_id, pubsub_topics) = 
+        match generate_ipns_key_verified(&ipns_key_name, &ipfs_config).await {
+            Ok(ipns_key_result) => {
+                info!(target: "diap", "✅ IPNS密钥生成成功: {} ({})", ipns_key_result.name, ipns_key_result.id);
+                
+                match publish_to_ipns_verified(&cid, &ipns_key_name, &ipfs_config).await {
+                    Ok(ipns_publish_result) => {
+                        info!(target: "diap", "✅ IPNS发布成功: {} -> {}", ipns_publish_result.name, ipns_publish_result.value);
+                        
+                        // 提供内容到DHT以加速传播（失败不影响）
+                        if let Err(e) = provide_to_dht_direct(&api_url, &cid).await {
+                            warn!(target: "diap", "DHT提供失败（不影响主流程）: {}", e);
+                        }
+                        
+                        // 启用IPNS PubSub以加速传播（失败不影响）
+                        if let Err(e) = enable_ipns_pubsub(&api_url).await {
+                            warn!(target: "diap", "IPNS PubSub启用失败（不影响主流程）: {}", e);
+                        }
+                        
+                        // 主动触发公共网关查询以加速全球传播
+                        let ipns_for_trigger = ipns_publish_result.value.clone();
+                        tokio::spawn(async move {
+                            trigger_public_gateway_query_with_retry(&ipns_for_trigger, 3, 10).await;
+                        });
+                        
+                        // 创建加密的节点ID
+                        let encrypted_node_id = match create_encrypted_node_id(&params.session_id, &key_pair.private_key).await {
+                            Ok(id) => Some(id),
+                            Err(e) => {
+                                warn!(target: "diap", "创建加密节点ID失败: {}", e);
+                                None
+                            }
+                        };
+                        
+                        // 生成PubSub主题
+                        let pubsub_topics = Some(vec![
+                            format!("/topic/agent/{}", params.session_id),
+                            format!("/topic/diap/{}", ipns_publish_result.value.trim_start_matches("/ipns/")),
+                            "/topic/global/agents".to_string(),
+                        ]);
+                        
+                        (ipns_publish_result.value, Some(ipns_key_name), encrypted_node_id, pubsub_topics)
+                    }
+                    Err(e) => {
+                        warn!(target: "diap", "⚠️ IPNS发布失败，但CID和DID已生成: {}", e);
+                        // IPNS发布失败，返回空IPNS但保留CID和DID
+                        let encrypted_node_id = match create_encrypted_node_id(&params.session_id, &key_pair.private_key).await {
+                            Ok(id) => Some(id),
+                            Err(_) => None
+                        };
+                        let pubsub_topics = Some(vec![
+                            format!("/topic/agent/{}", params.session_id),
+                            "/topic/global/agents".to_string(),
+                        ]);
+                        (String::new(), Some(ipns_key_name), encrypted_node_id, pubsub_topics)
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(target: "diap", "⚠️ IPNS密钥生成失败，但CID和DID已生成: {}", e);
+                // IPNS密钥生成失败，返回空IPNS但保留CID和DID
+                let encrypted_node_id = match create_encrypted_node_id(&params.session_id, &key_pair.private_key).await {
+                    Ok(id) => Some(id),
+                    Err(_) => None
+                };
+                let pubsub_topics = Some(vec![
+                    format!("/topic/agent/{}", params.session_id),
+                    "/topic/global/agents".to_string(),
+                ]);
+                (String::new(), None, encrypted_node_id, pubsub_topics)
+            }
+        };
     
     let identity = LocalDiapIdentityResponse {
         did,
         cid,
-        ipns: ipns_publish_result.value,
+        ipns: ipns_value,
         public_key,
         gateway_url,
-        ipns_key: Some(ipns_key_name),
-        encrypted_node_id: Some(encrypted_node_id),
+        ipns_key: ipns_key_opt,
+        encrypted_node_id,
         pubsub_topics,
     };
     

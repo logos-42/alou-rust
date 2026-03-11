@@ -91,7 +91,7 @@ export const useGroupChatAutonomousAgent = (
     // 从 store 获取
     try {
       const { getActions } = useClusterActionStore.getState()
-      const actions = getActions("") || []
+      const actions = getActions(null) || []
       
       // 查找匹配的群聊
       const groupAction = actions.find(action => 
@@ -424,7 +424,7 @@ export const useGroupChatAutonomousAgent = (
     // 初始化时加载现有群聊
     try {
       const { getActions } = useClusterActionStore.getState()
-      const actions = getActions("") || []
+      const actions = getActions(null) || []
       const groupIds = actions
         .filter(action => 
           action.action_id?.startsWith('local_group_') ||

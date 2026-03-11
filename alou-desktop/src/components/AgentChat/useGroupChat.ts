@@ -168,7 +168,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
         const hasWelcome = existingMessages.some((msg: { id: string }) => msg.id === `welcome_${actionId}`)
         
         if (!hasWelcome) {
-          const action = getActiveAction()
+          const action = getActiveAction(actionId)
           const description = action ? (action.description || actionId) : actionId
           const welcomeMessage: GroupChatMessage = {
             id: `welcome_${actionId}`,
@@ -222,7 +222,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
 
       // 本地群聊：使用本地状态，不轮询后端
       if (isLocalGroupChat(actionId)) {
-        const action = getActiveAction()
+        const action = getActiveAction(actionId)
         if (action) {
           updateActionStatus(actionId, action.status || 'Active')
         }
@@ -247,7 +247,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
       const poll = async () => {
         try {
           const status = await clusterActionService.getActionStatus(actionId) as ActionStatus
-          updateActionStatus(actionId, status.status)
+          updateActionStatus(actionId, status.status as 'Active' | 'Completed' | 'Failed' | 'Cancelled' | 'Pending')
 
           // 如果行动完成，获取最终结果
           if (status.status === 'Completed' || status.status === 'Failed' || status.status === 'Cancelled') {
@@ -337,7 +337,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
   }, [enabled, actionId, subscribeToGroupChat, pollActionStatus, loadGroupMessages])
 
   // 获取当前消息列表
-  const messages = actionId ? getGroupChatMessages(actionId) : []
+  const messages = (actionId ? getGroupChatMessages(actionId) : []) as GroupChatMessage[]
 
   // 获取当前状态
   const status = actionId ? getActionStatus(actionId) : null

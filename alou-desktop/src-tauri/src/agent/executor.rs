@@ -7,7 +7,8 @@ use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult
 use super::error::AgentError;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
 use std::sync::Arc;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
+use std::path::PathBuf;
 
 /// Ralph Loop 执行器
 pub struct RalphLoopExecutor {
@@ -589,22 +590,49 @@ impl RalphLoopExecutor {
 
         match action {
             "read" => {
-                // 从当前任务的系统消息中提取文档段落
+                // 从文件读取文档（而不是从系统提示词提取）
                 let task = self.task_manager.get_task(task_id).await;
-                let content = task.and_then(|t| {
-                    // 找第一条 system 消息（包含 customPrompt）
-                    t.messages.iter().find_map(|msg| {
-                        let msg_json = serde_json::to_value(msg).ok()?;
-                        let role = msg_json.get("role")?.as_str()?;
-                        if role != "system" { return None; }
-                        let text = msg_json.get("content")?.as_str()?;
-                        Self::extract_section_from_prompt(text, doc_type)
-                    })
-                });
+                let agent_id = task.map(|t| t.metadata.agent_id.clone()).unwrap_or_default();
+                
+                if agent_id.is_empty() {
+                    return Ok(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some("无法获取 agent_id".to_string()),
+                    });
+                }
+                
+                // 直接从文件读取文档
+                let mut content: Option<String> = None;
+                if let Some(app) = &self.app_handle {
+                    if let Ok(app_data_dir) = app.path().app_data_dir() {
+                        let doc_path = std::path::PathBuf::from(&app_data_dir)
+                            .join("agent-documents")
+                            .join(&agent_id)
+                            .join(format!("{}.md", doc_type.to_uppercase()));
+                        
+                        log::info!("[RalphLoop] 尝试读取文档: {:?}", doc_path);
+                        
+                        if doc_path.exists() {
+                            match tokio::fs::read_to_string(&doc_path).await {
+                                Ok(text) => {
+                                    content = Some(text);
+                                },
+                                Err(e) => {
+                                    log::warn!("[RalphLoop] 读取文档失败: {}", e);
+                                }
+                            }
+                        } else {
+                            log::warn!("[RalphLoop] 文档文件不存在: {:?}", doc_path);
+                        }
+                    }
+                };
 
                 match content {
                     Some(text) => {
-                        log::info!("[RalphLoop] agent_document read: 已读取 {} 文档，长度: {}", doc_type, text.len());
+                        let len = text.len();
+                        log::info!("[RalphLoop] agent_document read: 已从文件读取 {} 文档，长度: {}", doc_type, len);
                         Ok(ToolResult {
                             tool_call_id: tool_call.id.clone(),
                             success: true,
@@ -613,12 +641,12 @@ impl RalphLoopExecutor {
                         })
                     }
                     None => {
-                        log::warn!("[RalphLoop] agent_document read: 未找到文档 '{}'", doc_type);
+                        log::warn!("[RalphLoop] agent_document read: 未找到文档 '{}' 或读取失败", doc_type);
                         Ok(ToolResult {
                             tool_call_id: tool_call.id.clone(),
                             success: false,
                             data: None,
-                            error: Some(format!("文档 '{}' 未找到，可能系统提示词中没有此段落", doc_type)),
+                            error: Some(format!("文档 '{}' 未找到或读取失败", doc_type)),
                         })
                     }
                 }

@@ -157,7 +157,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
 
   // 状态管理
   const [showGroupChat, setShowGroupChat] = useState(false)
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null)
+  const [activeGroupId, setActiveGroupId] = useState(null)
 
   // 按频道加载群聊存档，并尽量恢复活跃群聊
   const isGroupInActiveChannel = useCallback((group) => {
@@ -184,18 +184,18 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     if (!activeGroupId) {
       if (storedActiveActionId) {
         // eslint-disable-next-line react-hooks/setState-in-effect
-        setActiveGroupId(storedActiveActionId as string)
+        setActiveGroupId(storedActiveActionId)
         return
       }
       const firstDiapGroup = diapGroupChat.groups.find(isGroupInActiveChannel)
       if (firstDiapGroup) {
         // eslint-disable-next-line react-hooks/setState-in-effect
-        setActiveGroupId(firstDiapGroup.groupId as string)
+        setActiveGroupId(firstDiapGroup.groupId)
         return
       }
       if (actions.length > 0) {
         // eslint-disable-next-line react-hooks/setState-in-effect
-        setActiveGroupId(actions[0].action_id as string)
+        setActiveGroupId(actions[0].action_id)
       }
     }
   }, [activeChannelId, activeGroupId, diapGroupChat.groups, isGroupInActiveChannel, loadChannelGroupChats])
@@ -207,7 +207,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       if (firstGroup) {
         console.log('[useGroupChatManager] 自动恢复活跃群聊:', firstGroup.groupId)
         // eslint-disable-next-line react-hooks/setState-in-effect
-        setActiveGroupId(firstGroup.groupId as string)
+        setActiveGroupId(firstGroup.groupId)
       }
     }
   }, [diapGroupChat.groups, activeGroupId])
@@ -353,7 +353,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       })
 
       // 设置为活跃群聊
-      setActiveGroupId(group.groupId as string)
+      setActiveGroupId(group.groupId)
       await diapGroupChat.switchToGroup(group.groupId)
       setShowGroupChat(true)
 
@@ -407,7 +407,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         setActiveAction(actionId, channelId)
 
         // 设置为活跃群聊
-        setActiveGroupId(actionId as string)
+        setActiveGroupId(actionId)
         setShowGroupChat(true)
         openConversationPanelRef.current?.()
 

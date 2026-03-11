@@ -88,19 +88,7 @@ class PersistentGroupChat {
   }
 
   static fromJSON(json: Record<string, any>) {
-    return new PersistentGroupChat({
-      groupId: json.groupId,
-      groupName: json.groupName,
-      description: json.description,
-      topic: json.topic,
-      channelId: json.channelId,
-      channelName: json.channelName,
-      agents: json.agents || [],
-      messages: json.messages || [],
-      createdAt: json.createdAt,
-      lastActivity: json.lastActivity,
-      metadata: json.metadata || {}
-    })
+    return new PersistentGroupChat(json)
   }
 
   // 保存到本地存储
@@ -115,7 +103,7 @@ class PersistentGroupChat {
   }
 
   // 从本地存储加载
-  static load(groupId: string) {
+  static load(groupId) {
     try {
       const key = `${STORAGE_KEYS.GROUP_CHAT_PREFIX}${groupId}`
       const data = localStorage.getItem(key)
