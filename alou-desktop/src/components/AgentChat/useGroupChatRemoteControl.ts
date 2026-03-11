@@ -343,8 +343,7 @@ export const useGroupChatRemoteControl = ({
       }
 
       setCurrentMessage('')
-      // 发送消息后自动打开对话面板
-      openConversationPanel?.()
+      // 发送消息后不自动打开对话面板，只显示查看按钮
       await sendMessageToAgent(activeChannelId, text, selectedAgent)
       return
     }
@@ -362,8 +361,7 @@ export const useGroupChatRemoteControl = ({
       }
 
       setCurrentMessage('')
-      // 发送消息后自动打开对话面板
-      openConversationPanel?.()
+      // 发送消息后不自动打开对话面板，只显示查看按钮
       await sendMessageToAgent(activeChannelId, text, selectedAgent)
     }
   }, [
