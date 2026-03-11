@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import agentService from '@/services/agentService'
 import useAgentStore, { useAgentStoreHydration } from '@/stores/agentStore'
 import useClusterActionStore from '@/stores/clusterActionStore'
@@ -6,10 +6,13 @@ import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from '
 import { resolveBackendChain } from '@/hooks/useAgentChat'
 import { isIpns, isCid } from '@/services/utils/ipnsUtils'
 
+import type { Channel } from '@/types/chat'
+import type { AgentInfo } from '@/types/groupchat'
+
 /**
  * 迁移群聊数据到新频道
  */
-const migrateGroupChatData = (oldChannelId, newChannelId) => {
+const migrateGroupChatData = (oldChannelId: string, newChannelId: string) => {
   if (!oldChannelId || !newChannelId || oldChannelId === newChannelId) {
     return
   }
@@ -29,7 +32,7 @@ const migrateGroupChatData = (oldChannelId, newChannelId) => {
   // 获取旧频道的群聊数据
   const oldActions = getActions(oldChannelId) || []
   const oldActiveActionId = getActiveActionId(oldChannelId)
-  const oldMessages = {}
+  const oldMessages: Record<string, any[]> = {}
   
   // 收集旧频道的所有群聊消息
   oldActions.forEach(action => {
@@ -42,7 +45,7 @@ const migrateGroupChatData = (oldChannelId, newChannelId) => {
     console.log(`[useChannelManager] 迁移 ${oldActions.length} 个群聊到新频道`)
     
     // 将群聊数据迁移到新频道
-    useClusterActionStore.getState().setActions(oldActions, newChannelId)
+    const store = useClusterActionStore.getState() as any; if (typeof store.setActions === 'function') { store.setActions(oldActions, newChannelId) }
     
     // 如果有活跃的群聊，设置为新频道的活跃群聊
     if (oldActiveActionId) {
@@ -53,7 +56,7 @@ const migrateGroupChatData = (oldChannelId, newChannelId) => {
     // 迁移群聊消息
     Object.keys(oldMessages).forEach(actionId => {
       if (oldMessages[actionId].length > 0) {
-        useClusterActionStore.getState().setGroupChatMessages(actionId, oldMessages[actionId])
+        if (typeof store.setGroupChatMessages === 'function') { store.setGroupChatMessages(actionId, oldMessages[actionId]) }
         console.log(`[useChannelManager] 迁移群聊消息: ${actionId} (${oldMessages[actionId].length} 条)`)
       }
     })
@@ -85,6 +88,7 @@ export const useChannelManager = ({
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
   const hasLoadedFromStorageRef = useRef(false) // 防止重复从本地加载
+  const hasLoadedInitialChannelsRef = useRef(false) // 防止重复加载初始频道列表
   const resolveExistingAgentTargetRef = useRef(null) // 用于在 loadChannelList 中访问 resolveExistingAgentTarget
   const creatingAgentsRef = useRef<Set<string>>(new Set()) // 防止重复创建同名智能体
 
@@ -130,7 +134,9 @@ export const useChannelManager = ({
                   console.log('[useChannelManager] 后端频道已存在，跳过添加:', channel.id)
                   return prev // 已存在，不做改变
                 }
-              
+                // 频道不存在，添加到列表
+                console.log('[useChannelManager] 添加后端频道到列表:', channel.id, channel.name)
+                return [channel, ...prev]
               })
               // 只有当前没有选中的频道时才设置
               setActiveChannelId((prev) => prev || channel.id)
@@ -364,6 +370,14 @@ export const useChannelManager = ({
     if (!isSessionReady) {
       return
     }
+    // 防止重复加载初始频道列表
+    if (hasLoadedInitialChannelsRef.current) {
+      console.log('[useChannelManager] 初始频道已加载，跳过重复加载')
+      return
+    }
+    // 标记为已加载
+    hasLoadedInitialChannelsRef.current = true
+    
     // 等待本地存储加载完成后再加载后端频道
     // 避免本地频道被后端频道覆盖
     const timer = setTimeout(() => {
@@ -911,18 +925,18 @@ export const useChannelManager = ({
         // 构建元数据：优先使用返回的数据，但必须包含头像等关键信息
         const metadata = {
           // 从返回的数据中提取
-          did: result.diap_identity?.did || result.agent_metadata?.did,
-          cid: result.diap_identity?.cid || result.agent_metadata?.cid,
-          ipns: result.diap_identity?.ipns || result.agent_metadata?.ipns,
-          agent_type: result.agent_metadata?.agent_type || 'claude_agent_sdk',
-          display_name: result.agent_metadata?.display_name || name,
-          role_description: result.agent_metadata?.role_description || roleDescription,
+          did: result.data?.diap_identity || (result as any).diap_identity?.did || result.data?.agent_metadata || (result as any).agent_metadata?.did,
+          cid: result.data?.diap_identity || (result as any).diap_identity?.cid || result.data?.agent_metadata || (result as any).agent_metadata?.cid,
+          ipns: result.data?.diap_identity || (result as any).diap_identity?.ipns || result.data?.agent_metadata || (result as any).agent_metadata?.ipns,
+          agent_type: result.data?.agent_metadata || (result as any).agent_metadata?.agent_type || 'claude_agent_sdk',
+          display_name: result.data?.agent_metadata || (result as any).agent_metadata?.display_name || name,
+          role_description: result.data?.agent_metadata || (result as any).agent_metadata?.role_description || roleDescription,
           // 关键：必须包含我们上传的头像和配置
-          avatar_cid: avatar_cid || result.agent_metadata?.avatar_cid,  // 优先使用我们上传的
-          avatar_url: avatar_url || result.agent_metadata?.avatar_url,  // 本地 base64（无 IPFS 时）
-          mcp_config_cid: mcp_config_cid || result.agent_metadata?.mcp_config_cid,
-          mcp_ports: mcp_ports || result.agent_metadata?.mcp_ports,
-          diap_identity: diapIdentity || result.agent_metadata?.diap_identity,
+          avatar_cid: avatar_cid || result.data?.agent_metadata || (result as any).agent_metadata?.avatar_cid,  // 优先使用我们上传的
+          avatar_url: avatar_url || result.data?.agent_metadata || (result as any).agent_metadata?.avatar_url,  // 本地 base64（无 IPFS 时）
+          mcp_config_cid: mcp_config_cid || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_config_cid,
+          mcp_ports: mcp_ports || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_ports,
+          diap_identity: diapIdentity || result.data?.agent_metadata || (result as any).agent_metadata?.diap_identity,
           sessionId,
         }
 
