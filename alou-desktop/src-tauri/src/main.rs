@@ -642,20 +642,26 @@ fn main() {
                 
                 // Set the menu
                 app.set_menu(menu)?;
-                
+
                 // Handle menu events - toggle developer tools
-                let window_handle = window.clone();
+                // NOTE: In Tauri v2, devtools are controlled via CLI flags, not programmatically.
+                // The following methods do NOT exist in Tauri v2:
+                // - window.open_devtools()
+                // - window.close_devtools()
+                // - window.is_devtools_open()
+                // 
+                // To enable devtools in development, run the app with:
+                //   cargo tauri dev --debug
+                // Or set the following in tauri.conf.json:
+                //   "tauri": { "security": { "devtools": true } }
+                // 
+                // This menu item is kept for documentation purposes. Users should use
+                // browser-style devtools (F12) when running in development mode.
+                let _window_handle = window.clone();
                 app.on_menu_event(move |_app_handle, event| {
                     if event.id() == "devtools" {
-                        // Get the webview from the window and toggle devtools
-                        for webview in window_handle.webview_windows().values() {
-                            if webview.is_devtools_open() {
-                                webview.close_devtools();
-                            } else {
-                                webview.open_devtools();
-                            }
-                            break;
-                        }
+                        log::info!("DevTools menu clicked. In Tauri v2, devtools are controlled via CLI flags or tauri.conf.json settings, not programmatically.");
+                        log::info!("To enable devtools, run: cargo tauri dev --debug");
                     }
                 });
             }
