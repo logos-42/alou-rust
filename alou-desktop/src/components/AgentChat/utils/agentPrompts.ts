@@ -1,11 +1,38 @@
 // 辅助函数：生成系统提示
-export const getSystemPromptForAgent = (
+export const getSystemPromptForAgent = async (
   agentInfo: { name?: string; role_description?: string; id?: string } | null,
   mode: 'agent' | 'alou' | 'group_chat',
   walletAddress: string | null,
   chain: string | null
-): string => {
+): Promise<string> => {
   console.log('[getSystemPromptForAgent] 参数:', { mode, hasAgentInfo: !!agentInfo, walletAddress, chain });
+
+  // 动态获取文档路径（跨平台兼容）
+  let memoryPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
+  let soulPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
+  let identityPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
+  
+  try {
+    // 动态获取实际的应用数据目录
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { resolve, BaseDirectory } = await import('@tauri-apps/api/path');
+    
+    const appDataPath = await resolve(BaseDirectory.AppData);
+    const agentId = agentInfo?.id || 'unknown';
+    
+    memoryPath = `${appDataPath}/agent-documents/${agentId}`;
+    soulPath = `${appDataPath}/agent-documents/${agentId}`;
+    identityPath = `${appDataPath}/agent-documents/${agentId}`;
+    
+    console.log('[getSystemPromptForAgent] 动态获取路径成功:', { appDataPath, agentId });
+  } catch (err) {
+    // 如果 Tauri API 不可用，使用默认值（主要是开发环境）
+    const agentId = agentInfo?.id || 'unknown';
+    memoryPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
+    soulPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
+    identityPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
+    console.warn('[getSystemPromptForAgent] 使用默认路径（非Tauri环境）:', err);
+  }
 
   // 处理群聊模式 - 注入模因设计
   if (mode === 'group_chat') {
@@ -375,13 +402,14 @@ Alou 的个性与价值观：
    }
    \`\`\`
 
-3. **直接编辑文档**：也可以使用 \`filesystem\` 工具直接编辑 .md 文件
-   - **你的文档位置**：\`~/Library/Application Support/com.alou.desktop/agent-documents/${agentInfo?.id || 'unknown'}/\`
+3.  **直接编辑文档**：也可以使用 \`filesystem\` 工具直接编辑 .md 文件
+   - **你的文档位置**：\`${memoryPath}\
+- 用户分享重要偏/\`
    - 例如：\`MEMORY.md\`, \`SOUL.md\` 等
    - **重要**：这些文档是属于你的个人记忆，每个智能体有自己的独立文档目录
 
 ### 何时更新记忆
-
+${memoryPath}
 - 用户分享重要偏好时 → 更新 MEMORY.md
 - 学到新知识或技巧时 → 更新 MEMORY.md 或 TOOLS.md
 - 完成重要项目时 → 更新 MEMORY.md

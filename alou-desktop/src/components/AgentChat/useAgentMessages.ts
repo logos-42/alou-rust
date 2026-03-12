@@ -10,6 +10,8 @@ import { useAsyncTaskPolling } from './hooks/useAsyncTaskPolling'
 import { useAgentCreation } from './hooks/useAgentCreation'
 import clusterActionStore from '@/stores/clusterActionStore'
 import { isAgentMentioned } from '@/utils/mentionParser'
+import { useSessionId } from '@/context/SessionContext'
+import { enqueueMessage, setSessionHandler, type QueueMessage } from '@/services/sessionMessageQueue'
 
 // ── Tauri 进度事件类型 ──────────────────────────────────────────
 interface AgentProgressPayload {
@@ -465,7 +467,7 @@ export const useAgentMessages = ({
 
       // 2. 构建包含上下文的正确消息数组（system + history + 当前 user）
       const agentInfo = targetAgent || selectedAgent
-      const systemPrompt = getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null)
+      const systemPrompt = await getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null)
       const history = getMessageHistory(targetAgentId, messagesByChannel)
 
       // 构建正确格式的 messages 数组发送给 Rust

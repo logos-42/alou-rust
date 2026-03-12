@@ -547,13 +547,20 @@ pub fn set_app_handle(app_handle: tauri::AppHandle) {
 }
 
 /// 从文件加载 DIAP 身份到内存管理器
-fn load_diap_identities_from_file(_app_handle: &tauri::AppHandle, manager: &MemoryManager) {
-    // 使用 dirs crate 获取应用数据目录
-    let app_data_dir = match dirs::data_dir() {
-        Some(dir) => dir.join("alou-desktop"),
-        None => {
-            log::warn!("[MemoryManager] 无法获取应用数据目录");
-            return;
+fn load_diap_identities_from_file(app_handle: &tauri::AppHandle, manager: &MemoryManager) {
+    // 使用 Tauri API 获取应用数据目录（跨平台兼容）
+    let app_data_dir = match app_handle.path().app_data_dir() {
+        Ok(dir) => dir.join("alou-desktop"),
+        Err(e) => {
+            log::warn!("[MemoryManager] 无法获取应用数据目录: {}", e);
+            // 回退到 dirs crate
+            match dirs::data_dir() {
+                Some(dir) => dir.join("alou-desktop"),
+                None => {
+                    log::error!("[MemoryManager] 无法获取应用数据目录（dirs 也失败）");
+                    return;
+                }
+            }
         }
     };
     
@@ -609,12 +616,31 @@ fn load_diap_identities_from_file(_app_handle: &tauri::AppHandle, manager: &Memo
 fn save_diap_identities_to_file(manager: &MemoryManager) {
     use std::io::Write;
     
-    // 使用 dirs crate 获取应用数据目录
-    let app_data_dir = match dirs::data_dir() {
-        Some(dir) => dir.join("alou-desktop"),
+    // 从 APP_HANDLE 获取 app_data_dir（跨平台兼容）
+    let app_data_dir = match APP_HANDLE.get() {
+        Some(handle) => match handle.path().app_data_dir() {
+            Ok(dir) => dir.join("alou-desktop"),
+            Err(e) => {
+                log::warn!("[MemoryManager] 无法从 Tauri 获取应用数据目录: {}", e);
+                // 回退到 dirs crate
+                match dirs::data_dir() {
+                    Some(dir) => dir.join("alou-desktop"),
+                    None => {
+                        log::error!("[MemoryManager] 无法获取应用数据目录（dirs 也失败）");
+                        return;
+                    }
+                }
+            }
+        },
         None => {
-            log::warn!("[MemoryManager] 无法获取应用数据目录");
-            return;
+            log::warn!("[MemoryManager] APP_HANDLE 未初始化，使用 dirs 回退");
+            match dirs::data_dir() {
+                Some(dir) => dir.join("alou-desktop"),
+                None => {
+                    log::error!("[MemoryManager] 无法获取应用数据目录");
+                    return;
+                }
+            }
         }
     };
     
