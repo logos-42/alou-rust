@@ -1,4 +1,123 @@
 // 辅助函数：生成系统提示
+import { agentDocumentService } from '@/services/agentDocumentService';
+
+// 默认的文档内容（当加载失败时使用）
+const DEFAULT_DOCUMENT_CONTENTS = {
+  memory: `# 长期记忆
+
+这里存储跨会话的重要信息。使用 agent_document 工具的 update 操作来更新此段落。
+
+## 用户偏好
+（暂无记录）
+
+## 项目信息
+（暂无记录）
+
+## 学到的知识
+（暂无记录）
+
+## 重要对话
+（暂无记录）
+`,
+  soul: `# 核心身份
+
+**智能体 ID**: \${agentInfo?.id || 'unknown'}
+**名称**: \${agentInfo?.name || '智能体'}
+
+\${agentInfo?.name || '智能体'}的核心特质和价值观。
+
+## 角色定位
+\${agentInfo?.role_description || '专业的AI助手'}
+
+## 核心价值观
+- 准确性：提供准确可靠的信息
+- 效率：快速完成任务
+- 安全性：注重操作安全
+- 学习性：从每次交互中学习和改进
+
+## 个性特点
+- 友好且专业
+- 注重细节
+- 善于沟通
+`,
+  identity: `# 身份定义
+
+**智能体 ID**: \${agentInfo?.id || 'unknown'}
+
+## 名称
+\${agentInfo?.name || '智能体'}
+
+## 角色
+\${agentInfo?.role_description || '专业的AI助手'}
+
+## 专长领域
+（根据实际使用情况更新）
+
+## 工作方式
+- 理解用户需求
+- 选择合适工具
+- 执行任务
+- 反馈结果
+`,
+  capabilities: `# 能力清单
+
+## 核心能力
+- 文件操作：读取、写入、编辑、搜索文件
+- 终端命令：执行系统命令
+- 网络操作：搜索信息、获取网页内容
+- 任务规划：制定和管理任务计划
+- 代码理解：分析和修改代码
+
+## 工具使用
+- 熟练使用所有可用工具
+- 能够组合多个工具完成复杂任务
+- 理解工具的限制和最佳实践
+
+## 学习能力
+- 从用户反馈中学习
+- 记录成功的解决方案
+- 避免重复错误
+`,
+  constraints: `# 约束和限制
+
+## 操作限制
+- 不执行危险命令
+- 不访问敏感文件
+- 不进行未经授权的网络操作
+
+## 行为准则
+- 始终征求用户确认重要操作
+- 清晰解释操作步骤
+- 提供操作结果反馈
+
+## 安全原则
+- 保护用户数据安全
+- 遵守系统安全策略
+- 及时报告异常情况
+`,
+  tools: `# 工具使用记录
+
+## 常用工具
+（根据实际使用情况更新）
+
+## 工具组合
+（记录有效的工具组合方案）
+
+## 最佳实践
+（记录工具使用的最佳实践）
+`,
+  agents: `# 协作智能体
+
+## 已知智能体
+（暂无记录）
+
+## 协作经验
+（暂无记录）
+
+## 协作模式
+（暂无记录）
+`
+};
 export const getSystemPromptForAgent = async (
   agentInfo: { name?: string; role_description?: string; id?: string } | null,
   mode: 'agent' | 'alou' | 'group_chat',
@@ -8,17 +127,34 @@ export const getSystemPromptForAgent = async (
   console.log('[getSystemPromptForAgent] 参数:', { mode, hasAgentInfo: !!agentInfo, walletAddress, chain });
 
   // 动态获取文档路径（跨平台兼容）
-  let memoryPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
-  let soulPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
-  let identityPath = '~/Library/Application Support/com.alou.desktop/agent-documents';
+  const agentId = agentInfo?.id || 'unknown';
+  let memoryPath = '';
+  let soulPath = '';
+  let identityPath = '';
+  
+  // 检测操作系统并设置默认路径
+  const getDefaultPath = () => {
+    const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
+    const isMac = platform.toLowerCase().includes('mac');
+    const isWin = platform.toLowerCase().includes('win') || platform.toLowerCase().includes('microsoft');
+    const isLinux = platform.toLowerCase().includes('linux');
+    
+    if (isWin) {
+      return `%APPDATA%\\com.alou.desktop\\agent-documents\\${agentId}`;
+    } else if (isLinux) {
+      return `~/.local/share/alou-desktop/agent-documents/${agentId}`;
+    } else {
+      return `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
+    }
+  };
+  
+  const defaultPath = getDefaultPath();
   
   try {
     // 动态获取实际的应用数据目录
-    const { invoke } = await import('@tauri-apps/api/core');
     const { resolve, BaseDirectory } = await import('@tauri-apps/api/path');
     
     const appDataPath = await resolve(BaseDirectory.AppData);
-    const agentId = agentInfo?.id || 'unknown';
     
     memoryPath = `${appDataPath}/agent-documents/${agentId}`;
     soulPath = `${appDataPath}/agent-documents/${agentId}`;
@@ -26,12 +162,32 @@ export const getSystemPromptForAgent = async (
     
     console.log('[getSystemPromptForAgent] 动态获取路径成功:', { appDataPath, agentId });
   } catch (err) {
-    // 如果 Tauri API 不可用，使用默认值（主要是开发环境）
-    const agentId = agentInfo?.id || 'unknown';
-    memoryPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
-    soulPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
-    identityPath = `~/Library/Application Support/com.alou.desktop/agent-documents/${agentId}`;
+    // 如果 Tauri API 不可用，根据操作系统使用默认路径
+    memoryPath = defaultPath;
+    soulPath = defaultPath;
+    identityPath = defaultPath;
     console.warn('[getSystemPromptForAgent] 使用默认路径（非Tauri环境）:', err);
+  }
+
+  // 加载实际的文档内容
+  let documentContents = { ...DEFAULT_DOCUMENT_CONTENTS };
+  
+  if (agentId && agentId !== 'unknown') {
+    try {
+      const docs = await agentDocumentService.getAgentDocuments(agentId);
+      console.log('[getSystemPromptForAgent] 加载文档内容:', Object.keys(docs));
+      
+      // 如果文档存在且有内容，使用加载的内容
+      if (docs.memory) documentContents.memory = docs.memory;
+      if (docs.soul) documentContents.soul = docs.soul;
+      if (docs.identity) documentContents.identity = docs.identity;
+      if (docs.capabilities) documentContents.capabilities = docs.capabilities;
+      if (docs.constraints) documentContents.constraints = docs.constraints;
+      if (docs.tools) documentContents.tools = docs.tools;
+      if (docs.agents) documentContents.agents = docs.agents;
+    } catch (loadErr) {
+      console.warn('[getSystemPromptForAgent] 加载文档失败，使用默认内容:', loadErr);
+    }
   }
 
   // 处理群聊模式 - 注入模因设计
@@ -422,125 +578,25 @@ ${memoryPath}
 - 🌐 网络操作：验证URL安全性，使用HTTPS连接
 
 === MEMORY ===
-# 长期记忆
-
-这里存储跨会话的重要信息。使用 agent_document 工具的 update 操作来更新此段落。
-
-## 用户偏好
-（暂无记录）
-
-## 项目信息
-（暂无记录）
-
-## 学到的知识
-（暂无记录）
-
-## 重要对话
-（暂无记录）
+${documentContents.memory}
 
 === SOUL ===
-# 核心身份
-
-**智能体 ID**: ${agentInfo?.id || 'unknown'}
-**名称**: ${agentInfo.name || '智能体'}
-
-${agentInfo.name || '智能体'}的核心特质和价值观。
-
-## 角色定位
-${agentInfo.role_description || '专业的AI助手'}
-
-## 核心价值观
-- 准确性：提供准确可靠的信息
-- 效率：快速完成任务
-- 安全性：注重操作安全
-- 学习性：从每次交互中学习和改进
-
-## 个性特点
-- 友好且专业
-- 注重细节
-- 善于沟通
+${documentContents.soul}
 
 === IDENTITY ===
-# 身份定义
-
-## 名称
-${agentInfo.name || '智能体'}
-
-## 角色
-${agentInfo.role_description || '专业的AI助手'}
-
-## 专长领域
-（根据实际使用情况更新）
-
-## 工作方式
-- 理解用户需求
-- 选择合适工具
-- 执行任务
-- 反馈结果
+${documentContents.identity}
 
 === CAPABILITIES ===
-# 能力清单
-
-## 核心能力
-- 文件操作：读取、写入、编辑、搜索文件
-- 终端命令：执行系统命令
-- 网络操作：搜索信息、获取网页内容
-- 任务规划：制定和管理任务计划
-- 代码理解：分析和修改代码
-
-## 工具使用
-- 熟练使用所有可用工具
-- 能够组合多个工具完成复杂任务
-- 理解工具的限制和最佳实践
-
-## 学习能力
-- 从用户反馈中学习
-- 记录成功的解决方案
-- 避免重复错误
+${documentContents.capabilities}
 
 === CONSTRAINTS ===
-# 约束和限制
-
-## 操作限制
-- 不执行危险命令
-- 不访问敏感文件
-- 不进行未经授权的网络操作
-
-## 行为准则
-- 始终征求用户确认重要操作
-- 清晰解释操作步骤
-- 提供操作结果反馈
-
-## 安全原则
-- 保护用户数据安全
-- 遵守系统安全策略
-- 及时报告异常情况
+${documentContents.constraints}
 
 === TOOLS ===
-# 工具使用记录
-
-## 常用工具
-（根据实际使用情况更新）
-
-## 工具组合
-（记录有效的工具组合方案）
-
-## 最佳实践
-（记录工具使用的最佳实践）
+${documentContents.tools}
 
 === AGENTS ===
-# 协作智能体
-
-记录与其他智能体的协作关系和经验。
-
-## 已知智能体
-（暂无记录）
-
-## 协作经验
-（暂无记录）
-
-## 协作模式
-（暂无记录）
+${documentContents.agents}
 
 现在，请根据用户需求选择合适的工具来完成任务。`;
 

@@ -1314,12 +1314,14 @@ async loadGroupsFromKV(): Promise<void> {
   }
 
   /**
-   * 从 Tauri KV 存储加载群聊消息
+   * 从 Tauri KV 存储加载群聊消息（只加载最新的 N 条）
+   * @param groupId - 群聊 ID
+   * @param limit - 最大加载数量，默认 100 条
    */
-  async loadMessagesFromKV(groupId: string): Promise<void> {
+  async loadMessagesFromKV(groupId: string, limit: number = 100): Promise<void> {
     try {
       const keys: string[] = await invoke('kv_keys', { prefix: `message:${groupId}:` })
-      this.log(LogLevel.INFO, '加载群聊消息:', { groupId, count: keys.length })
+      this.log(LogLevel.INFO, '加载群聊消息:', { groupId, totalKeys: keys.length, limit })
 
       const messages: LocalGroupMessage[] = []
       for (const key of keys) {
@@ -1334,31 +1336,87 @@ async loadGroupsFromKV(): Promise<void> {
         }
       }
 
-      // 按时间戳排序
-      messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
+      // 按时间戳排序（从新到旧）
+      messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => b.timestamp - a.timestamp)
 
-      // 限制内存中的消息数量
-      if (messages.length > 200) {
-        messages.splice(0, messages.length - 200)
-      }
+      // 只保留最新的 N 条
+      const latestMessages = messages.slice(0, limit)
 
-      this.messages.set(groupId, messages)
-      
-      // 初始化消息ID集合
+      // 重新按时间戳排序（从旧到新，保证时间线正确）
+      latestMessages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
+
+      this.messages.set(groupId, latestMessages)
+
+      // 初始化消息 ID 集合
       const idSet = new Set<string>()
       const hashSet = new Set<string>()
-      messages.forEach(msg => {
+      latestMessages.forEach(msg => {
         idSet.add(msg.id)
         hashSet.add(this.generateMessageHash(msg))
       })
       this.messageIdSet.set(groupId, idSet)
       this.messageHashSet.set(groupId, hashSet)
-      
-      this.log(LogLevel.INFO, '群聊消息加载完成:', { groupId, count: messages.length })
+
+      this.log(LogLevel.INFO, '群聊消息加载完成:', { 
+        groupId, 
+        loaded: latestMessages.length, 
+        total: messages.length,
+        limit 
+      })
     } catch (error: any) {
       this.log(LogLevel.WARN, '加载群聊消息失败:', { groupId, error: error.message })
     }
   }
+
+  /**
+   * 加载更多历史消息（用于滚动加载）
+   * @param groupId - 群聊 ID
+   * @param beforeTimestamp - 在此时间戳之前的消息
+   * @param limit - 加载数量，默认 50 条
+   * @returns 加载的历史消息
+   */
+  async loadMoreMessages(groupId: string, beforeTimestamp: number, limit: number = 50): Promise<LocalGroupMessage[]> {
+    try {
+      const keys: string[] = await invoke('kv_keys', { prefix: `message:${groupId}:` })
+      
+      const messages: LocalGroupMessage[] = []
+      for (const key of keys) {
+        try {
+          const value: string | null = await invoke('kv_get', { key })
+          if (value) {
+            const message = LocalGroupMessage.fromJSON(JSON.parse(value))
+            // 只加载指定时间戳之前的消息
+            if (message.timestamp < beforeTimestamp) {
+              messages.push(message)
+            }
+          }
+        } catch (error: any) {
+          this.log(LogLevel.WARN, `加载历史消息失败:`, { key, error: error.message })
+        }
+      }
+
+      // 按时间戳排序（从新到旧）
+      messages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => b.timestamp - a.timestamp)
+
+      // 只保留指定的数量
+      const olderMessages = messages.slice(0, limit)
+
+      // 重新按时间戳排序（从旧到新）
+      olderMessages.sort((a: LocalGroupMessage, b: LocalGroupMessage) => a.timestamp - b.timestamp)
+
+      this.log(LogLevel.INFO, '加载更多历史消息:', { 
+        groupId, 
+        loaded: olderMessages.length,
+        beforeTimestamp 
+      })
+
+      return olderMessages
+    } catch (error: any) {
+      this.log(LogLevel.WARN, '加载更多历史消息失败:', { groupId, error: error.message })
+      return []
+    }
+  }
+
 
   /**
    * 从 LocalStorage 加载备份数据

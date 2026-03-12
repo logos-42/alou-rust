@@ -83,6 +83,150 @@ impl RalphLoopExecutor {
         self
     }
 
+    /// 生成初始文档内容
+    fn generate_initial_document_content(document_type: &str, agent_id: &str) -> String {
+        let now = chrono::Utc::now().to_rfc3339();
+        match document_type.to_lowercase().as_str() {
+            "memory" => format!(r#"# 长期记忆
+
+**智能体 ID**: {}
+
+## 用户偏好
+（暂无记录）
+
+## 项目信息
+（暂无记录）
+
+## 学到的知识
+（暂无记录）
+
+## 重要对话
+（暂无记录）
+
+---
+最后更新: {}
+"#, agent_id, now),
+            "soul" => format!(r#"# 核心身份
+
+**智能体 ID**: {}
+
+## 角色定位
+专业的AI助手
+
+## 核心价值观
+- 准确性：提供准确可靠的信息
+- 效率：快速完成任务
+- 安全性：注重操作安全
+- 学习性：从每次交互中学习和改进
+
+## 个性特点
+- 友好且专业
+- 注重细节
+- 善于沟通
+
+---
+最后更新: {}
+"#, agent_id, now),
+            "identity" => format!(r#"# 身份定义
+
+**智能体 ID**: {}
+
+## 名称
+智能体
+
+## 角色
+专业的AI助手
+
+## 专长领域
+（根据实际使用情况更新）
+
+## 工作方式
+- 理解用户需求
+- 选择合适工具
+- 执行任务
+- 反馈结果
+
+---
+最后更新: {}
+"#, agent_id, now),
+            "capabilities" => format!(r#"# 能力清单
+
+## 核心能力
+- 文件操作：读取、写入、编辑、搜索文件
+- 终端命令：执行系统命令
+- 网络操作：搜索信息、获取网页内容
+- 任务规划：制定和管理任务计划
+- 代码理解：分析和修改代码
+
+## 工具使用
+- 熟练使用所有可用工具
+- 能够组合多个工具完成复杂任务
+- 理解工具的限制和最佳实践
+
+## 学习能力
+- 从用户反馈中学习
+- 记录成功的解决方案
+- 避免重复错误
+
+---
+最后更新: {}
+"#, now),
+            "constraints" => format!(r#"# 约束和限制
+
+## 操作限制
+- 不执行危险命令
+- 不访问敏感文件
+- 不进行未经授权的网络操作
+
+## 行为准则
+- 始终征求用户确认重要操作
+- 清晰解释操作步骤
+- 提供操作结果反馈
+
+## 安全原则
+- 保护用户数据安全
+- 遵守系统安全策略
+- 及时报告异常情况
+
+---
+最后更新: {}
+"#, now),
+            "tools" => format!(r#"# 工具使用记录
+
+## 常用工具
+（根据实际使用情况更新）
+
+## 工具组合
+（记录有效的工具组合方案）
+
+## 最佳实践
+（记录工具使用的最佳实践）
+
+---
+最后更新: {}
+"#, now),
+            "agents" => format!(r#"# 协作智能体
+
+## 已知智能体
+（暂无记录）
+
+## 协作经验
+（暂无记录）
+
+## 协作模式
+（暂无记录）
+
+---
+最后更新: {}
+"#, now),
+            _ => format!(r#"# {}
+
+---
+最后更新: {}
+"#, document_type, now),
+        }
+    }
+
     /// 执行完整的 Ralph Loop
     pub async fn execute(&self, task_id: &str) -> std::result::Result<TaskFinalResult, ExecutorError> {
         log::info!("[RalphLoop] 开始执行任务: {}", task_id);
@@ -614,7 +758,24 @@ impl RalphLoopExecutor {
                         
                         log::info!("[RalphLoop] 尝试读取文档: {:?}", doc_path);
                         
-                        if doc_path.exists() {
+                        // 自动创建目录和初始文档（如果不存在）
+                        if !doc_path.exists() {
+                            if let Some(parent) = doc_path.parent() {
+                                if let Err(e) = std::fs::create_dir_all(parent) {
+                                    log::warn!("[RalphLoop] 创建文档目录失败: {}", e);
+                                } else {
+                                    // 写入初始内容
+                                    let initial_content = Self::generate_initial_document_content(doc_type, &agent_id);
+                                    if let Err(e) = std::fs::write(&doc_path, &initial_content) {
+                                        log::warn!("[RalphLoop] 创建初始文档失败: {}", e);
+                                    } else {
+                                        log::info!("[RalphLoop] 自动创建文档: {:?}", doc_path);
+                                        content = Some(initial_content);
+                                    }
+                                }
+                            }
+                        } else {
+                            // 文件存在，读取内容
                             match tokio::fs::read_to_string(&doc_path).await {
                                 Ok(text) => {
                                     content = Some(text);
@@ -623,8 +784,6 @@ impl RalphLoopExecutor {
                                     log::warn!("[RalphLoop] 读取文档失败: {}", e);
                                 }
                             }
-                        } else {
-                            log::warn!("[RalphLoop] 文档文件不存在: {:?}", doc_path);
                         }
                     }
                 };
