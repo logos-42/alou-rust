@@ -122,7 +122,8 @@ export const getSystemPromptForAgent = async (
   agentInfo: { name?: string; role_description?: string; id?: string } | null,
   mode: 'agent' | 'alou' | 'group_chat',
   walletAddress: string | null,
-  chain: string | null
+  chain: string | null,
+  injectAll: boolean = false  // 是否注入所有文档（初次激活用），默认 false（只注入记忆）
 ): Promise<string> => {
   console.log('[getSystemPromptForAgent] 参数:', { mode, hasAgentInfo: !!agentInfo, walletAddress, chain });
 
@@ -420,7 +421,44 @@ Alou 的个性与价值观：
       basePrompt += `\n\n当前链：${chain}`;
     }
 
-    console.log('[getSystemPromptForAgent] 返回 Alou 提示词，长度:', basePrompt.length);
+    // 根据 injectAll 参数决定注入范围
+    if (injectAll) {
+      // 初次激活：注入所有文档
+      basePrompt += `
+
+=== 你的长期记忆 ===
+${documentContents.memory}
+
+=== 核心身份 ===
+${documentContents.soul}
+
+=== 身份定义 ===
+${documentContents.identity}
+
+=== 能力清单 ===
+${documentContents.capabilities}
+
+=== 约束限制 ===
+${documentContents.constraints}
+
+=== 工具记录 ===
+${documentContents.tools}
+
+=== 协作智能体 ===
+${documentContents.agents}
+`;
+      console.log('[getSystemPromptForAgent] 初次激活：注入所有 7 个文档，长度:', basePrompt.length);
+    } else {
+      // 后续对话：只注入记忆
+      basePrompt += `
+
+=== 你的长期记忆 ===
+${documentContents.memory}
+`;
+      console.log('[getSystemPromptForAgent] 后续对话：只注入记忆，长度:', basePrompt.length);
+    }
+
+    console.log('[getSystemPromptForAgent] 返回 Alou 提示词（已注入记忆），长度:', basePrompt.length);
     return basePrompt;
   }
 

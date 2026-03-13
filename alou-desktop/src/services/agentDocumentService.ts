@@ -6,11 +6,14 @@
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, writeTextFile, readTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
+import useAgentStore from '@/stores/agentStore';
 
 export interface DocumentUpdatePayload {
   document_type: string;
   new_content: string;
   reason: string;
+  agent_id?: string;  // Rust 事件会携带正确的 agent_id
+  persisted_to_file?: boolean;  // 是否已成功保存到文件
 }
 
 export interface AgentDocuments {
@@ -93,63 +96,74 @@ class AgentDocumentService {
 
   /**
    * 处理文档更新
+   * 注意：Rust 后端已经直接写入文件，这里只需要更新前端状态
    */
   private async handleDocumentUpdate(payload: DocumentUpdatePayload) {
-    const { document_type, new_content, reason } = payload;
+    const { document_type, new_content, reason, agent_id } = payload;
 
-    console.log(`[AgentDocumentService] 更新文档: ${document_type}, 原因: ${reason}`);
+    console.log(`[AgentDocumentService] 更新文档: ${document_type}, 原因: ${reason}, agent_id: ${agent_id}`);
 
-    // 获取当前agent的ID
-    const currentAgentId = this.getCurrentAgentId();
+    // 优先使用事件中携带的正确 agent_id
+    const currentAgentId = agent_id || this.getCurrentAgentId();
     if (!currentAgentId) {
-      console.warn('[AgentDocumentService] 未找到当前agent ID');
+      console.warn('[AgentDocumentService] 未找到 agent ID');
       return;
     }
 
-    try {
-      // 确保agent文档目录存在
-      const agentDocPath = this.getAgentDocPath(currentAgentId);
-      const dirExists = await exists(agentDocPath, { baseDir: BaseDirectory.AppData });
-      if (!dirExists) {
-        await mkdir(agentDocPath, { baseDir: BaseDirectory.AppData, recursive: true });
-        console.log('[AgentDocumentService] 创建agent文档目录:', agentDocPath);
+    // 注意：Rust 后端已经写入文件，这里只需要更新前端状态（如果需要）
+    // 触发自定义事件，通知其他组件
+    window.dispatchEvent(new CustomEvent('agent-document-updated', {
+      detail: { 
+        agentId: currentAgentId, 
+        documentType: document_type, 
+        content: new_content,
+        filePath: this.getDocumentPath(currentAgentId, document_type)
       }
-
-      // 写入文档文件
-      const filePath = this.getDocumentPath(currentAgentId, document_type);
-      await writeTextFile(filePath, new_content, { baseDir: BaseDirectory.AppData });
-
-      console.log(`[AgentDocumentService] 文档已保存到: ${filePath}`);
-
-      // 触发自定义事件，通知其他组件
-      window.dispatchEvent(new CustomEvent('agent-document-updated', {
-        detail: { 
-          agentId: currentAgentId, 
-          documentType: document_type, 
-          content: new_content,
-          filePath 
-        }
-      }));
-
-    } catch (error) {
-      console.error('[AgentDocumentService] 保存文档失败:', error);
-    }
+    }));
   }
 
   /**
    * 获取当前agent ID
    */
   private getCurrentAgentId(): string | null {
-    // 从localStorage获取当前选中的agent
+    // 优先从 agentStore 获取当前智能体 ID
+    try {
+      const state = useAgentStore.getState();
+      const agents = state.agents;
+      if (agents && agents.length > 0) {
+        // 返回第一个智能体的 ID（通常是最近使用的）
+        const latestAgent = agents[0];
+        if (latestAgent && latestAgent.id) {
+          console.log('[AgentDocumentService] 从 agentStore 获取当前智能体 ID:', latestAgent.id);
+          return latestAgent.id;
+        }
+      }
+    } catch (error) {
+      console.warn('[AgentDocumentService] 从 agentStore 获取智能体 ID 失败:', error);
+    }
+
+    // 备选方案：从 localStorage 获取当前选中的 agent
     const selectedAgent = localStorage.getItem('selectedAgent');
     if (selectedAgent) {
       try {
         const agent = JSON.parse(selectedAgent);
         return agent.id;
       } catch (error) {
-        console.error('[AgentDocumentService] 解析selectedAgent失败:', error);
+        console.error('[AgentDocumentService] 解析 selectedAgent 失败:', error);
       }
     }
+    
+    // 备选方案：从活跃频道 ID 获取智能体 ID
+    try {
+      const activeChannelId = localStorage.getItem('activeChannelId');
+      if (activeChannelId) {
+        console.log('[AgentDocumentService] 使用活跃频道 ID 作为智能体 ID:', activeChannelId);
+        return activeChannelId;
+      }
+    } catch (error) {
+      console.warn('[AgentDocumentService] 获取活跃频道 ID 失败:', error);
+    }
+    
     return null;
   }
 

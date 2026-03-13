@@ -6,6 +6,7 @@ import { buildChannelFromAgent, extractAgentTarget, extractErrorMessage } from '
 import { resolveBackendChain } from '@/hooks/useAgentChat'
 import { isIpns, isCid } from '@/services/utils/ipnsUtils'
 import { agentDocumentService } from '@/services/agentDocumentService'
+import { BaseDirectory, readTextFile } from '@tauri-apps/plugin-fs'
 
 import type { Channel } from '@/shared/types/services'
 import type { AgentInfo } from '@/types/groupchat'
@@ -110,6 +111,44 @@ export const useChannelManager = ({
   const channelRequestIdRef = useRef(0)
   const searchDebounceRef = useRef(null)
   const hasLoadedFromStorageRef = useRef(false) // 防止重复从本地加载
+
+  /**
+   * 从文件系统加载智能体文档
+   */
+  const loadAgentDocumentsFromFile = useCallback(async (agentId: string): Promise<Record<string, string> | null> => {
+    try {
+      const documents: Record<string, string> = {};
+      const docTypes = ['memory', 'soul', 'identity', 'capabilities', 'constraints', 'tools', 'agents'];
+      
+      for (const type of docTypes) {
+        try {
+          const filePath = `agent-documents/${agentId}/${type.toUpperCase()}.md`;
+          const content = await readTextFile(filePath, { baseDir: BaseDirectory.AppData });
+          if (content) {
+            documents[type] = content;
+          }
+        } catch (error) {
+          // 文件可能不存在，跳过
+        }
+      }
+      
+      return Object.keys(documents).length > 0 ? documents : null;
+    } catch (error) {
+      console.warn('[useChannelManager] 加载文档失败:', error);
+      return null;
+    }
+  }, []);
+
+  /**
+   * 更新智能体的 documents 字段（从文件加载）
+   */
+  const updateAgentWithDocuments = useCallback(async (agentId: string) => {
+    const docs = await loadAgentDocumentsFromFile(agentId);
+    if (docs) {
+      console.log(`[useChannelManager] 从文件加载智能体 ${agentId} 的文档:`, Object.keys(docs));
+      useAgentStore.getState().updateAgent(agentId, { documents: docs });
+    }
+  }, [loadAgentDocumentsFromFile]);
   const hasLoadedInitialChannelsRef = useRef(false) // 防止重复加载初始频道列表
   const resolveExistingAgentTargetRef = useRef(null) // 用于在 loadChannelList 中访问 resolveExistingAgentTarget
   const creatingAgentsRef = useRef<Set<string>>(new Set()) // 防止重复创建同名智能体
@@ -686,8 +725,18 @@ export const useChannelManager = ({
           const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
           
           if (newChannels.length > 0) {
-            console.log(`[useChannelManager] 从本地存储添加 ${newChannels.length} 个新频道:`, 
+            console.log(`[useChannelManager] 从本地存储添加 ${newChannels.length} 个新频道:`,
               newChannels.map(c => ({ id: c.id, name: c.name })))
+            
+            // 从文件加载文档（异步，不阻塞 UI）
+            newChannels.forEach(channel => {
+              if (channel.meta?.id) {
+                updateAgentWithDocuments(channel.meta.id).catch(err => 
+                  console.warn(`[useChannelManager] 加载频道 ${channel.id} 的文档失败:`, err)
+                );
+              }
+            });
+            
             // 本地频道添加到前面，保持现有频道顺序
             return [...newChannels, ...prev]
           }
@@ -702,6 +751,8 @@ export const useChannelManager = ({
         setActiveChannelId(prev => {
           if (!prev && localChannels.length > 0) {
             setSelectedAgent(localChannels[0].meta)
+            // 从文件加载文档
+            updateAgentWithDocuments(localChannels[0].meta.id)
             return localChannels[0].id
           }
           return prev

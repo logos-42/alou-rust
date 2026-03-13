@@ -93,6 +93,8 @@ use crate::memory_manager::{
     garbage_collect, pin_item, unpin_item, set_diap_identity, get_diap_identity,
     remove_diap_identity, get_all_diap_identities, archive_diap_identity_to_ipfs,
     pin_diap_identity, unpin_diap_identity,
+    set_diap_identity_for_agent, get_diap_identity_for_agent,
+    remove_diap_identity_for_agent, get_all_diap_identities_for_agent,
 };
 
 // Agent commands

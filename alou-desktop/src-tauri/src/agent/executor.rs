@@ -825,30 +825,84 @@ impl RalphLoopExecutor {
                     });
                 }
 
-                // 发送 document:updated 事件到前端，前端负责持久化到 agentStore
-                if let Some(app) = &self.app_handle {
-                    let payload = serde_json::json!({
-                        "document_type": doc_type,
-                        "new_content": new_content,
-                        "reason": reason,
+                // 获取 agent_id
+                let task = self.task_manager.get_task(task_id).await;
+                let agent_id = task.map(|t| t.metadata.agent_id.clone()).unwrap_or_default();
+                
+                if agent_id.is_empty() {
+                    return Ok(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some("无法获取 agent_id".to_string()),
                     });
-                    match app.emit("document:updated", &payload) {
-                        Ok(_) => log::info!("[RalphLoop] 已发送 document:updated 事件，文档类型: {}, 原因: {}", doc_type, reason),
-                        Err(e) => log::warn!("[RalphLoop] 发送 document:updated 事件失败: {}", e),
-                    }
                 }
 
-                Ok(ToolResult {
-                    tool_call_id: tool_call.id.clone(),
-                    success: true,
-                    data: Some(serde_json::json!({
-                        "document_type": doc_type,
-                        "status": "updated",
-                        "message": format!("文档 '{}' 已发送更新请求，将由前端持久化", doc_type),
-                        "reason": reason,
-                    })),
-                    error: None,
-                })
+                // 直接写入文件系统
+                let write_result = if let Some(app) = &self.app_handle {
+                    if let Ok(app_data_dir) = app.path().app_data_dir() {
+                        let doc_path = std::path::PathBuf::from(&app_data_dir)
+                            .join("agent-documents")
+                            .join(&agent_id)
+                            .join(format!("{}.md", doc_type.to_uppercase()));
+                        
+                        log::info!("[RalphLoop] 尝试写入文档: {:?}", doc_path);
+                        
+                        // 确保目录存在
+                        if let Some(parent) = doc_path.parent() {
+                            if let Err(e) = std::fs::create_dir_all(parent) {
+                                log::warn!("[RalphLoop] 创建文档目录失败: {}", e);
+                            }
+                        }
+                        
+                        // 写入文件
+                        match std::fs::write(&doc_path, new_content) {
+                            Ok(_) => {
+                                log::info!("[RalphLoop] agent_document update: 已写入 {} 文档，长度: {}", doc_type, new_content.len());
+                                
+                                // 发送事件通知前端（包含 agent_id 和持久化状态）
+                                let payload = serde_json::json!({
+                                    "document_type": doc_type,
+                                    "new_content": new_content,
+                                    "reason": reason,
+                                    "agent_id": agent_id.clone(),
+                                    "persisted_to_file": true,
+                                });
+                                let _ = app.emit("document:updated", &payload);
+                                
+                                Ok(true)
+                            },
+                            Err(e) => {
+                                log::warn!("[RalphLoop] 写入文档失败: {}", e);
+                                Err(e)
+                            }
+                        }
+                    } else {
+                        Err(std::io::Error::new(std::io::ErrorKind::NotFound, "无法获取 app_data_dir"))
+                    }
+                } else {
+                    Err(std::io::Error::new(std::io::ErrorKind::NotFound, "app_handle 不存在"))
+                };
+
+                match write_result {
+                    Ok(_) => Ok(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: true,
+                        data: Some(serde_json::json!({
+                            "document_type": doc_type,
+                            "status": "updated",
+                            "message": format!("文档 '{}' 已成功写入文件系统", doc_type),
+                            "reason": reason,
+                        })),
+                        error: None,
+                    }),
+                    Err(e) => Ok(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some(format!("写入文档失败: {}", e)),
+                    }),
+                }
             }
             _ => Ok(ToolResult {
                 tool_call_id: tool_call.id.clone(),

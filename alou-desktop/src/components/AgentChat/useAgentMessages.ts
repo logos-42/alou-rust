@@ -189,6 +189,8 @@ export const useAgentMessages = ({
   const [loadingByAgent, setLoadingByAgent] = useState<Record<string, boolean>>({})
   // 按智能体存储 session：Map<channelId, sessionId>
   const [sessionsByAgent, setSessionsByAgent] = useState<Record<string, string>>({})
+  // 按智能体缓存系统提示词（包含记忆注入）：Map<channelId, string>
+  const [systemPromptCache, setSystemPromptCache] = useState<Record<string, string>>({})
   const [isConversationVisible, setConversationVisible] = useState(false)
   
   // 跟踪已保存过的消息数量，避免重复保存
@@ -196,7 +198,37 @@ export const useAgentMessages = ({
   
   // 获取钱包地址（在组件级别获取，供多个函数使用）
   const walletAddress = typeof window !== 'undefined' ? localStorage.getItem('wallet_address') : null
-  
+
+  // 预加载系统提示词（包含记忆注入）
+  useEffect(() => {
+    if (!activeChannelId || !selectedAgent?.id) return
+
+    const prefetchSystemPrompt = async () => {
+      try {
+        const cachedPrompt = systemPromptCache[activeChannelId]
+        if (cachedPrompt && cachedPrompt.length > 0) {
+          console.log('[useAgentMessages] 使用缓存的系统提示词')
+          return
+        }
+
+        console.log('[useAgentMessages] 预加载系统提示词（初次激活，注入所有文档）...')
+        const prompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, true)  // injectAll=true
+        
+        if (prompt) {
+          setSystemPromptCache(prev => ({
+            ...prev,
+            [activeChannelId]: prompt
+          }))
+          console.log('[useAgentMessages] 系统提示词预加载完成，长度:', prompt.length)
+        }
+      } catch (error) {
+        console.warn('[useAgentMessages] 预加载系统提示词失败:', error)
+      }
+    }
+
+    prefetchSystemPrompt()
+  }, [activeChannelId, selectedAgent?.id, currentMode, walletAddress, activeChain, systemPromptCache])
+
   // 按智能体存储 AbortController：Map<channelId, AbortController>
   const abortControllersByAgent = useRef<Record<string, AbortController>>({})
   
@@ -467,7 +499,25 @@ export const useAgentMessages = ({
 
       // 2. 构建包含上下文的正确消息数组（system + history + 当前 user）
       const agentInfo = targetAgent || selectedAgent
-      const systemPrompt = await getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null)
+      
+      // 优先使用缓存的系统提示词（已包含记忆注入）
+      let systemPrompt = systemPromptCache[activeChannelId]
+      
+      // 如果缓存不存在或为空，动态生成并更新缓存（只注入记忆）
+      if (!systemPrompt || systemPrompt.length === 0) {
+        console.log('[useAgentMessages] 缓存未命中，动态生成系统提示词（只注入记忆）')
+        systemPrompt = await getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null, false)  // injectAll=false
+        
+        if (systemPrompt) {
+          setSystemPromptCache(prev => ({
+            ...prev,
+            [activeChannelId]: systemPrompt
+          }))
+        }
+      } else {
+        console.log('[useAgentMessages] 使用缓存的系统提示词（长度:', systemPrompt.length, ')')
+      }
+      
       const history = getMessageHistory(targetAgentId, messagesByChannel)
 
       // 构建正确格式的 messages 数组发送给 Rust
@@ -1123,35 +1173,33 @@ export const useAgentMessages = ({
   }, [activeChannelId])
 
   // ── 监听 Rust 发来的 document:updated 事件（agent_document update 工具触发）──
-  // AI 在 Ralph Loop 中调用 agent_document({ action: "update", ... }) 后，
-  // Rust 会 emit "document:updated"，前端负责持久化到 agentStore
+  // Rust 会 emit "document:updated"，包含正确的 agent_id，前端负责更新 agentStore
   useEffect(() => {
     let unlisten: (() => void) | null = null
     let cancelled = false
 
     const setupDocumentUpdatedListener = async () => {
       try {
-        const fn = await listen<{ document_type: string; new_content: string; reason?: string }>(
+        const fn = await listen<{ document_type: string; new_content: string; reason?: string; agent_id: string }>(
           'document:updated',
           (event) => {
-            const { document_type, new_content, reason } = event.payload
-            console.log('[useAgentMessages] 收到 document:updated 事件:', document_type, '原因:', reason)
+            const { document_type, new_content, reason, agent_id } = event.payload
+            console.log('[useAgentMessages] 收到 document:updated 事件:', document_type, '原因:', reason, 'agent_id:', agent_id)
 
-            // 用 activeChannelIdRef 获取当前活动智能体（无陈旧闭包问题）
-            const agentId = activeChannelIdRef.current
-            if (!agentId) {
-              console.warn('[useAgentMessages] document:updated: 无活动智能体，跳过更新')
+            // 使用 Rust 事件中携带的正确 agent_id
+            if (!agent_id) {
+              console.warn('[useAgentMessages] document:updated: 事件中无 agent_id，跳过更新')
               return
             }
 
             // 调用 agentStore.updateAgentDocument 持久化文档变更
             const updateDocFn = useAgentStore.getState().updateAgentDocument
             if (updateDocFn) {
-              const updated = updateDocFn(agentId, document_type, new_content)
+              const updated = updateDocFn(agent_id, document_type, new_content)
               if (updated) {
-                console.log(`[useAgentMessages] 智能体 '${agentId}' 的 ${document_type} 文档已更新，新长度: ${new_content.length}`)
+                console.log(`[useAgentMessages] 智能体 '${agent_id}' 的 ${document_type} 文档已更新，新长度: ${new_content.length}`)
               } else {
-                console.warn(`[useAgentMessages] 未找到智能体 '${agentId}'，无法更新文档`)
+                console.warn(`[useAgentMessages] 未找到智能体 '${agent_id}'，无法更新文档`)
               }
             }
           }
