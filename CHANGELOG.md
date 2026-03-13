@@ -5,6 +5,34 @@ All notable changes to Alou Desktop will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-03-13
+
+### 🎉 新增功能
+
+#### DIAP 长期存储
+- **DIAP 文件管理器** - 新增 `diap_file_manager.rs`，实现 DIAP 身份的本地文件系统持久化
+- **启动自动加载** - 应用启动时自动从磁盘加载所有已保存的 DIAP 身份到内存
+- **原子写入** - 使用临时文件 + 重命名确保写入安全性
+
+#### 智能体记忆持久化
+- **Rust 后端直接写入** - `agent_document` update 操作现在由 Rust 直接写入文件系统
+- **正确的 agent_id 传递** - 事件携带正确的 agent_id，解决群聊场景下的路径错误
+- **前端缓存优化** - 支持 full(首次) 和 lite(后续) 两种提示词缓存，节省 token
+
+### 🐛 Bug 修复
+
+#### 记忆持久化修复
+- **修复写入路径问题** - 群聊时记忆不再写入到群聊频道 ID，而是正确的智能体 ID
+- **前端缓存刷新** - 记忆更新后正确清除缓存
+
+### 🔧 技术改进
+
+#### Token 优化
+- **按需注入记忆** - 首次激活注入全部7个文档，后续对话只注入 MEMORY.md
+- **双版本缓存** - 预生成 full 和 lite 两个版本的系统提示词
+
+---
+
 ## [0.2.1] - 2026-03-11
 
 ### 🐛 Bug 修复
