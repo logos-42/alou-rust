@@ -356,6 +356,32 @@ class ToolService {
     args: Record<string, any>,
     timeout: number
   ): Promise<Omit<ToolExecutionResult, 'executionMode' | 'toolId' | 'timestamp'>> {
+    // 特殊处理 browser 工具：必须使用 PlaywrightService
+    // 如果 Playwright 不可用，直接返回错误，不使用 mock 避免误导 AI
+    if (toolId === 'browser') {
+      const { default: playwrightService } = await import('./browserPlaywrightService');
+      const action = args.action || 'navigate';
+      
+      try {
+        const result = await playwrightService.execute(action, args);
+        if (result.success) {
+          return {
+            success: true,
+            data: result.data,
+            executionTimeMs: 0,
+            output: result.output,
+            warnings: []
+          };
+        }
+        // Playwright 执行失败，返回错误信息（不返回假数据）
+        throw new Error(result.error || 'Playwright 执行失败');
+      } catch (playwrightError) {
+        // 如果 Playwright 不可用或执行失败，返回明确错误
+        const errorMsg = playwrightError instanceof Error ? playwrightError.message : String(playwrightError);
+        throw new Error(`浏览器工具不可用: ${errorMsg}。请确保已安装 Playwright: npm install -g playwright && npx playwright install chromium`);
+      }
+    }
+
     const { invoke } = await import('@tauri-apps/api/core')
 
     try {

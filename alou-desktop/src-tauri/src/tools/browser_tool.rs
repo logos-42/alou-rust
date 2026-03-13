@@ -3,6 +3,7 @@ use crate::tools::ExecutionContext;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::time::{sleep, Duration};
+use std::future::Future;
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "action")]
@@ -182,11 +183,32 @@ pub struct BrowserResult {
 // 模拟浏览器客户端
 pub struct BrowserClient {
     state: std::sync::Arc<tokio::sync::RwLock<BrowserState>>,
+    /// CDP 客户端（真实浏览器控制）
+    cdp_manager: std::sync::Arc<tokio::sync::Mutex<CdpManager>>,
+    /// 是否使用真实浏览器（如果可用）
+    use_real_browser: bool,
 }
 
 impl BrowserClient {
     pub fn new(state: std::sync::Arc<tokio::sync::RwLock<BrowserState>>) -> Self {
-        Self { state }
+        Self { 
+            state,
+            cdp_manager: std::sync::Arc::new(tokio::sync::Mutex::new(CdpManager::new())),
+            use_real_browser: true, // 优先使用真实浏览器
+        }
+    }
+
+    /// 尝试使用 CDP 客户端执行操作
+    async fn try_cdp<F, R>(&self, op: F) -> Result<R, String>
+    where
+        F: Future<Output = Result<R, String>>,
+    {
+        // 如果设置了不使用真实浏览器，直接返回错误
+        if !self.use_real_browser {
+            return Err("Real browser disabled".to_string());
+        }
+        
+        op.await
     }
 
     pub async fn open_page(&mut self, url: &str, wait_time: Option<u64>) -> Result<(), String> {
@@ -231,6 +253,35 @@ impl BrowserClient {
     }
 
     pub async fn navigate(&mut self, url: &str) -> Result<(), String> {
+        // 优先尝试使用真实浏览器（CDP）
+        if self.use_real_browser {
+            let mut cdp_manager = self.cdp_manager.lock().await;
+            match cdp_manager.get_client().await {
+                Ok(cdp_client) => {
+                    match cdp_client.navigate(url).await {
+                        Ok(_) => {
+                            // 同步更新本地状态
+                            let mut state = self.state.write().await;
+                            state.current_url = url.to_string();
+                            // 获取真实标题
+                            if let Ok(title) = cdp_client.get_title().await {
+                                state.current_title = title;
+                            }
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            log::warn!("CDP navigate failed, falling back to mock: {}", e);
+                            // CDP 失败，继续使用 mock
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("CDP client unavailable: {}", e);
+                }
+            }
+        }
+        
+        // 回退到模拟实现
         {
             let mut state = self.state.write().await;
             state.current_url = url.to_string();
@@ -282,17 +333,75 @@ impl BrowserClient {
     }
 
     pub async fn get_page_title(&self) -> Result<String, String> {
+        // 优先使用真实浏览器
+        if self.use_real_browser {
+            let mut cdp_manager = self.cdp_manager.lock().await;
+            if let Ok(cdp_client) = cdp_manager.get_client().await {
+                if let Ok(title) = cdp_client.get_title().await {
+                    return Ok(title);
+                }
+            }
+        }
+        
+        // 回退到模拟实现
         let state = self.state.read().await;
         Ok(state.current_title.clone())
     }
 
     pub async fn get_page_url(&self) -> Result<String, String> {
+        // 优先使用真实浏览器
+        if self.use_real_browser {
+            let mut cdp_manager = self.cdp_manager.lock().await;
+            if let Ok(cdp_client) = cdp_manager.get_client().await {
+                if let Ok(url) = cdp_client.get_url().await {
+                    return Ok(url);
+                }
+            }
+        }
+        
+        // 回退到模拟实现
         let state = self.state.read().await;
         Ok(state.current_url.clone())
     }
 
     pub async fn take_screenshot(&self, path: Option<String>) -> Result<String, String> {
         let screenshot_path = path.unwrap_or_else(|| format!("screenshot_{}.png", chrono::Utc::now().timestamp()));
+        
+        // 优先使用真实浏览器
+        if self.use_real_browser {
+            let mut cdp_manager = self.cdp_manager.lock().await;
+            if let Ok(cdp_client) = cdp_manager.get_client().await {
+                match cdp_client.screenshot().await {
+                    Ok(base64_data) => {
+                        // 保存 base64 图片到文件
+                        use std::fs::File;
+                        use std::io::Write;
+                        match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &base64_data) {
+                            Ok(decoded) => {
+                                match File::create(&screenshot_path) {
+                                    Ok(mut file) => {
+                                        if file.write_all(&decoded).is_ok() {
+                                            return Ok(screenshot_path);
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::warn!("Failed to create screenshot file: {}", e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to decode base64: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("CDP screenshot failed: {}", e);
+                    }
+                }
+            }
+        }
+        
+        // 回退到模拟实现
         println!("Taking screenshot and saving to: {}", screenshot_path);
         Ok(screenshot_path)
     }
@@ -904,5 +1013,437 @@ mod tests {
         let input_result = tool.execute(input_args, &context).await.unwrap();
         assert!(input_result.success);
         assert!(input_result.output.as_ref().unwrap().contains("Input text"));
+    }
+}
+
+// ============== CDP 客户端模块 ==============
+// 使用 Chrome DevTools Protocol 控制真实浏览器
+
+use std::process::Stdio;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tokio::process::Command;
+
+/// CDP 客户端 - 通过 Chrome DevTools Protocol 控制浏览器
+pub struct CdpClient {
+    /// 浏览器调试端口
+    port: u16,
+    /// 浏览器进程
+    browser_process: Option<tokio::process::Child>,
+    /// CDP WebSocket URL
+    ws_url: Option<String>,
+    /// HTTP 客户端用于 CDP 协议
+    http_client: reqwest::Client,
+}
+
+impl CdpClient {
+    /// 创建新的 CDP 客户端
+    pub fn new(port: u16) -> Self {
+        Self {
+            port,
+            browser_process: None,
+            ws_url: None,
+            http_client: reqwest::Client::new(),
+        }
+    }
+
+    /// 启动 Chrome 浏览器并连接到调试端口
+    pub async fn start_browser(&mut self) -> Result<(), String> {
+        // 检查 Chrome 是否可用
+        let chrome_path = self.find_chrome()?;
+        
+        // 启动 Chrome with remote debugging
+        let mut child = Command::new(&chrome_path)
+            .args(&[
+                &format!("--remote-debugging-port={}", self.port),
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-popup-blocking",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--disable-sync",
+                "--disable-translate",
+                "--headless",  // 无头模式
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start Chrome: {}", e))?;
+
+        // 等待浏览器启动
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        
+        // 检查进程是否还在运行
+        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+            return Err(format!("Chrome exited immediately with status: {:?}", status));
+        }
+
+        self.browser_process = Some(child);
+        
+        // 获取 CDP WebSocket URL
+        self.ws_url = Some(self.get_ws_url().await?);
+        
+        Ok(())
+    }
+
+    /// 查找系统中的 Chrome 可执行文件
+    fn find_chrome(&self) -> Result<String, String> {
+        // 检查常见位置
+        #[cfg(target_os = "windows")]
+        let paths = vec![
+            "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+            "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+            "chromium.exe",
+            "chrome.exe",
+        ];
+
+        #[cfg(target_os = "macos")]
+        let paths = vec![
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "chrome",
+            "chromium",
+        ];
+
+        #[cfg(target_os = "linux")]
+        let paths = vec![
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "google-chrome",
+            "chromium",
+            "chromium-browser",
+        ];
+
+        for path in paths {
+            if std::path::Path::new(path).exists() {
+                return Ok(path.to_string());
+            }
+            // 尝试从 PATH 中查找
+            if let Ok(output) = std::process::Command::new("which").arg(path).output() {
+                if output.status.success() {
+                    let found = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if !found.is_empty() {
+                        return Ok(found);
+                    }
+                }
+            }
+        }
+
+        Err("Chrome/Chromium not found. Please install Chrome or Chromium.".to_string())
+    }
+
+    /// 从浏览器获取 CDP WebSocket URL
+    async fn get_ws_url(&self) -> Result<String, String> {
+        let url = format!("http://localhost:{}/json/version", self.port);
+        
+        let response = self.http_client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to connect to Chrome: {}", e))?;
+
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Chrome response: {}", e))?;
+
+        json["webSocketDebuggerUrl"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No WebSocket URL in response".to_string())
+    }
+
+    /// 导航到 URL
+    pub async fn navigate(&mut self, url: &str) -> Result<String, String> {
+        // 使用 CDP 的 Page.navigate 命令
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Page.navigate",
+                "params": {
+                    "url": url
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to navigate: {}", e))?;
+
+        let _json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse navigate response: {}", e))?;
+
+        Ok(format!("Navigated to {}", url))
+    }
+
+    /// 获取页面标题
+    pub async fn get_title(&self) -> Result<String, String> {
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .get(&cdp_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get page info: {}", e))?;
+
+        let json: Vec<serde_json::Value> = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+        json.first()
+            .and_then(|v| v["title"].as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No page found".to_string())
+    }
+
+    /// 获取当前 URL
+    pub async fn get_url(&self) -> Result<String, String> {
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .get(&cdp_url)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get page info: {}", e))?;
+
+        let json: Vec<serde_json::Value> = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse response: {}", e))?;
+
+        json.first()
+            .and_then(|v| v["url"].as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No page found".to_string())
+    }
+
+    /// 点击元素
+    pub async fn click(&self, selector: &str) -> Result<(), String> {
+        // 使用 CDP 的 Runtime.evaluate 来执行点击
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        // 先获取页面标题以确保有页面
+        let _: String = self.get_title().await?;
+
+        // 使用 DOM.getDocument 和 DOM.querySelector
+        // 这里简化处理，实际需要先获取 nodeId
+        let script = format!(
+            r#"document.querySelector('{}').click()"#,
+            selector.replace("'", "\\'")
+        );
+
+        let response = self.http_client
+            .post(&format!("http://localhost:{}/json", self.port))
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Runtime.evaluate",
+                "params": {
+                    "expression": script
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to click element: {}", e))?;
+
+        let _json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse click response: {}", e))?;
+
+        Ok(())
+    }
+
+    /// 输入文本
+    pub async fn input_text(&self, selector: &str, text: &str, clear_first: bool) -> Result<(), String> {
+        let script = if clear_first {
+            format!(
+                r#"(function() {{ var el = document.querySelector('{}'); el.value = ''; el.value = '{}'; }})()"#,
+                selector.replace("'", "\\'"),
+                text.replace("'", "\\'")
+            )
+        } else {
+            format!(
+                r#"document.querySelector('{}').value += '{}'"#,
+                selector.replace("'", "\\'"),
+                text.replace("'", "\\'")
+            )
+        };
+
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Runtime.evaluate",
+                "params": {
+                    "expression": script
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to input text: {}", e))?;
+
+        let _json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse input response: {}", e))?;
+
+        Ok(())
+    }
+
+    /// 截图
+    pub async fn screenshot(&self) -> Result<String, String> {
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        // 使用 CDP 的 Page.captureScreenshot
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Page.captureScreenshot",
+                "params": {
+                    "format": "base64"
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to take screenshot: {}", e))?;
+
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse screenshot response: {}", e))?;
+
+        json["data"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No screenshot data".to_string())
+    }
+
+    /// 获取页面源码
+    pub async fn get_content(&self) -> Result<String, String> {
+        let script = "document.documentElement.outerHTML";
+        
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Runtime.evaluate",
+                "params": {
+                    "expression": script
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to get content: {}", e))?;
+
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse content response: {}", e))?;
+
+        // 从 result.result.value 获取内容
+        json["result"]["result"]["value"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No content found".to_string())
+    }
+
+    /// 执行 JavaScript
+    pub async fn execute_script(&self, script: &str) -> Result<String, String> {
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Runtime.evaluate",
+                "params": {
+                    "expression": script
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to execute script: {}", e))?;
+
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse script response: {}", e))?;
+
+        json["result"]["result"]["value"]
+            .as_str()
+            .map(|s| s.to_string())
+            .ok_or_else(|| "No result".to_string())
+    }
+
+    /// 刷新页面
+    pub async fn reload(&self) -> Result<(), String> {
+        let cdp_url = format!("http://localhost:{}/json", self.port);
+        
+        let response = self.http_client
+            .post(&cdp_url)
+            .json(&serde_json::json!({
+                "id": 1,
+                "method": "Page.reload"
+            }))
+            .send()
+            .await
+            .map_err(|e| format!("Failed to reload: {}", e))?;
+
+        let _json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse reload response: {}", e))?;
+
+        Ok(())
+    }
+
+    /// 停止浏览器
+    pub async fn stop(&mut self) -> Result<(), String> {
+        if let Some(mut child) = self.browser_process.take() {
+            child.kill().await.map_err(|e| format!("Failed to kill browser: {}", e))?;
+        }
+        Ok(())
+    }
+}
+
+/// 全局 CDP 客户端管理器
+pub struct CdpManager {
+    client: Option<CdpClient>,
+}
+
+impl CdpManager {
+    pub fn new() -> Self {
+        Self { client: None }
+    }
+
+    /// 获取或创建 CDP 客户端
+    pub async fn get_client(&mut self) -> Result<&mut CdpClient, String> {
+        if self.client.is_none() {
+            let mut client = CdpClient::new(9222);
+            client.start_browser().await?;
+            self.client = Some(client);
+        }
+        
+        Ok(self.client.as_mut().expect("Client should exist"))
+    }
+}
+
+impl Default for CdpManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
