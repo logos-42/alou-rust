@@ -1,6 +1,6 @@
 [package]
 name = "alou-desktop"
-version = "0.2.2"
+version = "0.2.3"
 description = "Alou Desktop - Web3 AI Agent Desktop Application"
 authors = ["Alou Team"]
 license = "MIT OR Apache-2.0"
@@ -70,6 +70,7 @@ rand = "0.9"
 brotli = "8"
 
 # Agent 模块依赖
+dashmap = "6"
 aes-gcm = "0.10"
 thiserror = "2"
 

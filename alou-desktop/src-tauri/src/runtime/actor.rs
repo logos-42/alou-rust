@@ -1,4 +1,6 @@
 //! Session Actor
+//! 
+//! 每个 Session 对应一个独立的 Actor（Tokio Task），处理该 Session 的所有消息。
 
 use std::sync::Arc;
 use tokio::sync::mpsc;
@@ -7,6 +9,10 @@ use crate::runtime::message::SessionMessage;
 use crate::runtime::handle::ActorHandle;
 use crate::bridges::BridgeManager;
 
+/// Session Actor
+/// 
+/// 每个 Session 对应一个独立的 Actor，负责处理该 Session 的所有消息。
+/// 消息按顺序处理，避免并发问题。
 pub struct SessionActor {
     session_id: String,
     runtime: SessionRuntime,
@@ -15,6 +21,7 @@ pub struct SessionActor {
 }
 
 impl SessionActor {
+    /// 创建并启动 Session Actor
     pub fn spawn(
         session_id: String,
         bridge_manager: Arc<BridgeManager>,
@@ -30,30 +37,31 @@ impl SessionActor {
 
         let handle = tokio::spawn(actor.run());
 
-        ActorHandle { session_id, tx, handle }
+        ActorHandle::new(session_id, tx, handle)
     }
 
-    pub async fn run(self) {
+    /// Actor 主循环
+    pub async fn run(mut self) {
         let session_id = self.session_id.clone();
-        let mut runtime = self.runtime;
 
         // 发送 SessionCreated 消息
-        runtime = Self::handle_message(&session_id, SessionMessage::SessionCreated, runtime).await;
+        self.runtime = Self::handle_message(&session_id, SessionMessage::SessionCreated, self.runtime).await;
 
         while let Some(msg) = self.message_rx.recv().await {
-            runtime = Self::handle_message(&session_id, msg, runtime).await;
+            self.runtime = Self::handle_message(&session_id, msg, self.runtime).await;
         }
 
         // 通道关闭，发送 SessionDestroy 消息
-        Self::handle_message(&session_id, SessionMessage::SessionDestroy, runtime).await;
+        Self::handle_message(&session_id, SessionMessage::SessionDestroy, self.runtime).await;
 
         log::info!("[SessionActor] Session {} actor shutdown", session_id);
     }
 
+    /// 处理消息
     async fn handle_message(
         session_id: &str,
         msg: SessionMessage,
-        mut runtime: SessionRuntime,
+        runtime: SessionRuntime,
     ) -> SessionRuntime {
         match msg {
             SessionMessage::UserMessage { content, .. } => {
@@ -62,7 +70,10 @@ impl SessionActor {
                     session_id,
                     content.chars().take(50).collect::<String>()
                 );
-                runtime.agent_state.add_user_message(content);
+                // 记录到 agent 状态
+                let mut runtime = runtime;
+                runtime.agent_state.add_message("user", content);
+                return runtime;
             }
 
             SessionMessage::ToolResult { tool_call_id, result } => {
@@ -74,34 +85,6 @@ impl SessionActor {
                 );
             }
 
-            SessionMessage::ToolCall { tool_call_id, tool_name, arguments } => {
-                log::info!(
-                    "[SessionActor:{}] tool call: {} {:?}",
-                    session_id,
-                    tool_name,
-                    arguments
-                );
-            }
-
-            SessionMessage::WorkflowStep { workflow_id, step_id, action } => {
-                log::info!(
-                    "[SessionActor:{}] workflow step: {} {} {:?}",
-                    session_id,
-                    workflow_id,
-                    step_id,
-                    action
-                );
-            }
-
-            SessionMessage::WorkflowExecute { workflow_id, input } => {
-                log::info!(
-                    "[SessionActor:{}] workflow execute: {}",
-                    session_id,
-                    workflow_id
-                );
-                runtime.workflow_client.start_workflow(workflow_id, format!("exec_{}", workflow_id));
-            }
-
             SessionMessage::WorkflowEvent { workflow_id, event_type, data } => {
                 log::info!(
                     "[SessionActor:{}] workflow event: {} - {}",
@@ -109,7 +92,7 @@ impl SessionActor {
                     workflow_id,
                     event_type
                 );
-                runtime.workflow_client.record_event(workflow_id, event_type, data);
+                log::debug!("[SessionActor:{}] workflow data: {:?}", session_id, data);
             }
 
             SessionMessage::SystemEvent { event_type, .. } => {
@@ -155,10 +138,42 @@ impl SessionActor {
             }
 
             SessionMessage::Ping => {
-                runtime.touch();
+                log::debug!("[SessionActor:{}] ping", session_id);
             }
 
-            SessionMessage::Pong => {}
+            SessionMessage::Pong => {
+                log::debug!("[SessionActor:{}] pong", session_id);
+            }
+
+            // 新增消息类型（简化处理）
+            SessionMessage::ToolCall { tool_call_id, tool_name, arguments } => {
+                log::info!(
+                    "[SessionActor:{}] tool call: {} - {} {:?}",
+                    session_id,
+                    tool_call_id,
+                    tool_name,
+                    arguments
+                );
+            }
+
+            SessionMessage::WorkflowStep { workflow_id, step_id, action } => {
+                log::info!(
+                    "[SessionActor:{}] workflow step: {} - {} {:?}",
+                    session_id,
+                    workflow_id,
+                    step_id,
+                    action
+                );
+            }
+
+            SessionMessage::WorkflowExecute { workflow_id, input } => {
+                log::info!(
+                    "[SessionActor:{}] workflow execute: {} {:?}",
+                    session_id,
+                    workflow_id,
+                    input
+                );
+            }
         }
 
         runtime

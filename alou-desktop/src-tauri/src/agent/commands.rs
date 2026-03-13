@@ -42,7 +42,7 @@ pub async fn execute_agent_task(
     let executor = RalphLoopExecutor::new(
         ai_client.clone(),
         task_manager.clone(),
-        Arc::new(tool_bridge.clone()),
+        tool_bridge.clone(),
         Arc::new(crate::tools::ToolRegistry::new()),
     );
 
@@ -144,7 +144,7 @@ pub async fn execute_ai_conversation(
     let executor = RalphLoopExecutor::new(
         ai_client.clone(),
         task_manager.clone(),
-        Arc::new(tool_bridge.clone()),
+        tool_bridge.clone(),
         Arc::new(crate::tools::ToolRegistry::new()),
     )
     .with_app_handle(app_handle);
