@@ -675,6 +675,11 @@ fn main() {
             archive_diap_identity_to_ipfs,
             pin_diap_identity,
             unpin_diap_identity,
+            // DIAP identity for agent commands (file-based)
+            set_diap_identity_for_agent,
+            get_diap_identity_for_agent,
+            remove_diap_identity_for_agent,
+            get_all_diap_identities_for_agent,
             // Agent commands
             execute_agent_task,
             execute_ai_conversation,

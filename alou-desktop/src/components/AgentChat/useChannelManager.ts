@@ -7,6 +7,7 @@ import { resolveBackendChain } from '@/hooks/useAgentChat'
 import { isIpns, isCid } from '@/services/utils/ipnsUtils'
 import { agentDocumentService } from '@/services/agentDocumentService'
 import { BaseDirectory, readTextFile } from '@tauri-apps/plugin-fs'
+import { saveDiapIdentityToFile } from '@/utils/diapAgentIdentityManager'
 
 import type { Channel } from '@/shared/types/services'
 import type { AgentInfo } from '@/types/groupchat'
@@ -1022,6 +1023,15 @@ export const useChannelManager = ({
           metadata.did = metadata.did || diapIdentity.did
           metadata.cid = metadata.cid || diapIdentity.cid
           metadata.ipns = metadata.ipns || diapIdentity.ipns
+          
+          // 保存 DIAP 身份到文件 (基于 agent-id)
+          const agentId = metadata.id
+          if (agentId && diapIdentity) {
+            saveDiapIdentityToFile(agentId, diapIdentity).catch(err => {
+              console.error('[useChannelManager] 保存 DIAP 身份到文件失败:', err)
+            })
+          }
+          
           console.log('[useChannelManager] 合并 DIAP Identity 后的元数据:', metadata)
         }
 

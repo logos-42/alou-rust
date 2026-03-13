@@ -36,6 +36,8 @@ import {
 
 import useAgentStore, { useAgentStoreHydration } from '../stores/agentStore'
 
+import { loadDiapIdentityFromFile } from '@/utils/diapAgentIdentityManager'
+
 /**
  * 智能体消息处理器类型
  */
@@ -235,8 +237,24 @@ export class UnifiedAgentCoordinator {
 
       // 将 agentStore 中的智能体转换为 AgentInfo 并注册
       for (const agent of agents) {
+        const agentId = agent.id
+        
+        // 尝试从文件加载 DIAP 身份
+        let diapIdentity = agent.diapIdentity
+        if (!diapIdentity && agentId) {
+          try {
+            const loadedIdentity = await loadDiapIdentityFromFile(agentId)
+            if (loadedIdentity) {
+              diapIdentity = loadedIdentity
+              console.log('[AgentCoordinator] 从文件加载 DIAP 身份:', agentId, loadedIdentity.did)
+            }
+          } catch (loadError) {
+            console.warn('[AgentCoordinator] 加载 DIAP 身份失败:', agentId, loadError)
+          }
+        }
+        
         const agentInfo: AgentInfo = {
-          id: agent.id,
+          id: agentId,
           name: agent.name || agent.display_name || '未命名智能体',
           mode: 'agent',
           avatar: agent.avatar_url || undefined,
@@ -246,7 +264,7 @@ export class UnifiedAgentCoordinator {
             ipns: agent.ipns,
             cid: agent.cid,
             did: agent.did,
-            diapIdentity: agent.diapIdentity,
+            diapIdentity: diapIdentity,
           },
         }
 
