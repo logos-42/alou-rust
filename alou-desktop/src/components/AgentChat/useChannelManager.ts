@@ -915,35 +915,7 @@ export const useChannelManager = ({
         return { success: true, skipped: true, reason: 'already_creating' }
       }
 
-      // 检查本地存储中是否已存在同名智能体（防止重复创建）
-      const existingAgents = storedAgents || []
-      const existingAgent = existingAgents.find((agent: any) =>
-        agent.name?.toLowerCase() === name.toLowerCase() ||
-        agent.display_name?.toLowerCase() === name.toLowerCase()
-      )
-
-      if (existingAgent) {
-        console.log('[useChannelManager] 智能体已存在，跳过创建，直接切换:', name)
-        // 切换到已存在的智能体
-        const existingChannel = buildChannelFromAgent(existingAgent)
-        if (existingChannel) {
-          setChannels((prev: Channel[]) => {
-            // 检查是否已在频道列表中
-            const existsInList = prev.some(c => c.id === existingChannel.id)
-            if (existsInList) {
-              // 已存在，移动到开头
-              return [existingChannel, ...prev.filter(c => c.id !== existingChannel.id)]
-            } else {
-              // 不存在，添加到开头
-              return [existingChannel, ...prev]
-            }
-          })
-          setActiveChannelId(existingChannel.id)
-        }
-        setSelectedAgent(existingAgent)
-        return { success: true, is_duplicate: true, existingAgent, existingChannel }
-      }
-
+      // 允许同名智能体创建，不再检查重复
       // 标记为正在创建
       creatingAgentsRef.current.add(agentKey)
 
