@@ -239,14 +239,19 @@ export class UnifiedAgentCoordinator {
       for (const agent of agents) {
         const agentId = agent.id
         
-        // 尝试从文件加载 DIAP 身份
+        // 尝试从文件加载 DIAP 身份（无论是否已有都尝试加载，以支持重启后的恢复）
         let diapIdentity = agent.diapIdentity
-        if (!diapIdentity && agentId) {
+        if (agentId) {
           try {
             const loadedIdentity = await loadDiapIdentityFromFile(agentId)
             if (loadedIdentity) {
-              diapIdentity = loadedIdentity
-              console.log('[AgentCoordinator] 从文件加载 DIAP 身份:', agentId, loadedIdentity.did)
+              // 如果文件中有但 agentStore 中没有，或者文件中的更完整，使用文件中的
+              if (!diapIdentity || (loadedIdentity.did && !diapIdentity.did)) {
+                diapIdentity = loadedIdentity
+                console.log('[AgentCoordinator] 从文件加载 DIAP 身份:', agentId, loadedIdentity.did)
+              }
+            } else {
+              console.log('[AgentCoordinator] 文件中没有 DIAP 身份:', agentId)
             }
           } catch (loadError) {
             console.warn('[AgentCoordinator] 加载 DIAP 身份失败:', agentId, loadError)
