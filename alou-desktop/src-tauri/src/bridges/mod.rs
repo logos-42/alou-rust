@@ -1,16 +1,27 @@
 //! 前端桥接模块
 //!
 //! 提供前端与 Rust 后端的通信桥梁
+//!
+//! # 架构说明
+//!
+//! BridgeManager 是无状态的资源池管理器，使用 Semaphore 控制并发：
+//! - LlmPool: LLM 连接池
+//! - ToolPool: 工具调用池
+//! - BrowserPool: 浏览器实例池
 
 pub mod tool_bridge;
 pub mod context_bridge;
+pub mod pool;  // 资源池管理
 
 // 重新导出核心类型和接口
 pub use tool_bridge::{ToolBridge, ToolBridgeConfig, ToolCallRequest, ToolCallResponse};
 pub use context_bridge::{ContextBridge, ContextBridgeConfig};
+pub use pool::{LlmPool, LlmPoolConfig, ToolPool, ToolPoolConfig, BrowserPool, BrowserPoolConfig};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 /// 桥接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,121 +44,53 @@ pub struct BridgeConfig {
     pub debug_mode: bool,
 }
 
-/// 桥接统计信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BridgeStatistics {
-    /// 总调用次数
-    pub total_calls: u64,
-    /// 成功调用次数
-    pub successful_calls: u64,
-    /// 失败调用次数
-    pub failed_calls: u64,
-    /// 平均响应时间（毫秒）
-    pub average_response_time_ms: f64,
-    /// 最后调用时间
-    pub last_call_time: Option<i64>,
-    /// 活跃调用数
-    pub active_calls: usize,
-}
-
 /// 桥接管理器
+/// 
+/// 无状态资源池 + Semaphore 控制并发
 pub struct BridgeManager {
     /// 工具桥接
-    tool_bridge: ToolBridge,
+    tool_bridge: Arc<ToolBridge>,
     /// 上下文桥接
-    context_bridge: ContextBridge,
+    context_bridge: Arc<ContextBridge>,
     /// 配置
-    config: BridgeConfig,
-    /// 统计信息
-    statistics: BridgeStatistics,
+    config: Arc<BridgeConfig>,
+    /// 并发控制信号量
+    semaphore: Arc<Semaphore>,
 }
 
 impl BridgeManager {
     /// 创建新的桥接管理器
     pub fn new(config: BridgeConfig) -> Self {
+        let semaphore = Arc::new(Semaphore::new(config.max_concurrent_calls));
+        
         Self {
-            tool_bridge: ToolBridge::new_sync(config.tool_bridge.clone()),
-            context_bridge: ContextBridge::new(config.context_bridge.clone()),
-            config,
-            statistics: BridgeStatistics {
-                total_calls: 0,
-                successful_calls: 0,
-                failed_calls: 0,
-                average_response_time_ms: 0.0,
-                last_call_time: None,
-                active_calls: 0,
-            },
+            tool_bridge: Arc::new(ToolBridge::new_sync(config.tool_bridge.clone())),
+            context_bridge: Arc::new(ContextBridge::new(config.context_bridge.clone())),
+            config: Arc::new(config),
+            semaphore,
         }
+    }
+
+    /// 获取并发许可
+    pub async fn acquire_permit(&self) -> Result<tokio::sync::SemaphorePermit<'_>, Box<dyn std::error::Error + Send + Sync>> {
+        let permit = self.semaphore.acquire().await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        Ok(permit)
     }
 
     /// 获取工具桥接
-    pub fn tool_bridge(&self) -> &ToolBridge {
-        &self.tool_bridge
-    }
-
-    /// 获取工具桥接（可变引用）
-    pub fn tool_bridge_mut(&mut self) -> &mut ToolBridge {
-        &mut self.tool_bridge
+    pub fn tool_bridge(&self) -> Arc<ToolBridge> {
+        self.tool_bridge.clone()
     }
 
     /// 获取上下文桥接
-    pub fn context_bridge(&self) -> &ContextBridge {
-        &self.context_bridge
-    }
-
-    /// 获取上下文桥接（可变引用）
-    pub fn context_bridge_mut(&mut self) -> &mut ContextBridge {
-        &mut self.context_bridge
-    }
-
-    /// 获取统计信息
-    pub fn get_statistics(&self) -> &BridgeStatistics {
-        &self.statistics
-    }
-
-    /// 更新统计信息
-    pub fn update_statistics(&mut self, call_duration_ms: u64, success: bool) {
-        self.statistics.total_calls += 1;
-        self.statistics.last_call_time = Some(chrono::Utc::now().timestamp());
-
-        if success {
-            self.statistics.successful_calls += 1;
-        } else {
-            self.statistics.failed_calls += 1;
-        }
-
-        // 更新平均响应时间
-        let total_calls = self.statistics.total_calls as f64;
-        let current_avg = self.statistics.average_response_time_ms;
-        self.statistics.average_response_time_ms =
-            (current_avg * (total_calls - 1.0) + call_duration_ms as f64) / total_calls;
+    pub fn context_bridge(&self) -> Arc<ContextBridge> {
+        self.context_bridge.clone()
     }
 
     /// 获取配置
     pub fn get_config(&self) -> &BridgeConfig {
         &self.config
-    }
-
-    /// 更新配置
-    pub fn update_config(&mut self, config: BridgeConfig) {
-        self.config = config.clone();
-
-        // 更新子桥接的配置
-        self.tool_bridge.update_config(config.tool_bridge.clone());
-
-        self.context_bridge.update_config(config.context_bridge.clone());
-    }
-
-    /// 重置统计信息
-    pub fn reset_statistics(&mut self) {
-        self.statistics = BridgeStatistics {
-            total_calls: 0,
-            successful_calls: 0,
-            failed_calls: 0,
-            average_response_time_ms: 0.0,
-            last_call_time: None,
-            active_calls: 0,
-        };
     }
 
     /// 检查桥接健康状态
@@ -163,6 +106,11 @@ impl BridgeManager {
             context_bridge: context_bridge_healthy,
             timestamp: chrono::Utc::now().timestamp(),
         }
+    }
+
+    /// 获取当前活跃的连接数
+    pub fn active_connections(&self) -> usize {
+        self.semaphore.available_permits()
     }
 }
 
@@ -232,13 +180,13 @@ pub enum BridgeEventType {
 pub struct BridgeEvent {
     /// 事件类型
     pub event_type: BridgeEventType,
-    /// 事件ID
+    /// 事件 ID
     pub event_id: String,
     /// 时间戳
     pub timestamp: i64,
     /// 事件数据
     pub data: HashMap<String, serde_json::Value>,
-    /// 相关会话ID
+    /// 相关会话 ID
     pub session_id: Option<String>,
 }
 
@@ -312,31 +260,23 @@ mod tests {
 
         assert!(config.enabled);
         assert_eq!(config.max_concurrent_calls, 10);
-        assert_eq!(config.timeout_seconds, 30);
+        assert_eq!(manager.active_connections(), 10);
     }
 
     #[tokio::test]
-    async fn test_bridge_statistics_update() {
-        let mut manager = create_default_bridge_manager();
-
-        // 初始状态
-        let stats = manager.get_statistics();
-        assert_eq!(stats.total_calls, 0);
-        assert_eq!(stats.successful_calls, 0);
-
-        // 更新统计信息
-        manager.update_statistics(100, true);
-        let stats = manager.get_statistics();
-        assert_eq!(stats.total_calls, 1);
-        assert_eq!(stats.successful_calls, 1);
-        assert_eq!(stats.average_response_time_ms, 100.0);
-
-        // 再次更新
-        manager.update_statistics(200, false);
-        let stats = manager.get_statistics();
-        assert_eq!(stats.total_calls, 2);
-        assert_eq!(stats.successful_calls, 1);
-        assert_eq!(stats.failed_calls, 1);
-        assert_eq!(stats.average_response_time_ms, 150.0);
+    async fn test_bridge_manager_semaphore() {
+        let manager = create_default_bridge_manager();
+        
+        // 获取一个许可
+        let _permit1 = manager.acquire_permit().await.unwrap();
+        assert_eq!(manager.active_connections(), 9);
+        
+        // 获取第二个许可
+        let _permit2 = manager.acquire_permit().await.unwrap();
+        assert_eq!(manager.active_connections(), 8);
+        
+        // 释放许可（permit 离开作用域自动释放）
+        drop(_permit1);
+        assert_eq!(manager.active_connections(), 9);
     }
 }

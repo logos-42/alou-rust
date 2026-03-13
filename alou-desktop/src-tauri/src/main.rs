@@ -11,6 +11,11 @@ mod ipfs_node;
 mod ipfs;
 mod ipfs_repair;  // 新增 IPFS 修复模块
 mod ipns_verified;  // 新增验证过的IPNS解决方案
+// Runtime - Session Actor 架构
+mod runtime;
+use crate::runtime::router::SessionRouter;
+
+
 mod kubo;
 mod kv_commands;  // 新增KV存储模块
 mod lsp;
@@ -34,6 +39,7 @@ mod bot_gateway;  // Bot Gateway 模块
 mod heartbeat;  // 心跳模块
 mod cron;  // Cron 定时任务模块
 mod soul;  // 灵魂/人格管理模块
+mod scheduler;  // Agent 调度器模块
 mod tasks;  // 任务管理模块
 mod logs;  // 日志管理模块
 
@@ -180,7 +186,7 @@ async fn execute_tool(
     tool_id: String,
     args: String,
     timeout: Option<u64>,
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     // 记录工具调用开始
     println!("\n========================================");
@@ -223,8 +229,7 @@ async fn execute_tool(
     }
 
     // Get tool bridge and execute tool
-    let manager = bridge_manager.lock().await;
-    let tool_bridge = manager.tool_bridge();
+    let tool_bridge = bridge_manager.tool_bridge();
 
     let request = crate::bridges::ToolCallRequest {
         session_id: "tauri_session".to_string(),
@@ -277,23 +282,21 @@ async fn execute_tool(
 
 #[tauri::command]
 async fn get_tool_list(
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     // 从 ToolBridge 获取工具列表
-    let manager = bridge_manager.lock().await;
-    let tools = manager.tool_bridge().list_tools().await;
+    let tools = bridge_manager.tool_bridge().list_tools().await;
     Ok(serde_json::json!({ "tools": tools }))
 }
 
 #[tauri::command]
 async fn cancel_tool_execution(
     execution_id: String,
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     println!("[Tauri] Cancelling tool execution: {}", execution_id);
 
-    let manager = bridge_manager.lock().await;
-    let result = manager.tool_bridge().cancel_execution(&execution_id).await;
+    let result = bridge_manager.tool_bridge().cancel_execution(&execution_id).await;
 
     match result {
         Ok(_) => Ok(serde_json::json!({
@@ -308,12 +311,11 @@ async fn cancel_tool_execution(
 #[tauri::command]
 async fn get_execution_history(
     limit: Option<usize>,
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     println!("[Tauri] Getting execution history (limit: {:?})", limit);
 
-    let manager = bridge_manager.lock().await;
-    let history = manager.tool_bridge().get_execution_history(limit.unwrap_or(50)).await;
+    let history = bridge_manager.tool_bridge().get_execution_history(limit.unwrap_or(50)).await;
 
     Ok(serde_json::json!({
         "history": history,
@@ -510,7 +512,7 @@ async fn agent_skills(
     skill_name: Option<String>,
     inputs: Option<serde_json::Value>,
     query: Option<String>,
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     let args = serde_json::json!({
         "action": action,
@@ -520,9 +522,7 @@ async fn agent_skills(
     });
     
     let execution_id = format!("agent_skills_{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
-    
-    let manager = bridge_manager.lock().await;
-    
+
     let request = crate::bridges::ToolCallRequest {
         session_id: "agent_skills_session".to_string(),
         user_id: None,
@@ -535,8 +535,8 @@ async fn agent_skills(
         timeout_seconds: Some(30),
         permissions: vec!["read".to_string(), "write".to_string(), "execute".to_string()],
     };
-    
-    let result = manager.tool_bridge().handle_request(request).await;
+
+    let result = bridge_manager.tool_bridge().handle_request(request).await;
     
     match result {
         Ok(response) => {
@@ -578,7 +578,8 @@ fn main() {
         .manage(KvState::new())
         .manage(WorkflowState::default())
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
-        .manage(std::sync::Arc::new(tokio::sync::Mutex::new(create_default_bridge_manager())))
+        .manage(std::sync::Arc::new(create_default_bridge_manager()))
+        .manage(std::sync::Arc::new(SessionRouter::new(std::sync::Arc::new(create_default_bridge_manager()))))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
         .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))
