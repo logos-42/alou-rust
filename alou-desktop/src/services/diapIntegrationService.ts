@@ -174,7 +174,7 @@ class DiapIntegrationService {
 
     // 检查是否已存在
     if (hasDiapIdentity(sessionId)) {
-      const existing = getDiapIdentity(sessionId)
+      const existing = await loadDiapIdentityFromFile(sessionId)
       if (existing && existing.did && existing.cid && existing.ipns) {
         console.log('[DiapIntegration] DIAP身份已存在，跳过创建:', existing)
         return { identity: existing }
@@ -206,7 +206,8 @@ class DiapIntegrationService {
 
       // 第3步：保存到本地存储（跳过后端KV存储）
       console.log('[DiapIntegration] 步骤2: 保存到本地存储')
-      this.saveToLocalStorage(sessionId, completeIdentity as DIAPIdentity)
+      const agentId = completeIdentity.ipns ? completeIdentity.ipns.replace(/^\/?ipns\//, '') : completeIdentity.cid
+      await this.saveToLocalStorage(agentId, completeIdentity as DIAPIdentity)
 
       console.log('[DiapIntegration] 🎉 完整DIAP身份创建完成:', completeIdentity)
       return { identity: completeIdentity as DIAPIdentity }
@@ -428,9 +429,9 @@ class DiapIntegrationService {
   /**
    * 保存到本地存储
    */
-  saveToLocalStorage(sessionId: string, identity: DIAPIdentity): void {
+  async saveToLocalStorage(sessionId: string, identity: DIAPIdentity): Promise<void> {
     try {
-      setDiapIdentity(sessionId, identity)
+      await saveDiapIdentityToFile(sessionId, identity)
       console.log('[DiapIntegration] 本地存储保存成功')
     } catch (error) {
       console.warn('[DiapIntegration] 本地存储保存失败:', (error as Error).message)
@@ -444,7 +445,7 @@ class DiapIntegrationService {
     try {
       // 优先从本地存储获取
       if (hasDiapIdentity(sessionId)) {
-        const identity = getDiapIdentity(sessionId)
+        const identity = await loadDiapIdentityFromFile(sessionId)
         // DID 和 CID 是必须的，IPNS 可以为空
         if (identity && identity.did && identity.cid) {
           console.log('[DiapIntegration] 从本地存储获取DIAP身份成功')
@@ -461,7 +462,8 @@ class DiapIntegrationService {
       if (response.data && response.data.identity) {
         const identity = response.data.identity
         // 保存到本地存储
-        this.saveToLocalStorage(sessionId, identity)
+        const agentId = identity.ipns ? identity.ipns.replace(/^\/?ipns\//, '') : identity.cid
+        await this.saveToLocalStorage(agentId, identity)
         console.log('[DiapIntegration] 从后端获取DIAP身份成功')
         return { identity }
       }

@@ -516,7 +516,7 @@ pub fn unpin_diap_identity(session_id: String) -> bool {
 }
 
 /// 获取全局内存管理器实例
-fn get_memory_manager() -> &'static MemoryManager {
+pub fn get_memory_manager() -> &'static MemoryManager {
     static MANAGER: OnceLock<MemoryManager> = OnceLock::new();
 
     MANAGER.get_or_init(|| {
@@ -692,45 +692,3 @@ fn save_diap_identities_to_file(manager: &MemoryManager) {
     log::debug!("[MemoryManager] 保存了 {} 个 DIAP 身份到 {:?}", identities.len(), diap_file);
 }
 
-/// Tauri 命令：设置 DIAP 身份（基于 agent_id）
-#[tauri::command]
-pub fn set_diap_identity_for_agent(agent_id: String, identity: String) -> Result<(), String> {
-    let manager = get_memory_manager();
-    let key = format!("diap_agent_{}", agent_id);
-    manager.set_item(key, identity)
-}
-
-/// Tauri 命令：获取 DIAP 身份（基于 agent_id）
-#[tauri::command]
-pub fn get_diap_identity_for_agent(agent_id: String) -> Option<String> {
-    let manager = get_memory_manager();
-    let key = format!("diap_agent_{}", agent_id);
-    manager.get_item(&key)
-}
-
-/// Tauri 命令：删除 DIAP 身份（基于 agent_id）
-#[tauri::command]
-pub fn remove_diap_identity_for_agent(agent_id: String, remove_from_ipfs: bool) -> bool {
-    let manager = get_memory_manager();
-    let key = format!("diap_agent_{}", agent_id);
-    manager.remove_item(&key, remove_from_ipfs)
-}
-
-/// Tauri 命令：获取所有 DIAP 身份（基于 agent_id）
-#[tauri::command]
-pub fn get_all_diap_identities_for_agent() -> std::collections::HashMap<String, String> {
-    let manager = get_memory_manager();
-    let keys = manager.get_keys();
-    let mut identities = std::collections::HashMap::new();
-
-    for key in keys {
-        if key.starts_with("diap_agent_") {
-            if let Some(identity) = manager.get_item(&key) {
-                let agent_id = key.replace("diap_agent_", "");
-                identities.insert(agent_id, identity);
-            }
-        }
-    }
-
-    identities
-}

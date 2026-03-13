@@ -889,41 +889,25 @@ async fn create_encrypted_node_id(session_id: &str, private_key: &str) -> Result
     })
 }
 
-/// 保存身份到本地存储（支持 session_id 和 agent_id）
+/// 保存身份到本地存储（仅使用 agent_id 格式）
 async fn save_identity_to_local_storage(session_id: &str, identity: &LocalDiapIdentityResponse) -> Result<(), String> {
-    // 获取 agent_id（优先使用 ipns，其次使用 cid）
-    let agent_id = if !identity.ipns.is_empty() {
-        Some(identity.ipns.trim_start_matches("/ipns/").to_string())
-    } else if !identity.cid.is_empty() {
-        Some(identity.cid.clone())
+    // 使用 ipns 或 cid 作为 agent_id
+    let agent_id: String = if !identity.ipns.is_empty() {
+        identity.ipns.trim_start_matches("/ipns/").to_string()
     } else {
-        None
+        identity.cid.clone()
     };
 
-    if let Some(agent_id) = agent_id {
-        // 保存 agent_id -> identity 映射到文件
-        if let Err(e) = crate::memory_manager::set_diap_identity_for_agent(
-            agent_id.clone(),
-            serde_json::to_string(identity).map_err(|e| format!("序列化身份失败：{}", e))?
-        ) {
-            warn!(target: "diap", "保存到 agent_id 存储失败：{}", e);
-        } else {
-            info!(target: "diap", "✅ DIAP 身份已保存到 agent_id 存储：{}", agent_id);
-        }
-    }
-
-
-    match crate::memory_manager::set_diap_identity(
-        session_id.to_string(),
+    // 保存 agent_id -> identity 映射到文件
+    if let Err(e) = crate::diap_file_manager::set_diap_identity_for_agent(
+        agent_id.clone(),
         serde_json::to_string(identity).map_err(|e| format!("序列化身份失败：{}", e))?
     ) {
-        Ok(_) => {
-            info!(target: "diap", "✅ DIAP 身份已保存到本地存储");
-            Ok(())
-        }
-        Err(e) => {
-            Err(format!("保存到本地存储失败：{}", e))
-        }
+        warn!(target: "diap", "保存到 agent_id 存储失败：{}", e);
+        Err(format!("保存到 agent_id 存储失败：{}", e))
+    } else {
+        info!(target: "diap", "✅ DIAP 身份已保存到 agent_id 存储：{}", agent_id);
+        Ok(())
     }
 }
 

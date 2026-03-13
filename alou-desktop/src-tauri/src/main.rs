@@ -28,6 +28,7 @@ mod autonomous_agent;  // 自主智能体模块
 mod autonomous_loop;    // 自主循环模块
 mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
+mod diap_file_manager;  // 新增 DIAP 文件管理模块
 mod tool_api;  // 工具 API 模块
 mod bot_gateway;  // Bot Gateway 模块
 mod heartbeat;  // 心跳模块
@@ -93,6 +94,10 @@ use crate::memory_manager::{
     garbage_collect, pin_item, unpin_item, set_diap_identity, get_diap_identity,
     remove_diap_identity, get_all_diap_identities, archive_diap_identity_to_ipfs,
     pin_diap_identity, unpin_diap_identity,
+};
+
+// Agent DIAP identity file storage
+use crate::diap_file_manager::{
     set_diap_identity_for_agent, get_diap_identity_for_agent,
     remove_diap_identity_for_agent, get_all_diap_identities_for_agent,
 };
@@ -794,6 +799,9 @@ fn main() {
             )
         )))
         .setup(|app| {
+            // 设置全局 APP_HANDLE（用于 DIAP 身份文件存储）
+            crate::memory_manager::set_app_handle(app.handle().clone());
+            
             // Set window title
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title("Alou").unwrap();

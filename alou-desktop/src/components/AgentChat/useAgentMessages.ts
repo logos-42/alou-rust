@@ -205,21 +205,45 @@ export const useAgentMessages = ({
 
     const prefetchSystemPrompt = async () => {
       try {
-        const cachedPrompt = systemPromptCache[activeChannelId]
-        if (cachedPrompt && cachedPrompt.length > 0) {
-          console.log('[useAgentMessages] 使用缓存的系统提示词')
+        // 预加载完整版本（injectAll=true）- 用于首次激活时的上下文建立
+        const fullCacheKey = `${activeChannelId}_full`
+        const cachedFullPrompt = systemPromptCache[fullCacheKey]
+        
+        // 预加载精简版本（injectAll=false）- 用于后续对话，节省 token
+        const liteCacheKey = `${activeChannelId}_lite`
+        const cachedLitePrompt = systemPromptCache[liteCacheKey]
+        
+        if (cachedFullPrompt && cachedLitePrompt) {
+          console.log('[useAgentMessages] 使用缓存的系统提示词（full 和 lite 都已缓存）')
           return
         }
 
-        console.log('[useAgentMessages] 预加载系统提示词（初次激活，注入所有文档）...')
-        const prompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, true)  // injectAll=true
-        
-        if (prompt) {
-          setSystemPromptCache(prev => ({
-            ...prev,
-            [activeChannelId]: prompt
-          }))
-          console.log('[useAgentMessages] 系统提示词预加载完成，长度:', prompt.length)
+        // 首次激活时生成完整提示词（包含所有7个文档）
+        if (!cachedFullPrompt) {
+          console.log('[useAgentMessages] 预加载系统提示词（初次激活，注入所有文档）...')
+          const fullPrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, true)  // injectAll=true
+          
+          if (fullPrompt) {
+            setSystemPromptCache(prev => ({
+              ...prev,
+              [fullCacheKey]: fullPrompt
+            }))
+            console.log('[useAgentMessages] 系统提示词预加载完成（full），长度:', fullPrompt.length)
+          }
+        }
+
+        // 同时预加载精简版本（只包含 MEMORY.md）
+        if (!cachedLitePrompt) {
+          console.log('[useAgentMessages] 预加载系统提示词（lite，只注入记忆）...')
+          const litePrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, false)  // injectAll=false
+          
+          if (litePrompt) {
+            setSystemPromptCache(prev => ({
+              ...prev,
+              [liteCacheKey]: litePrompt
+            }))
+            console.log('[useAgentMessages] 系统提示词预加载完成（lite），长度:', litePrompt.length)
+          }
         }
       } catch (error) {
         console.warn('[useAgentMessages] 预加载系统提示词失败:', error)
@@ -501,7 +525,9 @@ export const useAgentMessages = ({
       const agentInfo = targetAgent || selectedAgent
       
       // 优先使用缓存的系统提示词（已包含记忆注入）
-      let systemPrompt = systemPromptCache[activeChannelId]
+      // 注意：我们使用 lite 版本（injectAll=false）来节省 token
+      const cacheKey = `${activeChannelId}_lite`
+      let systemPrompt = systemPromptCache[cacheKey]
       
       // 如果缓存不存在或为空，动态生成并更新缓存（只注入记忆）
       if (!systemPrompt || systemPrompt.length === 0) {
@@ -511,11 +537,11 @@ export const useAgentMessages = ({
         if (systemPrompt) {
           setSystemPromptCache(prev => ({
             ...prev,
-            [activeChannelId]: systemPrompt
+            [cacheKey]: systemPrompt
           }))
         }
       } else {
-        console.log('[useAgentMessages] 使用缓存的系统提示词（长度:', systemPrompt.length, ')')
+        console.log('[useAgentMessages] 使用缓存的系统提示词（lite模式，长度:', systemPrompt.length, ')')
       }
       
       const history = getMessageHistory(targetAgentId, messagesByChannel)

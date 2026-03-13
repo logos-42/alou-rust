@@ -142,6 +142,7 @@ export class UnifiedAgentCoordinator {
 
     // 从 agentStore 恢复智能体（仅恢复当前 session 的）
     if (this.config.restoreFromStore) {
+      console.log('[AgentCoordinator] 准备从 store 恢复智能体，sessionId:', this.sessionId)
       this.restoreAgentsFromStore()
     }
   }
@@ -322,7 +323,7 @@ export class UnifiedAgentCoordinator {
         const store = useAgentStore.getState()
         store.addAgent({
           id: agent.id,
-          sessionId: agent.sessionId || this.sessionId,
+          sessionId: String(agent.sessionId || this.sessionId),
           name: agent.name,
           display_name: agent.name,
           avatar_url: agent.avatar,

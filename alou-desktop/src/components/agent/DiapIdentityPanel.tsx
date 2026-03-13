@@ -1,40 +1,61 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import asyncDiapCreationService from '@/services/asyncDiapCreationService'
 import { useNavigate } from 'react-router-dom'
+import { invoke } from '@tauri-apps/api/core'
+import { ethers } from 'ethers'
+import asyncDiapCreationService, { DiapCreationProgress, DiapIdentityData } from '@/services/asyncDiapCreationService'
 import agentService from '@/services/agentService'
 import diapIntegrationService from '@/services/diapIntegrationService'
 import useAgentStore from '@/stores/agentStore'
 import { useI18n } from '@/hooks/useI18n'
-import { invoke } from '@tauri-apps/api/core'
-import { ethers } from 'ethers'
 import {
-  setDiapIdentitySafe,
-  getDiapIdentitySafe,
-  hasDiapIdentitySafe
-} from '@/utils/diapIdentityManager'
-import {
-  setDiapIdentity,
-  getDiapIdentity,
-  removeDiapIdentity,
-  hasDiapIdentity
-} from '@/utils/memoryStorage'
+  saveDiapIdentityToFile,
+  loadDiapIdentityFromFile,
+  hasDiapIdentityFile,
+} from '@/utils/diapAgentIdentityManager'
+import { DiapIdentity } from '@/utils/diapIdentityManager'
 import CloseIcon from '@/assets/关闭0.3.png'
 import CopyIcon from '@/assets/复制.png'
 import './DiapIdentityPanel.css'
 
-const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = false }) => {
+// Props 类型定义
+interface DiapIdentityPanelProps {
+  sessionId: string
+  selectedAgent: {
+    id: string
+    ipns?: string
+    cid?: string
+    did?: string
+    [key: string]: any
+  } | null
+  onClose?: () => void
+  isDarkMode?: boolean
+}
+
+interface RegisterInfo {
+  encoded_call?: {
+    data: string
+  }
+  [key: string]: any
+}
+
+const DiapIdentityPanel: React.FC<DiapIdentityPanelProps> = ({ 
+  sessionId, 
+  selectedAgent, 
+  onClose, 
+  isDarkMode = false 
+}) => {
   const { t } = useI18n()
   const navigate = useNavigate()
-  const [identity, setIdentity] = useState(null)
+  const [identity, setIdentity] = useState<DiapIdentity | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [registering, setRegistering] = useState(false)
-  const [error, setError] = useState(null)
-  const [registerInfo, setRegisterInfo] = useState(null)
-  const [toastMessage, setToastMessage] = useState(null)
-  const [txHash, setTxHash] = useState(null)
+  const [error, setError] = useState<string | null>(null)
+  const [registerInfo, setRegisterInfo] = useState<RegisterInfo | null>(null)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [txHash, setTxHash] = useState<string | null>(null)
   const [hasTestnetKey, setHasTestnetKey] = useState(false)
-  const [diapProgress, setDiapProgress] = useState(null) // DIAP 创建进度
+  const [diapProgress, setDiapProgress] = useState<DiapCreationProgress | null>(null)
 
   const updateAgent = useAgentStore((state) => state.updateAgent)
 
@@ -42,7 +63,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     navigate('/subscription')
   }
 
-  // loadIdentity 必须在 useEffect 之前定义，避免暂时性死区
+  // loadIdentity 必须在 useEffect 之前定义
   const loadIdentity = useCallback(async () => {
     try {
       setLoading(true)
@@ -57,65 +78,48 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
         did: selectedAgent.did,
       } : null)
 
-      // 优先级 1: 从统一内存存储加载（使用 sessionId）
-      console.log('[DiapIdentityPanel] 检查统一内存存储...')
-      if (await hasDiapIdentitySafe(sessionId)) {
+      // 确定用于加载的 agent ID（尝试多种格式）
+      const possibleAgentIds = [
+        selectedAgent?.id,  // 智能体 ID
+        sessionId,  // 会话 ID
+        selectedAgent?.ipns?.replace(/^\/?ipns\//, ''),  // IPNS（去除前缀）
+        selectedAgent?.cid,  // CID
+      ].filter((id): id is string => Boolean(id))
+
+      console.log('[DiapIdentityPanel] 尝试从以下 agentId 加载:', possibleAgentIds)
+
+      // 优先级 1: 从 agent 文件加载（尝试多个可能的 agentId）
+      console.log('[DiapIdentityPanel] 检查 agent 文件存储...')
+      for (const agentId of possibleAgentIds) {
         try {
-          const storedIdentity = await getDiapIdentitySafe(sessionId)
-          console.log('[DiapIdentityPanel] ✅ 从统一内存存储加载成功:', storedIdentity)
-          setIdentity(storedIdentity)
+          const agentIdentity = await loadDiapIdentityFromFile(agentId)
+          if (agentIdentity) {
+            console.log('[DiapIdentityPanel] ✅ 从 agent 文件加载成功:', agentId, agentIdentity.did)
+            setIdentity(agentIdentity)
 
-          if (selectedAgent?.id) {
-            updateAgent(selectedAgent.id, {
-              ipns: storedIdentity.ipns,
-              cid: storedIdentity.cid,
-              did: storedIdentity.did
-            })
+            if (selectedAgent?.id) {
+              updateAgent(selectedAgent.id, {
+                ipns: agentIdentity.ipns,
+                cid: agentIdentity.cid,
+                did: agentIdentity.did
+              })
+            }
+            setLoading(false)
+            console.log('[DiapIdentityPanel] ========== 加载完成（agent 文件）==========')
+            return
           }
-          setLoading(false)
-          console.log('[DiapIdentityPanel] ========== 加载完成（统一存储）==========')
-          return
         } catch (parseErr) {
-          console.error('[DiapIdentityPanel] 解析统一存储中的 DIAP 身份失败:', parseErr)
+          console.debug('[DiapIdentityPanel] agentId 加载失败:', agentId, parseErr)
         }
-      } else {
-        console.log('[DiapIdentityPanel] 统一内存存储中没有此 sessionId 的身份')
       }
+      console.log('[DiapIdentityPanel] ❌ 所有 agentId 都未找到身份')
 
-      // 优先级 2: 从 memoryStorage 加载（向后兼容）
-      console.log('[DiapIdentityPanel] 检查 memoryStorage...')
-      if (hasDiapIdentity(sessionId)) {
-        try {
-          const identity = getDiapIdentity(sessionId)
-          console.log('[DiapIdentityPanel] ✅ 从 memoryStorage 加载成功:', identity)
-          setIdentity(identity)
-
-          if (selectedAgent?.id) {
-            updateAgent(selectedAgent.id, {
-              ipns: identity.ipns,
-              cid: identity.cid,
-              did: identity.did
-            })
-          }
-          setLoading(false)
-          console.log('[DiapIdentityPanel] ========== 加载完成（memoryStorage）==========')
-          return
-        } catch (parseErr) {
-          console.error('[DiapIdentityPanel] 解析 memoryStorage 中的 DIAP 身份失败:', parseErr)
-          removeDiapIdentity(sessionId)
-        }
-      } else {
-        console.log('[DiapIdentityPanel] memoryStorage 中没有此 sessionId 的身份')
-      }
-
-      // 如果没有身份，显示创建按钮
-      console.log('[DiapIdentityPanel] ❌ 未找到任何 DIAP 身份，需要创建')
-      setIdentity(null)
+      // 未找到任何身份，保持当前状态
+      console.log('[DiapIdentityPanel] ========== 加载完成（无身份，保持当前状态）==========')
       setLoading(false)
-      console.log('[DiapIdentityPanel] ========== 加载完成（无身份）==========')
-    } catch (error) {
-      console.error('[DiapIdentityPanel] 加载 DIAP 身份失败:', error)
-      setError(error.message)
+    } catch (err) {
+      console.error('[DiapIdentityPanel] 加载 DIAP 身份失败:', err)
+      setError(err instanceof Error ? err.message : '加载失败')
       setLoading(false)
     }
   }, [sessionId, selectedAgent, updateAgent])
@@ -126,36 +130,52 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       try {
         await invoke('get_testnet_private_key')
         setHasTestnetKey(true)
-      } catch (err) {
+      } catch {
         setHasTestnetKey(false)
       }
     }
     checkTestnetKey()
   }, [])
 
-  // Load identity when sessionId changes
+  // 组件初始化时加载身份
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId && !identity && !loading) {
+      console.log('[DiapIdentityPanel] 组件初始化，开始加载身份')
       loadIdentity()
     }
-  }, [sessionId, loadIdentity])
+  }, [])
 
-  // 监听 DIAP 身份创建事件，立即刷新显示
+  // Load identity when sessionId changes
   useEffect(() => {
-    const handleDiapIdentityCreated = (event) => {
-      const { sessionId: createdSessionId, identity } = event.detail
+    if (sessionId && !identity) {
+      console.log('[DiapIdentityPanel] sessionId 变化且无身份，开始加载')
+      loadIdentity()
+    } else if (sessionId && identity) {
+      console.log('[DiapIdentityPanel] sessionId 变化但已有身份，跳过加载:', identity.did)
+    }
+  }, [sessionId])
+
+  // 监听 DIAP 身份创建事件
+  useEffect(() => {
+    const handleDiapIdentityCreated = (event: CustomEvent) => {
+      const { sessionId: createdSessionId, identity: eventIdentity } = event.detail
       console.log('[DiapIdentityPanel] 收到 DIAP 身份创建事件:', { createdSessionId, currentSessionId: sessionId })
 
       if (createdSessionId === sessionId) {
         console.log('[DiapIdentityPanel] 匹配当前 sessionId，立即刷新显示')
-        loadIdentity()
+        if (eventIdentity) {
+          setIdentity(eventIdentity)
+          setLoading(false)
+        } else {
+          loadIdentity()
+        }
       }
     }
 
-    window.addEventListener('diap-identity-created', handleDiapIdentityCreated)
+    window.addEventListener('diap-identity-created', handleDiapIdentityCreated as EventListener)
 
     return () => {
-      window.removeEventListener('diap-identity-created', handleDiapIdentityCreated)
+      window.removeEventListener('diap-identity-created', handleDiapIdentityCreated as EventListener)
     }
   }, [sessionId, loadIdentity])
 
@@ -163,7 +183,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
   useEffect(() => {
     if (!sessionId) return
 
-    const unsubscribeProgress = asyncDiapCreationService.subscribeProgress((progressSessionId, progress) => {
+    const unsubscribeProgress = asyncDiapCreationService.subscribeProgress((progressSessionId: string, progress: DiapCreationProgress) => {
       console.log('[DiapIdentityPanel] 收到进度更新:', { progressSessionId, stage: progress.stage, progress: progress.progress })
       if (progressSessionId === sessionId) {
         setDiapProgress(progress)
@@ -209,37 +229,67 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       setCreating(true)
       setError(null)
       const response = await diapIntegrationService.createDiapIdentity(sessionId)
-      if (response.identity) {
-        console.log('[DiapIdentityPanel] DIAP 身份创建成功:', response.identity)
-        setIdentity(response.identity)
+      
+      console.log('[DiapIdentityPanel] DIAP 创建响应:', response)
+      
+      if (response.success && response.cid) {
+        // 将扁平的响应转换为 identity 对象
+        const newIdentity: DiapIdentity = {
+          did: response.did || '',
+          cid: response.cid || '',
+          ipns: response.ipns || '',
+          public_key: response.public_key || '',
+          did_document: response.did_document,
+          zkp_proof: response.zkp_proof,
+          is_registered: false,
+          created_at: Math.floor(Date.now() / 1000)
+        }
+        
+        console.log('[DiapIdentityPanel] DIAP 身份创建成功:', newIdentity)
+        
+        // 确定用于存储的 agent ID - 使用 selectedAgent.id 或 sessionId
+        const agentId = selectedAgent?.id || sessionId
+        
+        // 保存到 agent 文件存储
+        await saveDiapIdentityToFile(agentId, newIdentity)
+        console.log('[DiapIdentityPanel] DIAP 身份已保存到 agent 文件:', agentId)
 
-        await setDiapIdentitySafe(sessionId, response.identity)
-        console.log('[DiapIdentityPanel] DIAP 身份已保存到统一内存存储:', sessionId)
+        // 更新 agentStore
+        if (selectedAgent?.id) {
+          updateAgent(selectedAgent.id, {
+            ipns: newIdentity.ipns,
+            cid: newIdentity.cid,
+            did: newIdentity.did,
+            sessionId: sessionId,
+          })
+          console.log('[DiapIdentityPanel] DIAP 身份引用已保存到智能体元数据:', selectedAgent.id)
+        }
 
-        const agentIdToUpdate = selectedAgent?.id ||
-                                (response.identity.ipns ? response.identity.ipns.replace(/^\/?ipns\//, '') : null) ||
-                                response.identity.cid ||
-                                response.identity.did
+        // 立即设置身份显示
+        setIdentity(newIdentity)
+        setLoading(false)
+        console.log('[DiapIdentityPanel] 身份已设置到状态:', newIdentity.did)
 
+        // 同时保存到 agentStore
+        const agentIdToUpdate = selectedAgent?.id || agentId
         if (agentIdToUpdate) {
           updateAgent(agentIdToUpdate, {
-            ipns: response.identity.ipns,
-            cid: response.identity.cid,
-            did: response.identity.did,
+            ipns: newIdentity.ipns,
+            cid: newIdentity.cid,
+            did: newIdentity.did,
             sessionId: sessionId,
           })
           console.log('[DiapIdentityPanel] DIAP 身份引用已保存到智能体元数据:', agentIdToUpdate)
         }
 
-        setTimeout(() => {
-          loadIdentity()
-        }, 100)
-
         setToastMessage(t('agent.diap.createSuccess'))
+      } else {
+        console.error('[DiapIdentityPanel] DIAP 创建失败:', response.error)
+        setError(response.error || '创建失败')
       }
     } catch (err) {
       console.error('Failed to create DIAP identity:', err)
-      const message = err.message || t('agent.diap.createFailed')
+      const message = err instanceof Error ? err.message : t('agent.diap.createFailed')
       setError(message)
       setToastMessage(message)
     } finally {
@@ -263,7 +313,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       setError(null)
       setTxHash(null)
 
-      const result = await agentService.registerAgentOnChain(
+      const result = await (agentService as any).registerAgentOnChain(
         identity,
         network,
         stakeAmount,
@@ -283,9 +333,9 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
 
       if (shouldAutoSign && result.encoded_call?.data) {
         try {
-          const privateKey = await invoke('get_testnet_private_key')
+          const privateKey = await invoke<string>('get_testnet_private_key')
 
-          let rpcUrl, chainId
+          let rpcUrl: string, chainId: number
           if (network === 'base_sepolia') {
             rpcUrl = 'https://sepolia.base.org'
             chainId = 84532
@@ -296,7 +346,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
             throw new Error(`不支持的测试网络：${network}`)
           }
 
-          let contractAddress
+          let contractAddress: string
           if (network === 'base_sepolia') {
             contractAddress = '0xA960cf9053FA76278e16f9D4BA35225f7634DC54'
           } else if (network === 'sepolia') {
@@ -336,8 +386,8 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
           await loadIdentity()
         } catch (signErr) {
           console.error('Failed to sign and broadcast transaction:', signErr)
-          setError(`签名/广播失败：${signErr.message}`)
-          setToastMessage(`签名/广播失败：${signErr.message}`)
+          setError(`签名/广播失败：${signErr instanceof Error ? signErr.message : '未知错误'}`)
+          setToastMessage(`签名/广播失败：${signErr instanceof Error ? signErr.message : '未知错误'}`)
           setRegisterInfo(result)
         }
       } else {
@@ -345,7 +395,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
       }
     } catch (err) {
       console.error('Failed to register agent on-chain:', err)
-      const message = err.message || t('agent.diap.registerFailed')
+      const message = err instanceof Error ? err.message : t('agent.diap.registerFailed')
       setError(message)
       setToastMessage(message)
     } finally {
@@ -353,7 +403,7 @@ const DiapIdentityPanel = ({ sessionId, selectedAgent, onClose, isDarkMode = fal
     }
   }
 
-  const copyToClipboard = (text) => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
       // Could show a toast notification here
     })

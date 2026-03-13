@@ -10,10 +10,10 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import {
-  setDiapIdentity,
-  getDiapIdentity,
-  hasDiapIdentity
-} from '../utils/memoryStorage'
+  saveDiapIdentityToFile,
+  loadDiapIdentityFromFile,
+  hasDiapIdentityFile
+} from '../utils/diapAgentIdentityManager'
 import useAgentStore from '../stores/agentStore'
 
 const DEFAULT_IPFS_API = 'http://localhost:5001'
@@ -95,9 +95,9 @@ class AsyncDiapCreationService {
       maxRetries?: number
     } = {}
   ): Promise<string> {
-    // 检查是否已存在 DIAP 身份
-    if (hasDiapIdentity(sessionId)) {
-      const existing = getDiapIdentity(sessionId)
+    // 检查是否已存在 DIAP 身份（基于 agentId）
+    if (await hasDiapIdentityFile(sessionId)) {
+      const existing = await loadDiapIdentityFromFile(sessionId)
       if (existing && existing.did && existing.cid && existing.ipns) {
         console.log('[AsyncDiapCreation] DIAP 身份已存在，跳过创建:', existing.did)
         // 触发完成回调
@@ -214,14 +214,16 @@ class AsyncDiapCreationService {
 
       task.progress.identity = identity
 
-      // 第 3 步：保存到本地存储
+      // 第 3 步：保存到本地存储（使用 agentId）
       this.updateProgress(task, {
         stage: 'saving',
         message: '保存身份...',
         progress: 90
       })
 
-      this.saveToLocalStorage(sessionId, identity)
+      // 使用 ipns 或 cid 作为 agentId
+      const agentId = identity.ipns ? identity.ipns.replace(/^\/?ipns\//, '') : identity.cid
+      await this.saveToLocalStorage(agentId, identity)
 
       // 第 4 步：更新 agentStore
       await this.updateAgentStore(sessionId, identity)
@@ -260,7 +262,7 @@ class AsyncDiapCreationService {
         console.log(`[AsyncDiapCreation] ${task.retryCount}/${task.maxRetries} 后重试...`)
         
         this.updateProgress(task, {
-          stage: 'pending',
+          stage: 'idle',
           message: `重试中 (${task.retryCount}/${task.maxRetries})...`,
           progress: 0,
           error: errorMsg
@@ -353,12 +355,12 @@ class AsyncDiapCreationService {
   }
 
   /**
-   * 保存到本地存储
+   * 保存到本地存储（基于 agentId）
    */
-  private saveToLocalStorage(sessionId: string, identity: DiapIdentityData): void {
+  private async saveToLocalStorage(agentId: string, identity: DiapIdentityData): Promise<void> {
     try {
-      setDiapIdentity(sessionId, identity)
-      console.log('[AsyncDiapCreation] 本地存储保存成功:', sessionId)
+      await saveDiapIdentityToFile(agentId, identity)
+      console.log('[AsyncDiapCreation] 本地存储保存成功:', agentId)
     } catch (error) {
       console.warn('[AsyncDiapCreation] 本地存储保存失败:', (error as Error).message)
     }
@@ -417,8 +419,8 @@ class AsyncDiapCreationService {
    * 获取 DIAP 身份
    */
   async getDiapIdentity(sessionId: string): Promise<DiapIdentityData | null> {
-    if (hasDiapIdentity(sessionId)) {
-      const identity = getDiapIdentity(sessionId)
+    if (await hasDiapIdentityFile(sessionId)) {
+      const identity = await loadDiapIdentityFromFile(sessionId)
       // DID 和 CID 是必须的，IPNS 可以为空
       if (identity && identity.did && identity.cid) {
         return identity
