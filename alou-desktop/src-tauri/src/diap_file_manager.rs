@@ -32,8 +32,11 @@ fn get_agent_diap_dir(app_handle: &AppHandle, agent_id: &str) -> Result<PathBuf,
 
 /// 保存 DIAP 身份到文件
 fn save_identity_to_file(app_handle: &AppHandle, agent_id: &str, identity: &str) -> Result<(), String> {
+    log::info!("[DiapFileManager] 开始保存 DIAP 身份：agent_id={}", agent_id);
+    
     // 获取 agent 存储目录
     let agent_diap_dir = get_agent_diap_dir(app_handle, agent_id)?;
+    log::info!("[DiapFileManager] 存储目录：{:?}", agent_diap_dir);
 
     // 创建目录
     if let Err(e) = fs::create_dir_all(&agent_diap_dir) {
@@ -69,6 +72,14 @@ fn save_identity_to_file(app_handle: &AppHandle, agent_id: &str, identity: &str)
     }
 
     log::info!("[DiapFileManager] ✅ DIAP 身份已保存到文件：{:?}", diap_file);
+    
+    // 验证文件是否存在
+    if diap_file.exists() {
+        log::info!("[DiapFileManager] ✅ 文件验证成功：{:?}", diap_file);
+    } else {
+        log::error!("[DiapFileManager] ❌ 文件验证失败：{:?}", diap_file);
+    }
+    
     Ok(())
 }
 

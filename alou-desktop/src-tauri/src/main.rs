@@ -100,6 +100,7 @@ use crate::memory_manager::{
 use crate::diap_file_manager::{
     set_diap_identity_for_agent, get_diap_identity_for_agent,
     remove_diap_identity_for_agent, get_all_diap_identities_for_agent,
+    init_app_handle,
 };
 
 // Agent commands
@@ -799,8 +800,13 @@ fn main() {
             )
         )))
         .setup(|app| {
-            // 设置全局 APP_HANDLE（用于 DIAP 身份文件存储）
-            crate::memory_manager::set_app_handle(app.handle().clone());
+            // 初始化 DIAP 文件管理器（用于 DIAP 身份文件存储）
+            crate::diap_file_manager::init_app_handle(app.handle().clone());
+            log::info!("[main] DIAP file manager initialized");
+            
+            // 自动加载所有已有身份到内存
+            crate::diap_file_manager::load_all_identities_to_memory(app.handle());
+            log::info!("[main] DIAP identities loaded from files");
             
             // Set window title
             if let Some(window) = app.get_webview_window("main") {

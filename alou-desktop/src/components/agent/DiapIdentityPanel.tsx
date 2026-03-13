@@ -78,41 +78,43 @@ const DiapIdentityPanel: React.FC<DiapIdentityPanelProps> = ({
         did: selectedAgent.did,
       } : null)
 
-      // 确定用于加载的 agent ID（尝试多种格式）
-      const possibleAgentIds = [
-        selectedAgent?.id,  // 智能体 ID
-        sessionId,  // 会话 ID
-        selectedAgent?.ipns?.replace(/^\/?ipns\//, ''),  // IPNS（去除前缀）
-        selectedAgent?.cid,  // CID
-      ].filter((id): id is string => Boolean(id))
-
-      console.log('[DiapIdentityPanel] 尝试从以下 agentId 加载:', possibleAgentIds)
-
-      // 优先级 1: 从 agent 文件加载（尝试多个可能的 agentId）
-      console.log('[DiapIdentityPanel] 检查 agent 文件存储...')
-      for (const agentId of possibleAgentIds) {
-        try {
-          const agentIdentity = await loadDiapIdentityFromFile(agentId)
-          if (agentIdentity) {
-            console.log('[DiapIdentityPanel] ✅ 从 agent 文件加载成功:', agentId, agentIdentity.did)
-            setIdentity(agentIdentity)
-
-            if (selectedAgent?.id) {
-              updateAgent(selectedAgent.id, {
-                ipns: agentIdentity.ipns,
-                cid: agentIdentity.cid,
-                did: agentIdentity.did
-              })
-            }
-            setLoading(false)
-            console.log('[DiapIdentityPanel] ========== 加载完成（agent 文件）==========')
-            return
-          }
-        } catch (parseErr) {
-          console.debug('[DiapIdentityPanel] agentId 加载失败:', agentId, parseErr)
-        }
+      // 确定用于加载的 agent ID（只使用智能体 ID）
+      const agentId = selectedAgent?.id
+      
+      if (!agentId) {
+        console.log('[DiapIdentityPanel] 没有 agentId，无法加载')
+        setLoading(false)
+        return
       }
-      console.log('[DiapIdentityPanel] ❌ 所有 agentId 都未找到身份')
+
+      console.log('[DiapIdentityPanel] 使用 agentId 加载:', agentId)
+
+      // 优先级 1: 从 agent 文件加载
+      console.log('[DiapIdentityPanel] 检查 agent 文件存储...')
+      try {
+        const agentIdentity = await loadDiapIdentityFromFile(agentId)
+        if (agentIdentity) {
+          console.log('[DiapIdentityPanel] ✅ 从 agent 文件加载成功:', agentId, agentIdentity.did)
+          setIdentity(agentIdentity)
+
+          if (selectedAgent?.id) {
+            updateAgent(selectedAgent.id, {
+              ipns: agentIdentity.ipns,
+              cid: agentIdentity.cid,
+              did: agentIdentity.did
+            })
+          }
+          setLoading(false)
+          console.log('[DiapIdentityPanel] ========== 加载完成（agent 文件）==========')
+          return
+        } else {
+          console.log('[DiapIdentityPanel] 文件中没有 DIAP 身份:', agentId)
+        }
+      } catch (parseErr) {
+        console.debug('[DiapIdentityPanel] agentId 加载失败:', agentId, parseErr)
+      }
+      
+      console.log('[DiapIdentityPanel] ❌ agentId 未找到身份')
 
       // 未找到任何身份，保持当前状态
       console.log('[DiapIdentityPanel] ========== 加载完成（无身份，保持当前状态）==========')
@@ -144,6 +146,27 @@ const DiapIdentityPanel: React.FC<DiapIdentityPanelProps> = ({
       loadIdentity()
     }
   }, [])
+
+  // 当 selectedAgent 变化且有 cid 时，直接加载该 cid 的身份
+  useEffect(() => {
+    if (selectedAgent?.cid && !identity) {
+      console.log('[DiapIdentityPanel] selectedAgent 有 cid，尝试加载:', selectedAgent.cid)
+      const loadFromCid = async () => {
+        try {
+          const agentIdentity = await loadDiapIdentityFromFile(selectedAgent.cid)
+          if (agentIdentity) {
+            console.log('[DiapIdentityPanel] ✅ 从 CID 加载成功:', selectedAgent.cid, agentIdentity.did)
+            setIdentity(agentIdentity)
+            setLoading(false)
+            return
+          }
+        } catch (err) {
+          console.debug('[DiapIdentityPanel] 从 CID 加载失败:', selectedAgent.cid, err)
+        }
+      }
+      loadFromCid()
+    }
+  }, [selectedAgent?.cid])
 
   // Load identity when sessionId changes
   useEffect(() => {
@@ -247,39 +270,35 @@ const DiapIdentityPanel: React.FC<DiapIdentityPanelProps> = ({
         
         console.log('[DiapIdentityPanel] DIAP 身份创建成功:', newIdentity)
         
-        // 确定用于存储的 agent ID - 使用 selectedAgent.id 或 sessionId
-        const agentId = selectedAgent?.id || sessionId
+        // 使用智能体的 agentId 保存（优先使用 selectedAgent.id）
+        const agentId = selectedAgent?.id
+        
+        if (!agentId) {
+          console.error('[DiapIdentityPanel] 无法获取 agentId，无法保存 DIAP 身份')
+          setError('无法获取智能体 ID')
+          setCreating(false)
+          return
+        }
         
         // 保存到 agent 文件存储
         await saveDiapIdentityToFile(agentId, newIdentity)
         console.log('[DiapIdentityPanel] DIAP 身份已保存到 agent 文件:', agentId)
-
-        // 更新 agentStore
-        if (selectedAgent?.id) {
-          updateAgent(selectedAgent.id, {
-            ipns: newIdentity.ipns,
-            cid: newIdentity.cid,
-            did: newIdentity.did,
-            sessionId: sessionId,
-          })
-          console.log('[DiapIdentityPanel] DIAP 身份引用已保存到智能体元数据:', selectedAgent.id)
-        }
 
         // 立即设置身份显示
         setIdentity(newIdentity)
         setLoading(false)
         console.log('[DiapIdentityPanel] 身份已设置到状态:', newIdentity.did)
 
-        // 同时保存到 agentStore
-        const agentIdToUpdate = selectedAgent?.id || agentId
+        // 更新 agentStore（确保 cid 被保存）
+        const agentIdToUpdate = selectedAgent?.id || sessionId
         if (agentIdToUpdate) {
           updateAgent(agentIdToUpdate, {
             ipns: newIdentity.ipns,
-            cid: newIdentity.cid,
+            cid: newIdentity.cid,  // 关键：保存 CID
             did: newIdentity.did,
             sessionId: sessionId,
           })
-          console.log('[DiapIdentityPanel] DIAP 身份引用已保存到智能体元数据:', agentIdToUpdate)
+          console.log('[DiapIdentityPanel] ✅ DIAP 身份引用已保存到智能体元数据:', agentIdToUpdate, 'cid:', newIdentity.cid)
         }
 
         setToastMessage(t('agent.diap.createSuccess'))

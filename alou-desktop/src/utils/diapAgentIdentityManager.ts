@@ -26,12 +26,13 @@ export async function saveDiapIdentityToFile(
   identity: DiapIdentity
 ): Promise<boolean> {
   try {
-    console.log('[DiapAgentIdentity] 保存 DIAP 身份到文件:', agentId)
+    console.log('[DiapAgentIdentity] 保存 DIAP 身份到文件, agentId:', agentId)
     
     // 序列化身份数据为 JSON 字符串
     const identityJson = JSON.stringify(identity)
     
-    // 调用 Tauri 命令保存到内存管理器 (会持久化到文件)
+    // 调用 Tauri 命令保存到文件
+    console.log('[DiapAgentIdentity] 调用后端 set_diap_identity_for_agent, agentId:', agentId)
     await invoke('set_diap_identity_for_agent', {
       agentId,
       identity: identityJson,
@@ -56,7 +57,8 @@ export async function loadDiapIdentityFromFile(
   try {
     console.log('[DiapAgentIdentity] 从文件加载 DIAP 身份:', agentId)
     
-    // 调用 Tauri 命令从内存管理器读取
+    // 调用 Tauri 命令从文件读取
+    console.log('[DiapAgentIdentity] 调用后端 get_diap_identity_for_agent, agentId:', agentId)
     const identityJson = await invoke<string | null>('get_diap_identity_for_agent', {
       agentId,
     })

@@ -72,6 +72,7 @@ export const useGroupChatAutonomousAgent = (
   const agentTasksRef = useRef<Map<string, Promise<void>>>(new Map())
   const groupAgentsRef = useRef<Map<string, AgentConfig[]>>(new Map())
   const activeGroupsRef = useRef<string[]>([])
+  const messageQueueRef = useRef<Map<string, string[]>>(new Map())
 
   /**
    * 获取群聊中的所有智能体

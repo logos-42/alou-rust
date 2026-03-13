@@ -3,15 +3,31 @@ import DiapIdentityPanel from '@/components/agent/DiapIdentityPanel'
 import DiapPanelIcon from '@/assets/设置0.3.png'
 import './DiapPanelToggle.css'
 
-function DiapPanelToggle({
-  sessionId,
-  selectedAgent,
-  _isSidebarCollapsed,
-  isDarkMode,
-  showPanel,
+interface DiapPanelToggleProps {
+  sessionId: string
+  selectedAgent: {
+    id: string
+    ipns?: string
+    cid?: string
+    did?: string
+    [key: string]: any
+  } | null
+  _isSidebarCollapsed: boolean
+  isDarkMode: boolean
+  showPanel: boolean
+  onToggle: () => void
+  onClosePanel: () => void
+}
+
+const DiapPanelToggle: React.FC<DiapPanelToggleProps> = ({
+  sessionId = '',
+  selectedAgent = null,
+  _isSidebarCollapsed = false,
+  isDarkMode = false,
+  showPanel = false,
   onToggle,
   onClosePanel,
-}) {
+}) => {
   const toggleButtonRef = useRef(null)
   const panelRef = useRef(null)
 
