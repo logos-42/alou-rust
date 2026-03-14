@@ -133,6 +133,61 @@ DIAP 身份 Id:did;cid;ipns
 ## 如何更新
 - 重要对话结束后，自动记录到本文件
 - 每条记录包含：CID、时间、主题、消息数
+`,
+  user: `# 用户喜好与偏好
+
+这里记录了用户的个人偏好、习惯和工作方式。
+
+## 用户偏好
+（暂无记录）
+
+## 沟通风格
+（暂无记录）
+
+## 技术栈偏好
+（暂无记录）
+
+## 如何更新
+- 用户分享偏好时自动记录
+- 使用 agent_document 工具的 update 操作更新
+`,
+  project: `# 项目与工作报告
+
+这里记录了参与的项目、工作报告和重要成果。
+
+## 当前项目
+（暂无记录）
+
+## 已完成项目
+（暂无记录）
+
+## 工作报告
+（暂无记录）
+
+## 如何更新
+- 项目启动时创建记录
+- 定期更新工作报告
+- 项目完成后归档
+`,
+  key: `# 关键密钥路径
+
+这里记录了重要密钥和凭证的存储路径（不存储实际密钥）。
+
+## 钱包密钥
+- 路径：~/Library/Application Support/com.alou.desktop/wallets/
+- 格式：加密存储
+
+## API 密钥
+- 路径：~/Library/Application Support/com.alou.desktop/api-keys/
+- 格式：加密配置文件
+
+## 其他凭证
+（暂无记录）
+
+## 安全提醒
+- ⚠️ 本文件只记录路径，不存储实际密钥
+- 🔒 所有密钥都使用加密存储
+- 🛡️ 不要将密钥硬编码在代码或对话中
 `
 };
 export const getSystemPromptForAgent = async (
@@ -203,7 +258,10 @@ export const getSystemPromptForAgent = async (
       if (docs.constraints) documentContents.constraints = docs.constraints;
       if (docs.tools) documentContents.tools = docs.tools;
       if (docs.agents) documentContents.agents = docs.agents;
-      if (docs.ipfs) documentContents.ipfs = docs.ipfs;  // ← 新增：加载 IPFS.md
+      if (docs.ipfs) documentContents.ipfs = docs.ipfs;
+      if (docs.user) documentContents.user = docs.user;  // ← 新增：加载 USER.md
+      if (docs.project) documentContents.project = docs.project;  // ← 新增：加载 PROJECT.md
+      if (docs.key) documentContents.key = docs.key;  // ← 新增：加载 KEY.md
     } catch (loadErr) {
       console.warn('[getSystemPromptForAgent] 加载文档失败，使用默认内容:', loadErr);
     }
@@ -441,7 +499,7 @@ Alou 的个性与价值观：
 
     // 根据 injectAll 参数决定注入范围
     if (injectAll) {
-      // 初次激活：注入所有 8 个文档
+      // 初次激活：注入所有 11 个文档
       basePrompt += `
 
 === 你的长期记忆 ===
@@ -449,6 +507,15 @@ ${documentContents.memory}
 
 === IPFS 对话历史 ===
 ${documentContents.ipfs}
+
+=== 用户喜好 ===
+${documentContents.user}
+
+=== 项目与工作报告 ===
+${documentContents.project}
+
+=== 关键密钥路径 ===
+${documentContents.key}
 
 === 核心身份 ===
 ${documentContents.soul}
@@ -468,9 +535,9 @@ ${documentContents.tools}
 === 协作智能体 ===
 ${documentContents.agents}
 `;
-      console.log('[getSystemPromptForAgent] 初次激活：注入所有 8 个文档，长度:', basePrompt.length);
+      console.log('[getSystemPromptForAgent] 初次激活：注入所有 11 个文档，长度:', basePrompt.length);
     } else {
-      // 后续对话：注入记忆 + IPFS 历史
+      // 后续对话：注入记忆 + IPFS + 用户 + 项目
       basePrompt += `
 
 === 你的长期记忆 ===
@@ -478,8 +545,14 @@ ${documentContents.memory}
 
 === IPFS 对话历史 ===
 ${documentContents.ipfs}
+
+=== 用户喜好 ===
+${documentContents.user}
+
+=== 项目与工作报告 ===
+${documentContents.project}
 `;
-      console.log('[getSystemPromptForAgent] 后续对话：注入记忆 + IPFS 历史，长度:', basePrompt.length);
+      console.log('[getSystemPromptForAgent] 后续对话：注入记忆 +IPFS+ 用户 + 项目，长度:', basePrompt.length);
     }
 
     console.log('[getSystemPromptForAgent] 返回 Alou 提示词（已注入记忆），长度:', basePrompt.length);
@@ -644,6 +717,15 @@ ${documentContents.memory}
 
 === IPFS 对话历史 ===
 ${documentContents.ipfs}
+
+=== 用户喜好 ===
+${documentContents.user}
+
+=== 项目与工作报告 ===
+${documentContents.project}
+
+=== 关键密钥路径 ===
+${documentContents.key}
 
 === SOUL ===
 ${documentContents.soul}

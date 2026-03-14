@@ -336,12 +336,6 @@ const AgentSidebarLeft = ({
                 <div className="channel-info">
                   <div className="channel-name">
                     {channel.name}
-                    {/* 显示创建中状态 */}
-                    {(channel.meta?.status === 'creating' || channel.tempId || channel.id?.startsWith('temp_')) && (
-                      <span className="creating-indicator" title="正在创建 DIAP 身份...">
-                        <span className="creating-spinner" />
-                      </span>
-                    )}
                   </div>
                   <div className="channel-meta">
                     <span className={`status-dot ${channel.status}`} />

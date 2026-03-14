@@ -975,6 +975,10 @@ export const useChannelManager = ({
 
         console.log('[useChannelManager] 智能体创建API响应:', result)
 
+        // 判断是否需要异步创建 DIAP 身份（没有立即返回 DIAP 身份就意味着需要异步创建）
+        const willCreateDiapAsync = !diapIdentity && !(result.data?.diap_identity || (result as any).diap_identity)
+        console.log('[useChannelManager] 将异步创建 DIAP 身份:', willCreateDiapAsync)
+
         // 构建元数据：优先使用返回的数据，但必须包含头像等关键信息
         const metadata = {
           // 从返回的数据中提取
