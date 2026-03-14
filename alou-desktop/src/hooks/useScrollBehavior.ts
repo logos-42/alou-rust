@@ -3,30 +3,48 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /**
  * 智能滚动行为 Hook
  * 自动滚动到底部，但当用户向上滚动查看历史消息时暂停
- * 
- * @param {Object} options
- * @param {boolean} options.autoScroll - 是否启用自动滚动
- * @param {number} options.threshold - 距离底部多少像素内认为是"在底部"
- * @param {number} options.scrollDelay - 滚动延迟（毫秒）
  */
-export const useScrollBehavior = (options = {}) => {
+interface UseScrollBehaviorOptions {
+  autoScroll?: boolean
+  threshold?: number
+  scrollDelay?: number
+}
+
+interface UseScrollBehaviorReturn {
+  containerRef: React.RefObject<HTMLDivElement>
+  isAtBottom: boolean
+  isUserScrolling: boolean
+  hasNewMessages: boolean
+  scrollToBottom: (behavior?: ScrollBehavior) => void
+  scrollToBottomManual: () => void
+  scrollToElement: (element: Element, behavior?: ScrollBehavior) => void
+  handleScroll: () => void
+  handleNewMessage: () => void
+  pauseAutoScroll: () => void
+  resumeAutoScroll: () => void
+  checkIsAtBottom: () => boolean
+}
+
+export const useScrollBehavior = (
+  options: UseScrollBehaviorOptions = {}
+): UseScrollBehaviorReturn => {
   const {
     autoScroll = true,
     threshold = 100,
     scrollDelay = 100,
   } = options
 
-  const containerRef = useRef(null)
-  const [isAtBottom, setIsAtBottom] = useState(true)
-  const [isUserScrolling, setIsUserScrolling] = useState(false)
-  const [hasNewMessages, setHasNewMessages] = useState(false)
-  const scrollTimeoutRef = useRef(null)
-  const userScrollTimeoutRef = useRef(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState<boolean>(true)
+  const [isUserScrolling, setIsUserScrolling] = useState<boolean>(false)
+  const [hasNewMessages, setHasNewMessages] = useState<boolean>(false)
+  const scrollTimeoutRef = useRef<number | null>(null)
+  const userScrollTimeoutRef = useRef<number | null>(null)
 
   /**
    * 检查是否在底部
    */
-  const checkIsAtBottom = useCallback(() => {
+  const checkIsAtBottom = useCallback((): boolean => {
     const container = containerRef.current
     if (!container) return true
 
@@ -38,7 +56,7 @@ export const useScrollBehavior = (options = {}) => {
   /**
    * 滚动到底部
    */
-  const scrollToBottom = useCallback((behavior = 'smooth') => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const container = containerRef.current
     if (!container) return
 
@@ -51,7 +69,7 @@ export const useScrollBehavior = (options = {}) => {
   /**
    * 滚动到指定元素
    */
-  const scrollToElement = useCallback((element, behavior = 'smooth') => {
+  const scrollToElement = useCallback((element: Element, behavior: ScrollBehavior = 'smooth') => {
     if (!element || !containerRef.current) return
 
     element.scrollIntoView({
@@ -85,7 +103,7 @@ export const useScrollBehavior = (options = {}) => {
     }
 
     // 用户停止滚动后一段时间，重置 isUserScrolling
-    userScrollTimeoutRef.current = setTimeout(() => {
+    userScrollTimeoutRef.current = window.setTimeout(() => {
       setIsUserScrolling(false)
     }, 150)
   }, [checkIsAtBottom])
@@ -102,8 +120,8 @@ export const useScrollBehavior = (options = {}) => {
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current)
       }
-      
-      scrollTimeoutRef.current = setTimeout(() => {
+
+      scrollTimeoutRef.current = window.setTimeout(() => {
         scrollToBottom('smooth')
       }, scrollDelay)
     } else {
@@ -169,7 +187,22 @@ export const useScrollBehavior = (options = {}) => {
  * 无限滚动 Hook
  * 用于消息历史加载
  */
-export const useInfiniteScroll = (options = {}) => {
+interface UseInfiniteScrollOptions {
+  onLoadMore?: () => Promise<void>
+  hasMore?: boolean
+  threshold?: number
+  loading?: boolean
+}
+
+interface UseInfiniteScrollReturn {
+  containerRef: React.RefObject<HTMLDivElement>
+  isLoadingMore: boolean
+  handleScroll: () => void
+}
+
+export const useInfiniteScroll = (
+  options: UseInfiniteScrollOptions = {}
+): UseInfiniteScrollReturn => {
   const {
     onLoadMore,
     hasMore = true,
@@ -177,25 +210,25 @@ export const useInfiniteScroll = (options = {}) => {
     loading = false,
   } = options
 
-  const containerRef = useRef(null)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false)
 
   const handleScroll = useCallback(async () => {
     const container = containerRef.current
     if (!container || isLoadingMore || loading || !hasMore || !onLoadMore) return
 
     const { scrollTop } = container
-    
+
     // 当滚动到顶部附近时加载更多
     if (scrollTop < threshold) {
       setIsLoadingMore(true)
-      
+
       // 记录当前滚动位置
       const oldScrollHeight = container.scrollHeight
-      
+
       try {
         await onLoadMore()
-        
+
         // 加载完成后，保持滚动位置
         requestAnimationFrame(() => {
           const newScrollHeight = container.scrollHeight

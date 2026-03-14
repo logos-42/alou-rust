@@ -3,15 +3,33 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /**
  * 自动调整高度的 Textarea Hook
  * 根据内容自动调整 textarea 的高度
- * 
- * @param {Object} options
- * @param {number} options.minRows - 最小行数
- * @param {number} options.maxRows - 最大行数
- * @param {number} options.lineHeight - 行高（像素）
- * @param {number} options.padding - 内边距（像素）
- * @param {boolean} options.autoFocus - 是否自动聚焦
  */
-export const useAutoResizeTextarea = (options = {}) => {
+interface UseAutoResizeTextareaOptions {
+  minRows?: number
+  maxRows?: number
+  lineHeight?: number
+  padding?: number
+  autoFocus?: boolean
+}
+
+interface UseAutoResizeTextareaReturn {
+  textareaRef: React.RefObject<HTMLTextAreaElement>
+  rows: number
+  isFocused: boolean
+  minHeight: number
+  maxHeight: number
+  handleInput: (e: React.ChangeEvent<HTMLTextAreaElement>) => string
+  handleFocus: () => void
+  handleBlur: () => void
+  resize: () => void
+  focus: () => void
+  clear: () => void
+  setValue: (value: string) => void
+}
+
+export const useAutoResizeTextarea = (
+  options: UseAutoResizeTextareaOptions = {}
+): UseAutoResizeTextareaReturn => {
   const {
     minRows = 1,
     maxRows = 5,
@@ -20,9 +38,9 @@ export const useAutoResizeTextarea = (options = {}) => {
     autoFocus = false,
   } = options
 
-  const textareaRef = useRef(null)
-  const [rows, setRows] = useState(minRows)
-  const [isFocused, setIsFocused] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [rows, setRows] = useState<number>(minRows)
+  const [isFocused, setIsFocused] = useState<boolean>(false)
 
   // 计算最小和最大高度
   const minHeight = minRows * lineHeight + padding
@@ -37,13 +55,13 @@ export const useAutoResizeTextarea = (options = {}) => {
 
     // 重置高度以获取正确的 scrollHeight
     textarea.style.height = 'auto'
-    
+
     // 计算新的高度
     const scrollHeight = textarea.scrollHeight
     const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight))
-    
+
     textarea.style.height = `${newHeight}px`
-    
+
     // 计算行数
     const newRows = Math.min(
       maxRows,
@@ -55,7 +73,7 @@ export const useAutoResizeTextarea = (options = {}) => {
   /**
    * 处理输入事件
    */
-  const handleInput = useCallback((e) => {
+  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     resize()
     return e.target.value
   }, [resize])
@@ -94,7 +112,7 @@ export const useAutoResizeTextarea = (options = {}) => {
   /**
    * 设置内容
    */
-  const setValue = useCallback((value) => {
+  const setValue = useCallback((value: string) => {
     if (textareaRef.current) {
       textareaRef.current.value = value
       resize()
