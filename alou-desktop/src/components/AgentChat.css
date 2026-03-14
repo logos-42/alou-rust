@@ -44,7 +44,7 @@
   flex: 1;
   height: 100%;
   display: grid;
-  grid-template-columns: var(--left-column-width) 1fr;
+  grid-template-columns: auto 1fr;
   grid-template-rows: 1fr;
   overflow: hidden;
   min-height: 0;

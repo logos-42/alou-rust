@@ -312,7 +312,6 @@ const AgentSidebarLeft = ({
     <aside
       className={sidebarClassName}
       style={{
-        '--left-column-width': `${currentWidth}px`,
         width: `${currentWidth}px`,
       } as React.CSSProperties}
     >
