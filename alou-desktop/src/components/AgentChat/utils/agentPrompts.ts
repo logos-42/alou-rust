@@ -537,14 +537,14 @@ ${documentContents.agents}
 `;
       console.log('[getSystemPromptForAgent] 初次激活：注入所有 11 个文档，长度:', basePrompt.length);
     } else {
-      // 后续对话：注入记忆 + IPFS + 用户 + 项目
+      // 后续对话：只注入 4 个核心文档（SOUL + MEMORY + USER + PROJECT）
       basePrompt += `
+
+=== 核心身份 ===
+${documentContents.soul}
 
 === 你的长期记忆 ===
 ${documentContents.memory}
-
-=== IPFS 对话历史 ===
-${documentContents.ipfs}
 
 === 用户喜好 ===
 ${documentContents.user}
@@ -552,7 +552,7 @@ ${documentContents.user}
 === 项目与工作报告 ===
 ${documentContents.project}
 `;
-      console.log('[getSystemPromptForAgent] 后续对话：注入记忆 +IPFS+ 用户 + 项目，长度:', basePrompt.length);
+      console.log('[getSystemPromptForAgent] 后续对话：注入 4 个核心文档，长度:', basePrompt.length);
     }
 
     console.log('[getSystemPromptForAgent] 返回 Alou 提示词（已注入记忆），长度:', basePrompt.length);
@@ -712,38 +712,17 @@ ${memoryPath}
 - 📁 文件操作：重要文件操作前建议备份
 - 🌐 网络操作：验证URL安全性，使用HTTPS连接
 
+=== SOUL ===
+${documentContents.soul}
+
 === MEMORY ===
 ${documentContents.memory}
-
-=== IPFS 对话历史 ===
-${documentContents.ipfs}
 
 === 用户喜好 ===
 ${documentContents.user}
 
 === 项目与工作报告 ===
 ${documentContents.project}
-
-=== 关键密钥路径 ===
-${documentContents.key}
-
-=== SOUL ===
-${documentContents.soul}
-
-=== IDENTITY ===
-${documentContents.identity}
-
-=== CAPABILITIES ===
-${documentContents.capabilities}
-
-=== CONSTRAINTS ===
-${documentContents.constraints}
-
-=== TOOLS ===
-${documentContents.tools}
-
-=== AGENTS ===
-${documentContents.agents}
 
 现在，请根据用户需求选择合适的工具来完成任务。`;
 

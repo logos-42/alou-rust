@@ -131,6 +131,8 @@ const AgentChat = () => {
     toggleInteractionPanel,
     toggleDarkMode,
     toggleLeftSidebar,
+    handleLeftSidebarWidthChange,
+    leftSidebarWidth,
     openConversationPanel,
     closeConversationPanel,
     handleResize,

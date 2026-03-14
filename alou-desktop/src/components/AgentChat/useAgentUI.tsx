@@ -14,6 +14,7 @@ export const useAgentUI = ({
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isSidebarCollapsedLocal, setSidebarCollapsed] = useState(true)
   const [isLeftSidebarCollapsedLocal, setLeftSidebarCollapsed] = useState(false)
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(300) // 默认宽度
   const [isInteractionCollapsed, setInteractionCollapsed] = useState(true)
   const [isConversationVisible, setConversationVisible] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(initialViewportWidth)
@@ -159,6 +160,10 @@ export const useAgentUI = ({
     })
   }, [recordInteraction])
 
+  const handleLeftSidebarWidthChange = useCallback((newWidth: number) => {
+    setLeftSidebarWidth(newWidth)
+  }, [])
+
   const openConversationPanel = useCallback(() => {
     setConversationVisible(true)
   }, [])
@@ -211,6 +216,8 @@ export const useAgentUI = ({
     setSidebarCollapsed,
     isLeftSidebarCollapsed: effectiveLeftSidebarCollapsed,
     setLeftSidebarCollapsed,
+    leftSidebarWidth,
+    setLeftSidebarWidth,
     isInteractionCollapsed,
     setInteractionCollapsed,
     isConversationVisible,
@@ -236,6 +243,7 @@ export const useAgentUI = ({
     toggleInteractionPanel,
     toggleDarkMode,
     toggleLeftSidebar,
+    handleLeftSidebarWidthChange,
     openConversationPanel,
     closeConversationPanel,
     handleResize,

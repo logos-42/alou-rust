@@ -119,6 +119,10 @@ const MODE_TYPES = [
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max)
 const MIN_MENU_WIDTH = 176
+const MIN_SIDEBAR_WIDTH = 0 // 最小宽度为 0（完全收起）
+const MAX_SIDEBAR_WIDTH = 600
+const DEFAULT_SIDEBAR_WIDTH = 300
+const COLLAPSE_THRESHOLD = 100 // 低于此宽度时自动收起
 
 const AgentSidebarLeft = ({
   channels = [],
@@ -140,7 +144,77 @@ const AgentSidebarLeft = ({
   currentMode = 'agent', // 当前模式：'agent' 或 'alou'（已废弃，保留用于向后兼容）
   onModeChange, // 切换模式的回调：(channelId, mode) => void
   onShowIdentityPanel,
+  sidebarWidth, // 外部控制的宽度
+  onSidebarWidthChange, // 宽度变化回调
 }) => {
+  // 内部宽度状态（如果没有外部控制）
+  const [internalWidth, setInternalWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeHandleRef = useRef<HTMLDivElement>(null)
+  const startXRef = useRef<number>(0)
+  const startWidthRef = useRef<number>(0)
+
+  // 使用外部控制的宽度或内部状态
+  const currentWidth = sidebarWidth !== undefined ? sidebarWidth : internalWidth
+  const isCurrentlyCollapsed = isCollapsed || currentWidth <= COLLAPSE_THRESHOLD
+
+  // 设置宽度（同时更新内部状态和外部状态）
+  const setWidth = (newWidth: number) => {
+    const clampedWidth = clamp(newWidth, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH)
+    setInternalWidth(clampedWidth)
+    onSidebarWidthChange?.(clampedWidth)
+
+    // 如果拖到阈值以下，自动收起
+    if (clampedWidth <= COLLAPSE_THRESHOLD && !isCollapsed) {
+      onToggleCollapse?.()
+    }
+  }
+
+  // 开始调整大小
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsResizing(true)
+    startXRef.current = e.clientX
+    startWidthRef.current = currentWidth
+  }
+
+  // 处理调整大小移动
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      const deltaX = e.clientX - startXRef.current
+      const newWidth = startWidthRef.current + deltaX
+      setWidth(newWidth)
+    }
+
+    const handleResizeEnd = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeEnd)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeEnd)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing])
+
+  // 当外部 isCollapsed 变化时，调整宽度
+  useEffect(() => {
+    if (isCollapsed && currentWidth > COLLAPSE_THRESHOLD) {
+      setWidth(0)
+    } else if (!isCollapsed && currentWidth <= COLLAPSE_THRESHOLD) {
+      setWidth(DEFAULT_SIDEBAR_WIDTH)
+    }
+  }, [isCollapsed])
   const { t } = useI18n()
   const sidebarClassName = `sidebar-left${isCollapsed ? ' collapsed' : ''}`
   const [modelMenuState, setModelMenuState] = useState({ visible: false, top: 0, left: 0, width: 0 })
@@ -227,7 +301,22 @@ const AgentSidebarLeft = ({
   }
 
   return (
-    <aside className={sidebarClassName}>
+    <aside
+      className={sidebarClassName}
+      style={{
+        '--left-column-width': `${currentWidth}px`,
+        width: `${currentWidth}px`,
+      } as React.CSSProperties}
+    >
+      {/* 可拖动的调整大小手柄 */}
+      {!isCurrentlyCollapsed && (
+        <div
+          ref={resizeHandleRef}
+          className={`sidebar-resize-handle${isResizing ? ' resizing' : ''}`}
+          onMouseDown={handleResizeStart}
+          title="拖动调整宽度"
+        />
+      )}
       <div className="sidebar-header">
         <button
           type="button"

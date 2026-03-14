@@ -8,10 +8,37 @@
   width: var(--left-column-width, 300px);
   height: 100%;
   min-height: 0;
+  position: relative;
   transition:
-    width 0.28s ease,
+    width 0.1s ease,
     padding 0.2s ease,
     background 0.3s ease;
+}
+
+/* 可拖动的调整大小手柄 */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 100;
+  transition: background 0.2s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background: rgba(99, 102, 241, 0.3);
+}
+
+.sidebar-resize-handle.resizing {
+  cursor: col-resize;
+}
+
+.app-shell.dark-mode .sidebar-resize-handle:hover,
+.app-shell.dark-mode .sidebar-resize-handle.resizing {
+  background: rgba(165, 180, 252, 0.4);
 }
 
 /* 暗夜模式 - 纯黑色左侧边栏 */
