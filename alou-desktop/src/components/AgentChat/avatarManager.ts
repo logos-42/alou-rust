@@ -75,10 +75,43 @@ class AvatarManager {
     try {
       // 获取 store 中的智能体信息
       const store = useAgentStore.getState();
-      const existingAgent = store.getAgent(agentId);
+      let existingAgent = store.getAgent(agentId);
+      
+      // 如果智能体不存在，尝试通过 sessionId 查找
+      if (!existingAgent) {
+        existingAgent = store.agents.find(a => a.sessionId === agentId);
+      }
       
       if (!existingAgent) {
-        console.error('[AvatarManager] 智能体不存在:', agentId);
+        // 智能体不存在，创建一个新的记录
+        console.log('[AvatarManager] 智能体不存在，创建新记录:', agentId);
+        const newAgentData = {
+          id: agentId,
+          sessionId: agentId,
+          name: newName || '智能体',
+          display_name: newName || '智能体',
+          avatar_url: newAvatarUrl,
+          avatar_cid: null,
+          agent_type: 'custom',
+          status: 'active',
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        };
+        
+        store.addAgent(newAgentData);
+        const createdAgent = store.getAgent(agentId);
+        
+        if (createdAgent) {
+          // 更新缓存
+          const cacheKey = this.getCacheKey(createdAgent as any);
+          this.avatarCache.set(cacheKey, newAvatarUrl);
+          
+          // 通知监听器
+          this.notifyListeners(createdAgent as any);
+          
+          console.log('[AvatarManager] 头像更新成功 (新建):', agentId);
+          return createdAgent as Agent;
+        }
         return null;
       }
 
