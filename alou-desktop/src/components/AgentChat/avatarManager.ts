@@ -62,37 +62,58 @@ class AvatarManager {
 
   /**
    * 更新智能体头像
-   * @param agent - 智能体对象
+   * @param agentId - 智能体 ID
    * @param newAvatarUrl - 新头像 URL
+   * @param newName - 可选，新名称
+   * @returns 更新后的智能体对象
    */
-  async updateAvatar(agent: Agent, newAvatarUrl: string): Promise<void> {
-    if (!agent || !newAvatarUrl) {
-      return;
+  async updateAvatar(agentId: string, newAvatarUrl: string, newName?: string): Promise<Agent | null> {
+    if (!agentId || !newAvatarUrl) {
+      return null;
     }
 
     try {
-      // 更新缓存
-      const cacheKey = this.getCacheKey(agent);
-      this.avatarCache.set(cacheKey, newAvatarUrl);
-
-      // 更新 store 中的智能体信息
+      // 获取 store 中的智能体信息
       const store = useAgentStore.getState();
-      if (store.agents) {
-        const agentId = agent.id || agent.sessionId;
-        if (agentId) {
-          store.updateAgent(agentId, {
-            avatar_url: newAvatarUrl,
-            avatar_cid: null,
-          });
-        }
+      const existingAgent = store.getAgent(agentId);
+      
+      if (!existingAgent) {
+        console.error('[AvatarManager] 智能体不存在:', agentId);
+        return null;
       }
 
-      // 通知监听器
-      this.notifyListeners(agent);
+      // 更新 store 中的智能体信息
+      const updates: any = {
+        avatar_url: newAvatarUrl,
+        avatar_cid: null,
+      };
+      
+      if (newName) {
+        updates.display_name = newName;
+        updates.name = newName;
+      }
+      
+      store.updateAgent(agentId, updates);
 
-      console.log('[AvatarManager] 头像更新成功:', agent.id);
+      // 获取更新后的智能体
+      const updatedAgent = store.getAgent(agentId);
+      
+      if (updatedAgent) {
+        // 更新缓存
+        const cacheKey = this.getCacheKey(updatedAgent as any);
+        this.avatarCache.set(cacheKey, newAvatarUrl);
+
+        // 通知监听器
+        this.notifyListeners(updatedAgent as any);
+
+        console.log('[AvatarManager] 头像更新成功:', agentId);
+        return updatedAgent as Agent;
+      }
+      
+      return null;
     } catch (error) {
       console.error('[AvatarManager] 头像更新失败:', error);
+      return null;
     }
   }
 

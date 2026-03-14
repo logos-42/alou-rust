@@ -257,7 +257,7 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
       if (field === 'name') {
         // 更新名称 - 使用头像管理模块确保同步
         const currentAvatar = agent.avatar || agent.avatar_url
-        updatedAgent = avatarManager.updateAvatar(agent.id, currentAvatar, value)
+        updatedAgent = await avatarManager.updateAvatar(agent.id, currentAvatar, value)
       } else if (field === 'role') {
         // 更新角色
         updatedAgent = updateAgent(agent.id, {
@@ -268,7 +268,7 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
         // 使用头像管理模块更新头像
         // 同时传递当前名称，确保同步更新
         const currentName = agent.display_name || agent.name
-        updatedAgent = avatarManager.updateAvatar(agent.id, value, currentName)
+        updatedAgent = await avatarManager.updateAvatar(agent.id, value, currentName)
       }
 
       console.log('[AgentDetailPanel] 保存更改:', { 
