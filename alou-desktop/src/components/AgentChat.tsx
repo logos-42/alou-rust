@@ -810,6 +810,8 @@ const AgentChat = () => {
           currentMode={currentMode}
           onModeChange={handleModeChange}
           onShowIdentityPanel={() => setShowDiapPanel(true)}
+          sidebarWidth={leftSidebarWidth}
+          onSidebarWidthChange={handleLeftSidebarWidthChange}
         />
 
         <div 

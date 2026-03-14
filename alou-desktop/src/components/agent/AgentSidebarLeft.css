@@ -25,20 +25,46 @@
   cursor: col-resize;
   z-index: 100;
   transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-resize-handle::before {
+  content: '';
+  width: 1px;
+  height: 100%;
+  background: rgba(148, 163, 184, 0.3);
+  transition: all 0.2s ease;
 }
 
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle.resizing {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle.resizing::before {
+  width: 2px;
+  background: rgba(99, 102, 241, 0.5);
 }
 
 .sidebar-resize-handle.resizing {
   cursor: col-resize;
 }
 
+.app-shell.dark-mode .sidebar-resize-handle::before {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .app-shell.dark-mode .sidebar-resize-handle:hover,
 .app-shell.dark-mode .sidebar-resize-handle.resizing {
-  background: rgba(165, 180, 252, 0.4);
+  background: rgba(165, 180, 252, 0.2);
+}
+
+.app-shell.dark-mode .sidebar-resize-handle:hover::before,
+.app-shell.dark-mode .sidebar-resize-handle.resizing::before {
+  background: rgba(165, 180, 252, 0.6);
 }
 
 /* 暗夜模式 - 纯黑色左侧边栏 */
@@ -876,11 +902,52 @@
   gap: 0.35rem;
 }
 
+/* 当侧边栏收起时，右侧边缘显示可展开提示 */
+.sidebar-left.collapsed {
+  cursor: ew-resize;
+}
+
+.sidebar-left.collapsed .sidebar-resize-handle {
+  right: -4px;
+  width: 12px;
+}
+
+.sidebar-left.collapsed .sidebar-resize-handle::before {
+  height: 60%;
+  border-radius: 1px;
+}
+
 .sidebar-left.collapsed .channel-item {
   grid-template-columns: 1fr;
   justify-items: center;
   gap: 0.4rem;
   padding: 0.4rem;
+}
+
+/* 当宽度为 0 时完全隐藏边栏内容 */
+.sidebar-left[style*="width: 0px"] {
+  overflow: hidden;
+}
+
+.sidebar-left[style*="width: 0px"] .sidebar-header,
+.sidebar-left[style*="width: 0px"] .channel-search,
+.sidebar-left[style*="width: 0px"] .channel-list,
+.sidebar-left[style*="width: 0px"] .model-filter-chip {
+  display: none;
+}
+
+.sidebar-left[style*="width: 0px"] .sidebar-resize-handle {
+  right: -6px;
+  width: 16px;
+}
+
+.sidebar-left[style*="width: 0px"] .sidebar-resize-handle::before {
+  height: 100%;
+  background: rgba(99, 102, 241, 0.4);
+}
+
+.app-shell.dark-mode .sidebar-left[style*="width: 0px"] .sidebar-resize-handle::before {
+  background: rgba(165, 180, 252, 0.5);
 }
 
 .sidebar-left.collapsed .channel-item.active {

@@ -188,13 +188,25 @@ const useAgentStore = create<AgentStore>()(
                             agentData.cid ||
                             `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 
-        // 处理头像 URL
-        const avatarUrl = agentData.avatar_cid ? get().resolveIpfsUrl(agentData.avatar_cid) : (agentData.avatar_url || agentData.avatar_cid || null)
+        // 处理头像 URL - 优先使用 avatar_url (base64), 其次使用 avatar_cid (IPFS)
+        let avatarUrl: string | null = null
+        if (agentData.avatar_url && (agentData.avatar_url.startsWith('data:') || agentData.avatar_url.startsWith('http'))) {
+          // 直接使用提供的 avatar_url (base64 或 http)
+          avatarUrl = agentData.avatar_url
+        } else if (agentData.avatar_cid) {
+          // 从 CID 解析 IPFS URL
+          avatarUrl = get().resolveIpfsUrl(agentData.avatar_cid)
+        } else if (agentData.avatar_cid) {
+          // 兼容旧数据：avatar_cid 可能是完整的 URL
+          avatarUrl = agentData.avatar_cid
+        }
 
         console.log('[AgentStore] 创建/更新智能体头像信息:', {
           name: agentData.name,
           hasAvatarCid: !!agentData.avatar_cid,
+          hasAvatarUrl: !!agentData.avatar_url,
           avatar_cid: agentData.avatar_cid,
+          avatar_url_input: agentData.avatar_url?.substring(0, 50),
           resolvedAvatarUrl: avatarUrl?.substring(0, 100)
         })
 
@@ -229,14 +241,15 @@ display_name: getAgentName(agentData) || '未命名智能体',
 
         let updatedAgents: AgentMetadata[]
         if (existingIndex >= 0) {
-          // 更新现有智能体 - 保护现有头像
+          // 更新现有智能体 - 保护现有头像，除非明确提供新头像
           updatedAgents = [...agents]
           const existingAgent = updatedAgents[existingIndex]
           updatedAgents[existingIndex] = {
             ...existingAgent,
             ...newAgent,
-            avatar_cid: newAgent.avatar_cid || existingAgent.avatar_cid,
-            avatar_url: newAgent.avatar_url || existingAgent.avatar_url,
+            // 如果新数据有头像则使用新的，否则保留旧的
+            avatar_cid: agentData.avatar_cid !== undefined ? agentData.avatar_cid : existingAgent.avatar_cid,
+            avatar_url: agentData.avatar_url !== undefined || agentData.avatar_cid !== undefined ? avatarUrl : existingAgent.avatar_url,
             created_at: existingAgent.created_at,
           }
         } else {
@@ -263,19 +276,51 @@ display_name: getAgentName(agentData) || '未命名智能体',
         const updatedAgents = [...agents]
         const existingAgent = updatedAgents[index]
 
-        // 处理头像更新：如果提供了 avatar_cid，需要重新解析为 URL
-        let finalAvatarUrl = updates.avatar_url || existingAgent.avatar_url
-        if (updates.avatar_cid) {
-          finalAvatarUrl = get().resolveIpfsUrl(updates.avatar_cid)
+        // 处理头像更新逻辑
+        let finalAvatarCid = existingAgent.avatar_cid
+        let finalAvatarUrl = existingAgent.avatar_url
+
+        // 如果明确提供了 avatar_cid
+        if (updates.avatar_cid !== undefined) {
+          finalAvatarCid = updates.avatar_cid
+          if (updates.avatar_cid) {
+            // 从 CID 解析 URL
+            finalAvatarUrl = get().resolveIpfsUrl(updates.avatar_cid)
+          } else {
+            // CID 被清空，检查是否有 avatar_url
+            finalAvatarUrl = updates.avatar_url !== undefined ? updates.avatar_url : null
+          }
+        }
+
+        // 如果明确提供了 avatar_url (base64 或 http)
+        if (updates.avatar_url !== undefined) {
+          if (updates.avatar_url && (updates.avatar_url.startsWith('data:') || updates.avatar_url.startsWith('http'))) {
+            finalAvatarUrl = updates.avatar_url
+            // 如果 avatar_url 是 base64，清空 avatar_cid
+            if (updates.avatar_url.startsWith('data:')) {
+              finalAvatarCid = null
+            }
+          } else if (!updates.avatar_url) {
+            // avatar_url 被显式清空
+            finalAvatarUrl = null
+          }
         }
 
         updatedAgents[index] = {
           ...existingAgent,
           ...updates,
-          avatar_cid: updates.avatar_cid !== undefined ? updates.avatar_cid : existingAgent.avatar_cid,
+          avatar_cid: finalAvatarCid,
           avatar_url: finalAvatarUrl,
           updated_at: Date.now(),
         }
+
+        console.log('[AgentStore] 智能体头像更新:', {
+          id: idOrSessionId,
+          oldAvatarUrl: existingAgent.avatar_url?.substring(0, 50),
+          newAvatarUrl: finalAvatarUrl?.substring(0, 50),
+          oldAvatarCid: existingAgent.avatar_cid,
+          newAvatarCid: finalAvatarCid
+        })
 
         set({ agents: updatedAgents })
         return updatedAgents[index]
@@ -381,6 +426,17 @@ display_name: getAgentName(agentData) || '未命名智能体',
 
         // 添加新智能体
         const now = Date.now()
+
+        // 处理头像 URL - 优先使用 avatar_url (base64), 其次使用 avatar_cid (IPFS)
+        let avatarUrl: string | null = null
+        if (agentData.avatar_url && (agentData.avatar_url.startsWith('data:') || agentData.avatar_url.startsWith('http'))) {
+          // 直接使用提供的 avatar_url (base64 或 http)
+          avatarUrl = agentData.avatar_url
+        } else if (agentData.avatar_cid) {
+          // 从 CID 解析 IPFS URL
+          avatarUrl = get().resolveIpfsUrl(agentData.avatar_cid)
+        }
+
         const newAgent: AgentMetadata = {
           ...agentData,
           id: agentData.id || `agent_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
@@ -391,7 +447,7 @@ name: getAgentName(agentData) || '未命名智能体',
 display_name: getAgentName(agentData) || '未命名智能体',
           role_description: agentData.role_description || '',
           avatar_cid: agentData.avatar_cid || null,
-          avatar_url: agentData.avatar_url || null,
+          avatar_url: avatarUrl,
           mcp_config_cid: agentData.mcp_config_cid || null,
           mcp_ports: agentData.mcp_ports || [],
           agent_type: agentData.agent_type || 'ai_agent_sdk',

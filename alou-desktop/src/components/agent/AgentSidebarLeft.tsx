@@ -174,9 +174,15 @@ const AgentSidebarLeft = ({
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    
+    // 如果是从收起状态拖动，先展开
+    if (isCurrentlyCollapsed && !isCollapsed) {
+      onToggleCollapse?.()
+    }
+    
     setIsResizing(true)
     startXRef.current = e.clientX
-    startWidthRef.current = currentWidth
+    startWidthRef.current = currentWidth > 0 ? currentWidth : COLLAPSE_THRESHOLD + 1
   }
 
   // 处理调整大小移动
@@ -209,7 +215,7 @@ const AgentSidebarLeft = ({
 
   // 当外部 isCollapsed 变化时，调整宽度
   useEffect(() => {
-    if (isCollapsed && currentWidth > COLLAPSE_THRESHOLD) {
+    if (isCollapsed && currentWidth > 0) {
       setWidth(0)
     } else if (!isCollapsed && currentWidth <= COLLAPSE_THRESHOLD) {
       setWidth(DEFAULT_SIDEBAR_WIDTH)
@@ -308,15 +314,13 @@ const AgentSidebarLeft = ({
         width: `${currentWidth}px`,
       } as React.CSSProperties}
     >
-      {/* 可拖动的调整大小手柄 */}
-      {!isCurrentlyCollapsed && (
-        <div
-          ref={resizeHandleRef}
-          className={`sidebar-resize-handle${isResizing ? ' resizing' : ''}`}
-          onMouseDown={handleResizeStart}
-          title="拖动调整宽度"
-        />
-      )}
+      {/* 可拖动的调整大小手柄 - 始终显示以便从收起状态展开 */}
+      <div
+        ref={resizeHandleRef}
+        className={`sidebar-resize-handle${isResizing ? ' resizing' : ''}`}
+        onMouseDown={handleResizeStart}
+        title={isCurrentlyCollapsed ? '拖动展开' : '拖动调整宽度'}
+      />
       <div className="sidebar-header">
         <button
           type="button"

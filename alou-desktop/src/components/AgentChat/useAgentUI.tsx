@@ -182,13 +182,13 @@ export const useAgentUI = ({
     if (viewportWidth <= 1024) {
       return { margin: '0 1rem 0 1rem' }
     }
-    const leftWidth = effectiveLeftSidebarCollapsed ? 84 : viewportWidth <= 1280 ? 240 : 300
+    const leftWidth = effectiveLeftSidebarCollapsed || leftSidebarWidth <= 100 ? 84 : leftSidebarWidth
     const rightWidth = effectiveSidebarCollapsed ? 80 : 340
     return {
       marginLeft: `${leftWidth + 24}px`,
       marginRight: `${rightWidth + 24}px`,
     }
-  }, [viewportWidth, effectiveSidebarCollapsed, effectiveLeftSidebarCollapsed])
+  }, [viewportWidth, effectiveSidebarCollapsed, effectiveLeftSidebarCollapsed, leftSidebarWidth])
 
   // Initialize dark mode from localStorage or system preference
   useEffect(() => {
