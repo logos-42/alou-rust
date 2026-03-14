@@ -14,6 +14,7 @@ import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
 import LoadingIcon from '@/assets/加载0.2.png'
+import SendIcon from '@/assets/向上·发送 2.png'
 import './GroupChatPanel.css'
 
 /**
@@ -80,7 +81,8 @@ const GroupChatPanel = ({
   activeChannelId,
   onSwitchGroupChat,
   onSelectAgent,
-  externalOnSendMessage
+  externalOnSendMessage,
+  onStop
 }) => {
   const { t } = useI18n()
   
@@ -421,6 +423,20 @@ const GroupChatPanel = ({
               <span>加载中...</span>
             </div>
           )}
+          {/* 停止按钮 - 当有任务运行时显示 */}
+          {onStop && (
+            <button
+              type="button"
+              className="stop-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onStop()
+              }}
+              title="停止任务"
+            >
+              <span className="stop-btn-text">⏹</span>
+            </button>
+          )}
           {/* 群聊操作按钮 */}
           <div className="group-chat-actions">
             <button
@@ -603,7 +619,7 @@ const GroupChatPanel = ({
               disabled={!messageInput.trim() || !isInitialized || isLoading}
               title="发送消息 (Enter)"
             >
-              {(isInitialized && isLoading) ? '...' : '→'}
+              <img src={SendIcon} alt="发送" />
             </button>
           </div>
         </div>

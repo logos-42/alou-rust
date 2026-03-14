@@ -3,33 +3,32 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  background: rgba(20, 20, 20, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 1.75rem;
-  padding: 1.5rem 2rem;
-  box-shadow: var(--shadow, 0 12px 32px rgba(15, 23, 42, 0.12));
+  padding: 0;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
   overflow: hidden;
   position: relative;
   pointer-events: auto;
-  /* 移除 transition 以避免每次重渲染时触发闪烁 */
   cursor: pointer;
 }
 
 /* 点击动画效果 */
 .group-chat-panel.clicked {
   transform: scale(0.98);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.2);
-  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
 }
 
 /* 群聊面板激活状态（当输入目标是群聊时） */
 .group-chat-panel.input-target-active {
   border-color: var(--primary-color, #6366f1);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), 0 12px 32px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15), 0 12px 32px rgba(15, 23, 42, 0.08);
 }
 
 .group-chat-panel.input-target-active .group-chat-header {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(99, 102, 241, 0.03);
 }
 
 /* 头部 */
@@ -37,10 +36,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
-  background: var(--surface, rgba(255, 255, 255, 0.85));
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(248, 250, 252, 0.6);
   flex-shrink: 0;
+  backdrop-filter: blur(8px);
 }
 
 .header-left {
@@ -99,22 +99,24 @@
 
 /* 参与智能体头像区域 */
 .group-chat-agents-avatars {
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
-  background: var(--surface, rgba(255, 255, 255, 0.85));
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(248, 250, 252, 0.4);
   flex-shrink: 0;
 }
 
 .agents-avatars-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary, #475569);
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
   margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .agents-avatars-list {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   align-items: center;
 }
@@ -133,8 +135,8 @@
 }
 
 .agent-avatar-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
 }
 
 .agent-avatar-button:active {
@@ -146,8 +148,9 @@
   height: 32px;
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--border-color, rgba(15, 23, 42, 0.1));
-  background: var(--surface, rgba(255, 255, 255, 0.85));
+  border: 2px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .agent-avatar-small img {
@@ -306,6 +309,7 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* 消息列表 */
@@ -313,46 +317,41 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 0;
+  padding: 16px 18px;
   scroll-behavior: smooth;
   min-width: 0;
   position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(248, 250, 252, 0.3) 100%);
 }
 
 .group-chat-messages::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 
 .group-chat-messages::-webkit-scrollbar-track {
-  background: #f1f3f4;
-  border-radius: 4px;
+  background: transparent;
+  border-radius: 3px;
 }
 
 .app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-track {
-  background: #1a202c;
+  background: transparent;
 }
 
 .group-chat-messages::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 4px;
-  border: 1px solid #f1f3f4;
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 3px;
 }
 
 .app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border: 1px solid #1a202c;
+  background: rgba(148, 163, 184, 0.3);
 }
 
 .group-chat-messages::-webkit-scrollbar-thumb:hover {
-  background: #a0aec0;
+  background: rgba(148, 163, 184, 0.6);
 }
 
 .app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e0;
-}
-
-.group-chat-messages::-webkit-scrollbar-thumb:active {
-  background: #718096;
+  background: rgba(148, 163, 184, 0.5);
 }
 
 .app-shell.dark-mode .group-chat-messages::-webkit-scrollbar-thumb:active {
@@ -508,14 +507,33 @@
 
 /* 暗色模式 */
 .app-shell.dark-mode .group-chat-panel {
-  background: rgba(0, 0, 0, 0.5);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.app-shell.dark-mode .group-chat-panel.clicked {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.app-shell.dark-mode .group-chat-panel.input-target-active {
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), 0 12px 32px rgba(0, 0, 0, 0.3);
 }
 
 .app-shell.dark-mode .group-chat-header,
 .app-shell.dark-mode .group-chat-agents {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.app-shell.dark-mode .group-chat-content {
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.app-shell.dark-mode .group-chat-messages {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(30, 41, 59, 0.2) 100%);
 }
 
 .app-shell.dark-mode .agent-item {
@@ -540,17 +558,29 @@
 
 /* 消息输入框 */
 .message-input-container {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color, rgba(15, 23, 42, 0.08));
-  background: var(--surface, rgba(255, 255, 255, 0.95));
+  padding: 14px 18px 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.8);
   flex-shrink: 0;
+  backdrop-filter: blur(8px);
 }
 
 .message-input-wrapper {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
   position: relative;
+  background: var(--background, #ffffff);
+  border: 2px solid var(--border-color, rgba(15, 23, 42, 0.1));
+  border-radius: 16px;
+  padding: 6px 6px 6px 16px;
+  transition: all 0.2s ease;
+}
+
+.message-input-wrapper:focus-within {
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  background: var(--surface, #ffffff);
 }
 
 /* @智能体自动补全弹出框 */
@@ -631,19 +661,13 @@
 
 .message-input {
   flex: 1;
-  padding: 10px 16px;
-  border: 1px solid var(--border-color, rgba(15, 23, 42, 0.15));
-  border-radius: 20px;
-  background: var(--background, #ffffff);
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
   font-size: 14px;
   color: var(--text-primary, #0f172a);
   outline: none;
   transition: all 0.2s ease;
-}
-
-.message-input:focus {
-  border-color: var(--primary-color, #6366f1);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
 
 .message-input::placeholder {
@@ -651,18 +675,17 @@
 }
 
 .message-input:disabled {
-  background: var(--surface-secondary, #f1f5f9);
   color: var(--text-muted, #94a3b8);
   cursor: not-allowed;
 }
 
 .send-button {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border: none;
-  border-radius: 50%;
-  background: var(--primary-color, #6366f1);
-  color: white;
+  border-radius: 12px;
+  background: #f5f5f5;
+  color: #1a1a1a;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
@@ -671,34 +694,60 @@
   justify-content: center;
   transition: all 0.2s ease;
   flex-shrink: 0;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.send-button img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%);
 }
 
 .send-button:hover:not(:disabled) {
-  background: #5558e3;
-  transform: scale(1.05);
+  background: #e8e8e8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.send-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .send-button:disabled {
-  background: var(--text-muted, #94a3b8);
+  background: #e0e0e0;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.send-button:disabled img {
+  filter: brightness(0) saturate(100%) opacity(0.6);
 }
 
 /* 暗色模式下的输入框 */
 .app-shell.dark-mode .message-input-container {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(15, 23, 42, 0.6);
   border-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.app-shell.dark-mode .message-input-wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.app-shell.dark-mode .message-input-wrapper:focus-within {
+  border-color: var(--primary-color, #6366f1);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .app-shell.dark-mode .message-input {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
   color: var(--text-primary-dark, #f7fafc);
-}
-
-.app-shell.dark-mode .message-input:focus {
-  border-color: var(--primary-color, #6366f1);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
 .app-shell.dark-mode .message-input::placeholder {
@@ -706,8 +755,23 @@
 }
 
 .app-shell.dark-mode .message-input:disabled {
-  background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted-dark, #718096);
+}
+
+.app-shell.dark-mode .send-button {
+  background: #2a2a2a;
+}
+
+.app-shell.dark-mode .send-button img {
+  filter: brightness(0) invert(1) saturate(100%);
+}
+
+.app-shell.dark-mode .send-button:hover:not(:disabled) {
+  background: #3a3a3a;
+}
+
+.app-shell.dark-mode .send-button:disabled {
+  background: #333333;
 }
 
 
@@ -840,14 +904,14 @@
 }
 
 .modal-btn.confirm {
-  background: #6366f1;
-  color: white;
+  background: #f5f5f5;
+  color: #1a1a1a;
 }
 
 .modal-btn.confirm:hover {
-  background: #5558e3;
+  background: #e8e8e8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 @keyframes fadeIn {
@@ -900,6 +964,15 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+.app-shell.dark-mode .modal-btn.confirm {
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.app-shell.dark-mode .modal-btn.confirm:hover {
+  background: #3a3a3a;
+}
+
 
 /* 群聊操作按钮 */
 .group-chat-actions {
@@ -910,8 +983,8 @@
 
 .action-btn {
   padding: 6px 12px;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  color: white;
+  background: #f5f5f5;
+  color: #1a1a1a;
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -922,9 +995,9 @@
 }
 
 .action-btn:hover {
+  background: #e8e8e8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  filter: brightness(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .action-btn:active {
@@ -933,7 +1006,60 @@
 
 /* 暗色模式下的操作按钮 */
 .app-shell.dark-mode .action-btn {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: #2a2a2a;
+  color: #e0e0e0;
+}
+
+.app-shell.dark-mode .action-btn:hover {
+  background: #3a3a3a;
+}
+
+/* 停止按钮 */
+.stop-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: #f5f5f5;
+  color: #1a1a1a;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stop-btn-text {
+  font-size: 20px;
+  line-height: 1;
+  filter: brightness(0) saturate(100%);
+}
+
+.stop-btn:hover {
+  background: #e8e8e8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.stop-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* 暗色模式下的停止按钮 */
+.app-shell.dark-mode .stop-btn {
+  background: #2a2a2a;
+}
+
+.app-shell.dark-mode .stop-btn-text {
+  filter: brightness(0) invert(1) saturate(100%);
+}
+
+.app-shell.dark-mode .stop-btn:hover {
+  background: #3a3a3a;
 }
 
 

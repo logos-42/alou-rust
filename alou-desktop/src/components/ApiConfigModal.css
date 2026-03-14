@@ -262,9 +262,19 @@
   cursor: pointer;
 }
 
+.api-config-modal__field select option {
+  background: #1a1a1a;
+  color: #f1f5f9;
+}
+
 .api-config-modal.light .api-config-modal__field select {
   background: #f8fafc;
   border-color: rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+}
+
+.api-config-modal.light .api-config-modal__field select option {
+  background: #ffffff;
   color: #1e293b;
 }
 
