@@ -123,6 +123,7 @@ const MIN_SIDEBAR_WIDTH = 0 // 最小宽度为 0（完全收起）
 const MAX_SIDEBAR_WIDTH = 600
 const DEFAULT_SIDEBAR_WIDTH = 300
 const COLLAPSE_THRESHOLD = 100 // 低于此宽度时自动收起
+const COLLAPSED_WIDTH = 60 // 收起时的宽度（只显示展开按钮）
 
 const AgentSidebarLeft = ({
   channels = [],
@@ -182,7 +183,7 @@ const AgentSidebarLeft = ({
     
     setIsResizing(true)
     startXRef.current = e.clientX
-    startWidthRef.current = currentWidth > 0 ? currentWidth : COLLAPSE_THRESHOLD + 1
+    startWidthRef.current = currentWidth > COLLAPSE_THRESHOLD ? currentWidth : DEFAULT_SIDEBAR_WIDTH
   }
 
   // 处理调整大小移动
@@ -215,9 +216,10 @@ const AgentSidebarLeft = ({
 
   // 当外部 isCollapsed 变化时，调整宽度
   useEffect(() => {
-    if (isCollapsed && currentWidth > 0) {
-      setWidth(0)
-    } else if (!isCollapsed && currentWidth <= COLLAPSE_THRESHOLD) {
+    if (isCollapsed) {
+      // 收起时设置为最小可见宽度，只显示展开按钮
+      setWidth(COLLAPSED_WIDTH)
+    } else if (currentWidth <= COLLAPSE_THRESHOLD) {
       setWidth(DEFAULT_SIDEBAR_WIDTH)
     }
   }, [isCollapsed])

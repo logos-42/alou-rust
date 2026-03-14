@@ -877,11 +877,16 @@
 }
 
 .sidebar-left.collapsed .sidebar-header {
-  padding: 0.8rem 0.8rem 0.4rem;
+  padding: 0.8rem 0.5rem 0.4rem;
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-left.collapsed .brand-toggle {
+  margin: 0 auto;
 }
 
 .sidebar-left.collapsed .new-channel-btn,
-.sidebar-left.collapsed .import-channel-btn,
 .sidebar-left.collapsed .import-channel-btn {
   display: none;
 }
@@ -896,10 +901,7 @@
 }
 
 .sidebar-left.collapsed .channel-list {
-  padding: 0.4rem 0.35rem 0.6rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  display: none;
 }
 
 /* 当侧边栏收起时，右侧边缘显示可展开提示 */
@@ -915,39 +917,6 @@
 .sidebar-left.collapsed .sidebar-resize-handle::before {
   height: 60%;
   border-radius: 1px;
-}
-
-.sidebar-left.collapsed .channel-item {
-  grid-template-columns: 1fr;
-  justify-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem;
-}
-
-/* 当宽度为 0 时完全隐藏边栏内容 */
-.sidebar-left[style*="width: 0px"] {
-  overflow: hidden;
-}
-
-.sidebar-left[style*="width: 0px"] .sidebar-header,
-.sidebar-left[style*="width: 0px"] .channel-search,
-.sidebar-left[style*="width: 0px"] .channel-list,
-.sidebar-left[style*="width: 0px"] .model-filter-chip {
-  display: none;
-}
-
-.sidebar-left[style*="width: 0px"] .sidebar-resize-handle {
-  right: -6px;
-  width: 16px;
-}
-
-.sidebar-left[style*="width: 0px"] .sidebar-resize-handle::before {
-  height: 100%;
-  background: rgba(99, 102, 241, 0.4);
-}
-
-.app-shell.dark-mode .sidebar-left[style*="width: 0px"] .sidebar-resize-handle::before {
-  background: rgba(165, 180, 252, 0.5);
 }
 
 .sidebar-left.collapsed .channel-item.active {
