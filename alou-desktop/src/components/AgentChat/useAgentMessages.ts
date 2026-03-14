@@ -618,6 +618,19 @@ export const useAgentMessages = ({
           agentId: targetAgentId,
         }
         appendMessage(assistantMessage, targetAgentId)
+        
+        // ✅ 关键修复：对话结束后立即保存消息到 IPFS，保存上下文
+        if (selectedAgent?.id && activeChannelId) {
+          saveMessagesToIpfs(activeChannelId, selectedAgent.id, false).then((cid) => {
+            if (cid) {
+              console.log('[useAgentMessages] 消息已保存到 IPFS，CID:', cid)
+              // 更新 agent 的 messages_cid
+              updateAgent(selectedAgent.id, { messages_cid: cid })
+            }
+          }).catch(err => {
+            console.warn('[useAgentMessages] 保存消息失败:', err)
+          })
+        }
       } else {
         appendMessage({
           id: `error_${Date.now()}`,
