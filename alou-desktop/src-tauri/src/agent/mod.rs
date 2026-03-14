@@ -24,6 +24,7 @@ pub mod swarm;        // Multi-agent swarm coordination
 pub mod autonomy;     // Agent autonomy framework
 pub mod agent_hook;   // Agent Hook system for real-time instruction injection
 pub mod hook_commands; // Tauri commands for Agent Hook
+pub mod context_layers; // Layered Agent Context architecture
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
