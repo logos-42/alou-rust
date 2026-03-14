@@ -23,7 +23,12 @@ const debounce = (func, wait) => {
 }
 
 const resolveAvatar = (agent) => {
-  return avatarManager.resolveAvatar(agent)
+  // 同步版本：先尝试从缓存读取，如果没有缓存再返回默认值
+  // 异步加载会在 useEffect 中处理
+  if (!agent) return fallbackAvatar
+  
+  // 直接使用 agent 的头像字段
+  return agent.avatar_url || agent.avatar || fallbackAvatar
 }
 
 const resolveName = (agent) => {
@@ -109,7 +114,8 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
     if (agent) {
       setLocalName(resolveName(agent))
       setLocalRole(resolveRole(agent))
-      setLocalAvatar(resolveAvatar(agent))
+      // 异步加载头像
+      resolveAvatar(agent).then(setLocalAvatar)
     }
   }, [agent])
 
@@ -324,7 +330,8 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
 
   // 处理头像变化
   const handleAvatarChange = async (newAvatar) => {
-    if (newAvatar && newAvatar !== resolveAvatar(agent)) {
+    // 使用当前 localAvatar 状态进行比较，而不是异步解析
+    if (newAvatar && newAvatar !== localAvatar) {
       await saveChanges('avatar', newAvatar)
     }
   }
