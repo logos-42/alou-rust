@@ -43,7 +43,7 @@ const DEFAULT_DOCUMENT_CONTENTS = {
   identity: `# 身份定义
 
 **智能体 ID**: \${agentInfo?.id || 'unknown'}
-
+DIAP 身份 Id:did;cid;ipns
 ## 名称
 \${agentInfo?.name || '智能体'}
 
@@ -116,6 +116,23 @@ const DEFAULT_DOCUMENT_CONTENTS = {
 
 ## 协作模式
 （暂无记录）
+`,
+  ipfs: `# IPFS 对话历史索引
+
+这里记录了存储在 IPFS 上的重要对话会话。
+
+## 最近会话
+（暂无记录）
+
+## 统计信息
+- 总会话数：0
+- 总消息数：0
+- 最早会话：暂无
+- 最近会话：暂无
+
+## 如何更新
+- 重要对话结束后，自动记录到本文件
+- 每条记录包含：CID、时间、主题、消息数
 `
 };
 export const getSystemPromptForAgent = async (
@@ -172,12 +189,12 @@ export const getSystemPromptForAgent = async (
 
   // 加载实际的文档内容
   let documentContents = { ...DEFAULT_DOCUMENT_CONTENTS };
-  
+
   if (agentId && agentId !== 'unknown') {
     try {
       const docs = await agentDocumentService.getAgentDocuments(agentId);
       console.log('[getSystemPromptForAgent] 加载文档内容:', Object.keys(docs));
-      
+
       // 如果文档存在且有内容，使用加载的内容
       if (docs.memory) documentContents.memory = docs.memory;
       if (docs.soul) documentContents.soul = docs.soul;
@@ -186,6 +203,7 @@ export const getSystemPromptForAgent = async (
       if (docs.constraints) documentContents.constraints = docs.constraints;
       if (docs.tools) documentContents.tools = docs.tools;
       if (docs.agents) documentContents.agents = docs.agents;
+      if (docs.ipfs) documentContents.ipfs = docs.ipfs;  // ← 新增：加载 IPFS.md
     } catch (loadErr) {
       console.warn('[getSystemPromptForAgent] 加载文档失败，使用默认内容:', loadErr);
     }
@@ -423,11 +441,14 @@ Alou 的个性与价值观：
 
     // 根据 injectAll 参数决定注入范围
     if (injectAll) {
-      // 初次激活：注入所有文档
+      // 初次激活：注入所有 8 个文档
       basePrompt += `
 
 === 你的长期记忆 ===
 ${documentContents.memory}
+
+=== IPFS 对话历史 ===
+${documentContents.ipfs}
 
 === 核心身份 ===
 ${documentContents.soul}
@@ -447,15 +468,18 @@ ${documentContents.tools}
 === 协作智能体 ===
 ${documentContents.agents}
 `;
-      console.log('[getSystemPromptForAgent] 初次激活：注入所有 7 个文档，长度:', basePrompt.length);
+      console.log('[getSystemPromptForAgent] 初次激活：注入所有 8 个文档，长度:', basePrompt.length);
     } else {
-      // 后续对话：只注入记忆
+      // 后续对话：注入记忆 + IPFS 历史
       basePrompt += `
 
 === 你的长期记忆 ===
 ${documentContents.memory}
+
+=== IPFS 对话历史 ===
+${documentContents.ipfs}
 `;
-      console.log('[getSystemPromptForAgent] 后续对话：只注入记忆，长度:', basePrompt.length);
+      console.log('[getSystemPromptForAgent] 后续对话：注入记忆 + IPFS 历史，长度:', basePrompt.length);
     }
 
     console.log('[getSystemPromptForAgent] 返回 Alou 提示词（已注入记忆），长度:', basePrompt.length);

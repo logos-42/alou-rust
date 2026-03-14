@@ -388,7 +388,14 @@ export const useAgentMessages = ({
           last_saved_at: Date.now()
         })
         console.log(`[useAgentMessages] 消息已保存到 IPFS，CID: ${cid}`)
-      }
+        
+        // ✅ 新增：更新 IPFS.md 文档
+        await updateIpfsDocument(agentId, {
+          cid,
+          timestamp: Date.now(),
+          messageCount: newMessages.length,
+          totalMessages: channelMessages.length,
+        })      }
       
       // 更新已保存计数
       savedMessageCountRef.current[channelId] = channelMessages.length
@@ -399,6 +406,63 @@ export const useAgentMessages = ({
       return null
     }
   }, [messagesByChannel, updateAgent])
+
+    // ✅ 新增：更新 IPFS.md 文档
+  const updateIpfsDocument = useCallback(async (agentId: string, sessionInfo: {
+    cid: string;
+    timestamp: number;
+    messageCount: number;
+    totalMessages: number;
+  }): Promise<void> => {
+    try {
+      console.log('[useAgentMessages] 更新 IPFS.md 文档:', agentId)
+      
+      // 读取当前 IPFS.md
+      const currentDoc = await agentDocumentService.getDocument(agentId, 'ipfs').catch(() => null)
+      
+      const now = new Date(sessionInfo.timestamp)
+      const dateStr = now.toLocaleString('zh-CN')
+      
+      // 生成新的会话记录
+      const sessionRecord = `
+### 会话：${dateStr}
+- **CID**: \`${sessionInfo.cid}\`
+- **时间**: ${dateStr}
+- **消息数**: ${sessionInfo.messageCount} 条（本会话）/ ${sessionInfo.totalMessages} 条（总计）
+- **主题**: 对话会话
+`
+      
+      // 更新文档内容
+      let updatedContent = currentDoc || '# IPFS 对话历史索引\n\n这里记录了存储在 IPFS 上的重要对话会话。\n\n'
+      
+      // 查找"## 最近会话"位置
+      const recentSection = updatedContent.indexOf('## 最近会话')
+      if (recentSection !== -1) {
+        // 在"## 最近会话"后插入
+        const insertPos = updatedContent.indexOf('\n', recentSection + 6) + 1
+        updatedContent = updatedContent.slice(0, insertPos) + sessionRecord + updatedContent.slice(insertPos)
+      } else {
+        // 如果没有"## 最近会话"部分，添加到末尾
+        updatedContent += '\n\n## 最近会话\n' + sessionRecord
+      }
+      
+      // 更新统计信息
+      updatedContent = updatedContent.replace(/- 总会话数：\d+/, (match) => {
+        const count = parseInt(match.match(/\d+/)?.[0] || '0') + 1
+        return `- 总会话数：${count}`
+      })
+      updatedContent = updatedContent.replace(/- 总消息数：\d+/, (match) => {
+        const count = parseInt(match.match(/\d+/)?.[0] || '0') + sessionInfo.messageCount
+        return `- 总消息数：${count}`
+      })
+      
+      // 写回
+      await agentDocumentService.updateDocument(agentId, 'ipfs', updatedContent)
+      console.log('[useAgentMessages] IPFS.md 文档已更新')
+    } catch (err) {
+      console.warn('[useAgentMessages] 更新 IPFS.md 失败:', err)
+    }
+  }, [agentDocumentService])
 
   // 从 IPFS 加载消息
   const loadMessagesFromIpfs = useCallback(async (channelId: string, messagesCid: string): Promise<boolean> => {
