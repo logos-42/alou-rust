@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import sendIcon from '@/assets/向上·发送 2.png'
-import cancelIcon from '@/assets/终止 0.2.png'
+import cancelIcon from '@/assets/终止0.2.png'
 import './ChatInput.css'
 
 export interface ChatInputProps {

@@ -4,22 +4,28 @@ import useAuthStore from '@/stores/authStore'
 import { useI18n } from '@/hooks/useI18n'
 import './SubscriptionView.css'
 
-const SubscriptionView = () => {
+/**
+ * SubscriptionView 组件
+ * 订阅管理页面，显示订阅计划和高级功能
+ */
+const SubscriptionView: React.FC = () => {
   const { t } = useI18n()
-  const { subscription, trial, plans, loading, isPremium, isTrial, daysRemaining, trialDaysRemaining, refresh } = useSubscription()
-  const walletAddress = useAuthStore((state) => state.walletAddress)
-  const [selectedPlan, setSelectedPlan] = useState(null)
-  const [paymentStatus, setPaymentStatus] = useState(null)
+  const subscriptionData = useSubscription()
+  const walletAddress = useAuthStore((state: any) => state.walletAddress)
+  const [selectedPlan, setSelectedPlan] = useState<any>(null)
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null)
+
+  const { plans, loading, isPremium, isTrial, daysRemaining, trialDaysRemaining, refresh } = subscriptionData as any
 
   // 使用 useMemo 来计算默认选中的计划，避免在 useEffect 中调用 setState
   const defaultSelectedPlan = useMemo(() => {
-    return plans.length > 0 ? plans[0] : null
+    return plans && plans.length > 0 ? plans[0] : null
   }, [plans])
 
   // 如果没有选中计划，使用默认计划
   const currentSelectedPlan = selectedPlan || defaultSelectedPlan
 
-  const handleSubscribe = async (plan) => {
+  const handleSubscribe = async (plan: any) => {
     if (!walletAddress) {
       alert('Please connect your wallet first')
       return
@@ -35,7 +41,7 @@ const SubscriptionView = () => {
     } catch (error) {
       console.error('Subscription error:', error)
       setPaymentStatus('error')
-      alert(`Subscription failed: ${error.message}`)
+      alert(`Subscription failed: ${(error as Error).message}`)
     }
   }
 
@@ -66,7 +72,7 @@ const SubscriptionView = () => {
       <div className="subscription-plans">
         <h2>{t('subscription.choosePlan', 'Choose a Plan')}</h2>
         <div className="plans-grid">
-          {plans.map((plan) => (
+          {plans.map((plan: any) => (
             <div
               key={plan.id}
               className={`plan-card ${selectedPlan?.id === plan.id ? 'selected' : ''}`}
@@ -135,4 +141,3 @@ const SubscriptionView = () => {
 }
 
 export default SubscriptionView
-

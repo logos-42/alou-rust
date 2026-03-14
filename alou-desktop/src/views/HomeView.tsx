@@ -2,7 +2,11 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import AgentChat from '@/components/AgentChat'
 
-const HomeView = () => {
+/**
+ * HomeView 组件
+ * 应用程序的主页面，包含自主循环快捷入口和 AgentChat
+ */
+const HomeView: React.FC = () => {
   const navigate = useNavigate()
 
   const handleOpenAutonomousLoop = () => {
