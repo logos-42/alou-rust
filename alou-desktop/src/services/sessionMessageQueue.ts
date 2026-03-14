@@ -3,9 +3,10 @@
  *
  * 为每个 session 创建独立的消息队列，实现：
  * - Session 隔离：不同 session 的消息互不影响
- * - 并发处理：同一个 session 内的消息可以并发处理
+ * - 并发处理：同一个 session 内支持最多 30 个消息并发处理
  * - 异步执行：fire-and-forget 模式，不阻塞 UI
  * - 优先级控制：支持消息优先级排序
+ * - 大容量队列：最多支持 200 条消息排队
  */
 
 export interface QueueMessage {
@@ -42,8 +43,8 @@ class SessionQueue {
   constructor(sessionId: string, config: QueueConfig = {}) {
     this.sessionId = sessionId
     this.config = {
-      maxConcurrent: 5,
-      maxQueueSize: 100,
+      maxConcurrent: 30,  // 支持最多 30 个消息并发处理
+      maxQueueSize: 200,  // 队列容量提升到 200
       retryDelay: 1000,
       messageTimeout: 60000,
       ...config,
