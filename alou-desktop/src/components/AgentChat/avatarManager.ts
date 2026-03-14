@@ -15,7 +15,7 @@ class AvatarManager {
   /**
    * 解析智能体头像
    * @param agent - 智能体对象
-   * @returns 头像URL
+   * @returns 头像 URL
    */
   async resolveAvatar(agent: Agent): Promise<string> {
     if (!agent) {
@@ -32,10 +32,10 @@ class AvatarManager {
       // 使用现有的头像解析逻辑
       // 将 AgentMetadata 转换为 Agent 类型
       const avatarUrl = resolveAgentAvatar(agent as any);
-      
+
       // 缓存结果
       this.avatarCache.set(cacheKey, avatarUrl);
-      
+
       return avatarUrl;
     } catch (error) {
       console.error('[AvatarManager] 解析头像失败:', error);
@@ -54,7 +54,7 @@ class AvatarManager {
 
   /**
    * 获取默认头像
-   * @returns 默认头像URL
+   * @returns 默认头像 URL
    */
   getFallbackAvatar(): string {
     return this.fallbackAvatar;
@@ -63,7 +63,7 @@ class AvatarManager {
   /**
    * 更新智能体头像
    * @param agent - 智能体对象
-   * @param newAvatarUrl - 新头像URL
+   * @param newAvatarUrl - 新头像 URL
    */
   async updateAvatar(agent: Agent, newAvatarUrl: string): Promise<void> {
     if (!agent || !newAvatarUrl) {
@@ -109,7 +109,7 @@ class AvatarManager {
       try {
         await this.resolveAvatar(agent);
       } catch (error) {
-        console.warn(`[AvatarManager] 预加载头像失败: ${agent.id}`, error);
+        console.warn(`[AvatarManager] 预加载头像失败：${agent.id}`, error);
       }
     });
 
@@ -132,13 +132,20 @@ class AvatarManager {
   }
 
   /**
+   * 清除所有缓存
+   */
+  clearAllCache(): void {
+    this.avatarCache.clear();
+  }
+
+  /**
    * 添加头像变更监听器
    * @param listener - 监听器函数
    * @returns 清理函数
    */
   addListener(listener: (agent: Agent) => void): () => void {
     this.listeners.add(listener);
-    
+
     // 返回清理函数
     return () => {
       this.listeners.delete(listener);
@@ -183,7 +190,7 @@ class AvatarManager {
 
   /**
    * 检查头像是否有效
-   * @param avatarUrl - 头像URL
+   * @param avatarUrl - 头像 URL
    * @returns 是否有效
    */
   async isValidAvatar(avatarUrl: string): Promise<boolean> {
@@ -204,12 +211,12 @@ class AvatarManager {
 
   /**
    * 批量验证头像
-   * @param avatarUrls - 头像URL列表
+   * @param avatarUrls - 头像 URL 列表
    * @returns 验证结果
    */
   async batchValidateAvatars(avatarUrls: string[]): Promise<Record<string, boolean>> {
     const results: Record<string, boolean> = {};
-    
+
     const validationPromises = avatarUrls.map(async (url) => {
       const isValid = await this.isValidAvatar(url);
       results[url] = isValid;
@@ -222,7 +229,7 @@ class AvatarManager {
   /**
    * 处理文件上传
    * @param file - 上传的文件
-   * @returns 头像URL
+   * @returns 头像 URL
    */
   async processFileUpload(file: File): Promise<string> {
     if (!file) {
@@ -266,6 +273,43 @@ class AvatarManager {
       }
       reader.readAsDataURL(file)
     })
+  }
+
+  /**
+   * 更新频道列表中的头像
+   * @param channels - 频道列表
+   * @param updatedAgent - 更新后的智能体
+   * @returns 更新后的频道列表
+   */
+  updateChannelsAvatar(channels: any[], updatedAgent: Agent): any[] {
+    if (!channels || !updatedAgent) {
+      return channels;
+    }
+
+    // 查找需要更新的频道
+    const agentId = updatedAgent.id || updatedAgent.sessionId || updatedAgent.did;
+    if (!agentId) {
+      return channels;
+    }
+
+    return channels.map(channel => {
+      // 检查是否是需要更新的频道
+      const channelId = channel.id || channel.meta?.id;
+      if (channelId === agentId || channel.meta?.sessionId === agentId) {
+        // 更新头像
+        const newAvatar = resolveAgentAvatar(updatedAgent as any);
+        return {
+          ...channel,
+          avatar: newAvatar,
+          meta: {
+            ...channel.meta,
+            avatar_url: updatedAgent.avatar_url,
+            avatar_cid: updatedAgent.avatar_cid,
+          },
+        };
+      }
+      return channel;
+    });
   }
 }
 
