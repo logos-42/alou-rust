@@ -360,7 +360,8 @@ const AgentSidebarLeft = ({
                     >
                       {(channel.meta?.mode || 'agent') === 'agent' ? 'Agent' : 'Alou'}
                     </span>
-                    {channel.meta?.ipns && (
+                    {/* 链接按钮：有 ipns 或正在创建 DIAP 身份时显示 */}
+                    {(channel.meta?.ipns || channel.meta?.status === 'creating' || channel.tempId || channel.id?.startsWith('temp_')) && (
                       <button
                         type="button"
                         className={`link-icon-btn ${
@@ -371,9 +372,18 @@ const AgentSidebarLeft = ({
                         }
                         onClick={(event) => {
                           event.stopPropagation()
+                          // 先选中该智能体，确保 DiapIdentityPanel 能加载正确的身份
+                          onSelectChannel?.(channel)
+                          // 然后打开 DIAP 面板
                           onShowIdentityPanel?.()
                         }}
-                        title={channel.meta?.diap_identity?.is_registered ? 'DIAP 已注册' : 'DIAP 未注册，点击查看'}
+                        title={
+                          channel.meta?.diap_identity?.is_registered 
+                            ? 'DIAP 已注册' 
+                            : channel.meta?.status === 'creating' || channel.tempId || channel.id?.startsWith('temp_')
+                              ? '正在创建 DIAP 身份，点击查看进度'
+                              : 'DIAP 未注册，点击查看'
+                        }
                       >
                         {channel.meta?.diap_identity?.is_registered ? (
                           <svg viewBox="0 0 16 16" className="status-icon">

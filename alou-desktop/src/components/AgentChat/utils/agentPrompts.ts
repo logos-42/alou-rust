@@ -642,6 +642,9 @@ ${memoryPath}
 === MEMORY ===
 ${documentContents.memory}
 
+=== IPFS 对话历史 ===
+${documentContents.ipfs}
+
 === SOUL ===
 ${documentContents.soul}
 

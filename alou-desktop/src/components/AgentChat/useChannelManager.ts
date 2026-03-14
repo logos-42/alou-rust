@@ -991,6 +991,8 @@ export const useChannelManager = ({
           mcp_ports: mcp_ports || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_ports,
           diap_identity: diapIdentity || result.data?.agent_metadata || (result as any).agent_metadata?.diap_identity,
           sessionId,
+          // 关键：如果是异步创建 DIAP，标记为"创建中"状态
+          status: willCreateDiapAsync ? 'creating' : undefined,
           // 生成 id：优先使用 ipns/did/cid，否则使用临时 id
           id: result.data?.diap_identity?.ipns || result.data?.diap_identity?.did || result.data?.diap_identity?.cid || tempId,
         }
