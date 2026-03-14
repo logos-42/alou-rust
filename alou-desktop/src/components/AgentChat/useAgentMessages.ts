@@ -561,8 +561,30 @@ export const useAgentMessages = ({
       if (systemPrompt) {
         messagesArray.push({ role: 'system', content: systemPrompt })
       }
-      // 最近 10 条历史记录
-      for (const m of history.slice(-10)) {
+      // 动态计算保留多少条历史（不超过 token 限制）
+      // 估算：每条消息平均 100 tokens，system ≈ 500 tokens，预留 1000 tokens 给响应
+      // 可用 tokens = maxTokens - system - response_buffer
+      // 可用消息数 = 可用 tokens / 平均每条消息 tokens
+      const maxTokens = selectedAgent?.maxTokens || 4000
+      const avgTokensPerMessage = 100
+      const systemTokens = systemPrompt?.length || 0
+      const responseBuffer = 1000
+      const availableTokens = maxTokens - systemTokens - responseBuffer
+      const maxHistoryMessages = Math.floor(availableTokens / avgTokensPerMessage)
+      
+      // 至少保留 5 条，最多保留 50 条
+      const safeHistory = history.slice(-Math.max(5, Math.min(50, maxHistoryMessages)))
+      
+      console.log('[useAgentMessages] 动态计算上下文:', {
+        maxTokens,
+        systemTokens,
+        availableTokens,
+        maxHistoryMessages,
+        actualHistoryLength: safeHistory.length,
+      })
+      
+      // 添加历史消息
+      for (const m of safeHistory) {
         messagesArray.push({ role: m.role, content: m.content })
       }
       // 当前用户消息
