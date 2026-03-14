@@ -2,6 +2,7 @@ import { useCallback, useState, useMemo, useEffect, useRef, RefObject } from 're
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import agentService from '@/services/agentService'
+import agentDocumentService from '@/services/agentDocumentService'  // ← 新增
 import { getActiveApiConfig } from '@/hooks/useApiConfig'
 import useAgentStore from '@/stores/agentStore'
 import { getSystemPromptForAgent } from './utils/agentPrompts'
