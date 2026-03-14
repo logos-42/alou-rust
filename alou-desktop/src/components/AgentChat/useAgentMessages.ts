@@ -546,6 +546,14 @@ export const useAgentMessages = ({
       
       const history = getMessageHistory(targetAgentId, messagesByChannel)
 
+      // 调试日志：检查消息历史
+      console.log('[useAgentMessages] 发送消息前检查上下文:', {
+        targetAgentId,
+        messagesInChannel: messagesByChannel[targetAgentId]?.length || 0,
+        historyLength: history.length,
+        messagesArrayLength: history.length + 2, // +system +current
+      })
+
       // 构建正确格式的 messages 数组发送给 Rust
       const messagesArray: Array<{ role: string; content: string }> = []
       if (systemPrompt) {
