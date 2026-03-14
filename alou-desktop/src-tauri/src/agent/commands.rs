@@ -69,10 +69,37 @@ pub async fn execute_ai_conversation(
     };
 
     let target_session_id = session_id.or(agent_id).unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp()));
-    
-    // 创建任务管理器和执行器（用于同步等待）
+
+    // 创建任务管理器
     let task_manager = Arc::new(TaskManager::new());
     let tool_bridge = bridge_manager.tool_bridge();
+
+    // 创建任务：使用完整的消息历史
+    let task_id = if let Some(msgs) = &messages {
+        // 将 JSON 数组转换为 AiMessage 列表
+        use super::ai_client::AiMessage;
+        let ai_messages: Vec<AiMessage> = msgs
+            .iter()
+            .filter_map(|m| {
+                let role = m.get("role")?.as_str()?.to_string();
+                let content = m.get("content")?.as_str()?.to_string();
+                Some(AiMessage {
+                    role,
+                    content,
+                    tool_call_id: None,
+                    tool_calls: None,
+                })
+            })
+            .collect();
+        
+        log::info!("[Command] 使用完整消息历史创建任务，消息数：{}", ai_messages.len());
+        task_manager.create_task_with_messages(target_session_id.clone(), ai_messages).await
+    } else {
+        log::info!("[Command] 使用单条消息创建任务");
+        task_manager.create_task(target_session_id.clone(), message.clone()).await
+    };
+
+    // 创建执行器
     let executor = RalphLoopExecutor::new(
         ai_client.clone(),
         task_manager.clone(),
@@ -81,21 +108,15 @@ pub async fn execute_ai_conversation(
     )
     .with_app_handle(app_handle.clone());
 
-    // 构建消息内容
-    let content = if let Some(msgs) = messages {
-        msgs.last()
-            .and_then(|m| m.get("content"))
-            .and_then(|c| c.as_str())
-            .unwrap_or(&message)
-            .to_string()
-    } else {
-        message.clone()
-    };
-
-    // 创建任务
-    let task_id = task_manager.create_task(target_session_id.clone(), content.clone()).await;
-
     let use_stream = options.as_ref().and_then(|o| o.get("stream")).and_then(|s| s.as_bool()).unwrap_or(false);
+
+    // 提取 content 用于 SessionActor
+    let content = messages.as_ref()
+        .and_then(|msgs| msgs.last())
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_str())
+        .unwrap_or(&message)
+        .to_string();
 
     // 发送消息到 SessionActor（用于状态隔离）
     let handle = session_router.get_or_create(&target_session_id, ai_client.clone());

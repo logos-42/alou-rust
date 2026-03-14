@@ -553,6 +553,8 @@ export const useAgentMessages = ({
         historyLength: history.length,
         messagesArrayLength: history.length + 2, // +system +current
       })
+      console.log('[useAgentMessages] 历史消息内容:', history)
+      console.log('[useAgentMessages] 发送给 LLM 的 messagesArray:', messagesArray)
 
       // 构建正确格式的 messages 数组发送给 Rust
       const messagesArray: Array<{ role: string; content: string }> = []
