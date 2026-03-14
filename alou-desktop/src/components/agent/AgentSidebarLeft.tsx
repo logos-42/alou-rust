@@ -346,6 +346,23 @@ const AgentSidebarLeft = ({
         )}
       </div>
 
+      {/* 收起状态：显示智能体头像列表 */}
+      {isCollapsed && channels.length > 0 && (
+        <div className="collapsed-avatar-list">
+          {channels.map((channel) => (
+            <div
+              key={channel.id}
+              className={`collapsed-avatar-item${channel.id === activeChannelId ? ' active' : ''}`}
+              onClick={() => onSelectChannel?.(channel)}
+              role="button"
+              title={channel.name}
+            >
+              <ChannelAvatar channel={channel} />
+            </div>
+          ))}
+        </div>
+      )}
+
       {!isCollapsed && (
         <div className="channel-search">
           <input
