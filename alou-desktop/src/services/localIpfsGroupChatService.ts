@@ -371,7 +371,10 @@ class LocalIpfsGroupChatService {
     if (hashSet) {
       // 清理超过1分钟的旧哈希
       const now = Date.now()
-      for (const [key, timestamp] of Array.from(hashSet.entries()).map(e => e[0].split('_').slice(-1)).map(s => [s, parseInt(s[0])])) {
+      for (const entry of Array.from(hashSet.entries())) {
+        const key = entry[0]
+        const timestampStr = key.split('_').slice(-1)[0]
+        const timestamp = parseInt(timestampStr)
         if (now - (timestamp as number) > 60000) {
           hashSet.delete(key as string)
         }
@@ -404,6 +407,7 @@ class LocalIpfsGroupChatService {
 
   /**
    * 初始化服务
+   * 注意：此方法不再自动加载群聊数据，需要手动调用 loadGroupsFromKV() 或 loadGroup() 按需加载
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -411,13 +415,9 @@ class LocalIpfsGroupChatService {
     }
 
     this.log(LogLevel.INFO, '初始化本地IPFS群聊服务')
-    
-    // 检查IPFS节点可用性
+    // 检查 IPFS 节点可用性
     await this.checkIpfsAvailability()
-    
-    // 从KV存储加载群聊数据
-    await this.loadGroupsFromKV()
-    
+
     // 从LocalStorage加载备份数据
     await this.loadFromLocalStorage()
     
@@ -749,7 +749,7 @@ class LocalIpfsGroupChatService {
                 // 动态导入 clusterActionStore 以避免循环依赖
                 const clusterActionStore = await import('@/stores/clusterActionStore').then(m => m.default)
                 const { getActions } = clusterActionStore.getState()
-                const actions = getActions(null) || []
+                const actions = getActions('') || []
                 
                 // 查找群聊对应的行动
                 const groupAction = actions.find(action => 
@@ -798,7 +798,7 @@ class LocalIpfsGroupChatService {
                       }
                     })
                   
-                  this.log(LogLevel.INFO, '已通知', agentCount, '个智能体处理群聊消息')
+                  this.log(LogLevel.INFO, '已通知智能体处理群聊消息:', { agentCount })
                 }
               } catch (agentError) {
                 this.log(LogLevel.WARN, '触发智能体响应失败:', { error: agentError })

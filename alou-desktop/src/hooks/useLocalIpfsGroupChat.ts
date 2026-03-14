@@ -6,6 +6,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import localIpfsGroupChatService, { LocalGroup, LocalGroupMessage, LocalIdentity } from '@/services/localIpfsGroupChatService'
 
+// 导出类型供其他模块使用
+export type { LocalGroup, LocalGroupMessage, LocalIdentity }
+
 /**
  * 群聊配置接口
  */
@@ -118,41 +121,12 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
           console.warn('[useLocalIpfsGroupChat] 身份无效，无法创建/加入群聊')
         }
 
-        // 加载已有的群聊
-        await localIpfsGroupChatService.loadGroupsFromKV()
-        const loadedGroups = localIpfsGroupChatService.getAllGroups()
-        
-        // 同步 Iroh 群聊
-        try {
-          const { irohGroupChatService } = await import('@/services/irohGroupChatService')
-          const irohGroups = await irohGroupChatService.listGroups()
-          
-          // 将 Iroh 群聊转换为 LocalGroup 格式
-          const convertedIrohGroups = irohGroups.map(irohGroup => ({
-            groupId: irohGroup.group_id,
-            groupName: irohGroup.group_name,
-            topic: irohGroup.ticket,
-            description: irohGroup.description || '',
-            members: irohGroup.members,
-            createdAt: irohGroup.created_at,
-            createdBy: irohGroup.created_by,
-            isPublic: true,
-            metadata: {
-              type: 'iroh_group',
-              ticket: irohGroup.ticket
-            }
-          }))
-          
-          // 合并本地群聊和 Iroh 群聊
-          const allGroups = [...loadedGroups, ...convertedIrohGroups]
-          setGroups(allGroups)
-          
-          console.log('[useLocalIpfsGroupChat] 已同步 Iroh 群聊:', irohGroups.length)
-        } catch (irohError) {
-          console.warn('[useLocalIpfsGroupChat] 同步 Iroh 群聊失败:', irohError)
-          // 即使 Iroh 同步失败，也使用本地群聊
-          setGroups(loadedGroups)
-        }
+        // ✅ 按需加载：不再自动加载所有群聊，只在用户需要时加载
+        // 初始化时群聊列表为空，用户可以在需要时调用 refreshGroups() 手动加载
+        setGroups([])
+
+        // 同步 Iroh 群聊（只在用户明确请求时）
+        // Iroh 群聊的同步也改为按需加载
 
         setIsInitialized(true)
         console.log('[useLocalIpfsGroupChat] 初始化完成')
@@ -394,20 +368,21 @@ export const useLocalIpfsGroupChat = (): UseLocalIpfsGroupChatReturn => {
         const irohGroups = await irohGroupChatService.listGroups()
         
         // 将 Iroh 群聊转换为 LocalGroup 格式
-        const convertedIrohGroups = irohGroups.map(irohGroup => ({
-          groupId: irohGroup.group_id,
-          groupName: irohGroup.group_name,
-          topic: irohGroup.ticket,
-          description: irohGroup.description || '',
-          members: irohGroup.members,
-          createdAt: irohGroup.created_at,
-          createdBy: irohGroup.created_by,
-          isPublic: true,
-          metadata: {
-            type: 'iroh_group',
-            ticket: irohGroup.ticket
-          }
-        }))
+        const convertedIrohGroups: LocalGroup[] = irohGroups.map(irohGroup =>
+          new LocalGroup({
+            groupId: irohGroup.group_id,
+            groupName: irohGroup.group_name,
+            topic: irohGroup.ticket,
+            description: irohGroup.description || '',
+            members: irohGroup.members,
+            creator: irohGroup.created_by,
+            createdAt: irohGroup.created_at,
+            metadata: {
+              type: 'iroh_group',
+              ticket: irohGroup.ticket
+            }
+          })
+        )
         
         // 合并本地群聊和 Iroh 群聊
         const allGroups = [...loadedGroups, ...convertedIrohGroups]
