@@ -571,6 +571,7 @@ export const useAgentMessages = ({
           result?: string      // AI 最终回复的文本
           error?: string
           iteration_count?: number
+          session_id?: string  // 新增：session_id
           // 兼容旧字段
           final_answer?: string
           content?: string
@@ -578,21 +579,21 @@ export const useAgentMessages = ({
         }
         execution_mode?: string
         timestamp?: number
+        session_id?: string    // 新增：顶层 session_id
       }>('execute_ai_conversation', {
         agentConfig: {
           id: localApiConfig.id || 'primary',
           provider: localApiConfig.provider,
           api_key: localApiConfig.api_key,
-
           base_url: localApiConfig.base_url != null ? localApiConfig.base_url : null,
-
           model: localApiConfig.model != null ? localApiConfig.model : null,
           is_active: true,
         },
         message: text.trim(),       // fallback 单条消息
         messages: messagesArray,    // 完整上下文数组（优先使用）
         options: { stream: false },
-        agentId: agentInfo?.id || targetAgentId,  // 传递智能体 ID（从左侧栏获取，用于 agent_document 工具）
+        agentId: agentInfo?.id || targetAgentId,  // 传递智能体 ID
+        sessionId: sessionId,       // ← 新增：传递当前 session_id
       })
 
       console.log('[useAgentMessages] Tauri AI 响应:', tauri_result)
