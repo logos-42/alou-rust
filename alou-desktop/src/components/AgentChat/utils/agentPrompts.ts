@@ -243,7 +243,7 @@ export const getSystemPromptForAgent = async (
   }
 
   // 加载实际的文档内容
-  let documentContents = { ...DEFAULT_DOCUMENT_CONTENTS };
+  const documentContents = { ...DEFAULT_DOCUMENT_CONTENTS };
 
   if (agentId && agentId !== 'unknown') {
     try {
