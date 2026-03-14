@@ -413,19 +413,10 @@ display_name: getAgentName(agentData) || '未命名智能体',
       },
     }),
     {
-      name: 'alou_agents', // 使用固定名称，不依赖 session
+      name: getAgentStoreKey(getCurrentSessionId()),
       storage: createJSONStorage(() => createIndexedDBStorage(getCurrentSessionId())),
       partialize: (state: AgentStore) => ({
-        agents: state.agents.filter(agent => {
-          // 只显示当前 session 的智能体
-          const currentSessionId = getCurrentSessionId()
-          if (!currentSessionId) {
-            // 没有 session 时，显示所有没有 sessionId 或 sessionId 为空的智能体
-            return !agent.sessionId || agent.sessionId === ''
-          }
-          // 有 session 时，显示匹配的智能体
-          return agent.sessionId === currentSessionId || !agent.sessionId
-        }),
+        agents: state.agents,
         _hasHydrated: state._hasHydrated
       }),
       onRehydrateStorage: () => (state: AgentStore | undefined, error: Error | undefined) => {
