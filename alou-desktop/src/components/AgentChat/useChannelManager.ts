@@ -817,7 +817,19 @@ export const useChannelManager = ({
       const storedAgents = useAgentStore.getState().agents
       console.log('[useChannelManager] 当前存储的智能体数量:', storedAgents.length)
       console.log('[useChannelManager] 存储的智能体列表:', storedAgents.map(a => ({ id: a.id, name: a.name })))
-      
+
+      // ✅ 关键修复：手动将新智能体添加到 channels（不依赖 hasLoadedFromStorageRef）
+      if (channel) {
+        setChannels(prev => {
+          const existingIds = new Set(prev.map(c => c.id))
+          if (!existingIds.has(channel.id)) {
+            console.log(`[useChannelManager] 添加新智能体到频道列表：${channel.id} - ${channel.name}`)
+            return [channel, ...prev]
+          }
+          console.log(`[useChannelManager] 智能体已在频道列表中：${channel.id}`)
+          return prev
+        })
+      }      
       // 验证DIAP身份是否正确保存到统一存储
       if (agentMetadata.sessionId && agentMetadata.diapIdentity) {
         console.log('[useChannelManager] 验证DIAP身份保存状态...')
