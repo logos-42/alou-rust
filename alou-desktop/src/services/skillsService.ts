@@ -5,7 +5,67 @@
 
 import apiClient from './api'
 
+/**
+ * 技能定义接口
+ */
+interface SkillDefinition {
+  name: string
+  displayName?: string
+  description?: string
+  version?: string
+  category?: string
+  actions?: Record<string, any>
+  instance?: any
+}
+
+/**
+ * 技能执行结果
+ */
+interface SkillExecutionResult {
+  success: boolean
+  result?: any
+  error?: string
+  timestamp: string
+  source?: 'local' | 'remote'
+}
+
+/**
+ * 系统状态
+ */
+interface SystemStatus {
+  agent_skills_available: boolean
+  total_skills: number
+  initialized: boolean
+  api_connected: boolean
+  error?: string
+}
+
+/**
+ * 统计数据
+ */
+interface Stats {
+  totalSkills: number
+  totalActions: number
+  categories: string[]
+  initialized: boolean
+}
+
+/**
+ * 参数验证定义
+ */
+interface ParameterDefinition {
+  type?: string
+  description?: string
+  default?: any
+  required?: string[]
+  properties?: Record<string, any>
+}
+
 class SkillsService {
+  private skills: SkillDefinition[]
+  private initialized: boolean
+  private skillInstances: Map<string, any>
+
   constructor() {
     this.skills = []
     this.initialized = false
@@ -16,7 +76,7 @@ class SkillsService {
    * 初始化技能系统
    * 从后端 API 加载所有可用技能
    */
-  async initializeSkills() {
+  async initializeSkills(): Promise<void> {
     if (this.initialized) {
       console.log('[SkillsService] 技能系统已初始化')
       return
@@ -28,9 +88,9 @@ class SkillsService {
       // 尝试从后端 API 加载技能
       try {
         const response = await apiClient.get('/skills')
-        this.skills = response.data.skills || []
+        this.skills = (response.data as any).skills || []
         console.log(`[SkillsService] 从 API 加载了 ${this.skills.length} 个技能`)
-      } catch (apiError) {
+      } catch (apiError: any) {
         console.warn('[SkillsService] API 加载失败，使用本地技能:', apiError.message)
         // API 不可用，使用本地技能
         await this.loadLocalSkills()
@@ -41,7 +101,7 @@ class SkillsService {
 
       this.initialized = true
       console.log(`[SkillsService] 技能系统初始化完成，共 ${this.skills.length} 个技能`)
-    } catch (error) {
+    } catch (error: any) {
       console.error('[SkillsService] 初始化技能系统失败:', error)
       // 即使失败也标记为已初始化，避免重复尝试
       this.initialized = true
@@ -52,12 +112,12 @@ class SkillsService {
   /**
    * 加载本地技能（从 skills 目录）
    */
-  async loadLocalSkills() {
+  async loadLocalSkills(): Promise<void> {
     try {
       // 动态导入 WorkflowSkill
       const { WorkflowSkill } = await import('../skills/WorkflowSkill')
       const workflowSkill = new WorkflowSkill()
-      
+
       // 动态导入 IpfsAutoFixSkill
       let ipfsAutoFixSkill = null
       try {
@@ -150,7 +210,7 @@ class SkillsService {
   /**
    * 初始化技能实例
    */
-  initializeSkillInstances() {
+  initializeSkillInstances(): void {
     this.skillInstances.clear()
 
     this.skills.forEach(skill => {
@@ -167,50 +227,50 @@ class SkillsService {
 
   /**
    * 获取所有技能
-   * @returns {Array} 技能列表
+   * @returns 技能列表
    */
-  getAllSkills() {
+  getAllSkills(): SkillDefinition[] {
     return [...this.skills]
   }
 
   /**
    * 根据名称获取技能
-   * @param {string} skillName - 技能名称
-   * @returns {Object|null} 技能定义
+   * @param skillName - 技能名称
+   * @returns 技能定义
    */
-  getSkill(skillName) {
+  getSkill(skillName: string): SkillDefinition | null {
     return this.skills.find(skill => skill.name === skillName) || null
   }
 
   /**
    * 获取技能的所有操作
-   * @param {string} skillName - 技能名称
-   * @returns {Object} 操作定义
+   * @param skillName - 技能名称
+   * @returns 操作定义
    */
-  getActions(skillName) {
+  getActions(skillName: string): Record<string, any> {
     const skill = this.getSkill(skillName)
     return skill?.actions || {}
   }
 
   /**
    * 获取特定操作的参数定义
-   * @param {string} skillName - 技能名称
-   * @param {string} actionName - 操作名称
-   * @returns {Object} 参数定义
+   * @param skillName - 技能名称
+   * @param actionName - 操作名称
+   * @returns 参数定义
    */
-  getActionParameters(skillName, actionName) {
+  getActionParameters(skillName: string, actionName: string): ParameterDefinition {
     const actions = this.getActions(skillName)
     return actions[actionName]?.parameters || {}
   }
 
   /**
    * 执行技能操作
-   * @param {string} skillName - 技能名称
-   * @param {string} actionName - 操作名称
-   * @param {Object} parameters - 参数对象
-   * @returns {Promise<Object>} 执行结果
+   * @param skillName - 技能名称
+   * @param actionName - 操作名称
+   * @param parameters - 参数对象
+   * @returns 执行结果
    */
-  async executeSkill(skillName, actionName, parameters = {}) {
+  async executeSkill(skillName: string, actionName: string, parameters: Record<string, any> = {}): Promise<SkillExecutionResult> {
     if (!this.initialized) {
       await this.initializeSkills()
     }
@@ -241,7 +301,7 @@ class SkillsService {
           result: response.data,
           timestamp: new Date().toISOString()
         }
-      } catch (apiError) {
+      } catch (apiError: any) {
         // API 失败，尝试本地执行
         console.warn('[SkillsService] API 执行失败，尝试本地执行:', apiError.message)
 
@@ -254,7 +314,7 @@ class SkillsService {
           timestamp: new Date().toISOString()
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[SkillsService] 执行技能失败: ${skillName}.${actionName}`, error)
 
       return {
@@ -267,12 +327,12 @@ class SkillsService {
 
   /**
    * 本地执行技能
-   * @param {string} skillName - 技能名称
-   * @param {string} actionName - 操作名称
-   * @param {Object} parameters - 参数对象
-   * @returns {Promise<Object>} 执行结果
+   * @param skillName - 技能名称
+   * @param actionName - 操作名称
+   * @param parameters - 参数对象
+   * @returns 执行结果
    */
-  async executeLocally(skillName, actionName, parameters) {
+  async executeLocally(skillName: string, actionName: string, parameters: Record<string, any>): Promise<any> {
     const skillInstance = this.skillInstances.get(skillName)
 
     if (skillInstance) {
@@ -283,7 +343,7 @@ class SkillsService {
           ...parameters
         })
       }
-      
+
       // 对于其他 skills，使用 action 方法
       if (typeof skillInstance[actionName] === 'function') {
         return await skillInstance[actionName](parameters)
@@ -299,12 +359,11 @@ class SkillsService {
 
   /**
    * 验证参数
-   * @param {string} skillName - 技能名称
-   * @param {string} actionName - 操作名称
-   * @param {Object} parameters - 参数对象
-   * @throws {Error} 参数验证失败
+   * @param skillName - 技能名称
+   * @param actionName - 操作名称
+   * @param parameters - 参数对象
    */
-  validateParameters(skillName, actionName, parameters) {
+  validateParameters(skillName: string, actionName: string, parameters: Record<string, any>): void {
     const paramDef = this.getActionParameters(skillName, actionName)
 
     // 检查必需参数
@@ -330,16 +389,15 @@ class SkillsService {
 
   /**
    * 验证单个参数类型
-   * @param {string} key - 参数名
-   * @param {any} value - 参数值
-   * @param {string} expectedType - 期望类型
-   * @throws {Error} 类型验证失败
+   * @param key - 参数名
+   * @param value - 参数值
+   * @param expectedType - 期望类型
    */
-  validateParameterType(key, value, expectedType) {
+  validateParameterType(key: string, value: any, expectedType: string): void {
     const actualType = Array.isArray(value) ? 'array' : typeof value
 
     // 简化类型检查
-    const typeMap = {
+    const typeMap: Record<string, string> = {
       string: 'string',
       number: 'number',
       boolean: 'boolean',
@@ -354,20 +412,20 @@ class SkillsService {
 
   /**
    * 获取系统状态
-   * @returns {Promise<Object>} 系统状态
+   * @returns 系统状态
    */
-  async getSystemStatus() {
+  async getSystemStatus(): Promise<SystemStatus> {
     try {
       const response = await apiClient.get('/skills/status')
 
       return {
-        agent_skills_available: response.data.available || false,
+        agent_skills_available: (response.data as any).available || false,
         total_skills: this.skills.length,
         initialized: this.initialized,
         api_connected: true,
-        ...response.data
+        ...(response.data as any)
       }
-    } catch (error) {
+    } catch (error: any) {
       return {
         agent_skills_available: false,
         total_skills: this.skills.length,
@@ -380,11 +438,11 @@ class SkillsService {
 
   /**
    * 获取统计信息
-   * @returns {Object} 统计数据
+   * @returns 统计数据
    */
-  getStats() {
+  getStats(): Stats {
     let totalActions = 0
-    const categories = new Set()
+    const categories = new Set<string>()
 
     this.skills.forEach(skill => {
       if (skill.actions) {
@@ -406,10 +464,10 @@ class SkillsService {
 
   /**
    * 根据类别获取技能
-   * @param {string} category - 类别名称
-   * @returns {Array} 技能列表
+   * @param category - 类别名称
+   * @returns 技能列表
    */
-  getSkillsByCategory(category) {
+  getSkillsByCategory(category: string): SkillDefinition[] {
     if (category === 'all') {
       return this.getAllSkills()
     }
@@ -419,15 +477,15 @@ class SkillsService {
 
   /**
    * 搜索技能
-   * @param {string} query - 搜索关键词
-   * @returns {Array} 匹配的技能列表
+   * @param query - 搜索关键词
+   * @returns 匹配的技能列表
    */
-  searchSkills(query) {
+  searchSkills(query: string): SkillDefinition[] {
     const lowerQuery = query.toLowerCase()
 
     return this.skills.filter(skill =>
       skill.name.toLowerCase().includes(lowerQuery) ||
-      skill.description.toLowerCase().includes(lowerQuery) ||
+      (skill.description && skill.description.toLowerCase().includes(lowerQuery)) ||
       (skill.category && skill.category.toLowerCase().includes(lowerQuery))
     )
   }
@@ -435,7 +493,7 @@ class SkillsService {
   /**
    * 重置技能系统
    */
-  reset() {
+  reset(): void {
     this.skills = []
     this.skillInstances.clear()
     this.initialized = false
@@ -445,3 +503,6 @@ class SkillsService {
 
 // 导出单例
 export default new SkillsService()
+
+// 导出类和实例
+export { SkillsService }
