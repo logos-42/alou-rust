@@ -497,6 +497,12 @@ export default useAgentStore
  */
 export async function setCurrentSessionId(sessionId: string): Promise<void> {
   await sessionDb.set('alou_current_session', sessionId)
+  
+  // 重新初始化 agentStore 的 persist
+  // 这会触发 store 重新从 IndexedDB 加载当前 session 的数据
+  const store = useAgentStore.persist
+  store.rehydrate()
+  
   // 触发自定义事件，通知其他组件 session 已更改
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('alou:session-changed', {
