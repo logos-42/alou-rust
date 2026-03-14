@@ -40,6 +40,7 @@ pub async fn execute_agent_task(
 }
 
 /// Tauri 命令：执行 AI 对话（使用 SessionActor 架构）
+/// 同步等待执行完成
 #[tauri::command]
 pub async fn execute_ai_conversation(
     app_handle: tauri::AppHandle,
@@ -52,6 +53,9 @@ pub async fn execute_ai_conversation(
     bridge_manager: tauri::State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
     session_router: tauri::State<'_, std::sync::Arc<SessionRouter>>,
 ) -> std::result::Result<serde_json::Value, String> {
+    use super::task::TaskManager;
+    use crate::runtime::message::{SessionMessage, MessageMetadata};
+    
     log::info!("[Command] 执行 AI 对话：{}", &message[..20.min(message.len())]);
 
     let user_config = match serde_json::from_value::<UserApiConfig>(agent_config) {
@@ -65,8 +69,19 @@ pub async fn execute_ai_conversation(
     };
 
     let target_session_id = session_id.or(agent_id).unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp()));
-    let handle = session_router.get_or_create(&target_session_id, ai_client.clone());
+    
+    // 创建任务管理器和执行器（用于同步等待）
+    let task_manager = Arc::new(TaskManager::new());
+    let tool_bridge = bridge_manager.tool_bridge();
+    let executor = RalphLoopExecutor::new(
+        ai_client.clone(),
+        task_manager.clone(),
+        tool_bridge.clone(),
+        Arc::new(crate::tools::ToolRegistry::new()),
+    )
+    .with_app_handle(app_handle.clone());
 
+    // 构建消息内容
     let content = if let Some(msgs) = messages {
         msgs.last()
             .and_then(|m| m.get("content"))
@@ -77,10 +92,15 @@ pub async fn execute_ai_conversation(
         message.clone()
     };
 
+    // 创建任务
+    let task_id = task_manager.create_task(target_session_id.clone(), content.clone()).await;
+
     let use_stream = options.as_ref().and_then(|o| o.get("stream")).and_then(|s| s.as_bool()).unwrap_or(false);
 
+    // 发送消息到 SessionActor（用于状态隔离）
+    let handle = session_router.get_or_create(&target_session_id, ai_client.clone());
     handle.send(SessionMessage::UserMessage {
-        content,
+        content: content.clone(),
         metadata: MessageMetadata {
             stream: Some(use_stream),
             timestamp: Some(chrono::Utc::now().timestamp()),
@@ -91,14 +111,36 @@ pub async fn execute_ai_conversation(
 
     log::info!("[Command] 消息已发送到 SessionActor: session={}", target_session_id);
 
-    Ok(serde_json::json!({
-        "success": true,
-        "task_id": format!("task_{}", chrono::Utc::now().timestamp()),
-        "session_id": target_session_id,
-        "execution_mode": "session_actor",
-        "stream": use_stream,
-        "timestamp": chrono::Utc::now().timestamp()
-    }))
+    // 同步执行并等待完成
+    let result = if use_stream {
+        let streaming_executor = StreamingExecutor::new(task_manager.clone());
+        let _stream = streaming_executor.execute_stream(task_id.clone()).await;
+        Ok(serde_json::json!({
+            "success": true,
+            "task_id": task_id,
+            "stream": true,
+            "execution_mode": "session_actor",
+            "session_id": target_session_id,
+            "timestamp": chrono::Utc::now().timestamp()
+        }))
+    } else {
+        match executor.execute(&task_id).await {
+            Ok(result) => {
+                log::info!("[Command] 对话执行成功：{}", task_id);
+                Ok(serde_json::json!({
+                    "success": true,
+                    "result": result,
+                    "task_id": task_id,
+                    "execution_mode": "session_actor",
+                    "session_id": target_session_id,
+                    "timestamp": chrono::Utc::now().timestamp()
+                }))
+            }
+            Err(e) => Err(format!("AI 对话执行失败：{}", e)),
+        }
+    };
+
+    result
 }
 
 #[tauri::command]

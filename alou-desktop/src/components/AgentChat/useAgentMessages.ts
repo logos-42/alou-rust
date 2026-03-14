@@ -1038,63 +1038,64 @@ export const useAgentMessages = ({
   // ── 监听 Rust 发来的 agent:created 事件（agent_creator 工具创建成功后触发）────
   // Rust executor 在 agent_creator create 成功后 emit "agent:created"
   // 前端收到后调用 onAutoCreateAgent 将新 Agent 写入 Zustand 并显示在侧边栏
+  // 
+  // ⚠️ 注意：该事件监听已禁用，因为前端已经通过 handleCreateAgentSubmit 完整处理了创建流程
+  // 保留此监听会导致智能体被创建两次（前端一次 + 后端事件触发一次），造成侧边栏重复
+  // 如果未来需要支持纯后端创建场景，可以重新启用此监听
   useEffect(() => {
-    let unlisten: (() => void) | null = null
+    // let unlisten: (() => void) | null = null
+    // let cancelled = false
 
-    // cancelled flag：防止 React 18 Strict Mode 双重挂载导致注册两个监听器
-    // Strict Mode: mount → cleanup(cancel) → mount。async listen 的 resolve 可能在 cleanup 之后，
-    // 所以用 cancelled 在 resolve 时立即 unlisten，确保只有最新的监听器存活
-    let cancelled = false
+    // const setupAgentCreatedListener = async () => {
+    //   try {
+    //     const fn = await listen<{ name: string; role_description?: string }>('agent:created', async (event) => {
+    //       const payload = event.payload
+    //       console.log('[useAgentMessages] 收到 agent:created 事件:', payload)
 
-    const setupAgentCreatedListener = async () => {
-      try {
-        const fn = await listen<{ name: string; role_description?: string }>('agent:created', async (event) => {
-          const payload = event.payload
-          console.log('[useAgentMessages] 收到 agent:created 事件:', payload)
+    //       // 检查是否是前端刚触发的创建（避免重复处理）
+    //       const agentKey = `${payload.name}_${payload.role_description || ''}`.toLowerCase().trim()
+    //       if (pendingAgentCreatesRef.current.has(agentKey)) {
+    //         console.log('[useAgentMessages] 跳过前端已触发的创建:', payload.name)
+    //         return
+    //       }
 
-          // 检查是否是前端刚触发的创建（避免重复处理）
-          const agentKey = `${payload.name}_${payload.role_description || ''}`.toLowerCase().trim()
-          if (pendingAgentCreatesRef.current.has(agentKey)) {
-            console.log('[useAgentMessages] 跳过前端已触发的创建:', payload.name)
-            return
-          }
+    //       // 通过 ref 获取最新回调，避免陈旧闭包导致 "Should have a queue" React 错误
+    //       const cb = onAutoCreateAgentRef.current
+    //       if (cb && payload?.name) {
+    //         try {
+    //           await cb({
+    //             name: payload.name,
+    //             // 同时传两种字段命名，兼容 useAutoAgentCreator (roleDescription) 和其他消费者 (role_description)
+    //             role_description: payload.role_description ?? '',
+    //             roleDescription: payload.role_description ?? '',
+    //           })
+    //           console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name)
+    //         } catch (err) {
+    //           console.error('[useAgentMessages] 自动创建 Agent 失败:', err)
+    //         }
+    //       }
+    //     })
+    //     if (cancelled) {
+    //       // Strict Mode 的第一次挂载已经被取消，立即释放
+    //       fn()
+    //       console.log('[useAgentMessages] agent:created listener 已取消（Strict Mode cleanup）')
+    //     } else {
+    //       unlisten = fn
+    //     }
+    //   } catch (e) {
+    //     console.warn('[useAgentMessages] agent:created listen 不可用（非桌面环境）:', e)
+    //   }
+    // }
 
-          // 通过 ref 获取最新回调，避免陈旧闭包导致 "Should have a queue" React 错误
-          const cb = onAutoCreateAgentRef.current
-          if (cb && payload?.name) {
-            try {
-              await cb({
-                name: payload.name,
-                // 同时传两种字段命名，兼容 useAutoAgentCreator (roleDescription) 和其他消费者 (role_description)
-                role_description: payload.role_description ?? '',
-                roleDescription: payload.role_description ?? '',
-              })
-              console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name)
-            } catch (err) {
-              console.error('[useAgentMessages] 自动创建 Agent 失败:', err)
-            }
-          }
-        })
-        if (cancelled) {
-          // Strict Mode 的第一次挂载已经被取消，立即释放
-          fn()
-          console.log('[useAgentMessages] agent:created listener 已取消（Strict Mode cleanup）')
-        } else {
-          unlisten = fn
-        }
-      } catch (e) {
-        console.warn('[useAgentMessages] agent:created listen 不可用（非桌面环境）:', e)
-      }
-    }
-
-    setupAgentCreatedListener()
+    // setupAgentCreatedListener()
+    console.log('[useAgentMessages] agent:created 事件监听已禁用（避免重复创建）')
 
     return () => {
-      cancelled = true
-      if (unlisten) {
-        unlisten()
-        unlisten = null
-      }
+      // cancelled = true
+      // if (unlisten) {
+      //   unlisten()
+      //   unlisten = null
+      // }
     }
   // 只挂载一次；通过 onAutoCreateAgentRef 访问最新回调
 

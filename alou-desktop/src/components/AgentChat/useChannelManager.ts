@@ -371,20 +371,27 @@ export const useChannelManager = ({
 
           if (isConnectionError) {
             // 后端不可用时，检查本地存储是否有智能体
-            if (storedAgents && storedAgents.length > 0) {
+            // 注意：只有在本地存储尚未加载到 channels 时才添加，避免重复
+            if (storedAgents && storedAgents.length > 0 && !hasLoadedFromStorageRef.current) {
+              console.log('[useChannelManager] 后端不可用，从本地存储加载智能体（error handler）')
               const localChannels = storedAgents
                 .map((agent: any) => buildChannelFromAgent(agent))
                 .filter(Boolean)
-              
+
               if (localChannels.length > 0) {
                 setChannels(prev => {
                   // 合并去重
                   const existingIds = new Set(prev.map(c => c.id))
                   const newChannels = localChannels.filter(lc => !existingIds.has(lc.id))
+                  if (newChannels.length > 0) {
+                    console.log(`[useChannelManager] 从本地存储添加 ${newChannels.length} 个频道（error handler）`)
+                  }
                   return [...newChannels, ...prev]
                 })
                 setChannelError(null)
               }
+            } else if (hasLoadedFromStorageRef.current) {
+              console.log('[useChannelManager] 本地存储已加载，跳过 error handler 中的重复加载')
             }
           } else {
             if (now - lastErrorTime > 5000) {
