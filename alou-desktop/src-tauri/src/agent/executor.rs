@@ -244,6 +244,7 @@ impl RalphLoopExecutor {
         .await;
 
         loop {
+            let loop_start = std::time::Instant::now();
             // 获取当前任务状态
             let task = self
                 .task_manager
@@ -259,8 +260,13 @@ impl RalphLoopExecutor {
             );
 
             // 1. 调用 AI
+            log::info!("[RalphLoop:{}] 迭代 {} - AI 调用开始 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
+            let ai_start = std::time::Instant::now();
             let ai_response = match self.call_ai(&task).await {
-                Ok(response) => response,
+                Ok(response) => {
+                    log::info!("[RalphLoop:{}] AI 调用完成 (+{:?} 迭代耗时 {:?})", task_id, loop_start.elapsed(), ai_start.elapsed());
+                    response
+                }
                 Err(e) => {
                     log::error!("[RalphLoop] AI 调用失败: {}", e);
                     self.handle_error(task_id, &e.to_string()).await?;
@@ -278,6 +284,7 @@ impl RalphLoopExecutor {
             }
 
             // 2. 检查是否有工具调用
+            log::info!("[RalphLoop:{}] 迭代 {} - 检查工具调用 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
             if ai_response.tool_calls.is_empty() {
                 // 没有工具调用，任务完成
                 let final_content = ai_response.content;
@@ -297,6 +304,8 @@ impl RalphLoopExecutor {
             }
 
             // 3. 执行工具调用
+            let tool_start = std::time::Instant::now();
+            log::info!("[RalphLoop:{}] 迭代 {} - 工具执行开始 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
             self.task_manager
                 .update_task(task_id, |task| {
                     task.status = TaskStatus::ProcessingTools;
@@ -328,6 +337,8 @@ impl RalphLoopExecutor {
                 }
             };
 
+            log::info!("[RalphLoop:{}] 迭代 {} - 工具执行完成 (+{:?} 耗时 {:?})", task_id, task.metadata.iteration_count, loop_start.elapsed(), tool_start.elapsed());
+            
             // 4. 将工具结果添加到消息历史
             self.add_tool_results_to_task(task_id, &ai_response.tool_calls, &tool_results)
                 .await?;

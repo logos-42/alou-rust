@@ -82,10 +82,10 @@ async fn execute_tool(
 
     let start_time = std::time::Instant::now();
 
-    // 获取 BridgeManager - 使用 try_state 安全获取
-    let bridge_manager: Arc<tokio::sync::Mutex<BridgeManager>> = match api_state
+    // 获取 BridgeManager - 无锁 Arc
+    let bridge_manager: Arc<BridgeManager> = match api_state
         .app_handle
-        .try_state::<Arc<tokio::sync::Mutex<BridgeManager>>>()
+        .try_state::<Arc<BridgeManager>>()
     {
         Some(s) => s.inner().clone(),
         None => {
@@ -98,8 +98,7 @@ async fn execute_tool(
         }
     };
 
-    let manager = bridge_manager.lock().await;
-    let tool_bridge = manager.tool_bridge();
+    let tool_bridge = bridge_manager.tool_bridge();
 
     let request = crate::bridges::ToolCallRequest {
         session_id: "cli_session".to_string(),
@@ -165,10 +164,10 @@ async fn list_tools(
         }
     };
 
-    // 获取 BridgeManager - 使用 try_state 安全获取
-    let bridge_manager: Arc<tokio::sync::Mutex<BridgeManager>> = match api_state
+    // 获取 BridgeManager - 无锁 Arc
+    let bridge_manager: Arc<BridgeManager> = match api_state
         .app_handle
-        .try_state::<Arc<tokio::sync::Mutex<BridgeManager>>>()
+        .try_state::<Arc<BridgeManager>>()
     {
         Some(s) => s.inner().clone(),
         None => {
@@ -176,8 +175,7 @@ async fn list_tools(
         }
     };
 
-    let manager = bridge_manager.lock().await;
-    let tool_bridge = manager.tool_bridge();
+    let tool_bridge = bridge_manager.tool_bridge();
 
     // 获取工具列表（list_tools 返回 Vec<serde_json::Value>）
     let tools: Vec<serde_json::Value> = tool_bridge.list_tools().await;

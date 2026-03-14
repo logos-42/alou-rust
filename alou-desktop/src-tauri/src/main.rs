@@ -579,7 +579,10 @@ fn main() {
         .manage(WorkflowState::default())
         .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
         .manage(std::sync::Arc::new(create_default_bridge_manager()))
-        .manage(std::sync::Arc::new(SessionRouter::new(std::sync::Arc::new(create_default_bridge_manager()))))
+        .manage(std::sync::Arc::new(SessionRouter::new(
+            std::sync::Arc::new(create_default_bridge_manager()),
+            std::sync::Arc::new(crate::tools::ToolRegistry::new()),
+        )))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
         .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))

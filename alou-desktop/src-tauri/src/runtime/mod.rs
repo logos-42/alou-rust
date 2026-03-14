@@ -21,6 +21,8 @@ pub mod actor;
 pub mod handle;
 pub mod router;
 pub mod actor_commands;  // ← 新增：渐进式迁移模块
+#[cfg(test)]
+mod concurrency_test;  // ← 并发测试
 
 pub use session::SessionRuntime;
 pub use message::SessionMessage;

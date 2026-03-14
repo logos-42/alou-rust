@@ -21,13 +21,12 @@ pub async fn execute_agent_task(
     message: String,
     agent_id: String,
     config: UserApiConfig,
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::bridges::BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
 ) -> std::result::Result<TaskFinalResult, String> {
     log::info!("[Command] 执行 Agent 任务: {}", message);
 
     // 获取 BridgeManager
-    let manager = bridge_manager.lock().await;
-    let tool_bridge = manager.tool_bridge();
+    let tool_bridge = bridge_manager.tool_bridge();
 
     // 创建任务管理器
     let task_manager = Arc::new(TaskManager::new());
@@ -117,13 +116,12 @@ pub async fn execute_ai_conversation(
     messages: Option<Vec<serde_json::Value>>, // 完整的对话历史消息数组（role + content）
     options: Option<serde_json::Value>,
     agent_id: Option<String>, // 智能体 ID（可选，主要用于 agent_document 工具）
-    bridge_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::bridges::BridgeManager>>>,
+    bridge_manager: tauri::State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
 ) -> std::result::Result<serde_json::Value, String> {
     log::info!("[Command] 执行 AI 对话: {}", &message[..20.min(message.len())]);
     
     // 获取 BridgeManager
-    let manager = bridge_manager.lock().await;
-    let tool_bridge = manager.tool_bridge();
+    let tool_bridge = bridge_manager.tool_bridge();
 
     // 解析配置
     let user_config = match serde_json::from_value::<UserApiConfig>(agent_config) {
