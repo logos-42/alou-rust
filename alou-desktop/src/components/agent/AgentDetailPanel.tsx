@@ -114,8 +114,8 @@ const AgentDetailPanel = ({ agent, sessionId, onClose, isDarkMode = false, onAge
     if (agent) {
       setLocalName(resolveName(agent))
       setLocalRole(resolveRole(agent))
-      // 异步加载头像
-      resolveAvatar(agent).then(setLocalAvatar)
+      // 同步加载头像
+      setLocalAvatar(resolveAvatar(agent))
     }
   }, [agent])
 
