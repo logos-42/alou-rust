@@ -1040,6 +1040,8 @@ impl RalphLoopExecutor {
         tool_calls: &[ProviderToolCall],
         results: &[ToolResult],
     ) -> std::result::Result<(), ExecutorError> {
+        use crate::agent::context_layers::compress_tool_result;
+        
         self.task_manager
             .update_task(task_id, |task| {
                 // 保存工具结果
@@ -1061,16 +1063,21 @@ impl RalphLoopExecutor {
                 );
                 task.messages.push(tool_calls_message);
 
-                // 将工具结果消息添加到历史
+                // 将工具结果消息添加到历史（压缩后）
                 for (tool_call, result) in tool_calls.iter().zip(results.iter()) {
-                    let content = if result.success {
+                    // 压缩工具结果（最多 500 tokens）
+                    let raw_content = if result.success {
                         serde_json::to_string(&result.data).unwrap_or_else(|_| String::new())
                     } else {
                         result.error.clone().unwrap_or_else(|| String::new())
                     };
+                    
+                    // 使用压缩函数
+                    let compressed = compress_tool_result(&tool_call.name, &raw_content, 500);
+                    
                     task.messages.push(AiMessage::tool_result(
                         tool_call.id.clone(),
-                        content,
+                        compressed,
                     ));
                 }
             })
