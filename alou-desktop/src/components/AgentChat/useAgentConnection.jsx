@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSession } from '@/context/SessionContext'
 import agentService from '@/services/agentService'
 import { resolveBackendChain } from '@/hooks/useAgentChat'
 
@@ -6,9 +7,10 @@ import { resolveBackendChain } from '@/hooks/useAgentChat'
  * Hook for managing agent connection state and session
  */
 export const useAgentConnection = ({ activeChain, preferredChain, setPreferredChain }) => {
+  const { session } = useSession()
   const [connectionStatus, setConnectionStatus] = useState('disconnected')
-  const [sessionId, setSessionId] = useState(() => 
-    `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const [sessionId, setSessionId] = useState(() =>
+    session?.sessionId || `frontend_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   )
   const [isSessionReady, setSessionReady] = useState(false)
 
@@ -109,6 +111,15 @@ export const useAgentConnection = ({ activeChain, preferredChain, setPreferredCh
       throw error
     }
   }, [activeChain, preferredChain, setPreferredChain])
+
+  // 同步 SessionContext 的 session
+  useEffect(() => {
+    if (session?.sessionId) {
+      console.log('[useAgentConnection] SessionContext session 变更:', session.sessionId)
+      setSessionId(session.sessionId)
+      setSessionReady(true)
+    }
+  }, [session?.sessionId])
 
   return {
     connectionStatus,

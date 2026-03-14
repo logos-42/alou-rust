@@ -1,7 +1,11 @@
 import React from 'react'
 import WalletManager from '@/components/WalletManager'
 
-const WalletView = () => (
+/**
+ * WalletView 组件
+ * 钱包管理页面，显示钱包相关内容
+ */
+const WalletView: React.FC = () => (
   <main>
     <WalletManager />
   </main>

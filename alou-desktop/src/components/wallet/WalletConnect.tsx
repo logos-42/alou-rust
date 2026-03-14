@@ -2,7 +2,12 @@ import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './WalletConnect.css'
 
-const WalletConnect = ({ onConnectMetaMask, onConnectWalletConnect }) => {
+export interface WalletConnectProps {
+  onConnectMetaMask?: () => void
+  onConnectWalletConnect?: () => void
+}
+
+const WalletConnect: React.FC<WalletConnectProps> = ({ onConnectMetaMask, onConnectWalletConnect }) => {
   const { t } = useI18n()
 
   return (

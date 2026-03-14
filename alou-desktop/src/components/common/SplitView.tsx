@@ -1,11 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import './SplitView.css'
 
+export interface SplitViewProps {
+  left: React.ReactNode
+  right: React.ReactNode
+  defaultPosition?: number
+  minLeftWidth?: number
+  minRightWidth?: number
+  storageKey?: string
+  onResize?: (position: number) => void
+  className?: string
+}
+
 /**
  * SplitView - 可调整大小的分割视图组件
  * 支持水平分割（左右布局），中间有可拖拽的分割条
  */
-const SplitView = ({
+const SplitView: React.FC<SplitViewProps> = ({
   left,
   right,
   defaultPosition = 50,
@@ -15,8 +26,8 @@ const SplitView = ({
   onResize,
   className = '',
 }) => {
-  const containerRef = useRef(null)
-  const splitterRef = useRef(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const splitterRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState(() => {
     // 从 localStorage 读取保存的位置
     if (typeof window !== 'undefined' && storageKey) {
@@ -40,7 +51,7 @@ const SplitView = ({
   }, [position, storageKey])
 
   // 处理分割条拖拽开始
-  const handleSplitterMouseDown = useCallback((e) => {
+  const handleSplitterMouseDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
     setIsDragging(true)
     if (splitterRef.current) {
@@ -50,7 +61,7 @@ const SplitView = ({
 
   // 处理分割条拖拽
   const handleSplitterMouseMove = useCallback(
-    (e) => {
+    (e: PointerEvent) => {
       if (!isDragging || !containerRef.current) return
 
       const containerRect = containerRef.current.getBoundingClientRect()
@@ -69,7 +80,7 @@ const SplitView = ({
 
   // 处理分割条拖拽结束
   const handleSplitterMouseUp = useCallback(
-    (e) => {
+    (e: PointerEvent) => {
       if (isDragging) {
         setIsDragging(false)
         if (splitterRef.current) {
@@ -83,8 +94,8 @@ const SplitView = ({
   // 全局鼠标事件监听
   useEffect(() => {
     if (isDragging) {
-      const handleMouseMove = (e) => handleSplitterMouseMove(e)
-      const handleMouseUp = (e) => handleSplitterMouseUp(e)
+      const handleMouseMove = (e: PointerEvent) => handleSplitterMouseMove(e)
+      const handleMouseUp = (e: PointerEvent) => handleSplitterMouseUp(e)
 
       window.addEventListener('pointermove', handleMouseMove)
       window.addEventListener('pointerup', handleMouseUp)
@@ -122,4 +133,3 @@ const SplitView = ({
 }
 
 export default SplitView
-

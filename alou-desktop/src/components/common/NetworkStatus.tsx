@@ -6,7 +6,7 @@ import './NetworkStatus.css'
  * 网络状态指示器组件
  * 检测网络连接状态并显示相应提示
  */
-export const NetworkStatus = () => {
+export const NetworkStatus: React.FC = () => {
   const { t } = useI18n()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [isVisible, setIsVisible] = useState(false)
@@ -16,7 +16,7 @@ export const NetworkStatus = () => {
     setIsOnline(true)
     if (wasOffline) {
       setIsVisible(true)
-      // 3秒后隐藏
+      // 3 秒后隐藏
       setTimeout(() => {
         setIsVisible(false)
       }, 3000)
@@ -48,7 +48,7 @@ export const NetworkStatus = () => {
   if (!isVisible) return null
 
   return (
-    <div 
+    <div
       className={`network-status ${isOnline ? 'online' : 'offline'}`}
       role="status"
       aria-live="polite"
@@ -66,11 +66,15 @@ export const NetworkStatus = () => {
   )
 }
 
+export interface NetworkStatusBadgeProps {
+  showLabel?: boolean
+}
+
 /**
  * 网络状态徽章组件
  * 用于显示在网络相关功能旁边的小型状态指示
  */
-export const NetworkStatusBadge = ({ showLabel = false }) => {
+export const NetworkStatusBadge: React.FC<NetworkStatusBadgeProps> = ({ showLabel = false }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const { t } = useI18n()
 
@@ -88,7 +92,7 @@ export const NetworkStatusBadge = ({ showLabel = false }) => {
   }, [])
 
   return (
-    <div 
+    <div
       className={`network-badge ${isOnline ? 'online' : 'offline'}`}
       title={isOnline ? t('network.online') : t('network.offline')}
       aria-label={isOnline ? t('network.online') : t('network.offline')}

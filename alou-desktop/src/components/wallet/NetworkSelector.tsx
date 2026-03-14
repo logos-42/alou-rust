@@ -2,7 +2,20 @@ import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './NetworkSelector.css'
 
-const NetworkSelector = ({ networks = [], currentNetwork, onSwitchNetwork }) => {
+export interface Network {
+  chainId: string
+  name: string
+  type: string
+  icon: string
+}
+
+export interface NetworkSelectorProps {
+  networks?: Network[]
+  currentNetwork?: string
+  onSwitchNetwork?: (network: Network) => void
+}
+
+const NetworkSelector: React.FC<NetworkSelectorProps> = ({ networks = [], currentNetwork, onSwitchNetwork }) => {
   const { t } = useI18n()
 
   return (

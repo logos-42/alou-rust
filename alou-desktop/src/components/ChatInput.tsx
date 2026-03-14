@@ -1,19 +1,34 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import sendIcon from '@/assets/向上·发送 2.png'
-import cancelIcon from '@/assets/终止0.2.png'
+import cancelIcon from '@/assets/终止 0.2.png'
 import './ChatInput.css'
 
-const ChatInput = forwardRef(
+export interface ChatInputProps {
+  value: string
+  onChange?: (value: string) => void
+  onSend?: (value: string) => void
+  onNewLine?: () => void
+  onCancel?: () => void
+  isLoading?: boolean
+  autoFocus?: boolean
+  placeholder?: string
+}
+
+export interface ChatInputRef {
+  adjustHeight: () => void
+}
+
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   ({ value, onChange, onSend, onNewLine, onCancel, isLoading = false, autoFocus = false, placeholder }, ref) => {
     const { t } = useI18n()
     const displayPlaceholder = placeholder || t('inputPlaceholder')
-    const textareaRef = useRef(null)
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
 
     const adjustHeight = () => {
       const textarea = textareaRef.current
       if (!textarea) return
-      
+
       // 只在内容变化时调整高度，避免不必要的布局抖动
       const newHeight = `${Math.min(textarea.scrollHeight, 120)}px`
       if (textarea.style.height !== newHeight) {
@@ -44,11 +59,11 @@ const ChatInput = forwardRef(
       }
     }, [autoFocus])
 
-    const handleInput = (event) => {
+    const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       onChange?.(event.target.value)
     }
 
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (event.key === 'Enter' && event.shiftKey) {
         onNewLine?.()
         return
