@@ -551,10 +551,8 @@ export const useAgentMessages = ({
         targetAgentId,
         messagesInChannel: messagesByChannel[targetAgentId]?.length || 0,
         historyLength: history.length,
-        messagesArrayLength: history.length + 2, // +system +current
       })
       console.log('[useAgentMessages] 历史消息内容:', history)
-      console.log('[useAgentMessages] 发送给 LLM 的 messagesArray:', messagesArray)
 
       // 构建正确格式的 messages 数组发送给 Rust
       const messagesArray: Array<{ role: string; content: string }> = []
@@ -571,10 +569,10 @@ export const useAgentMessages = ({
       const responseBuffer = 1000
       const availableTokens = maxTokens - systemTokens - responseBuffer
       const maxHistoryMessages = Math.floor(availableTokens / avgTokensPerMessage)
-      
+
       // 至少保留 5 条，最多保留 50 条
-      const safeHistory = history.slice(-Math.max(5, Math.min(50, maxHistoryMessages)))
-      
+      const safeHistory = history.slice(-Math.max(3, Math.min(50, maxHistoryMessages)))
+
       console.log('[useAgentMessages] 动态计算上下文:', {
         maxTokens,
         systemTokens,
@@ -582,7 +580,7 @@ export const useAgentMessages = ({
         maxHistoryMessages,
         actualHistoryLength: safeHistory.length,
       })
-      
+
       // 添加历史消息
       for (const m of safeHistory) {
         messagesArray.push({ role: m.role, content: m.content })
@@ -590,6 +588,7 @@ export const useAgentMessages = ({
       // 当前用户消息
       messagesArray.push({ role: 'user', content: text.trim() })
 
+      console.log('[useAgentMessages] 发送给 LLM 的 messagesArray:', messagesArray)
       console.log('[useAgentMessages] 调用本地 AI，provider:', localApiConfig.provider, 'model:', localApiConfig.model, '消息数:', messagesArray.length)
 
       // 3. 通过 Tauri invoke 执行 AI 对话（本地 Rust 直接调用 AI API）
