@@ -2,16 +2,38 @@ import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './TransactionList.css'
 
-const formatAddress = (address) => {
-  if (!address || address.length <= 10) return address
+export interface Transaction {
+  hash: string
+  type: 'send' | 'receive' | 'contract'
+  to?: string
+  from?: string
+  value: string
+  token: string
+  timestamp: number
+  status: 'confirmed' | 'pending' | 'failed'
+}
+
+export interface TransactionListProps {
+  transactions?: Transaction[]
+  isRefreshing?: boolean
+  onRefresh?: () => void
+  onViewTransaction?: (tx: Transaction) => void
+}
+
+const formatAddress = (address?: string): string => {
+  if (!address || address.length <= 10) return address || ''
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
-const TransactionList = ({ transactions = [], isRefreshing, onRefresh, onViewTransaction }) => {
+const TransactionList: React.FC<TransactionListProps> = ({
+  transactions = [],
+  isRefreshing,
+  onRefresh,
+  onViewTransaction,
+}) => {
   const { t } = useI18n()
 
-  const formatTime = (timestamp) => {
-    // eslint-disable-next-line react-hooks/purity
+  const formatTime = (timestamp: number): string => {
     const now = Date.now()
     const diff = now - timestamp
     const minutes = Math.floor(diff / 60000)
@@ -41,7 +63,11 @@ const TransactionList = ({ transactions = [], isRefreshing, onRefresh, onViewTra
       ) : (
         <div className="transaction-list">
           {transactions.map((tx) => (
-            <div key={tx.hash} className="transaction-item" onClick={() => onViewTransaction?.(tx)}>
+            <div
+              key={tx.hash}
+              className="transaction-item"
+              onClick={() => onViewTransaction?.(tx)}
+            >
               <div className={`tx-icon ${tx.type}`}>
                 {tx.type === 'send' ? '📤' : tx.type === 'receive' ? '📥' : '🔄'}
               </div>

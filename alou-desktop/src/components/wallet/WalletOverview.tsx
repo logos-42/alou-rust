@@ -2,17 +2,51 @@ import React, { useMemo } from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './WalletOverview.css'
 
-const formatAddress = (address) => {
-  if (!address || address.length <= 10) return address
+export interface TokenBalance {
+  symbol: string
+  name: string
+  balance: string
+  rawBalance: string
+  decimals: number
+  usdDisplay: string
+}
+
+export interface Wallet {
+  address: string
+  ethBalance: string
+  tokenBalances: Record<string, {
+    normalizedBalance?: string
+    balance?: string
+    rawBalance?: string
+    decimals?: number
+  }>
+}
+
+export interface WalletOverviewProps {
+  wallet?: Wallet
+  currentNetwork?: string
+  networkName?: string
+  ethPrice?: number
+  supportedTokens?: Array<{
+    symbol: string
+    name: string
+    decimals: number
+  }>
+  onSwitchWallet?: () => void
+  onDisconnect?: () => void
+}
+
+const formatAddress = (address?: string): string => {
+  if (!address || address.length <= 10) return address || ''
   return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
-const calculateUSD = (ethAmount, price) => {
+const calculateUSD = (ethAmount: string | undefined, price: number | undefined): string => {
   const amount = parseFloat(ethAmount || '0')
-  return (amount * price).toFixed(2)
+  return (amount * (price || 0)).toFixed(2)
 }
 
-const formatStableUsd = (value) => {
+const formatStableUsd = (value: string | number | null | undefined): string => {
   if (value === undefined || value === null) {
     return '≈ $0.00'
   }
@@ -24,7 +58,15 @@ const formatStableUsd = (value) => {
   return `≈ $${coerced}`
 }
 
-const WalletOverview = ({ wallet, currentNetwork, networkName, ethPrice, supportedTokens = [], onSwitchWallet, onDisconnect }) => {
+const WalletOverview: React.FC<WalletOverviewProps> = ({
+  wallet,
+  currentNetwork,
+  networkName,
+  ethPrice,
+  supportedTokens = [],
+  onSwitchWallet,
+  onDisconnect,
+}) => {
   const { t } = useI18n()
 
   const formattedEthUSD = useMemo(
@@ -78,28 +120,39 @@ const WalletOverview = ({ wallet, currentNetwork, networkName, ethPrice, support
               {t('switchWallet')}
             </button>
           )}
-          <button type="button" onClick={onDisconnect} className="disconnect-btn">
-            {t('disconnect')}
-          </button>
+          {typeof onDisconnect === 'function' && (
+            <button type="button" onClick={onDisconnect} className="disconnect-btn">
+              {t('disconnect')}
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="wallet-balances">
-        <div className="balance-card">
-          <div className="balance-label">ETH {t('balance')}</div>
-          <div className="balance-amount">{wallet?.ethBalance || '0.0'}</div>
-          <div className="balance-usd">≈ ${formattedEthUSD}</div>
+      <div className="wallet-balance">
+        <div className="balance-label">{t('ethBalance')}</div>
+        <div className="balance-amount">
+          {wallet?.ethBalance || '0'} ETH
         </div>
-        {tokenCards.map((token) => (
-          <div className="balance-card" key={token.symbol}>
-            <div className="balance-label">
-              {token.symbol} {t('balance')}
-            </div>
-            <div className="balance-amount">{token.balance}</div>
-            <div className="balance-usd">{token.usdDisplay}</div>
-          </div>
-        ))}
+        <div className="balance-usd">{formattedEthUSD} USD</div>
       </div>
+
+      {tokenCards.length > 0 && (
+        <div className="wallet-tokens">
+          <div className="tokens-header">{t('tokens')}</div>
+          {tokenCards.map((token) => (
+            <div key={token.symbol} className="token-item">
+              <div className="token-info">
+                <span className="token-symbol">{token.symbol}</span>
+                <span className="token-name">{token.name}</span>
+              </div>
+              <div className="token-balance">
+                <span className="balance">{token.balance}</span>
+                <span className="usd">{token.usdDisplay}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

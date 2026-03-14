@@ -3,15 +3,22 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import './WalletSyncCallbackView.css'
 
+/**
+ * 解析 URL 查询参数的 Hook
+ */
 const useQuery = () => {
   const { search } = useLocation()
   return React.useMemo(() => new URLSearchParams(search), [search])
 }
 
-const WalletSyncCallbackView = () => {
+/**
+ * WalletSyncCallbackView 组件
+ * 处理钱包同步回调，展示同步状态
+ */
+const WalletSyncCallbackView: React.FC = () => {
   const navigate = useNavigate()
   const query = useQuery()
-  const loginWithWeb3Wallet = useAuthStore((state) => state.loginWithWeb3Wallet)
+  const loginWithWeb3Wallet = useAuthStore((state: any) => state.loginWithWeb3Wallet)
 
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -44,14 +51,14 @@ const WalletSyncCallbackView = () => {
         })
 
         setSuccess(true)
-        
+
         // 延迟跳转，让用户看到成功消息
         setTimeout(() => {
           navigate('/', { replace: true })
         }, 1500)
       } catch (err) {
         console.error('[WalletSyncCallback] Error:', err)
-        setError(err?.message || '同步钱包信息失败')
+        setError((err as Error)?.message || '同步钱包信息失败')
         setIsLoading(false)
       }
     }
@@ -82,9 +89,9 @@ const WalletSyncCallbackView = () => {
             <div className="error-icon">❌</div>
             <h2>同步失败</h2>
             <p>{error}</p>
-            <button 
-              type="button" 
-              onClick={() => navigate('/login')} 
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
               className="btn-primary"
             >
               返回登录
@@ -97,4 +104,3 @@ const WalletSyncCallbackView = () => {
 }
 
 export default WalletSyncCallbackView
-

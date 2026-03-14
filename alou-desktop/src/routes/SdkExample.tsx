@@ -3,11 +3,12 @@ import { LspEditor, SpecManager } from '../components/SDKComponents'
 import '../components/SDKComponents.css'
 
 /**
- * SDK示例页面
+ * SdkExamplePage 组件
+ * SDK 示例页面，展示 LSP 编辑器和 Spec 管理功能
  */
-function SdkExamplePage() {
-  const [activeTab, setActiveTab] = useState('lsp')
-  const [code, setCode] = useState(`// 示例JavaScript代码
+const SdkExamplePage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<string>('lsp')
+  const [code, setCode] = useState<string>(`// 示例JavaScript代码
 function greet(name) {
   return \`Hello, \${name}!\`
 }
@@ -44,18 +45,18 @@ const calc = new Calculator()
 console.log(calc.add(10).multiply(2).getResult())
 `)
 
-  const [language, setLanguage] = useState('javascript')
-  const [specType, setSpecType] = useState('product')
+  const [language, setLanguage] = useState<string>('javascript')
+  const [specType, setSpecType] = useState<string>('product')
 
-  const handleCodeChange = (newCode) => {
+  const handleCodeChange = (newCode: string) => {
     setCode(newCode)
   }
 
-  const handleLanguageChange = (newLanguage) => {
+  const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage)
   }
 
-  const handleSpecTypeChange = (newSpecType) => {
+  const handleSpecTypeChange = (newSpecType: string) => {
     setSpecType(newSpecType)
   }
 

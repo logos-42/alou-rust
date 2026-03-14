@@ -2,16 +2,27 @@ import React from 'react'
 import { useI18n } from '@/hooks/useI18n'
 import './EmptyStateGuide.css'
 
+export interface QuickAction {
+  icon: string
+  title: string
+  description: string
+  action: () => void
+}
+
+export interface EmptyStateGuideProps {
+  onQuickCreate?: (type: string) => void
+}
+
 /**
  * EmptyStateGuide - 空状态引导组件
- * 
+ *
  * 当用户没有创建任何智能体时显示友好的引导信息
  * 支持直接输入指令创建智能体
  */
-const EmptyStateGuide = ({ onQuickCreate }) => {
+const EmptyStateGuide: React.FC<EmptyStateGuideProps> = ({ onQuickCreate }) => {
   const { t } = useI18n()
 
-  const quickActions = [
+  const quickActions: QuickAction[] = [
     {
       icon: '🤖',
       title: t('agent.emptyState.quickActions.createAgent'),
@@ -77,15 +88,6 @@ const EmptyStateGuide = ({ onQuickCreate }) => {
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="empty-state-tips">
-          <h3 className="tips-title">{t('agent.emptyState.tips.title')}</h3>
-          <ul className="tips-list">
-            <li>{t('agent.emptyState.tips.tip1')}</li>
-            <li>{t('agent.emptyState.tips.tip2')}</li>
-            <li>{t('agent.emptyState.tips.tip3')}</li>
-          </ul>
         </div>
       </div>
     </div>

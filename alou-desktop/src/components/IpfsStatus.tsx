@@ -2,13 +2,19 @@ import React, { useState, useEffect } from 'react'
 import ipfsService from '@/services/ipfsService'
 import './IpfsStatus.css'
 
-const IpfsStatus = () => {
+export interface IpfsNodeInfo {
+  ID?: string
+  Addresses?: string[]
+  [key: string]: any
+}
+
+const IpfsStatus: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false)
-  const [nodeInfo, setNodeInfo] = useState(null)
+  const [nodeInfo, setNodeInfo] = useState<IpfsNodeInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [kuboInstalled, setKuboInstalled] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     checkKuboInstalled()
@@ -50,10 +56,10 @@ const IpfsStatus = () => {
         // Auto-start after download
         await handleStart(false)
       } else {
-        setError(result.error)
+        setError(result.error || 'Download failed')
       }
     } catch (err) {
-      setError(err.toString())
+      setError(err instanceof Error ? err.toString() : 'Unknown error')
     } finally {
       setDownloading(false)
     }
@@ -68,14 +74,14 @@ const IpfsStatus = () => {
         setKuboInstalled(true)
         await checkNodeStatus()
       } else {
-        setError(result.error)
+        setError(result.error || 'Start failed')
         // If binary not found, show download option
-        if (result.error.includes('not found')) {
+        if (result.error?.includes('not found')) {
           setKuboInstalled(false)
         }
       }
     } catch (err) {
-      setError(err.toString())
+      setError(err instanceof Error ? err.toString() : 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -90,10 +96,10 @@ const IpfsStatus = () => {
         setIsRunning(false)
         setNodeInfo(null)
       } else {
-        setError(result.error)
+        setError(result.error || 'Stop failed')
       }
     } catch (err) {
-      setError(err.toString())
+      setError(err instanceof Error ? err.toString() : 'Unknown error')
     } finally {
       setLoading(false)
     }
@@ -171,4 +177,3 @@ const IpfsStatus = () => {
 }
 
 export default IpfsStatus
-

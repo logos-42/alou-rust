@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import imageProxyService from '@/services/imageProxyService'
 
-const AvatarTest = () => {
-  const [testResults, setTestResults] = useState([])
+interface TestResult {
+  url: string
+  success: boolean
+  dataUrl: string | null
+  size: number
+  time: number
+  error: string | null
+}
+
+const AvatarTest: React.FC = () => {
+  const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const testUrls = [
+  const testUrls: string[] = [
     'https://avatars.githubusercontent.com/u/16309930?v=4',
     'https://github.com/identicons/jasonlong.png',
     'https://via.placeholder.com/150/0000FF/808080?text=Test'
@@ -14,24 +23,24 @@ const AvatarTest = () => {
   const testAvatarLoading = async () => {
     setIsLoading(true)
     setTestResults([])
-    
+
     console.log('[AvatarTest] 开始测试头像加载')
     console.log('[AvatarTest] 环境检测:', {
-      isTauri: typeof window !== 'undefined' && window.__TAURI__,
-      hasTauriHttp: typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.http,
+      isTauri: typeof window !== 'undefined' && Boolean(window.__TAURI__),
+      hasTauriHttp: typeof window !== 'undefined' && Boolean(window.__TAURI__ && (window.__TAURI__ as any).http),
       userAgent: navigator.userAgent
     })
 
-    const results = []
-    
+    const results: TestResult[] = []
+
     for (const url of testUrls) {
       try {
-        console.log(`[AvatarTest] 测试URL: ${url}`)
+        console.log(`[AvatarTest] 测试 URL: ${url}`)
         const startTime = Date.now()
-        
+
         const dataUrl = await imageProxyService.getImageDataUrl(url)
         const endTime = Date.now()
-        
+
         results.push({
           url,
           success: !!dataUrl,
@@ -40,21 +49,21 @@ const AvatarTest = () => {
           time: endTime - startTime,
           error: null
         })
-        
-        console.log(`[AvatarTest] 成功: ${url}, 大小: ${dataUrl?.length}, 时间: ${endTime - startTime}ms`)
+
+        console.log(`[AvatarTest] 成功：${url}, 大小：${dataUrl?.length}, 时间：${endTime - startTime}ms`)
       } catch (error) {
-        console.error(`[AvatarTest] 失败: ${url}`, error)
+        console.error(`[AvatarTest] 失败：${url}`, error)
         results.push({
           url,
           success: false,
           dataUrl: null,
           size: 0,
           time: 0,
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         })
       }
     }
-    
+
     setTestResults(results)
     setIsLoading(false)
   }
@@ -62,22 +71,22 @@ const AvatarTest = () => {
   return (
     <div style={{ padding: '20px', fontFamily: 'monospace' }}>
       <h2>Avatar Loading Test</h2>
-      
+
       <div style={{ marginBottom: '20px' }}>
         <h3>Environment Info:</h3>
         <ul>
-          <li>Is Tauri: {typeof window !== 'undefined' && window.__TAURI__ ? 'Yes' : 'No'}</li>
-          <li>Has Tauri HTTP: {typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.http ? 'Yes' : 'No'}</li>
+          <li>Is Tauri: {typeof window !== 'undefined' && Boolean(window.__TAURI__) ? 'Yes' : 'No'}</li>
+          <li>Has Tauri HTTP: {typeof window !== 'undefined' && Boolean(window.__TAURI__ && (window.__TAURI__ as any).http) ? 'Yes' : 'No'}</li>
           <li>User Agent: {navigator.userAgent}</li>
         </ul>
       </div>
 
-      <button 
-        onClick={testAvatarLoading} 
+      <button
+        onClick={testAvatarLoading}
         disabled={isLoading}
-        style={{ 
-          padding: '10px 20px', 
-          fontSize: '16px', 
+        style={{
+          padding: '10px 20px',
+          fontSize: '16px',
           marginBottom: '20px',
           backgroundColor: isLoading ? '#ccc' : '#007bff',
           color: 'white',
@@ -93,9 +102,9 @@ const AvatarTest = () => {
         <div>
           <h3>Test Results:</h3>
           {testResults.map((result, index) => (
-            <div key={index} style={{ 
-              marginBottom: '15px', 
-              padding: '10px', 
+            <div key={index} style={{
+              marginBottom: '15px',
+              padding: '10px',
               border: '1px solid #ddd',
               borderRadius: '4px',
               backgroundColor: result.success ? '#d4edda' : '#f8d7da'
@@ -108,12 +117,12 @@ const AvatarTest = () => {
                   <div><strong>Time:</strong> {result.time}ms</div>
                   <div><strong>Data URL Preview:</strong> {result.dataUrl}</div>
                   <div style={{ marginTop: '10px' }}>
-                    <img 
-                      src={result.dataUrl.replace('...', '')} 
-                      alt="Test Avatar" 
+                    <img
+                      src={result.dataUrl?.replace('...', '')}
+                      alt="Test Avatar"
                       style={{ width: '50px', height: '50px', borderRadius: '50%' }}
-                      onLoad={() => console.log(`[AvatarTest] 图片显示成功: ${result.url}`)}
-                      onError={(e) => console.error(`[AvatarTest] 图片显示失败: ${result.url}`, e)}
+                      onLoad={() => console.log(`[AvatarTest] 图片显示成功：${result.url}`)}
+                      onError={(e) => console.error(`[AvatarTest] 图片显示失败：${result.url}`, e)}
                     />
                   </div>
                 </>

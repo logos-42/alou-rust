@@ -3,7 +3,7 @@ import { useI18n } from '@/hooks/useI18n'
 import './MessageList.css'
 import LoadingIcon from '@/assets/加载0.2.png'
 
-const sourceMap = {
+const sourceMap: Record<string, string> = {
   'wasm-core': 'WASM',
   'edge-worker-proxy': 'Edge',
   'http-backend-fallback': 'Backend',
@@ -11,20 +11,44 @@ const sourceMap = {
   error: 'Error',
 }
 
-const formatMessage = (content) => {
+export interface Message {
+  id: string
+  type: string
+  content: string
+  html?: string
+  timestamp: number
+  formattedTime?: string
+  source?: string
+  formattedSource?: string | null
+  isNew?: boolean
+}
+
+export interface MessageListProps {
+  messages?: Message[]
+  isLoading?: boolean
+  loadingContent?: React.ReactNode
+  onMessageSelect?: (message: Message) => void
+}
+
+export interface MessageListRef {
+  container: HTMLDivElement | null
+  scrollToBottom: () => void
+}
+
+const formatMessage = (content: string | null | undefined): string => {
   // 如果 content 是 null 或 undefined，返回空字符串
   if (content == null) {
     return ''
   }
-  
+
   // 确保 content 是字符串类型
   const contentStr = String(content)
-  
+
   // 如果字符串为空，直接返回
   if (!contentStr.trim()) {
     return contentStr
   }
-  
+
   return contentStr
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -33,21 +57,29 @@ const formatMessage = (content) => {
     .replace(/•/g, '<span class="bullet">•</span>')
 }
 
-const formatTime = (timestamp) =>
+const formatTime = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
   })
 
+interface MessageItemProps {
+  message: Message & { isNew?: boolean }
+  isInteractive: boolean
+  onMessageSelect?: (message: Message) => void
+  handleCopy: (content: string, messageId: string) => void
+  isNew?: boolean
+}
+
 // 优化：单个消息组件，使用 memo 防止不必要的重渲染
-const MessageItem = memo(({ message, isInteractive, onMessageSelect, handleCopy, isNew }) => {
+const MessageItem = memo<MessageItemProps>(({ message, isInteractive, onMessageSelect, handleCopy, isNew }) => {
   return (
     <div
       className={`message-wrapper ${message.type}${isNew ? ' message-enter' : ''}`}
       role={isInteractive ? 'button' : undefined}
       tabIndex={isInteractive ? 0 : undefined}
       onClick={() => onMessageSelect?.(message)}
-      onKeyDown={(event) => {
+      onKeyDown={(event: React.KeyboardEvent) => {
         if (!isInteractive) return
         if (event.key === 'Enter' || event.key === ' ') {
           onMessageSelect(message)
@@ -57,7 +89,7 @@ const MessageItem = memo(({ message, isInteractive, onMessageSelect, handleCopy,
       <div className="message-bubble">
         <div
           className="message-content"
-          dangerouslySetInnerHTML={{ __html: message.html }}
+          dangerouslySetInnerHTML={{ __html: message.html || '' }}
         />
         <div className="message-footer">
           <span className="timestamp">{message.formattedTime}</span>
@@ -65,7 +97,7 @@ const MessageItem = memo(({ message, isInteractive, onMessageSelect, handleCopy,
             <button
               type="button"
               className="copy-btn"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation()
                 handleCopy(message.content, message.id)
               }}
@@ -85,12 +117,12 @@ const MessageItem = memo(({ message, isInteractive, onMessageSelect, handleCopy,
 
 MessageItem.displayName = 'MessageItem'
 
-const MessageList = forwardRef(
+const MessageList = forwardRef<MessageListRef, MessageListProps>(
   ({ messages = [], isLoading = false, loadingContent = null, onMessageSelect }, ref) => {
-  const containerRef = useRef(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const { t } = useI18n()
   // 跟踪已渲染过的消息 ID，用于判断哪些是新消息
-  const renderedMessageIds = useRef(new Set())
+  const renderedMessageIds = useRef<Set<string>>(new Set())
 
   useImperativeHandle(
     ref,
@@ -107,7 +139,7 @@ const MessageList = forwardRef(
     [],
   )
 
-  const handleCopy = useCallback(async (content, messageId) => {
+  const handleCopy = useCallback(async (content: string, messageId: string) => {
     try {
       await navigator.clipboard.writeText(content)
     } catch (error) {
@@ -116,20 +148,20 @@ const MessageList = forwardRef(
   }, [])
 
   // 跟踪上一条消息的 ID，用于判断是否有新消息
-  const prevLastMessageIdRef = useRef(null)
+  const prevLastMessageIdRef = useRef<string | null>(null)
 
   const renderedMessages = useMemo(() => {
     const lastMessage = messages[messages.length - 1]
     const lastMessageId = lastMessage?.id || null
-    
+
     // 检查是否有新消息（通过比较最后一条消息的 ID）
     const hasNewMessage = lastMessageId && lastMessageId !== prevLastMessageIdRef.current
-    
+
     // 更新上一条消息 ID
     if (hasNewMessage) {
       prevLastMessageIdRef.current = lastMessageId
     }
-    
+
     return messages.map((message, index) => ({
       ...message,
       html: formatMessage(message.content),
