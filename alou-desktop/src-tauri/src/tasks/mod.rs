@@ -1,10 +1,9 @@
-/**
- * mod.rs - Tasks Module
- *
- * Task tracking and breakpoint resumption for Alou.
- */
+//! 任务模块
 
-pub mod types;
-pub mod manager;
+pub mod unified_task;
+pub mod queue;
+pub mod executor;
 
-pub use manager::TasksManager;
+pub use unified_task::{Task, TaskType, TaskStatus, TaskResult};
+pub use queue::{TaskQueue, TaskMessage};
+pub use executor::TaskExecutor;
