@@ -6,7 +6,7 @@
 //! - generate_video: 视频生成
 
 use std::sync::Arc;
-use serde_json::Value;
+use serde_json::{Value, json};
 use crate::agent_runtime::tool_bus::Tool;
 use crate::agent::providers::ProviderRegistry;
 use crate::agent::error::Result;

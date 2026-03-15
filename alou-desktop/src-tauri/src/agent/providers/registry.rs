@@ -49,6 +49,10 @@ impl ProviderRegistry {
                 let provider = jimeng::JimengProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
+            "haimian" => {
+                let provider = haimian::HaimianMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
             _ => Err(AgentError::ConfigError(
                 format!("Unknown media provider: {}", name)
             )),

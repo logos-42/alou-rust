@@ -2,11 +2,11 @@
 //!
 //! 提供前端与 Agent Hook 系统交互的 Tauri 命令接口
 
-use crate::agent::agent_hook::{
-    AgentHookManager, AgentHookFactory, AgentHookConfig,
-    UserInstruction, InstructionType, InstructionPriority,
-    AgentExecutionStatus,
-};
+// use crate::agent::agent_hook::{  // 模块不存在，暂时注释
+//     AgentHookManager, AgentHookFactory, AgentHookConfig,
+//     UserInstruction, InstructionType, InstructionPriority,
+//     AgentExecutionStatus,
+// };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

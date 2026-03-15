@@ -5,7 +5,7 @@
 use super::ai_client::AiClient;
 use super::config::{ApiConfig, UserApiConfig};
 use super::executor::RalphLoopExecutor;
-use super::streaming::StreamingExecutor;
+// use super::streaming::StreamingExecutor;  // 暂时注释，模块不存在
 use super::task::{TaskFinalResult, TaskManager};
 use std::sync::Arc;
 use crate::runtime::router::SessionRouter;

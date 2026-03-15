@@ -594,14 +594,14 @@ fn main() {
             // Agent Runtime commands
             agent_runtime::commands::init_agent_runtime,
             agent_runtime::commands::register_backend_agent,
-            agent_runtime::commands::send_group_message,
-            agent_runtime::commands::get_active_agents,
+            // agent_runtime::commands::send_group_message,  // 已废弃，使用 send_user_message
+            // agent_runtime::commands::get_active_agents,  // 已废弃
             // 移除重复的命令注册
             // agent_runtime::commands::stop_agent,
             agent_runtime::commands::get_group_history,
             agent_runtime::commands::submit_task,
             // agent_runtime::commands::list_tools,
-            // agent_runtime::commands::execute_tool,
+            // agent_runtime::commands::execute_tool,  // 已在上面注册
             agent_runtime::commands::get_runtime_status,
             // Group chat subscription commands
             agent_runtime::commands::agent_subscribe_group,
