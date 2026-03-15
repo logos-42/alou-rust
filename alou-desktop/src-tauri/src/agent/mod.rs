@@ -8,8 +8,11 @@ pub mod ai_client;
 pub mod providers;
 pub mod media_config;
 pub mod media;
-pub mod executor;  // 新增
-pub mod task;      // 新增
+pub mod executor;
+pub mod task;
+pub mod context_layers;  // 新增
+pub mod commands;        // 新增
+pub mod hook_commands;   // 新增
 
 // 重新导出常用类型
 pub use config::ApiConfig;
