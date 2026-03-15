@@ -39,6 +39,10 @@ impl MediaProviderFactory {
                 let provider = crate::agent::providers::jimeng::JimengProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
+            "haimian" => {
+                let provider = crate::agent::providers::haimian::HaimianMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
             _ => Err(AgentError::ConfigError(
                 format!("未知的媒体 Provider: {}", name)
             )),
@@ -86,16 +90,29 @@ impl MediaProviderFactory {
                     "chinese_optimized".to_string(),
                 ],
             },
+            ProviderInfo {
+                name: "haimian".to_string(),
+                description: "海绵音乐是字节跳动推出的 AI 音乐生成平台，支持个性化音乐创作".to_string(),
+                supported_types: vec![
+                    super::media_provider::MediaType::Audio,
+                ],
+                capabilities: vec![
+                    "music_generation".to_string(),
+                    "chinese_optimized".to_string(),
+                    "lyrics_support".to_string(),
+                ],
+            },
         ]
     }
 
     /// 根据能力获取推荐的 Provider
     pub fn get_provider_by_capability(capability: &str) -> Option<String> {
         match capability {
-            "image" => Some("google".to_string()), // Google Imagen 质量最高
-            "image_cn" => Some("jimeng".to_string()), // 中文场景用即梦
-            "audio" | "tts" => Some("minimax".to_string()), // MiniMax TTS 效果好
-            "video" => Some("jimeng".to_string()), // 即梦视频生成质量较好
+            "image" => Some("google".to_string()),
+            "image_cn" => Some("jimeng".to_string()),
+            "audio" | "tts" => Some("minimax".to_string()),
+            "music" | "music_generation" => Some("haimian".to_string()),
+            "video" => Some("jimeng".to_string()),
             "video_cn" => Some("jimeng".to_string()),
             _ => None,
         }

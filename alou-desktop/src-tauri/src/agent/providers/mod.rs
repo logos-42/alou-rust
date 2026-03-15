@@ -1,7 +1,7 @@
 //! AI Provider 实现
 //!
 //! 支持多种 AI Provider：DeepSeek, OpenAI, Claude, Kimi
-//! 媒体 Provider: MiniMax, Google, Jimeng
+//! 媒体 Provider: MiniMax, Google, Jimeng, 海绵音乐 (Haimian)
 
 pub mod deepseek;
 pub mod openai;
@@ -15,6 +15,7 @@ pub mod registry;
 pub mod minimax;
 pub mod google;
 pub mod jimeng;
+pub mod haimian;
 
 pub use deepseek::DeepSeekProvider;
 pub use openai::OpenAiProvider;
