@@ -1,0 +1,172 @@
+/* 媒体消息查看器样式 */
+
+.media-viewer {
+  margin: 12px 0;
+  padding: 12px;
+  background: var(--media-bg, #f5f5f5);
+  border-radius: 8px;
+  border: 1px solid var(--media-border, #e0e0e0);
+}
+
+.media-viewer-image {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.media-viewer-audio {
+  width: 100%;
+  max-width: 500px;
+}
+
+.media-viewer-video {
+  width: 100%;
+  max-width: 640px;
+}
+
+.media-viewer-unknown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-secondary, #666);
+}
+
+/* 图片样式 */
+.media-image {
+  border-radius: 6px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.media-image:hover {
+  transform: scale(1.02);
+}
+
+/* 音频播放器样式 */
+.audio-player {
+  margin-bottom: 8px;
+}
+
+.audio-player audio {
+  width: 100%;
+  border-radius: 6px;
+}
+
+/* 视频播放器样式 */
+.video-player {
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+}
+
+.video-player video {
+  display: block;
+  border-radius: 6px;
+}
+
+/* 媒体信息样式 */
+.media-info {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.info-label {
+  font-weight: 500;
+}
+
+.info-value {
+  color: var(--text-primary, #333);
+}
+
+/* 媒体说明文字样式 */
+.media-caption {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--caption-bg, rgba(0, 0, 0, 0.05));
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.caption-label {
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  margin-right: 6px;
+}
+
+.caption-text {
+  color: var(--text-primary, #333);
+}
+
+/* 暗色模式支持 */
+[data-theme='dark'] .media-viewer {
+  background: var(--media-bg-dark, #2a2a2a);
+  border-color: var(--media-border-dark, #404040);
+}
+
+[data-theme='dark'] .media-caption {
+  background: var(--caption-bg-dark, rgba(255, 255, 255, 0.1));
+}
+
+[data-theme='dark'] .info-label {
+  color: #aaa;
+}
+
+[data-theme='dark'] .info-value {
+  color: #ddd;
+}
+
+/* 加载状态 */
+.media-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-secondary, #999);
+}
+
+.media-loading::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border-color, #e0e0e0);
+  border-top-color: var(--primary-color, #1890ff);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 12px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 错误状态 */
+.media-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--error-color, #ff4d4f);
+  background: var(--error-bg, rgba(255, 77, 79, 0.1));
+  border-radius: 6px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .media-viewer {
+    padding: 8px;
+  }
+
+  .media-viewer-video {
+    max-width: 100%;
+  }
+
+  .media-caption {
+    font-size: 12px;
+  }
+}

@@ -693,6 +693,42 @@ impl RalphLoopExecutor {
                 },
                 "required": ["action"]
             }),
+            "generate_image" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "图片描述，详细描述要生成的图片内容" },
+                    "width": { "type": "integer", "description": "图片宽度（像素），默认 1024", "default": 1024 },
+                    "height": { "type": "integer", "description": "图片高度（像素），默认 1024", "default": 1024 },
+                    "provider": { "type": "string", "enum": ["google", "jimeng"], "description": "图片生成 Provider，google=Google Imagen, jimeng=即梦", "default": "google" }
+                },
+                "required": ["prompt"]
+            }),
+            "generate_audio" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "要转换为语音的文字内容" },
+                    "voice_id": { "type": "string", "description": "音色 ID（可选），不指定则使用默认音色" },
+                    "provider": { "type": "string", "enum": ["minimax"], "description": "语音合成 Provider，minimax=MiniMax TTS", "default": "minimax" }
+                },
+                "required": ["text"]
+            }),
+            "generate_video" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "视频描述，详细描述要生成的视频内容" },
+                    "duration": { "type": "integer", "description": "视频时长（秒），默认 5 秒", "default": 5 },
+                    "provider": { "type": "string", "enum": ["minimax", "jimeng"], "description": "视频生成 Provider，minimax=MiniMax Video, jimeng=即梦视频", "default": "minimax" }
+                },
+                "required": ["prompt"]
+            }),
+            "get_video_status" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "task_id": { "type": "string", "description": "视频生成任务 ID" },
+                    "provider": { "type": "string", "enum": ["minimax", "jimeng"], "description": "视频生成 Provider" }
+                },
+                "required": ["task_id", "provider"]
+            }),
             _ => serde_json::json!({
                 "type": "object",
                 "properties": {},
@@ -723,6 +759,26 @@ impl RalphLoopExecutor {
             AiTool { name: "ipfs_archive".to_string(), description: "IPFS归档管理：归档文件到IPFS、提取、固定".to_string(), parameters: Self::get_tool_parameters("ipfs_archive") },
             AiTool { name: "browser".to_string(), description: "浏览器自动化：导航、点击、输入、截图、执行JS".to_string(), parameters: Self::get_tool_parameters("browser") },
             AiTool { name: "ui_control".to_string(), description: "UI控制：显示通知、更新状态、打开对话框".to_string(), parameters: Self::get_tool_parameters("ui_control") },
+            AiTool {
+                name: "generate_image".to_string(),
+                description: "根据文字描述生成图片，支持风景、人物、艺术创作等。当用户要求生成图片、绘制图像、创建插画时使用此工具。".to_string(),
+                parameters: Self::get_tool_parameters("generate_image"),
+            },
+            AiTool {
+                name: "generate_audio".to_string(),
+                description: "将文字转换为语音 (TTS)，支持多种音色和语言。当用户要求朗读文本、生成语音、创建音频时使用此工具。".to_string(),
+                parameters: Self::get_tool_parameters("generate_audio"),
+            },
+            AiTool {
+                name: "generate_video".to_string(),
+                description: "根据文字描述生成视频，支持动画、实景等风格。注意：视频生成是异步任务，生成开始后需要轮询状态。当用户要求生成视频、创建动画时使用此工具。".to_string(),
+                parameters: Self::get_tool_parameters("generate_video"),
+            },
+            AiTool {
+                name: "get_video_status".to_string(),
+                description: "查询异步视频生成任务的状态。当 generate_video 返回 status=processing 时，使用此工具轮询任务进度。".to_string(),
+                parameters: Self::get_tool_parameters("get_video_status"),
+            },
         ]
     }
 

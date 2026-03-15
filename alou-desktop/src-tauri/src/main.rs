@@ -35,6 +35,7 @@ mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
 mod diap_file_manager;  // 新增 DIAP 文件管理模块
 mod tool_api;  // 工具 API 模块
+mod media_api;  // 媒体 API 模块
 mod bot_gateway;  // Bot Gateway 模块
 mod heartbeat;  // 心跳模块
 mod cron;  // Cron 定时任务模块
@@ -42,6 +43,7 @@ mod soul;  // 灵魂/人格管理模块
 mod scheduler;  // Agent 调度器模块
 mod tasks;  // 任务管理模块
 mod logs;  // 日志管理模块
+mod agent_runtime;  // Agent Runtime 模块（新增）
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -80,6 +82,7 @@ use crate::sync::{
     read_wallet_sync_data, start_wallet_sync_server, write_wallet_sync_data,
 };
 use crate::tool_api::start_tool_api_server;
+use crate::media_api::start_media_api_server;
 use crate::lsp::{execute_lsp, get_supported_languages};
 use crate::spec::{execute_spec, get_spec_templates, load_template_content};
 use crate::workflow::{
@@ -586,7 +589,20 @@ fn main() {
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
         .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))
+        .manage(agent_runtime::commands::AgentRuntimeState::new())
         .invoke_handler(tauri::generate_handler![
+            // Agent Runtime commands
+            agent_runtime::commands::init_agent_runtime,
+            agent_runtime::commands::register_backend_agent,
+            agent_runtime::commands::send_group_message,
+            agent_runtime::commands::get_active_agents,
+            agent_runtime::commands::stop_agent,
+            agent_runtime::commands::get_group_history,
+            agent_runtime::commands::submit_task,
+            agent_runtime::commands::list_tools,
+            agent_runtime::commands::execute_tool,
+            agent_runtime::commands::get_runtime_status,
+            
             download_kubo_binary,
             start_ipfs_node,
             stop_ipfs_node,
@@ -912,6 +928,25 @@ fn main() {
                         let _ = std::fs::write(port_file, port.to_string());
                     }
                     Err(e) => eprintln!("Failed to start tool API server: {}", e),
+                }
+            });
+
+            // Start media API server on startup (for frontend media generation)
+            let app_handle_media = app.handle().clone();
+            let runtime_state_for_media = app.state::<crate::agent_runtime::AgentRuntimeState>().inner().clone();
+            tauri::async_runtime::spawn(async move {
+                match start_media_api_server(runtime_state_for_media).await {
+                    Ok(port) => {
+                        println!("Media API server started on port {}", port);
+                        // Write port to config file for frontend to read
+                        let config_dir = dirs::config_dir()
+                            .unwrap_or_else(|| std::path::PathBuf::from("."))
+                            .join("alou");
+                        let _ = std::fs::create_dir_all(&config_dir);
+                        let port_file = config_dir.join("media_api_port");
+                        let _ = std::fs::write(port_file, port.to_string());
+                    }
+                    Err(e) => eprintln!("Failed to start media API server: {}", e),
                 }
             });
 
