@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
-import CloseIcon from '@/assets/关闭 0.3.png'
+import CloseIcon from '@/assets/关闭0.3.png'
 import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
 import './ApiConfigModal.css'
 

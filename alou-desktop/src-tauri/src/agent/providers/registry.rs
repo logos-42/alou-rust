@@ -53,6 +53,14 @@ impl ProviderRegistry {
                 let provider = haimian::HaimianMusicProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
+            "seedance" => {
+                let provider = seedance::SeedanceProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            "seedream" => {
+                let provider = seedream::SeedreamProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
             _ => Err(AgentError::ConfigError(
                 format!("Unknown media provider: {}", name)
             )),

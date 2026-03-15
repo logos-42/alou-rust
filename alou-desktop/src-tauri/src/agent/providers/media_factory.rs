@@ -5,6 +5,8 @@
 //! - MiniMax: https://platform.minimaxi.com/document
 //! - Google Imagen: https://cloud.google.com/vertex-ai/docs/generative-ai/image/overview
 //! - Jimeng (即梦): https://api.jimeng.pro/docs
+//! - Seedance (即梦视频): https://doc.302.ai/305249446e0
+//! - Seedream (即梦图片): https://apidoc.deerapi.com/seedream-%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90-331149260e0
 
 use std::sync::Arc;
 use crate::agent::media_config::ProviderConfig;
@@ -41,6 +43,14 @@ impl MediaProviderFactory {
             }
             "haimian" => {
                 let provider = crate::agent::providers::haimian::HaimianMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            "seedance" => {
+                let provider = crate::agent::providers::seedance::SeedanceProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            "seedream" => {
+                let provider = crate::agent::providers::seedream::SeedreamProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             _ => Err(AgentError::ConfigError(
@@ -102,6 +112,32 @@ impl MediaProviderFactory {
                     "lyrics_support".to_string(),
                 ],
             },
+            ProviderInfo {
+                name: "seedance".to_string(),
+                description: "Seedance 是即梦 1.0 视频生成模型，支持文生视频和图片生视频".to_string(),
+                supported_types: vec![
+                    super::media_provider::MediaType::Video,
+                ],
+                capabilities: vec![
+                    "video_generation".to_string(),
+                    "text_to_video".to_string(),
+                    "image_to_video".to_string(),
+                    "chinese_optimized".to_string(),
+                ],
+            },
+            ProviderInfo {
+                name: "seedream".to_string(),
+                description: "Seedream 是即梦图片生成模型，支持高质量图片生成和多参考图".to_string(),
+                supported_types: vec![
+                    super::media_provider::MediaType::Image,
+                ],
+                capabilities: vec![
+                    "image_generation".to_string(),
+                    "high_quality".to_string(),
+                    "multi_reference".to_string(),
+                    "chinese_optimized".to_string(),
+                ],
+            },
         ]
     }
 
@@ -109,11 +145,11 @@ impl MediaProviderFactory {
     pub fn get_provider_by_capability(capability: &str) -> Option<String> {
         match capability {
             "image" => Some("google".to_string()),
-            "image_cn" => Some("jimeng".to_string()),
+            "image_cn" => Some("seedream".to_string()),
             "audio" | "tts" => Some("minimax".to_string()),
             "music" | "music_generation" => Some("haimian".to_string()),
-            "video" => Some("jimeng".to_string()),
-            "video_cn" => Some("jimeng".to_string()),
+            "video" => Some("seedance".to_string()),
+            "video_cn" => Some("seedance".to_string()),
             _ => None,
         }
     }
@@ -126,18 +162,23 @@ mod tests {
     #[test]
     fn test_list_providers() {
         let providers = MediaProviderFactory::list_providers();
-        assert_eq!(providers.len(), 3);
-        
+        assert_eq!(providers.len(), 6);
+
         let names: Vec<String> = providers.iter().map(|p| p.name.clone()).collect();
         assert!(names.contains(&"minimax".to_string()));
         assert!(names.contains(&"google".to_string()));
         assert!(names.contains(&"jimeng".to_string()));
+        assert!(names.contains(&"haimian".to_string()));
+        assert!(names.contains(&"seedance".to_string()));
+        assert!(names.contains(&"seedream".to_string()));
     }
 
     #[test]
     fn test_get_provider_by_capability() {
         assert_eq!(MediaProviderFactory::get_provider_by_capability("image"), Some("google".to_string()));
+        assert_eq!(MediaProviderFactory::get_provider_by_capability("image_cn"), Some("seedream".to_string()));
         assert_eq!(MediaProviderFactory::get_provider_by_capability("tts"), Some("minimax".to_string()));
-        assert_eq!(MediaProviderFactory::get_provider_by_capability("video"), Some("jimeng".to_string()));
+        assert_eq!(MediaProviderFactory::get_provider_by_capability("video"), Some("seedance".to_string()));
+        assert_eq!(MediaProviderFactory::get_provider_by_capability("music"), Some("haimian".to_string()));
     }
 }

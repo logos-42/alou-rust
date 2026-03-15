@@ -360,3 +360,46 @@ pub async fn agent_list_subscriptions(
     
     Ok(vec![])
 }
+
+// ============================================================================
+// 群聊订阅管理命令
+// ============================================================================
+
+/// 订阅群聊请求
+#[derive(Debug, Deserialize)]
+pub struct SubscribeGroupRequest {
+    pub agent_id: String,
+    pub group_id: String,
+    pub mode: String,
+}
+
+/// Agent 订阅群聊
+#[tauri::command]
+pub async fn agent_subscribe_group(
+    request: SubscribeGroupRequest,
+    _state: State<'_, AgentRuntimeState>,
+) -> Result<bool, String> {
+    log::info!("Agent 订阅群聊：{} -> {} ({})", request.agent_id, request.group_id, request.mode);
+    Ok(true)
+}
+
+/// Agent 取消订阅群聊
+#[tauri::command]
+pub async fn agent_unsubscribe_group(
+    agent_id: String,
+    group_id: String,
+    _state: State<'_, AgentRuntimeState>,
+) -> Result<bool, String> {
+    log::info!("Agent 取消订阅群聊：{} -> {}", agent_id, group_id);
+    Ok(true)
+}
+
+/// 列出 Agent 的群聊订阅
+#[tauri::command]
+pub async fn agent_list_subscriptions(
+    agent_id: String,
+    _state: State<'_, AgentRuntimeState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    log::info!("列出 Agent 群聊订阅：{}", agent_id);
+    Ok(vec![])
+}
