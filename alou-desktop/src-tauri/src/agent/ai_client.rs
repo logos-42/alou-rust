@@ -155,6 +155,31 @@ impl AiClient {
                 config.model.clone().unwrap_or_else(|| "kimi-k2-turbo-preview".to_string()),
                 config.base_url.clone(),
             )),
+            // 新增的 Provider
+            "openrouter" => Box::new(providers::OpenRouterProvider::new(
+                config.api_key.clone(),
+                config.model.clone().unwrap_or_else(|| "anthropic/claude-3.5-sonnet".to_string()),
+                config.base_url.clone(),
+            )),
+            "glm" | "zhipuai" | "智谱" => Box::new(providers::GlmProvider::new(
+                config.api_key.clone(),
+                config.model.clone().unwrap_or_else(|| "glm-4".to_string()),
+                config.base_url.clone(),
+            )),
+            "gemini" | "google" => Box::new(providers::GeminiProvider::new(
+                config.api_key.clone(),
+                config.model.clone().unwrap_or_else(|| "gemini-2.0-flash-exp".to_string()),
+                config.base_url.clone(),
+            )),
+            "minimax" | "minimax-text" => Box::new(providers::MiniMaxTextProvider::new(
+                config.api_key.clone(),
+                config.model.clone().unwrap_or_else(|| "minimax-01".to_string()),
+                config.base_url.clone(),
+                config.config.as_ref()
+                    .and_then(|c| c["group_id"].as_str())
+                    .unwrap_or("")
+                    .to_string(),
+            )),
             _ => {
                 return Err(AgentError::InvalidInput(format!(
                     "未知的 provider: {}",

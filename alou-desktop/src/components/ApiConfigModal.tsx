@@ -539,6 +539,22 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                 </div>
               )}
 
+              {/* 媒体 Provider 的 Model 字段 */}
+              {isEditingMedia && (
+                <div className="api-config-field">
+                  <label>
+                    <span>Model（可选）</span>
+                    <input
+                      type="text"
+                      value={currentConfig.model}
+                      onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
+                      placeholder="使用默认模型"
+                      disabled={isLoading}
+                    />
+                  </label>
+                </div>
+              )}
+
               {/* 能力标签展示 */}
               {currentConfig.capabilities.length > 0 && (
                 <div className="api-config-field">

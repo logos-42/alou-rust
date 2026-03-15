@@ -116,6 +116,7 @@ use crate::diap_file_manager::{
 use crate::agent::commands::{
     execute_agent_task, execute_ai_conversation, get_agent_config, update_agent_config,
     test_api_connection, get_available_providers, health_check,
+    get_media_config, update_media_config, test_media_provider_connection,
 };
 
 // Agent Hook commands

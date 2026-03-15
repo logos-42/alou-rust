@@ -198,6 +198,11 @@
   font-size: 13px;
 }
 
+.api-config-modal__field input::placeholder,
+.api-config-modal__field input[type="text"]::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
 .api-config-modal.light .api-config-modal__input-group input,
 .api-config-modal.light .api-config-modal__field input,
 .api-config-modal.light .api-config-modal__field select,
@@ -205,6 +210,11 @@
   background: #f8fafc;
   border-color: rgba(0, 0, 0, 0.1);
   color: #1e293b;
+}
+
+.api-config-modal.light .api-config-modal__field input::placeholder,
+.api-config-modal.light .api-config-modal__field input[type="text"]::placeholder {
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .api-config-modal__input-group input:focus,
@@ -435,19 +445,19 @@
 /* 标签页 */
 .api-config-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 6px;
+  margin-bottom: 14px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  padding-bottom: 12px;
+  padding-bottom: 10px;
 }
 
 .api-config-tab {
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: none;
   background: rgba(0, 0, 0, 0.05);
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   transition: all 0.2s;
 }
 
@@ -464,6 +474,8 @@
   margin-left: auto;
   background: #34C759;
   color: white;
+  padding: 6px 14px;
+  font-size: 13px;
 }
 
 .api-config-tab-add:hover {
@@ -472,14 +484,14 @@
 
 /* 配置列表 */
 .api-config-list {
-  max-height: 400px;
+  max-height: 320px;
   overflow-y: auto;
 }
 
 .api-config-item {
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   transition: all 0.2s;
 }
 
@@ -492,59 +504,63 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 12px;
   cursor: pointer;
 }
 
 .api-config-item-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .api-config-provider-icon {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .api-config-item-name {
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  font-size: 14px;
 }
 
 .api-config-active-badge {
   background: #34C759;
   color: white;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
 }
 
 .api-config-item-meta {
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.7;
   display: flex;
-  gap: 12px;
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .api-config-capabilities {
   display: flex;
-  gap: 4px;
+  gap: 3px;
+  flex-wrap: wrap;
 }
 
 .capability-tag {
   background: rgba(0, 122, 255, 0.1);
   color: #007AFF;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .api-config-item-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
@@ -552,8 +568,8 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
+  font-size: 14px;
+  padding: 3px;
   border-radius: 4px;
   transition: background 0.2s;
 }
@@ -566,19 +582,19 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 12px;
-  padding: 4px 8px;
+  font-size: 11px;
+  padding: 3px 6px;
 }
 
 .api-config-item-detail {
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   background: rgba(0, 0, 0, 0.02);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .api-config-detail-row {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .api-config-detail-row:last-child {
@@ -588,61 +604,62 @@
 /* 空状态 */
 .api-config-empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: 30px 20px;
   opacity: 0.6;
 }
 
 .api-config-empty button {
-  margin-top: 12px;
-  padding: 8px 24px;
+  margin-top: 10px;
+  padding: 6px 20px;
   background: #007AFF;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 13px;
 }
 
 /* 编辑表单 */
 .api-config-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
 }
 
 .api-config-field label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 14px;
+  gap: 4px;
+  font-size: 13px;
 }
 
 .api-config-field input,
 .api-config-field select {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid rgba(0, 0, 0, 0.2);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .api-config-hint {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.6;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .api-config-actions-inline {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .api-config-btn-verify {
-  padding: 8px 20px;
+  padding: 6px 16px;
   background: #5856D6;
   color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .api-config-btn-verify:disabled {
@@ -653,17 +670,17 @@
 .api-config-error {
   background: rgba(255, 59, 48, 0.1);
   color: #FF3B30;
-  padding: 12px;
+  padding: 8px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .api-config-success {
   background: rgba(52, 199, 89, 0.1);
   color: #34C759;
-  padding: 12px;
+  padding: 8px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* Dark mode */
@@ -699,4 +716,95 @@
 
 .dark .api-config-btn-icon:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+/* 能力标签 */
+.capability-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dark .capability-tag {
+  background: rgba(0, 122, 255, 0.2);
+}
+
+/* 底部操作栏 */
+.api-config-modal__actions {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.api-config-modal.light .api-config-modal__actions {
+  border-top-color: rgba(148, 163, 184, 0.3);
+}
+
+.api-config-modal__actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.api-config-modal__btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  color: #cbd5e1;
+}
+
+.api-config-modal.light .api-config-modal__btn-ghost {
+  border-color: rgba(148, 163, 184, 0.5) !important;
+  color: #64748b;
+}
+
+.api-config-modal__btn-ghost:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: rgba(148, 163, 184, 0.5) !important;
+}
+
+.api-config-modal__btn-save {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.api-config-modal__btn-save:hover:not(:disabled) {
+  background: #059669;
+}
+
+.api-config-modal__btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.api-config-modal__info {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #93c5fd;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.api-config-modal.light .api-config-modal__info {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #2563eb;
+}
+
+.api-config-modal__info p {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+}
+
+.api-config-modal__info p:last-child {
+  margin-bottom: 0;
 }

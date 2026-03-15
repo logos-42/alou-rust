@@ -10,6 +10,7 @@ use super::task::{TaskFinalResult, TaskManager};
 use std::sync::Arc;
 use crate::runtime::router::SessionRouter;
 use crate::runtime::message::{SessionMessage, MessageMetadata};
+use crate::agent::media_config::{MediaApiConfig, ProviderConfig as MediaProviderConfig};
 
 /// Tauri 命令：执行 Agent 任务（同步返回结果）
 #[tauri::command]
@@ -153,6 +154,76 @@ pub async fn update_agent_config(config: ApiConfig) -> std::result::Result<(), S
     match config.save().await {
         Ok(_) => Ok(()),
         Err(e) => Err(format!("保存配置失败：{}", e)),
+    }
+}
+
+/// Tauri 命令：获取媒体配置
+#[tauri::command]
+pub async fn get_media_config() -> std::result::Result<MediaApiConfig, String> {
+    MediaApiConfig::load()
+}
+
+/// Tauri 命令：更新媒体配置
+#[tauri::command]
+pub async fn update_media_config(config: MediaApiConfig) -> std::result::Result<(), String> {
+    config.save()
+}
+
+/// Tauri 命令：测试媒体 Provider 连接
+#[tauri::command]
+pub async fn test_media_provider_connection(
+    provider_name: String,
+    config: MediaProviderConfig,
+) -> std::result::Result<TestResult, String> {
+    use crate::agent::providers::media_factory::MediaProviderFactory;
+    
+    // 创建 Provider 实例
+    let provider = match MediaProviderFactory::create_provider(&provider_name, &config) {
+        Ok(p) => p,
+        Err(e) => return Ok(TestResult { 
+            success: false, 
+            message: format!("创建 Provider 失败：{}", e) 
+        }),
+    };
+
+    // 根据 Provider 类型测试
+    let result = match provider_name.as_str() {
+        "seedream" | "google" | "jimeng" => {
+            // 图片 Provider - 测试生成一张小图
+            use crate::agent::providers::media_provider::{MediaProvider, ImageOptions};
+            let options = ImageOptions {
+                prompt: "test".to_string(),
+                width: Some(64),
+                height: Some(64),
+                ..Default::default()
+            };
+            provider.generate_image(options).await
+                .map(|_| "图片生成测试成功".to_string())
+                .map_err(|e| e.to_string())
+        }
+        "minimax" => {
+            // 音频 Provider - 测试 TTS
+            use crate::agent::providers::media_provider::{MediaProvider, AudioOptions};
+            let options = AudioOptions {
+                text: "test".to_string(),
+                ..Default::default()
+            };
+            provider.generate_audio(options).await
+                .map(|_| "语音合成测试成功".to_string())
+                .map_err(|e| e.to_string())
+        }
+        "seedance" => {
+            // 视频 Provider - 只测试配置有效性，不实际生成
+            Ok("视频 Provider 配置有效".to_string())
+        }
+        _ => {
+            Ok(format!("Provider {} 不支持测试", provider_name))
+        }
+    };
+
+    match result {
+        Ok(msg) => Ok(TestResult { success: true, message: msg }),
+        Err(e) => Ok(TestResult { success: false, message: e }),
     }
 }
 
