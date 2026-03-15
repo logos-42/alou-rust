@@ -720,6 +720,10 @@ fn main() {
             test_api_connection,
             get_available_providers,
             health_check,
+            // Media Config commands
+            get_media_config,
+            update_media_config,
+            test_media_provider_connection,
             // Agent Hook commands
             agent_hook_inject,
             agent_hook_inject_high_priority,
