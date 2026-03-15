@@ -6,6 +6,7 @@ use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCa
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
 use super::error::AgentError;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
+use crate::agent::async_tool_manager::{AsyncToolManager, AsyncToolStatus};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ pub struct RalphLoopExecutor {
     task_manager: Arc<TaskManager>,
     tool_bridge: Arc<ToolBridge>,
     tool_registry: Arc<crate::tools::ToolRegistry>,
+    async_tool_manager: Option<Arc<AsyncToolManager>>,
     app_handle: Option<tauri::AppHandle>,
 }
 
@@ -73,6 +75,7 @@ impl RalphLoopExecutor {
             task_manager,
             tool_bridge,
             tool_registry,
+            async_tool_manager: None,
             app_handle: None,
         }
     }
@@ -80,6 +83,12 @@ impl RalphLoopExecutor {
     /// 设置 AppHandle（用于向前端发送进度事件）
     pub fn with_app_handle(mut self, app_handle: tauri::AppHandle) -> Self {
         self.app_handle = Some(app_handle);
+        self
+    }
+
+    /// 设置异步工具管理器
+    pub fn with_async_tool_manager(mut self, async_tool_manager: Arc<AsyncToolManager>) -> Self {
+        self.async_tool_manager = Some(async_tool_manager);
         self
     }
 

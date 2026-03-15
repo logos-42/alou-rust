@@ -50,6 +50,9 @@ const PROVIDERS = [
   { value: 'minimax', label: 'MiniMax', category: 'media', capabilities: ['tts', 'video'] },
   { value: 'google', label: 'Google Imagen', category: 'media', capabilities: ['image'] },
   { value: 'jimeng', label: '即梦', category: 'media', capabilities: ['image', 'video'] },
+  { value: 'seedance', label: 'Seedance', category: 'media', capabilities: ['video'] },
+  { value: 'seedream', label: 'Seedream', category: 'media', capabilities: ['image'] },
+  { value: 'haimian', label: '海绵音乐', category: 'media', capabilities: ['music'] },
   { value: 'stability', label: 'Stability AI', category: 'media', capabilities: ['image'] },
   { value: 'elevenlabs', label: 'ElevenLabs', category: 'media', capabilities: ['tts'] },
 ]
@@ -67,6 +70,9 @@ const MEDIA_PROVIDER_FIELDS = {
   minimax: { label: 'Group ID', placeholder: '输入 Group ID' },
   google: { label: 'Project ID', placeholder: '输入 Project ID' },
   jimeng: { label: 'API Secret', placeholder: '输入 API Secret' },
+  seedance: { label: 'Base URL', placeholder: 'https://api.302.ai/doubao' },
+  seedream: { label: 'Base URL', placeholder: 'https://api.deerapi.com' },
+  haimian: { label: 'API Secret', placeholder: '输入 API Secret' },
 }
 
 function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
