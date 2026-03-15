@@ -1,64 +1,57 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
-import CloseIcon from '@/assets/关闭0.3.png'
-// 安全导入 Tauri API
+import CloseIcon from '@/assets/关闭 0.3.png'
+import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
+import './ApiConfigModal.css'
+
+// Tauri invoke 安全导入
 let invokeCache = null;
 async function getInvoke() {
   if (!invokeCache) {
-    // 检测是否在 Tauri 环境中
-    const isTauri = typeof window !== 'undefined' && 
-                   (window.__TAURI__ !== undefined || 
+    const isTauri = typeof window !== 'undefined' &&
+                   (window.__TAURI__ !== undefined ||
                     window.__TAURI_IPC__ !== undefined ||
                     (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.TAURI_PLATFORM)));
-    
+
     if (isTauri) {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         invokeCache = invoke;
       } catch (error) {
-        console.warn('[ApiConfigModal] 无法导入 Tauri invoke，使用模拟函数:', error);
+        console.warn('[ApiConfigModal] 无法导入 Tauri invoke:', error);
         invokeCache = createMockInvoke();
       }
     } else {
-      console.log('[ApiConfigModal] 浏览器环境，使用模拟 invoke');
       invokeCache = createMockInvoke();
     }
   }
   return invokeCache;
 }
 
-// 创建模拟的 invoke 函数
 function createMockInvoke() {
   return async (cmd, args) => {
     console.warn(`[MockInvoke] ${cmd}`, args);
-    
-    switch (cmd) {
-      case 'test_api_connection':
-        return { success: true, message: '模拟API连接测试成功' };
-      case 'get_agent_config':
-        return { 
-          user_apis: [],
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: 'deepseek'
-        };
-      case 'update_agent_config':
-        return undefined;
-      default:
-        return {};
-    }
+    if (cmd === 'test_api_connection') return { success: true, message: '模拟连接成功' };
+    if (cmd === 'get_agent_config') return { user_apis: [], workers_api: { base_url: '', enabled: false }, execution_strategy: 'LocalOnly', default_provider: 'deepseek' };
+    if (cmd === 'update_agent_config') return undefined;
+    return {};
   };
 }
 
-import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
-import './ApiConfigModal.css'
-
+// Provider 定义（包含文本和媒体）
 const PROVIDERS = [
-  { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'claude', label: 'Claude (Anthropic)' },
-  { value: 'qwen', label: 'Qwen' },
-  { value: 'kimi', label: 'Kimi' },
+  // 文本 LLM
+  { value: 'deepseek', label: 'DeepSeek', category: 'text', capabilities: ['text'] },
+  { value: 'openai', label: 'OpenAI', category: 'text', capabilities: ['text'] },
+  { value: 'claude', label: 'Claude', category: 'text', capabilities: ['text'] },
+  { value: 'qwen', label: 'Qwen', category: 'text', capabilities: ['text'] },
+  { value: 'kimi', label: 'Kimi', category: 'text', capabilities: ['text'] },
+  // 媒体生成
+  { value: 'minimax', label: 'MiniMax', category: 'media', capabilities: ['tts', 'video'] },
+  { value: 'google', label: 'Google Imagen', category: 'media', capabilities: ['image'] },
+  { value: 'jimeng', label: '即梦', category: 'media', capabilities: ['image', 'video'] },
+  { value: 'stability', label: 'Stability AI', category: 'media', capabilities: ['image'] },
+  { value: 'elevenlabs', label: 'ElevenLabs', category: 'media', capabilities: ['tts'] },
 ]
 
 const DEFAULT_MODELS = {
@@ -69,113 +62,217 @@ const DEFAULT_MODELS = {
   kimi: 'moonshot-v1-8k',
 }
 
+// 媒体 Provider 的特殊配置字段
+const MEDIA_PROVIDER_FIELDS = {
+  minimax: { label: 'Group ID', placeholder: '输入 Group ID' },
+  google: { label: 'Project ID', placeholder: '输入 Project ID' },
+  jimeng: { label: 'API Secret', placeholder: '输入 API Secret' },
+}
+
 function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   const { t } = useI18n()
-  const [apiKey, setApiKey] = useState('')
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [provider, setProvider] = useState('deepseek')
-  const [model, setModel] = useState(DEFAULT_MODELS.deepseek)
-  const [baseUrl, setBaseUrl] = useState('')
+  const modalRef = useRef(null)
+
+  // 多 API 配置列表
+  const [apiConfigs, setApiConfigs] = useState([])
+  const [activeTab, setActiveTab] = useState('all') // 'all' | 'text' | 'media'
+  const [editingId, setEditingId] = useState(null)
+  const [expandedConfig, setExpandedConfig] = useState(null)
+
+  // 当前编辑的配置
+  const [currentConfig, setCurrentConfig] = useState({
+    id: '',
+    provider: 'deepseek',
+    api_key: '',
+    base_url: '',
+    model: '',
+    enabled: true,
+    is_active: false,
+    capabilities: [],
+  })
+
   const [isLoading, setIsLoading] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const modalRef = useRef(null)
 
-  // 从 Tauri 本地存储加载配置（不需要 Workers 后端）
+  // 加载配置
   useEffect(() => {
     if (isOpen) {
-      const loadConfig = async () => {
-        try {
-          const config = await getActiveApiConfig()
-          if (config) {
-            setApiKey(config.api_key || '')
-            setProvider(config.provider || 'deepseek')
-            setModel(config.model || DEFAULT_MODELS[config.provider] || 'deepseek-chat')
-            setBaseUrl(config.base_url || '')
-          } else {
-            // 回退到 localStorage
-            setApiKey(localStorage.getItem('user_api_key') || '')
-            const p = localStorage.getItem('ai_provider') || 'deepseek'
-            setProvider(p)
-            setModel(localStorage.getItem('ai_model') || DEFAULT_MODELS[p] || 'deepseek-chat')
-            setBaseUrl('')
-          }
-        } catch (err) {
-          console.warn('[ApiConfigModal] 加载配置失败，使用 localStorage:', err)
-          setApiKey(localStorage.getItem('user_api_key') || '')
-          const p = localStorage.getItem('ai_provider') || 'deepseek'
-          setProvider(p)
-          setModel(localStorage.getItem('ai_model') || DEFAULT_MODELS[p] || 'deepseek-chat')
-        }
-        setError(null)
-        setSuccess(null)
-      }
-      loadConfig()
+      loadConfigs()
     }
   }, [isOpen])
 
-  // 当 provider 改变时，更新默认 model
-  useEffect(() => {
-    if (DEFAULT_MODELS[provider]) {
-      setModel(DEFAULT_MODELS[provider])
-    }
-  }, [provider])
-
-  // 点击外部关闭
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (modalRef.current && !modalRef.current.contains(event.target)) {
-        handleClose()
+  const loadConfigs = async () => {
+    try {
+      const invoke = await getInvoke()
+      const config = await invoke('get_agent_config')
+      
+      if (config && config.user_apis) {
+        setApiConfigs(config.user_apis.map(api => ({
+          ...api,
+          base_url: api.base_url || '',
+          enabled: api.is_active !== false,
+        })))
+      }
+    } catch (err) {
+      console.warn('加载配置失败:', err)
+      // 回退到 localStorage
+      const localConfig = await getActiveApiConfig()
+      if (localConfig) {
+        setApiConfigs([{ ...localConfig, base_url: localConfig.base_url || '', enabled: true }])
       }
     }
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') handleClose()
-    }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      document.addEventListener('keydown', handleEscape)
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen])
+    setError(null)
+    setSuccess(null)
+  }
 
+  // 添加新配置
+  const handleAddNew = () => {
+    setEditingId('new')
+    setCurrentConfig({
+      id: `new_${Date.now()}`,
+      provider: 'deepseek',
+      api_key: '',
+      base_url: '',
+      model: DEFAULT_MODELS.deepseek,
+      enabled: true,
+      is_active: apiConfigs.length === 0,
+      capabilities: ['text'],
+    })
+    setExpandedConfig(null)
+  }
+
+  // 编辑现有配置
+  const handleEdit = (config) => {
+    setEditingId(config.id)
+    setCurrentConfig({
+      ...config,
+      base_url: config.base_url || '',
+    })
+    setExpandedConfig(null)
+  }
+
+  // 取消编辑
+  const handleCancel = () => {
+    setEditingId(null)
+    setCurrentConfig({
+      id: '',
+      provider: 'deepseek',
+      api_key: '',
+      base_url: '',
+      model: '',
+      enabled: true,
+      is_active: false,
+      capabilities: [],
+    })
+  }
+
+  // 保存配置
   const handleSave = async () => {
     setError(null)
     setSuccess(null)
 
-    if (!apiKey.trim()) {
-      setError(t('apiConfig.error.apiKeyRequired'))
-      return
-    }
-    if (!model.trim()) {
-      setError(t('apiConfig.error.modelRequired'))
+    if (!currentConfig.api_key.trim()) {
+      setError('API Key 不能为空')
       return
     }
 
     setIsLoading(true)
     try {
-      // 通过 Tauri 加密保存到本地文件（同时写入 localStorage 作为备份）
-      await saveApiConfig(apiKey.trim(), provider, model.trim(), baseUrl.trim() || undefined)
+      const invoke = await getInvoke()
+      
+      let newConfigs
+      if (editingId === 'new') {
+        // 添加新配置
+        newConfigs = [...apiConfigs, { ...currentConfig, id: `api_${Date.now()}` }]
+      } else {
+        // 更新现有配置
+        newConfigs = apiConfigs.map(c => 
+          c.id === editingId ? currentConfig : c
+        )
+      }
 
-      // 通知其他组件配置已更新
+      // 保存到 Tauri
+      await invoke('update_agent_config', {
+        config: {
+          user_apis: newConfigs,
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+        },
+      })
+
+      setApiConfigs(newConfigs)
+      setEditingId(null)
+      setSuccess('配置已保存')
+      
       window.dispatchEvent(new CustomEvent('api-config-changed'))
-
-      setSuccess(t('apiConfig.success.saved'))
-      setTimeout(() => handleClose(), 1000)
+      
+      setTimeout(() => {
+        handleClose()
+      }, 1000)
     } catch (err) {
-      console.error('[ApiConfigModal] 保存配置失败:', err)
-      setError(t('apiConfig.error.saveFailed') + (err?.message ? `: ${err.message}` : ''))
+      console.error('保存配置失败:', err)
+      setError(`保存失败：${err.message || '未知错误'}`)
     } finally {
       setIsLoading(false)
     }
   }
 
+  // 删除配置
+  const handleDelete = async (id) => {
+    if (!confirm('确定要删除此配置吗？')) return
+
+    try {
+      const invoke = await getInvoke()
+      const newConfigs = apiConfigs.filter(c => c.id !== id)
+      
+      await invoke('update_agent_config', {
+        config: {
+          user_apis: newConfigs,
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: newConfigs[0]?.provider || 'deepseek',
+        },
+      })
+
+      setApiConfigs(newConfigs)
+      if (editingId === id) handleCancel()
+    } catch (err) {
+      setError(`删除失败：${err.message}`)
+    }
+  }
+
+  // 设置激活状态
+  const handleSetActive = async (id) => {
+    try {
+      const invoke = await getInvoke()
+      const newConfigs = apiConfigs.map(c => ({
+        ...c,
+        is_active: c.id === id,
+      }))
+
+      await invoke('update_agent_config', {
+        config: {
+          user_apis: newConfigs,
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: newConfigs.find(c => c.is_active)?.provider || 'deepseek',
+        },
+      })
+
+      setApiConfigs(newConfigs)
+      window.dispatchEvent(new CustomEvent('api-config-changed'))
+    } catch (err) {
+      setError(`设置失败：${err.message}`)
+    }
+  }
+
+  // 测试连接
   const handleVerify = async () => {
-    if (!apiKey.trim()) {
-      setError(t('apiConfig.error.apiKeyRequired'))
+    if (!currentConfig.api_key.trim()) {
+      setError('API Key 不能为空')
       return
     }
 
@@ -184,37 +281,45 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     setIsVerifying(true)
 
     try {
-      // 通过 Tauri invoke 直接测试 API 连接，无需 Workers 后端
-      const invoke = await getInvoke();
+      const invoke = await getInvoke()
       const result = await invoke('test_api_connection', {
-        config: {
-          id: 'test',
-          provider,
-          api_key: apiKey.trim(),
-          base_url: baseUrl.trim() || null,
-          model: model.trim(),
-          is_active: true,
-        },
+        config: currentConfig,
       })
 
       if (result?.success) {
-        setSuccess(t('apiConfig.success.verified'))
+        setSuccess('连接测试成功')
       } else {
-        setError(result?.message || t('apiConfig.error.verifyFailed'))
+        setError(result?.message || '连接测试失败')
       }
     } catch (err) {
-      console.error('[ApiConfigModal] 验证 API Key 失败:', err)
-      setError(err?.message || t('apiConfig.error.networkError'))
+      setError(`连接测试失败：${err.message}`)
     } finally {
       setIsVerifying(false)
     }
   }
 
+  // 切换展开/收起
+  const toggleExpand = (id) => {
+    setExpandedConfig(expandedConfig === id ? null : id)
+  }
+
   const handleClose = () => {
     setError(null)
     setSuccess(null)
+    setEditingId(null)
+    setExpandedConfig(null)
     onClose()
   }
+
+  const filteredConfigs = activeTab === 'all' 
+    ? apiConfigs 
+    : apiConfigs.filter(c => {
+        const provider = PROVIDERS.find(p => p.value === c.provider)
+        return provider?.category === activeTab
+      })
+
+  const isEditingMedia = currentConfig.provider && 
+    PROVIDERS.find(p => p.value === currentConfig.provider)?.category === 'media'
 
   if (!isOpen) return null
 
@@ -224,7 +329,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         <div className="api-config-modal__header">
           <div>
             <h2>{t('apiConfig.title')}</h2>
-            <p>{t('apiConfig.subtitle')}</p>
+            <p>支持多 API 配置并存，智能体根据能力自动路由</p>
           </div>
           <button type="button" onClick={handleClose} className="api-config-modal__close">
             <img src={CloseIcon} alt="关闭" />
@@ -232,118 +337,261 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         </div>
 
         <div className="api-config-modal__content">
-          {/* API Key */}
-          <div className="api-config-modal__field">
-            <label>
-              <span>{t('apiConfig.apiKey.label')}</span>
-              <div className="api-config-modal__input-group">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  placeholder={t('apiConfig.apiKey.placeholder')}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  disabled={isLoading}
-                />
+          {/* 标签页切换 */}
+          <div className="api-config-tabs">
+            <button
+              className={`api-config-tab ${activeTab === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveTab('all')}
+            >
+              全部 ({apiConfigs.length})
+            </button>
+            <button
+              className={`api-config-tab ${activeTab === 'text' ? 'active' : ''}`}
+              onClick={() => setActiveTab('text')}
+            >
+              文本 LLM
+            </button>
+            <button
+              className={`api-config-tab ${activeTab === 'media' ? 'active' : ''}`}
+              onClick={() => setActiveTab('media')}
+            >
+              媒体生成
+            </button>
+            <button className="api-config-tab api-config-tab-add" onClick={handleAddNew}>
+              + 添加配置
+            </button>
+          </div>
+
+          {/* 配置列表 */}
+          {editingId === null && (
+            <div className="api-config-list">
+              {filteredConfigs.length === 0 ? (
+                <div className="api-config-empty">
+                  <p>暂无配置</p>
+                  <button onClick={handleAddNew}>添加第一个配置</button>
+                </div>
+              ) : (
+                filteredConfigs.map((config) => {
+                  const provider = PROVIDERS.find(p => p.value === config.provider)
+                  const isExpanded = expandedConfig === config.id
+                  const isActive = config.is_active
+
+                  return (
+                    <div key={config.id} className={`api-config-item ${isActive ? 'active' : ''}`}>
+                      <div className="api-config-item-header" onClick={() => toggleExpand(config.id)}>
+                        <div className="api-config-item-info">
+                          <span className="api-config-provider-icon">
+                            {provider?.category === 'media' ? '🎨' : '💬'}
+                          </span>
+                          <div>
+                            <div className="api-config-item-name">
+                              {provider?.label || config.provider}
+                              {isActive && <span className="api-config-active-badge">使用中</span>}
+                            </div>
+                            <div className="api-config-item-meta">
+                              {config.model && <span>模型：{config.model}</span>}
+                              {provider?.capabilities && (
+                                <span className="api-config-capabilities">
+                                  {provider.capabilities.map(cap => (
+                                    <span key={cap} className="capability-tag">{cap}</span>
+                                  ))}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="api-config-item-actions">
+                          <button
+                            className="api-config-btn-icon"
+                            onClick={(e) => { e.stopPropagation(); handleSetActive(config.id); }}
+                            title={isActive ? '取消激活' : '设为激活'}
+                          >
+                            {isActive ? '✅' : '⭕'}
+                          </button>
+                          <button
+                            className="api-config-btn-icon"
+                            onClick={(e) => { e.stopPropagation(); handleEdit(config); }}
+                            title="编辑"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="api-config-btn-icon"
+                            onClick={(e) => { e.stopPropagation(); handleDelete(config.id); }}
+                            title="删除"
+                          >
+                            🗑️
+                          </button>
+                          <button className="api-config-expand-icon">
+                            {isExpanded ? '▲' : '▼'}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {isExpanded && (
+                        <div className="api-config-item-detail">
+                          <div className="api-config-detail-row">
+                            <strong>API Key:</strong> {config.api_key ? '••••••' + config.api_key.slice(-4) : '未设置'}
+                          </div>
+                          {config.base_url && (
+                            <div className="api-config-detail-row">
+                              <strong>Base URL:</strong> {config.base_url}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
+
+          {/* 编辑/添加配置表单 */}
+          {editingId !== null && (
+            <div className="api-config-form">
+              {/* Provider 选择 */}
+              <div className="api-config-field">
+                <label>
+                  <span>Provider</span>
+                  <select
+                    value={currentConfig.provider}
+                    onChange={(e) => {
+                      const newProvider = e.target.value
+                      const provider = PROVIDERS.find(p => p.value === newProvider)
+                      setCurrentConfig({
+                        ...currentConfig,
+                        provider: newProvider,
+                        model: DEFAULT_MODELS[newProvider] || '',
+                        capabilities: provider?.capabilities || [],
+                      })
+                    }}
+                    disabled={isLoading}
+                  >
+                    <optgroup label="文本 LLM">
+                      {PROVIDERS.filter(p => p.category === 'text').map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="媒体生成">
+                      {PROVIDERS.filter(p => p.category === 'media').map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </label>
+              </div>
+
+              {/* API Key */}
+              <div className="api-config-field">
+                <label>
+                  <span>API Key</span>
+                  <input
+                    type="password"
+                    value={currentConfig.api_key}
+                    onChange={(e) => setCurrentConfig({ ...currentConfig, api_key: e.target.value })}
+                    placeholder="输入 API Key"
+                    disabled={isLoading}
+                  />
+                </label>
+              </div>
+
+              {/* Base URL（媒体 Provider 特殊字段） */}
+              {isEditingMedia && MEDIA_PROVIDER_FIELDS[currentConfig.provider] && (
+                <div className="api-config-field">
+                  <label>
+                    <span>{MEDIA_PROVIDER_FIELDS[currentConfig.provider].label}</span>
+                    <input
+                      type="text"
+                      value={currentConfig.base_url}
+                      onChange={(e) => setCurrentConfig({ ...currentConfig, base_url: e.target.value })}
+                      placeholder={MEDIA_PROVIDER_FIELDS[currentConfig.provider].placeholder}
+                      disabled={isLoading}
+                    />
+                  </label>
+                </div>
+              )}
+
+              {/* Model（仅文本 Provider） */}
+              {!isEditingMedia && (
+                <div className="api-config-field">
+                  <label>
+                    <span>Model</span>
+                    <input
+                      type="text"
+                      value={currentConfig.model}
+                      onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
+                      placeholder="输入模型名称"
+                      disabled={isLoading}
+                    />
+                  </label>
+                  {DEFAULT_MODELS[currentConfig.provider] && (
+                    <p className="api-config-hint">
+                      默认：{DEFAULT_MODELS[currentConfig.provider]}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* 能力标签展示 */}
+              {currentConfig.capabilities.length > 0 && (
+                <div className="api-config-field">
+                  <label>
+                    <span>支持能力</span>
+                    <div className="capability-tags">
+                      {currentConfig.capabilities.map(cap => (
+                        <span key={cap} className="capability-tag">{cap}</span>
+                      ))}
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* 测试连接 */}
+              <div className="api-config-actions-inline">
                 <button
                   type="button"
-                  className="api-config-modal__toggle-visibility"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  title={showApiKey ? t('apiConfig.apiKey.hide') : t('apiConfig.apiKey.show')}
+                  className="api-config-btn-verify"
+                  onClick={handleVerify}
+                  disabled={isLoading || isVerifying || !currentConfig.api_key.trim()}
                 >
-                  {showApiKey ? '👁️' : '👁️‍🗨️'}
+                  {isVerifying ? '测试中...' : '测试连接'}
                 </button>
               </div>
-            </label>
-            <p className="api-config-modal__hint">
-              ⚠️ {t('apiConfig.apiKey.warning')}
-            </p>
-          </div>
 
-          {/* Provider */}
-          <div className="api-config-modal__field">
-            <label>
-              <span>{t('apiConfig.provider.label')}</span>
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
+              {error && <div className="api-config-error">{error}</div>}
+              {success && <div className="api-config-success">{success}</div>}
+            </div>
+          )}
+
+          {/* 保存/取消按钮 */}
+          {editingId !== null && (
+            <div className="api-config-modal__actions">
+              <button
+                type="button"
+                className="api-config-modal__btn-ghost"
+                onClick={handleCancel}
                 disabled={isLoading}
               >
-                {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+                取消
+              </button>
+              <button
+                type="button"
+                className="api-config-modal__btn-save"
+                onClick={handleSave}
+                disabled={isLoading || isVerifying}
+              >
+                {isLoading ? '保存中...' : '保存'}
+              </button>
+            </div>
+          )}
 
-          {/* Model */}
-          <div className="api-config-modal__field">
-            <label>
-              <span>{t('apiConfig.model.label')}</span>
-              <input
-                type="text"
-                placeholder={t('apiConfig.model.placeholder')}
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                disabled={isLoading}
-              />
-            </label>
-            <p className="api-config-modal__hint">
-              {t('apiConfig.model.default')}: {DEFAULT_MODELS[provider] || t('apiConfig.model.notSet')}
-            </p>
-          </div>
-
-          {/* Base URL（可选，用于自定义 API 端点） */}
-          <div className="api-config-modal__field">
-            <label>
-              <span>Base URL <span style={{ fontWeight: 'normal', opacity: 0.6 }}>(可选)</span></span>
-              <input
-                type="text"
-                placeholder="https://api.example.com/v1 (留空使用官方端点)"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                disabled={isLoading}
-              />
-            </label>
-            <p className="api-config-modal__hint">
-              💡 配置后可直接使用工具和自主循环，无需启动 Workers 后端
-            </p>
-          </div>
-
-          {error && <div className="api-config-modal__error">{error}</div>}
-          {success && <div className="api-config-modal__success">{success}</div>}
-
-          <div className="api-config-modal__info">
-            <p>🔒 API Key 加密存储在本地，不上传到任何服务器</p>
-          </div>
-        </div>
-
-        <div className="api-config-modal__actions">
-          <button
-            type="button"
-            className="api-config-modal__btn-ghost"
-            onClick={handleClose}
-            disabled={isLoading}
-          >
-            {t('apiConfig.cancel')}
-          </button>
-          <button
-            type="button"
-            className="api-config-modal__btn-verify"
-            onClick={handleVerify}
-            disabled={isLoading || isVerifying || !apiKey.trim()}
-          >
-            {isVerifying ? t('apiConfig.verifying') : t('apiConfig.testConnection')}
-          </button>
-          <button
-            type="button"
-            className="api-config-modal__btn-save"
-            onClick={handleSave}
-            disabled={isLoading || isVerifying}
-          >
-            {isLoading ? t('apiConfig.saving') : t('apiConfig.save')}
-          </button>
+          {editingId === null && (
+            <div className="api-config-modal__info">
+              <p>🔒 所有 API Key 加密存储在本地</p>
+              <p>💡 智能体根据任务类型自动选择有对应能力的 Provider</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

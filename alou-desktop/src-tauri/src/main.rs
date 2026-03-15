@@ -589,7 +589,7 @@ fn main() {
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
         .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))
-        .manage(agent_runtime::commands::AgentRuntimeState::new())
+        // AgentRuntimeState 将在 init_agent_runtime 命令中创建
         .invoke_handler(tauri::generate_handler![
             // Agent Runtime commands
             agent_runtime::commands::init_agent_runtime,
@@ -602,6 +602,10 @@ fn main() {
             agent_runtime::commands::list_tools,
             agent_runtime::commands::execute_tool,
             agent_runtime::commands::get_runtime_status,
+            // Group chat subscription commands
+            agent_runtime::commands::agent_subscribe_group,
+            agent_runtime::commands::agent_unsubscribe_group,
+            agent_runtime::commands::agent_list_subscriptions,
             
             download_kubo_binary,
             start_ipfs_node,

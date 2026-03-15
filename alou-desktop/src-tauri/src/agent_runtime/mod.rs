@@ -1,16 +1,17 @@
 //! Agent Runtime - 本地 Agent 运行时
-//! 
+//!
 //! 包含：
 //! - MessageBus (不丢消息)
 //! - EventRouter (事件路由)
 //! - AgentRegistry (原子更新)
-//! - Agent Actor (顺序处理)
+//! - Agent Actor (顺序处理，集成 RalphLoop)
 //! - Agent Supervisor (崩溃恢复)
 //! - Agent Router (三种路由)
 //! - JS Runtime Pool (沙箱)
 //! - Tool Bus (工具总线)
 //! - Task Queue (全局任务队列)
 //! - Storage (SQLite)
+//! - Manager (统一管理入口)
 
 pub mod message_bus;
 pub mod event_router;
@@ -23,6 +24,9 @@ pub mod tool_bus;
 pub mod task_queue;
 pub mod storage;
 pub mod media_tools;
+pub mod group_chat_bridge;
+pub mod manager;  // 统一管理入口
+pub mod commands;  // Tauri 命令
 
 pub use message_bus::*;
 pub use event_router::*;
@@ -34,11 +38,14 @@ pub use js_runtime::*;
 pub use tool_bus::*;
 pub use task_queue::*;
 pub use storage::*;
+pub use manager::*;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::agent::providers::ProviderRegistry;
 use crate::agent::media_config::MediaApiConfig;
+use crate::tools::{ToolRegistry, ToolFacade};
+use crate::bridges::BridgeManager;
 
 /// Agent Runtime 状态
 pub struct AgentRuntimeState {
@@ -48,21 +55,41 @@ pub struct AgentRuntimeState {
     pub agent_router: AgentRouter,
     pub agent_supervisor: AgentSupervisor,
     pub js_runtime_pool: JsRuntimePool,
-    pub tool_bus: ToolBus,
+    pub tool_bus: Arc<ToolBus>,
     pub task_queue: TaskQueue,
     pub storage: Storage,
     pub provider_registry: Arc<ProviderRegistry>,
+    pub tool_registry: Arc<ToolRegistry>,
+    pub tool_facade: Arc<ToolFacade>,
+    pub bridge_manager: Arc<BridgeManager>,
 }
 
 impl AgentRuntimeState {
-    pub async fn new() -> Result<Self, String> {
+    pub async fn new(
+        tool_registry: Arc<ToolRegistry>,
+        bridge_manager: Arc<BridgeManager>,
+    ) -> Result<Self, String> {
         let message_bus = MessageBus::with_default_capacity();
         let event_router = EventRouter::new(message_bus.clone()).await;
         let agent_registry = AgentRegistry::new();
         let agent_router = AgentRouter::new(agent_registry.clone());
-        let agent_supervisor = AgentSupervisor::new(RestartPolicy::OnFailure(3));
+        
+        // 创建 ToolBus 并注册媒体工具
+        let mut tool_bus = ToolBus::new();
+        tool_bus.register_media_tools(provider_registry.clone());
+        let tool_bus = Arc::new(tool_bus);
+        
+        // 创建统一工具入口
+        let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), tool_bus.clone()));
+        
+        // 创建 Agent Supervisor
+        let agent_supervisor = AgentSupervisor::new(
+            RestartPolicy::OnFailure(3),
+            tool_facade.clone(),
+            bridge_manager.clone(),
+        );
+        
         let js_runtime_pool = JsRuntimePool::new(JsRuntimeConfig::default()).await?;
-        let tool_bus = ToolBus::new();
         let task_queue = TaskQueue::new();
         let storage = Storage::new("./alou_runtime.db").await?;
 
@@ -76,9 +103,6 @@ impl AgentRuntimeState {
                 })
         );
 
-        // 注册媒体工具
-        tool_bus.register_media_tools(provider_registry.clone());
-
         Ok(Self {
             message_bus,
             event_router,
@@ -90,6 +114,9 @@ impl AgentRuntimeState {
             task_queue,
             storage,
             provider_registry,
+            tool_registry,
+            tool_facade,
+            bridge_manager,
         })
     }
 }
@@ -100,17 +127,20 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-    pub async fn new() -> Result<Self, String> {
-        let state = Arc::new(AgentRuntimeState::new().await?);
+    pub async fn new(
+        tool_registry: Arc<ToolRegistry>,
+        bridge_manager: Arc<BridgeManager>,
+    ) -> Result<Self, String> {
+        let state = Arc::new(AgentRuntimeState::new(tool_registry, bridge_manager).await?);
         Ok(Self { state })
     }
-    
+
     /// 启动运行时
     pub async fn start(&self) -> Result<(), String> {
         log::info!("Agent Runtime 启动");
         Ok(())
     }
-    
+
     /// 停止运行时
     pub async fn stop(&self) -> Result<(), String> {
         log::info!("Agent Runtime 停止");

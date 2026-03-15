@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 pub mod executor;
 pub mod registry;
+pub mod facade;  // 统一工具入口（新增）
 pub mod bash;
 pub mod filesystem;
 pub mod search;
@@ -46,6 +47,7 @@ pub mod broadcast_transaction;    // 交易广播工具
 pub use executor::{ToolExecutor, ToolResult, ToolError};
 // ToolCategory is defined in this module, not registry
 pub use registry::ToolRegistry;
+pub use facade::{ToolFacade, ToolInfo};  // 新增统一入口
 pub use filesystem::FileSystemTool;
 pub use search::SearchTool;
 pub use bash::BashTool;

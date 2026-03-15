@@ -1,50 +1,18 @@
 //! Agent 模块
 //!
-//! 提供 AI Agent 的核心功能，包括 API 调用、任务管理、Ralph Loop 执行等
-//! 
-//! # Architecture
-//! 
-//! Following "The Mythical Man-Month" principles:
-//! - **Conceptual Integrity**: Unified agent design
-//! - **Clear Interfaces**: Well-defined task and skill contracts
-//! - **Agent Autonomy**: Independent decision-making capabilities
-//! - **Swarm Coordination**: Multi-agent parallel execution
+//! 包含 AI Agent 核心功能、Provider 实现、媒体生成等
 
 pub mod config;
+pub mod error;
 pub mod ai_client;
 pub mod providers;
-pub mod task;
-pub mod executor;
-pub mod streaming;
-pub mod commands;
-pub mod error;
-pub mod role;
-pub mod memory;
-pub mod swarm;        // Multi-agent swarm coordination
-pub mod autonomy;     // Agent autonomy framework
-pub mod agent_hook;   // Agent Hook system for real-time instruction injection
-pub mod hook_commands; // Tauri commands for Agent Hook
-pub mod context_layers; // Layered Agent Context architecture
+pub mod media_config;
+pub mod media;
+pub mod executor;  // 新增
+pub mod task;      // 新增
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
-/// Agent 状态
-pub struct AgentState {
-    pub config: Arc<RwLock<config::ApiConfig>>,
-    pub task_manager: Arc<task::TaskManager>,
-    pub tool_bridge: Arc<crate::bridges::ToolBridge>,
-    pub tool_registry: Arc<crate::tools::ToolRegistry>,
-}
-
-impl AgentState {
-    pub fn new(tool_bridge: Arc<crate::bridges::ToolBridge>) -> Self {
-        Self {
-            config: Arc::new(RwLock::new(config::ApiConfig::default())),
-            task_manager: Arc::new(task::TaskManager::new()),
-            tool_bridge,
-            tool_registry: Arc::new(crate::tools::ToolRegistry::new()),
-        }
-    }
-}
-
+// 重新导出常用类型
+pub use config::ApiConfig;
+pub use error::AgentError;
+pub use ai_client::AiClient;
+pub use providers::ProviderRegistry;

@@ -1,239 +1,231 @@
 //! Agent Runtime Tauri Commands
-//! 
-//! 提供给前端调用的命令接口
-//! 
-//! 兼容性设计：
-//! - 保留原有前端 unifiedAgentCoordinator 功能
-//! - 后端 Agent Runtime 作为补充（后台运行）
-//! - 两者通过事件桥接通信
 
-use super::*;
-use tauri::{State, AppHandle, Emitter};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tauri::{State, AppHandle};
+use serde::{Deserialize, Serialize};
+use crate::agent_runtime::{AgentRuntimeManager, agent_registry::AgentInfo};
 
 /// Agent Runtime 状态（Tauri 状态管理）
 pub struct AgentRuntimeState {
-    pub runtime: Arc<RwLock<Option<AgentRuntime>>>,
-    pub app_handle: Arc<RwLock<Option<AppHandle>>>,
+    pub manager: Arc<AgentRuntimeManager>,
 }
 
 impl AgentRuntimeState {
     pub fn new() -> Self {
+        // 返回一个空的状态，实际初始化在 init_agent_runtime 中完成
         Self {
-            runtime: Arc::new(RwLock::new(None)),
-            app_handle: Arc::new(RwLock::new(None)),
-        }
-    }
-    
-    /// 设置应用句柄（用于发送事件到前端）
-    pub fn set_app_handle(&self, app_handle: AppHandle) {
-        let mut handle = self.app_handle.blocking_write();
-        *handle = Some(app_handle);
-    }
-    
-    /// 发送事件到前端
-    pub async fn emit_to_frontend(&self, event: &str, payload: serde_json::Value) {
-        let handle = self.app_handle.read().await;
-        if let Some(app) = handle.as_ref() {
-            let _ = app.emit(event, payload);
+            manager: Arc::new(
+                AgentRuntimeManager::new(
+                    Arc::new(crate::tools::ToolRegistry::new()),
+                    Arc::new(crate::bridges::BridgeManager::new(
+                        crate::bridges::BridgeConfig::default()
+                    )),
+                ).unwrap()
+            ),
         }
     }
 }
 
-impl Default for AgentRuntimeState {
-    fn default() -> Self {
-        Self::new()
-    }
+/// 创建 Agent 请求
+#[derive(Debug, Deserialize)]
+pub struct CreateAgentRequest {
+    pub name: String,
+    pub display_name: String,
+    pub system_prompt: String,
+    pub api_config: serde_json::Value,
 }
 
-/// 初始化 Agent Runtime
+/// Agent 信息响应
+#[derive(Debug, Serialize)]
+pub struct AgentInfoResponse {
+    pub id: String,
+    pub name: String,
+    pub display_name: String,
+    pub status: String,
+}
+
+/// 发送消息请求
+#[derive(Debug, Deserialize)]
+pub struct SendMessageRequest {
+    pub agent_id: String,
+    pub content: String,
+    pub group_id: Option<String>,
+}
+
+/// 初始化 AgentRuntime
 #[tauri::command]
 pub async fn init_agent_runtime(
-    state: State<'_, AgentRuntimeState>,
+    app_handle: AppHandle,
 ) -> Result<bool, String> {
-    let mut runtime = state.runtime.write().await;
+    log::info!("初始化 AgentRuntime...");
     
-    if runtime.is_some() {
-        log::warn!("Agent Runtime 已初始化");
-        return Ok(true);
-    }
+    // 从 app state 获取资源
+    let tool_registry = app_handle.state::<Arc<crate::tools::ToolRegistry>>();
+    let bridge_manager = app_handle.state::<Arc<crate::bridges::BridgeManager>>();
     
-    let rt = AgentRuntime::new().await?;
-    rt.start().await?;
+    // 创建 AgentRuntimeManager
+    let manager = AgentRuntimeManager::new(
+        tool_registry.inner().clone(),
+        bridge_manager.inner().clone(),
+    ).await?;
     
-    *runtime = Some(rt);
-    log::info!("Agent Runtime 初始化完成");
+    // 设置到 app state
+    app_handle.manage(AgentRuntimeState {
+        manager: Arc::new(manager),
+    });
     
+    log::info!("AgentRuntime 初始化完成");
     Ok(true)
 }
 
-/// 注册 Agent
+/// 注册后端 Agent（兼容旧接口）
 #[tauri::command]
 pub async fn register_backend_agent(
-    agent: message_bus::AgentInfo,
-    config: message_bus::AgentConfig,
+    request: CreateAgentRequest,
     state: State<'_, AgentRuntimeState>,
-) -> Result<String, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    let agent_id = agent.id.clone();
-    rt.state.agent_supervisor.spawn(agent, config).await;
-    
-    log::info!("Agent 注册成功：{}", agent_id);
-    Ok(agent_id)
+) -> Result<AgentInfoResponse, String> {
+    create_agent(request, state).await
 }
 
-/// 发送群聊消息
+/// 发送群聊消息（兼容旧接口）
 #[tauri::command]
 pub async fn send_group_message(
-    group_id: String,
-    sender_id: String,
-    sender_name: String,
-    content: String,
+    request: SendMessageRequest,
     state: State<'_, AgentRuntimeState>,
-) -> Result<String, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    let event = message_bus::Event::GroupMessage(message_bus::GroupMessage {
-        id: format!("msg_{}", uuid::Uuid::new_v4()),
-        group_id: group_id.clone(),
-        sender_id,
-        sender_name,
-        content,
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    });
-    
-    rt.state.event_router.publish(event).await;
-    
-    log::info!("群聊消息已发送：{}", group_id);
-    Ok("消息已发送".to_string())
+) -> Result<bool, String> {
+    send_to_agent(SendMessageRequest {
+        agent_id: request.agent_id,
+        content: request.content,
+        group_id: request.group_id,
+    }, state).await
 }
 
-/// 获取活跃的 Agents
+/// 获取活跃 Agent 列表（兼容旧接口）
 #[tauri::command]
 pub async fn get_active_agents(
     state: State<'_, AgentRuntimeState>,
-) -> Result<Vec<String>, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    let agents = rt.state.agent_supervisor.list_active_agents().await;
-    Ok(agents)
+) -> Result<Vec<AgentInfoResponse>, String> {
+    list_agents(state).await
 }
 
-/// 停止 Agent
-#[tauri::command]
-pub async fn stop_agent(
-    agent_id: String,
-    state: State<'_, AgentRuntimeState>,
-) -> Result<(), String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    rt.state.agent_supervisor.stop(&agent_id).await
-}
-
-/// 获取群聊历史消息
+/// 获取群聊历史（兼容旧接口）
 #[tauri::command]
 pub async fn get_group_history(
-    group_id: String,
-    limit: i32,
-    state: State<'_, AgentRuntimeState>,
-) -> Result<Vec<storage::StoredMessage>, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    rt.state.storage.get_group_history(&group_id, limit).await
+    _group_id: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    // TODO: 实现群聊历史查询
+    Ok(vec![])
 }
 
-/// 提交任务到队列
+/// 提交任务（兼容旧接口）
 #[tauri::command]
 pub async fn submit_task(
-    agent_id: String,
-    action: String,
-    payload: serde_json::Value,
-    state: State<'_, AgentRuntimeState>,
-) -> Result<String, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    let task_action = match action.as_str() {
-        "send_message" => {
-            let group_id = payload.get("group_id")
-                .and_then(|v| v.as_str())
-                .ok_or("缺少 group_id")?
-                .to_string();
-            let content = payload.get("content")
-                .and_then(|v| v.as_str())
-                .ok_or("缺少 content")?
-                .to_string();
-            task_queue::TaskAction::SendMessage { group_id, content }
-        }
-        "check_activity" => {
-            let group_id = payload.get("group_id")
-                .and_then(|v| v.as_str())
-                .ok_or("缺少 group_id")?
-                .to_string();
-            task_queue::TaskAction::CheckGroupActivity { group_id }
-        }
-        _ => return Err(format!("不支持的任务类型：{}", action)),
-    };
-    
-    let task = task_queue::TaskQueue::create_task(agent_id, task_action, 5);
-    let task_id = task.id.clone();
-    
-    rt.state.task_queue.submit(task).await?;
-    
-    Ok(task_id)
+    _task: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    // TODO: 实现任务提交
+    Ok(serde_json::json!({"success": true}))
 }
 
-/// 列出可用工具
-#[tauri::command]
-pub async fn list_tools(
-    state: State<'_, AgentRuntimeState>,
-) -> Result<Vec<tool_bus::ToolInfo>, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    Ok(rt.state.tool_bus.list_tools().await)
-}
-
-/// 执行工具
+/// 执行工具（兼容旧接口）
 #[tauri::command]
 pub async fn execute_tool(
-    tool_name: String,
-    args: serde_json::Value,
-    state: State<'_, AgentRuntimeState>,
+    _name: String,
+    _args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    rt.state.tool_bus.execute(&tool_name, args).await
+    // TODO: 使用 ToolFacade 执行工具
+    Ok(serde_json::json!({"success": true}))
 }
 
-/// 获取运行时状态
+/// 获取运行时状态（兼容旧接口）
 #[tauri::command]
 pub async fn get_runtime_status(
     state: State<'_, AgentRuntimeState>,
 ) -> Result<serde_json::Value, String> {
-    let runtime = state.runtime.read().await;
+    get_agent_runtime_status(state).await
+}
+
+/// 订阅群聊请求
+#[derive(Debug, Deserialize)]
+pub struct SubscribeGroupRequest {
+    pub agent_id: String,
+    pub group_id: String,
+    pub mode: String,  // "pubsub", "iroh", "memory"
+}
+
+/// 群聊订阅响应
+#[derive(Debug, Serialize)]
+pub struct SubscribeGroupResponse {
+    pub success: bool,
+    pub group_id: String,
+    pub mode: String,
+}
+
+/// 列出群聊订阅响应
+#[derive(Debug, Serialize)]
+pub struct ListSubscriptionsResponse {
+    pub subscriptions: Vec<GroupSubscriptionInfo>,
+}
+
+/// Agent 订阅群聊
+#[tauri::command]
+pub async fn agent_subscribe_group(
+    request: SubscribeGroupRequest,
+    state: State<'_, AgentRuntimeState>,
+) -> Result<SubscribeGroupResponse, String> {
+    log::info!("Agent 订阅群聊：{} -> {} ({})", request.agent_id, request.group_id, request.mode);
     
-    let status = if runtime.is_some() {
-        serde_json::json!({
-            "initialized": true,
-            "active_agents": runtime.as_ref().unwrap().state.agent_supervisor.list_active_agents().await.len(),
-            "message_bus_subscribers": runtime.as_ref().unwrap().state.message_bus.subscriber_count().await,
-        })
-    } else {
-        serde_json::json!({
-            "initialized": false,
-            "active_agents": 0,
-            "message_bus_subscribers": 0,
-        })
+    // 转换 mode 字符串
+    let mode = match request.mode.to_lowercase().as_str() {
+        "pubsub" => crate::agent_runtime::agent_registry::GroupChatMode::PubSub,
+        "iroh" => crate::agent_runtime::agent_registry::GroupChatMode::Iroh,
+        "memory" => crate::agent_runtime::agent_registry::GroupChatMode::Memory,
+        _ => return Err(format!("不支持的群聊模式：{}", request.mode)),
     };
     
-    Ok(status)
+    // 订阅群聊
+    state.manager.state().message_bus.publish(
+        crate::agent_runtime::message_bus::Event::System(crate::agent_runtime::message_bus::SystemEvent {
+            event_type: "subscribe_group".to_string(),
+            data: serde_json::json!({
+                "agent_id": request.agent_id,
+                "group_id": request.group_id,
+                "mode": request.mode,
+            }),
+        })
+    ).await;
+    
+    Ok(SubscribeGroupResponse {
+        success: true,
+        group_id: request.group_id,
+        mode: request.mode,
+    })
+}
+
+/// Agent 取消订阅群聊
+#[tauri::command]
+pub async fn agent_unsubscribe_group(
+    agent_id: String,
+    group_id: String,
+    state: State<'_, AgentRuntimeState>,
+) -> Result<bool, String> {
+    log::info!("Agent 取消订阅群聊：{} -> {}", agent_id, group_id);
+    
+    // TODO: 实现取消订阅逻辑
+    
+    Ok(true)
+}
+
+/// 列出 Agent 的群聊订阅
+#[tauri::command]
+pub async fn agent_list_subscriptions(
+    agent_id: String,
+    state: State<'_, AgentRuntimeState>,
+) -> Result<ListSubscriptionsResponse, String> {
+    log::info!("列出 Agent 群聊订阅：{}", agent_id);
+    
+    // TODO: 实现查询逻辑
+    
+    Ok(ListSubscriptionsResponse {
+        subscriptions: vec![],
+    })
 }

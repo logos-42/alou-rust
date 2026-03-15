@@ -39,8 +39,8 @@ pub async fn execute_agent_task(
     }
 }
 
-/// Tauri 命令：执行 AI 对话（使用 SessionActor 架构）
-/// 同步等待执行完成
+/// Tauri 命令：执行 AI 对话
+/// 🔥 直接执行模式：每个请求独立并发执行，互不阻塞
 #[tauri::command]
 pub async fn execute_ai_conversation(
     app_handle: tauri::AppHandle,
@@ -51,11 +51,10 @@ pub async fn execute_ai_conversation(
     agent_id: Option<String>,
     session_id: Option<String>,
     bridge_manager: tauri::State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
-    session_router: tauri::State<'_, std::sync::Arc<SessionRouter>>,
+    _session_router: tauri::State<'_, std::sync::Arc<SessionRouter>>,
 ) -> std::result::Result<serde_json::Value, String> {
     use super::task::TaskManager;
-    use crate::runtime::message::{SessionMessage, MessageMetadata};
-    
+
     log::info!("[Command] 执行 AI 对话：{}", &message[..20.min(message.len())]);
 
     let user_config = match serde_json::from_value::<UserApiConfig>(agent_config) {
@@ -70,7 +69,7 @@ pub async fn execute_ai_conversation(
 
     let target_session_id = session_id.or(agent_id).unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp()));
 
-    // 创建任务管理器
+    // 🔥 每个请求创建独立的任务管理器和执行器，实现真正的并发
     let task_manager = Arc::new(TaskManager::new());
     let tool_bridge = bridge_manager.tool_bridge();
 
@@ -91,7 +90,7 @@ pub async fn execute_ai_conversation(
                 })
             })
             .collect();
-        
+
         log::info!("[Command] 使用完整消息历史创建任务，消息数：{}", ai_messages.len());
         task_manager.create_task_with_messages(target_session_id.clone(), ai_messages).await
     } else {
@@ -99,40 +98,18 @@ pub async fn execute_ai_conversation(
         task_manager.create_task(target_session_id.clone(), message.clone()).await
     };
 
-    // 创建执行器
+    // 🔥 创建执行器（带 AppHandle 用于发送进度事件到前端）
     let executor = RalphLoopExecutor::new(
-        ai_client.clone(),
+        ai_client,
         task_manager.clone(),
-        tool_bridge.clone(),
+        tool_bridge,
         Arc::new(crate::tools::ToolRegistry::new()),
     )
     .with_app_handle(app_handle.clone());
 
     let use_stream = options.as_ref().and_then(|o| o.get("stream")).and_then(|s| s.as_bool()).unwrap_or(false);
 
-    // 提取 content 用于 SessionActor
-    let content = messages.as_ref()
-        .and_then(|msgs| msgs.last())
-        .and_then(|m| m.get("content"))
-        .and_then(|c| c.as_str())
-        .unwrap_or(&message)
-        .to_string();
-
-    // 发送消息到 SessionActor（用于状态隔离）
-    let handle = session_router.get_or_create(&target_session_id, ai_client.clone());
-    handle.send(SessionMessage::UserMessage {
-        content: content.clone(),
-        metadata: MessageMetadata {
-            stream: Some(use_stream),
-            timestamp: Some(chrono::Utc::now().timestamp()),
-            user_id: None,
-            source: Some("execute_ai_conversation".to_string()),
-        },
-    });
-
-    log::info!("[Command] 消息已发送到 SessionActor: session={}", target_session_id);
-
-    // 同步执行并等待完成
+    // 🔥 直接执行任务，不通过 SessionActor，实现真正的并发
     let result = if use_stream {
         let streaming_executor = StreamingExecutor::new(task_manager.clone());
         let _stream = streaming_executor.execute_stream(task_id.clone()).await;
@@ -140,11 +117,11 @@ pub async fn execute_ai_conversation(
             "success": true,
             "task_id": task_id,
             "stream": true,
-            "execution_mode": "session_actor",
             "session_id": target_session_id,
             "timestamp": chrono::Utc::now().timestamp()
         }))
     } else {
+        // 🔥 同步执行并等待完成（每个请求独立，互不阻塞）
         match executor.execute(&task_id).await {
             Ok(result) => {
                 log::info!("[Command] 对话执行成功：{}", task_id);
@@ -152,7 +129,6 @@ pub async fn execute_ai_conversation(
                     "success": true,
                     "result": result,
                     "task_id": task_id,
-                    "execution_mode": "session_actor",
                     "session_id": target_session_id,
                     "timestamp": chrono::Utc::now().timestamp()
                 }))
