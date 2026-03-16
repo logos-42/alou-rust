@@ -9,10 +9,9 @@ use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCa
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
 use super::error::AgentError;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
-use crate::agent::async_tool_manager::{AsyncToolManager, AsyncToolStatus};
+use crate::agent::async_tool_manager::AsyncToolManager;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
