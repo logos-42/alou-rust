@@ -265,14 +265,8 @@ impl HeartbeatManager {
         }
 
         // Save TASKS.md
-        match TasksManager::new() {
-            Ok(tasks_manager) => {
-                actions.push(format!("[{}] Tasks module: initialized", now));
-            }
-            Err(e) => {
-                actions.push(format!("[{}] Tasks module: created default ({})", now, e));
-            }
-        }
+        let tasks_manager = TasksManager::new();
+        actions.push(format!("[{}] Tasks module: initialized", now));
 
         // Save LOGS.md
         match LogsManager::new(&base_dir).get_stats() {

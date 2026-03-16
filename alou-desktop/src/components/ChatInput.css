@@ -24,6 +24,9 @@
   /* 移除 transition 以避免输入时闪烁 */
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
   min-height: 38px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* 暗夜模式 - 透明输入框 */
@@ -58,6 +61,10 @@
   max-height: 120px;
   padding: 1px 0 1px 8px;
   overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .input-area .message-input::-webkit-scrollbar {

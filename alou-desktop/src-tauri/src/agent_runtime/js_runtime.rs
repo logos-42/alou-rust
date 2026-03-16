@@ -60,7 +60,7 @@ impl JsRuntimePool {
         let context = Context::full(&runtime).map_err(|e| e.to_string())?;
 
         // 设置内存限制
-        runtime.set_memory_limit(config.memory_limit).map_err(|e| e.to_string())?;
+        let _ = runtime.set_memory_limit(config.memory_limit);
 
         // 设置超时（rquickjs 不支持 set_time_limit，跳过）
         // runtime.set_time_limit(Duration::from_millis(config.timeout_ms)).map_err(|e| e.to_string())?;
@@ -72,10 +72,11 @@ impl JsRuntimePool {
             let _ = ctx.globals().set("require", rquickjs::Undefined);
 
             // 提供安全的 console（使用对象字面量）
-            let _ = ctx.globals().set("console", ConsoleWrapper::new())?;
+            let console = ConsoleWrapper::new();
+            let _ = ctx.globals().set("console", console);
 
             Ok(())
-        })?;
+        });
 
         Ok(JsRuntimeInstance { runtime, context })
     }
@@ -98,26 +99,23 @@ impl JsRuntimePool {
         history: Vec<GroupMessage>,
     ) -> Result<String, String> {
         let instance = self.acquire().await?;
-        
+
         let result = instance.context.with(|ctx| -> Result<String, String> {
             // 注入上下文
             let msg_json = serde_json::to_string(&message).map_err(|e| e.to_string())?;
             let history_json = serde_json::to_string(&history).map_err(|e| e.to_string())?;
 
-            ctx.globals().set("message", msg_json)?;
-            ctx.globals().set("history", history_json)?;
+            let _ = ctx.globals().set("message", msg_json);
+            let _ = ctx.globals().set("history", history_json);
 
             // 执行脚本
-            let result: String = ctx.eval(agent_script)?;
+            let result: String = ctx.eval(agent_script).map_err(|e| e.to_string())?;
             Ok(result)
         });
 
         self.release(instance).await;
 
-        match result {
-            Ok(response) => Ok(response),
-            Err(e) => Err(format!("JS 执行错误：{}", e)),
-        }
+        result
     }
 }
 
@@ -161,7 +159,7 @@ impl<'js> rquickjs::IntoJs<'js> for ConsoleWrapper {
         obj.set("log", log_func)?;
         obj.set("error", error_func)?;
         obj.set("warn", warn_func)?;
-        Ok(rquickjs::Value::Object(obj))
+        Ok(rquickjs::Value::from_object(obj))
     }
 }
 

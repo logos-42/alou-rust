@@ -38,13 +38,13 @@ struct GeminiRequest {
     generation_config: Option<GeminiConfig>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct GeminiContent {
     role: String,
     parts: Vec<GeminiPart>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct GeminiPart {
     text: String,
 }
@@ -99,7 +99,7 @@ impl AiProvider for GeminiProvider {
             })
             .collect();
 
-        let gemini_tools = tools.map(|tools| GeminiTool {
+        let gemini_tools = tools.map(|tools| vec![GeminiTool {
             function_declarations: tools
                 .into_iter()
                 .map(|t| GeminiFunctionDeclaration {
@@ -108,7 +108,7 @@ impl AiProvider for GeminiProvider {
                     parameters: t.parameters,
                 })
                 .collect(),
-        });
+        }]);
 
         let request = GeminiRequest {
             contents,

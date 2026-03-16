@@ -54,7 +54,7 @@ use crate::bridges::BridgeManager;
 pub struct AgentRuntimeState {
     pub message_bus: MessageBus,
     pub event_router: EventRouter,
-    pub agent_registry: AgentRegistry,
+    pub agent_registry: Arc<AgentRegistry>,
     pub agent_router: AgentRouter,
     pub agent_supervisor: AgentSupervisor,
     pub js_runtime_pool: JsRuntimePool,
@@ -86,7 +86,7 @@ impl AgentRuntimeState {
         
         let message_bus = MessageBus::with_default_capacity();
         let event_router = EventRouter::new(message_bus.clone()).await;
-        let agent_registry = AgentRegistry::new();
+        let agent_registry = Arc::new(AgentRegistry::new());
         let agent_router = AgentRouter::new(agent_registry.clone());
         
         // 创建 ToolBus 并注册媒体工具

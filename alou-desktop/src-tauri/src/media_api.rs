@@ -254,6 +254,7 @@ async fn execute_generate_video(
     // 生成视频（异步任务）
     let options = VideoOptions {
         prompt: prompt,
+        duration: Some(duration as f64),
         duration_secs: Some(duration as u32),
         resolution: None,
         model: None,

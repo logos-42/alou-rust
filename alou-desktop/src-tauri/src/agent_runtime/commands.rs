@@ -107,7 +107,16 @@ pub async fn init_agent_runtime(
     // Create required dependencies
     let tool_registry = Arc::new(crate::tools::ToolRegistry::new());
     let bridge_manager = Arc::new(crate::bridges::BridgeManager::new(
-        crate::agent_runtime::message_bus::MessageBus::with_default_capacity()
+        crate::bridges::BridgeConfig {
+            tool_bridge: crate::bridges::ToolBridgeConfig::default(),
+            context_bridge: crate::bridges::ContextBridgeConfig::default(),
+            enabled: true,
+            max_concurrent_calls: 10,
+            timeout_seconds: 30,
+            max_retries: 3,
+            retry_delay_ms: 1000,
+            debug_mode: false,
+        }
     ));
     
     let rt = AgentRuntime::new(tool_registry, bridge_manager).await?;
@@ -130,23 +139,35 @@ pub async fn send_user_message(
 ) -> Result<(), String> {
     let runtime = state.runtime.read().await;
     let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
+
+    // Store request data before moving
+    let group_id = request.group_id.clone();
+    let sender_id = request.sender_id.clone();
+    let sender_name = request.sender_name.clone();
+    let content = request.content.clone();
+
     // 创建群聊消息事件
     let event = message_bus::Event::GroupMessage(message_bus::GroupMessage {
         id: format!("msg_{}", uuid::Uuid::new_v4()),
-        group_id: request.group_id.clone(),
+        group_id: group_id.clone(),
+        sender_id,
+        sender_name,
+        content,
+        timestamp: chrono::Utc::now().timestamp_millis(),
+    });
+
+    // 发布到 MessageBus
+    rt.state.message_bus.publish(event.clone()).await;
+
+    // 同时发送到前端显示
+    let frontend_request = SendUserMessageRequest {
+        group_id,
         sender_id: request.sender_id,
         sender_name: request.sender_name,
         content: request.content,
-        timestamp: chrono::Utc::now().timestamp_millis(),
-    });
-    
-    // 发布到 MessageBus
-    rt.state.message_bus.publish(event.clone()).await;
-    
-    // 同时发送到前端显示
-    state.emit_to_frontend("user-message-sent", serde_json::to_value(&request).unwrap()).await;
-    
+    };
+    state.emit_to_frontend("user-message-sent", serde_json::to_value(&frontend_request).unwrap()).await;
+
     log::info!("用户消息已发送到群聊：{}", request.group_id);
     Ok(())
 }

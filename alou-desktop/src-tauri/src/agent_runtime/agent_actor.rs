@@ -79,10 +79,18 @@ impl AgentActor {
         ai_client_pool: Arc<AiClientPool>,
     ) -> Self {
         // 从 Pool 获取 AI Client（复用）
-        // Note: Using config from agent.config for now as api_config field doesn't exist
-        let ai_client = Arc::new(
-            ai_client_pool.get_default().await.unwrap()
-        );
+        // Create a default config for the AI client
+        let default_config = crate::agent::config::UserApiConfig {
+            id: "default".to_string(),
+            provider: "anthropic".to_string(),
+            api_key: "".to_string(),
+            base_url: None,
+            model: Some("claude-3-7-sonnet-20250219".to_string()),
+            is_active: true,
+        };
+        let ai_client = ai_client_pool.get(&default_config).await.unwrap_or_else(|_| {
+            Arc::new(crate::agent::ai_client::AiClient::new(&default_config).unwrap())
+        });
 
         // 创建 TaskManager
         let task_manager = Arc::new(TaskManager::new());

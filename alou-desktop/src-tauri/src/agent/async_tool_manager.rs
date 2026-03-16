@@ -136,6 +136,7 @@ impl AsyncToolManager {
         }
 
         let result = self.tool_executor.execute_tool(&tool_name, arguments).await;
+        let is_success = result.is_ok();
 
         {
             let mut tasks = self.tasks.write().await;
@@ -156,7 +157,7 @@ impl AsyncToolManager {
             }
         }
 
-        log::info!("[AsyncTool] 任务完成：{} - {:?}", task_id, result.is_ok());
+        log::info!("[AsyncTool] 任务完成：{} - success={}", task_id, is_success);
     }
 
     /// 启动后台轮询

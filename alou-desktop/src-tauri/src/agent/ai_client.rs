@@ -175,10 +175,7 @@ impl AiClient {
                 config.api_key.clone(),
                 config.model.clone().unwrap_or_else(|| "minimax-01".to_string()),
                 config.base_url.clone(),
-                config.config.as_ref()
-                    .and_then(|c| c["group_id"].as_str())
-                    .unwrap_or("")
-                    .to_string(),
+                "".to_string(),
             )),
             _ => {
                 return Err(AgentError::InvalidInput(format!(

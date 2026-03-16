@@ -93,7 +93,7 @@ impl AgentSupervisor {
                                 let mut counts = supervisor.restart_counts.write().await;
                                 let count = counts.entry(agent_id.clone()).or_insert(0);
                                 *count += 1;
-                                *count <= max
+                                *count <= *max
                             }
                         };
 
@@ -134,14 +134,20 @@ impl AgentSupervisor {
     pub async fn list_active_agents(&self) -> Vec<String> {
         self.actors.read().await.keys().cloned().collect()
     }
+
+    /// Join group chat (placeholder implementation)
+    pub async fn join_group_chat(&self, _agent_id: &str, _group_id: &str) -> Result<(), String> {
+        log::warn!("join_group_chat is not implemented yet");
+        Ok(())
+    }
 }
 
 impl Clone for AgentSupervisor {
     fn clone(&self) -> Self {
         Self {
             actors: RwLock::new(HashMap::new()),  // Cannot clone
-            configs: self.configs.clone(),
-            restart_counts: self.restart_counts.clone(),
+            configs: RwLock::new(HashMap::new()),  // Cannot clone
+            restart_counts: RwLock::new(HashMap::new()),  // Cannot clone
             restart_policy: self.restart_policy.clone(),
             tool_facade: self.tool_facade.clone(),
             bridge_manager: self.bridge_manager.clone(),

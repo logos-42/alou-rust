@@ -109,10 +109,11 @@ impl AgentRouter {
     
     /// 注册 agent 到群聊
     pub async fn add_agent_to_group(&self, agent_id: &str, group_id: &str) {
-        let mut agents = self.registry.agents.write().await;
-        if let Some(agent) = agents.get_mut(agent_id) {
+        // Use the registry's get method and update through public API
+        if let Some(mut agent) = self.registry.get(agent_id).await {
             if !agent.groups.contains(&group_id.to_string()) {
                 agent.groups.push(group_id.to_string());
+                self.registry.register(agent).await;
             }
         }
     }

@@ -29,12 +29,18 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       const textarea = textareaRef.current
       if (!textarea) return
 
-      // 只在内容变化时调整高度，避免不必要的布局抖动
-      const newHeight = `${Math.min(textarea.scrollHeight, 120)}px`
-      if (textarea.style.height !== newHeight) {
-        textarea.style.height = 'auto'
-        textarea.style.height = newHeight
+      // 重置高度为 auto 以获取正确的 scrollHeight
+      textarea.style.height = 'auto'
+      
+      // 如果是空值，重置为最小高度
+      if (!value || value.trim() === '') {
+        textarea.style.height = '28px'
+        return
       }
+      
+      // 计算新高度，最大不超过 120px
+      const newHeight = `${Math.min(textarea.scrollHeight, 120)}px`
+      textarea.style.height = newHeight
     }
 
     useImperativeHandle(

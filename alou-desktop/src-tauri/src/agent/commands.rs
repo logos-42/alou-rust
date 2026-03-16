@@ -112,14 +112,14 @@ pub async fn execute_ai_conversation(
 
     // 🔥 直接执行任务，不通过 SessionActor，实现真正的并发
     let result = if use_stream {
-        let streaming_executor = StreamingExecutor::new(task_manager.clone());
-        let _stream = streaming_executor.execute_stream(task_id.clone()).await;
+        // StreamingExecutor not implemented yet
         Ok(serde_json::json!({
             "success": true,
             "task_id": task_id,
-            "stream": true,
+            "stream": false,
             "session_id": target_session_id,
-            "timestamp": chrono::Utc::now().timestamp()
+            "timestamp": chrono::Utc::now().timestamp(),
+            "note": "Streaming not implemented"
         }))
     } else {
         // 🔥 同步执行并等待完成（每个请求独立，互不阻塞）

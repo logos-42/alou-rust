@@ -137,6 +137,7 @@ pub trait MediaProvider: Send + Sync {
 /// 占位符 Provider（用于测试和默认值）
 pub struct PlaceholderProvider;
 
+#[async_trait]
 impl MediaProvider for PlaceholderProvider {
     fn name(&self) -> &str {
         "placeholder"

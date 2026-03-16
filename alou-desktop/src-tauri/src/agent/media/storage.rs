@@ -32,19 +32,12 @@ pub fn save_media(bytes: &[u8], media_type: &str, format: &str) -> Result<String
 
 /// 获取媒体存储目录
 pub fn get_media_directory() -> Result<PathBuf, String> {
-    // 尝试从配置获取
-    if let Ok(config) = MediaApiConfig::load() {
-        if let Some(storage) = config.storage {
-            return Ok(PathBuf::from(storage.media_directory));
-        }
-    }
-    
     // 默认目录
     let mut path = dirs::home_dir()
         .ok_or_else(|| "Failed to get home directory".to_string())?;
     path.push("Alou");
     path.push("media");
-    
+
     Ok(path)
 }
 

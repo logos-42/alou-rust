@@ -36,16 +36,14 @@ pub struct TaskQueue {
 
 impl TaskQueue {
     pub fn new() -> Self {
-        let (tx, mut rx) = mpsc::channel(1000);
-        
+        let (tx, rx) = mpsc::channel(1000);
+
         // 启动 worker 池（4 个并发 worker）
-        for i in 0..4 {
-            let rx_clone = rx.clone();
-            tokio::spawn(async move {
-                Self::worker(i, rx_clone).await;
-            });
-        }
-        
+        // Note: mpsc::Receiver doesn't support clone, so we use a single worker for now
+        tokio::spawn(async move {
+            Self::worker(0, rx).await;
+        });
+
         Self { tx }
     }
     

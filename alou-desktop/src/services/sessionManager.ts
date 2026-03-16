@@ -95,6 +95,22 @@ export class SessionManager {
 
   private async restoreSessions(): Promise<void> {
     try {
+      // 1. 先尝试恢复最后一个 session（即使不是 active 状态）
+      const lastSessionId = await sessionStorage.get<string>('last_session_id')
+      if (lastSessionId) {
+        const meta = await sessionStorage.get<SessionInfo>(`session_meta_${lastSessionId}`)
+        if (meta) {
+          console.log('[SessionManager] 恢复最后一个 session:', lastSessionId)
+          this.sessions.set(lastSessionId, {
+            ...meta,
+            coordinator: null,
+            active: true, // 强制标记为 active，以便恢复
+          })
+          return // 只恢复最后一个，不恢复其他的
+        }
+      }
+
+      // 2. 如果没有 last_session_id，尝试恢复所有 active sessions（向后兼容）
       const sessionKeys = await sessionStorage.getAllKeys()
       const sessionIds = sessionKeys
         .filter(key => key.startsWith('session_meta_'))
@@ -111,8 +127,6 @@ export class SessionManager {
               coordinator: null,
               active: true,
             })
-          } else {
-            await this.destroySession(sessionId, true)
           }
         }
       }
@@ -133,6 +147,11 @@ export class SessionManager {
       }, {
         sessionId: sessionInfo.sessionId,
         expiresAt: sessionInfo.lastActivityAt + (sessionInfo.config?.ttl || 30 * 60 * 1000),
+      })
+
+      // 保存最后一个 session 的 ID，用于重启后恢复
+      await sessionStorage.set('last_session_id', sessionInfo.sessionId, {
+        sessionId: sessionInfo.sessionId,
       })
     } catch (error) {
       console.error('[SessionManager] 保存 session 元数据失败:', error)
@@ -276,11 +295,27 @@ export class SessionManager {
 
   async destroyAllSessions(): Promise<void> {
     console.log('[SessionManager] 销毁所有 session，总数:', this.sessions.size)
-    const destroyPromises = Array.from(this.sessions.keys()).map(sessionId => 
-      this.destroySession(sessionId, true)
+    
+    // 保留最后一个 session 的元数据，不清理
+    const sessionIds = Array.from(this.sessions.keys())
+    const lastSessionId = sessionIds.length > 0 ? sessionIds[sessionIds.length - 1] : null
+    
+    const destroyPromises = sessionIds.map(sessionId =>
+      // 最后一个 session 不清理存储，以便重启后恢复
+      this.destroySession(sessionId, sessionId !== lastSessionId)
     )
     await Promise.all(destroyPromises)
-    this.sessions.clear()
+    
+    // 注意：this.sessions 不清空，保留最后一个 session 的引用
+    if (lastSessionId) {
+      const lastSession = this.sessions.get(lastSessionId)
+      this.sessions.clear()
+      if (lastSession) {
+        this.sessions.set(lastSessionId, lastSession)
+      }
+    } else {
+      this.sessions.clear()
+    }
   }
 
   touchSession(sessionId: string): void {

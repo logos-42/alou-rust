@@ -18,8 +18,8 @@
 
 use crate::agent::media_config::ProviderConfig;
 use crate::agent::providers::media_provider::{
-    MediaProvider, MediaType, MediaOutput, MediaMetadata,
-    ImageOptions,
+    MediaProvider, MediaType, MediaOutput, MediaMetadata, MediaTask, TaskStatus,
+    ImageOptions, AudioOptions, VideoOptions,
 };
 use crate::agent::error::{AgentError, Result};
 use async_trait::async_trait;
