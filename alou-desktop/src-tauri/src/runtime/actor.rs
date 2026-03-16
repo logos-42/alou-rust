@@ -293,11 +293,12 @@ impl SessionActor {
                 // 并发执行待处理任务
                 for task in pending_tasks {
                     let task_id = task.id.clone();
+                    let session_id_clone = session_id.to_string();
                     let exec = executor.clone();
                     tokio::spawn(async move {
-                        log::info!("[SessionActor:{}] Executing task: {}", session_id, task_id);
+                        log::info!("[SessionActor:{}] Executing task: {}", session_id_clone, task_id);
                         if let Err(e) = exec.execute(&task_id).await {
-                            log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id, task_id, e);
+                            log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id_clone, task_id, e);
                         }
                     });
                 }

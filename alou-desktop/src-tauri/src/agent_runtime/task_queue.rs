@@ -40,7 +40,7 @@ impl TaskQueue {
         
         // 启动 worker 池（4 个并发 worker）
         for i in 0..4 {
-            let rx_clone = rx.resubscribe();
+            let rx_clone = rx.clone();
             tokio::spawn(async move {
                 Self::worker(i, rx_clone).await;
             });
@@ -51,13 +51,14 @@ impl TaskQueue {
     
     async fn worker(id: usize, mut rx: mpsc::Receiver<Task>) {
         log::info!("Task Worker {} 启动", id);
-        
+
         while let Some(task) = rx.recv().await {
             log::info!("Worker {} 执行任务：{}", id, task.id);
             Self::execute_task(task).await;
         }
     }
-    
+
+    #[allow(dead_code)]
     async fn execute_task(task: Task) {
         match task.action {
             TaskAction::SendMessage { group_id, content } => {
@@ -76,7 +77,12 @@ impl TaskQueue {
         self.tx.send(task).await
             .map_err(|_| "任务队列已满".to_string())
     }
-    
+
+    pub async fn get_queue_size(&self) -> usize {
+        // Simple implementation - in production could use a counter
+        0
+    }
+
     pub fn create_task(agent_id: String, action: TaskAction, priority: u8) -> Task {
         Task {
             id: format!("task_{}", uuid::Uuid::new_v4()),

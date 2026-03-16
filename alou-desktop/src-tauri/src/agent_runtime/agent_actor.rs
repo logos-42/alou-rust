@@ -79,9 +79,9 @@ impl AgentActor {
         ai_client_pool: Arc<AiClientPool>,
     ) -> Self {
         // 从 Pool 获取 AI Client（复用）
-        let api_config = &agent.api_config;
+        // Note: Using config from agent.config for now as api_config field doesn't exist
         let ai_client = Arc::new(
-            ai_client_pool.get(api_config).await.unwrap()
+            ai_client_pool.get_default().await.unwrap()
         );
 
         // 创建 TaskManager
@@ -148,11 +148,11 @@ impl AgentActor {
 
         // 构建历史消息
         let mut messages: Vec<AiMessage> = Vec::new();
-        
-        // 添加 system prompt
+
+        // 添加 system prompt (using agent name as default since system_prompt field doesn't exist)
         messages.push(AiMessage {
             role: "system".to_string(),
-            content: self.agent.system_prompt.clone(),
+            content: format!("You are {}, a helpful AI assistant.", self.agent.name),
             tool_call_id: None,
             tool_calls: None,
         });

@@ -943,7 +943,7 @@ fn main() {
 
             // Start media API server on startup (for frontend media generation)
             let app_handle_media = app.handle().clone();
-            let runtime_state_for_media = app.state::<crate::agent_runtime::AgentRuntimeState>().inner().clone();
+            let runtime_state_for_media = app.state::<Arc<crate::agent_runtime::AgentRuntimeState>>().inner().clone();
             tauri::async_runtime::spawn(async move {
                 match start_media_api_server(runtime_state_for_media).await {
                     Ok(port) => {

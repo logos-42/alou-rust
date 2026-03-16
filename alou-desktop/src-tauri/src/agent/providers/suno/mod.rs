@@ -242,15 +242,17 @@ impl SunoProvider {
             None
         };
 
+        let error = if status == TaskStatus::Failed { Some("音乐生成失败".to_string()) } else { None };
+
         Ok(MediaTask {
             task_id: task_id.to_string(),
             provider: "suno".to_string(),
             media_type: MediaType::Audio,
-            status,
+            status: status.clone(),
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
             result,
-            error: if status == TaskStatus::Failed { Some("音乐生成失败".to_string()) } else { None },
+            error,
             progress: if status == TaskStatus::Completed { 100.0 } else { 50.0 },
         })
     }

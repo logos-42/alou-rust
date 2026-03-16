@@ -146,6 +146,7 @@ impl Clone for AgentSupervisor {
             tool_facade: self.tool_facade.clone(),
             bridge_manager: self.bridge_manager.clone(),
             ai_client_pool: self.ai_client_pool.clone(),
+            tool_registry: self.tool_registry.clone(),
         }
     }
 }

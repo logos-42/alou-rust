@@ -54,7 +54,7 @@ impl Default for AgentRuntimeState {
 // ============================================================================
 
 /// 发送用户消息到群聊请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SendUserMessageRequest {
     pub group_id: String,
     pub sender_id: String,
@@ -98,21 +98,27 @@ pub async fn init_agent_runtime(
     app_handle: AppHandle,
 ) -> Result<bool, String> {
     let mut runtime = state.runtime.write().await;
-    
+
     if runtime.is_some() {
         log::warn!("Agent Runtime 已初始化");
         return Ok(true);
     }
+
+    // Create required dependencies
+    let tool_registry = Arc::new(crate::tools::ToolRegistry::new());
+    let bridge_manager = Arc::new(crate::bridges::BridgeManager::new(
+        crate::agent_runtime::message_bus::MessageBus::with_default_capacity()
+    ));
     
-    let rt = AgentRuntime::new().await?;
+    let rt = AgentRuntime::new(tool_registry, bridge_manager).await?;
     rt.start().await?;
-    
+
     // 设置 app handle 用于事件发送
     state.set_app_handle(app_handle);
-    
+
     *runtime = Some(rt);
     log::info!("Agent Runtime 初始化完成");
-    
+
     Ok(true)
 }
 

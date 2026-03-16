@@ -18,14 +18,14 @@ pub struct GroupSubscription {
 /// 群聊桥接器
 pub struct GroupChatBridge {
     message_bus: MessageBus,
-    subscriptions: RwLock<Vec<GroupSubscription>>,
+    subscriptions: Arc<RwLock<Vec<GroupSubscription>>>,
 }
 
 impl GroupChatBridge {
     pub fn new(message_bus: MessageBus) -> Self {
         Self {
             message_bus,
-            subscriptions: RwLock::new(Vec::new()),
+            subscriptions: Arc::new(RwLock::new(Vec::new())),
         }
     }
 

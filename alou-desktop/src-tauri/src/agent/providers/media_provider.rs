@@ -14,6 +14,7 @@ pub enum MediaType {
     Image,
     Audio,
     Video,
+    Music,
 }
 
 /// 媒体输出
@@ -97,6 +98,8 @@ pub struct AudioOptions {
     pub speed: Option<f32>,
     pub pitch: Option<f32>,
     pub volume: Option<f32>,
+    pub lyrics: Option<String>,
+    pub is_instrumental: Option<bool>,
 }
 
 /// 视频选项

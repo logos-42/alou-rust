@@ -63,7 +63,7 @@ impl MediaProvider for JimengProvider {
         options: ImageOptions,
     ) -> Result<MediaOutput> {
         let client = Client::new();
-        
+
         #[derive(Serialize)]
         struct ImageRequest {
             prompt: String,
@@ -72,7 +72,7 @@ impl MediaProvider for JimengProvider {
         }
 
         let request = ImageRequest {
-            prompt: options.prompt,
+            prompt: options.prompt.clone(),
             width: options.width,
             height: options.height,
         };
@@ -145,12 +145,16 @@ impl MediaProvider for JimengProvider {
         })
     }
 
+    async fn generate_audio(&self, _options: AudioOptions) -> Result<MediaOutput> {
+        Err(AgentError::InvalidInput("Jimeng provider does not support audio generation".to_string()))
+    }
+
     async fn generate_video(
         &self,
         options: VideoOptions,
     ) -> Result<MediaTask> {
         let client = Client::new();
-        
+
         #[derive(Serialize)]
         struct VideoRequest {
             prompt: String,
@@ -159,7 +163,7 @@ impl MediaProvider for JimengProvider {
         }
 
         let request = VideoRequest {
-            prompt: options.prompt.unwrap_or_default(),
+            prompt: options.prompt,
             duration: options.duration_secs,
             resolution: options.resolution,
         };
@@ -243,6 +247,25 @@ impl MediaProvider for JimengProvider {
             _ => TaskStatus::Processing,
         };
 
+        let video_result = if status == TaskStatus::Completed && result.video_url.is_some() {
+            Some(MediaOutput {
+                media_type: MediaType::Video,
+                provider: self.name().to_string(),
+                url: result.video_url,
+                file_path: None,
+                ipfs_cid: None,
+                metadata: Default::default(),
+            })
+        } else {
+            None
+        };
+
+        let error = if status == TaskStatus::Failed { 
+            Some("Video generation failed".to_string()) 
+        } else { 
+            None 
+        };
+
         Ok(MediaTask {
             task_id: result.task_id,
             provider: self.name().to_string(),
@@ -250,19 +273,8 @@ impl MediaProvider for JimengProvider {
             status,
             created_at: chrono::Utc::now().timestamp(),
             updated_at: chrono::Utc::now().timestamp(),
-            result: if status == TaskStatus::Completed && result.video_url.is_some() {
-                Some(MediaOutput {
-                    media_type: MediaType::Video,
-                    provider: self.name().to_string(),
-                    url: result.video_url,
-                    file_path: None,
-                    ipfs_cid: None,
-                    metadata: Default::default(),
-                })
-            } else {
-                None
-            },
-            error: if status == TaskStatus::Failed { Some("Video generation failed".to_string()) } else { None },
+            result: video_result,
+            error,
             progress: result.progress.unwrap_or(0.0),
         })
     }

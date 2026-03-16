@@ -150,6 +150,8 @@ impl Tool for GenerateAudioTool {
             speed: None,
             pitch: None,
             volume: None,
+            lyrics: None,
+            is_instrumental: None,
         };
 
         match provider.generate_audio(options).await {
@@ -224,10 +226,10 @@ impl Tool for GenerateVideoTool {
         // 生成视频（异步任务）
         let options = VideoOptions {
             prompt: prompt,
+            duration: Some(duration as f64),
             duration_secs: Some(duration as u32),
             resolution: None,
             model: None,
-            image_url: None,
         };
 
         match provider.generate_video(options).await {

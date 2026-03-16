@@ -27,11 +27,23 @@ impl AgentRuntimeManager {
         tool_bus: Arc<ToolBus>,
     ) -> Result<Self, String> {
         // 创建统一工具入口
-        let tool_facade = Arc::new(ToolFacade::new(tool_registry, tool_bus));
-        
-        // 创建 AgentRuntime
-        let runtime = Arc::new(AgentRuntime::new().await?);
-        
+        let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), tool_bus));
+
+        // 创建 AgentRuntime (passing required dependencies)
+        let bridge_manager = Arc::new(crate::bridges::BridgeManager::new(
+            crate::bridges::BridgeConfig {
+                tool_bridge: crate::bridges::ToolBridgeConfig::default(),
+                context_bridge: crate::bridges::ContextBridgeConfig::default(),
+                enabled: true,
+                max_concurrent_calls: 10,
+                timeout_seconds: 30,
+                max_retries: 3,
+                retry_delay_ms: 1000,
+                debug_mode: false,
+            }
+        ));
+        let runtime = Arc::new(AgentRuntime::new(tool_registry, bridge_manager).await?);
+
         Ok(Self {
             runtime,
             tool_facade,

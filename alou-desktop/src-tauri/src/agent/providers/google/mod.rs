@@ -140,7 +140,7 @@ impl MediaProvider for GoogleProvider {
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             log::error!("[Google Imagen] API 错误：{}", error);
-            
+
             // 尝试解析 Google 错误格式
             if let Ok(error_json) = serde_json::from_str::<serde_json::Value>(&error) {
                 if let Some(error_obj) = error_json.get("error") {
@@ -152,7 +152,7 @@ impl MediaProvider for GoogleProvider {
                     ));
                 }
             }
-            
+
             return Err(AgentError::ExternalApiError(
                 format!("Google Imagen API 错误 ({}): {}", status, error)
             ));
@@ -178,7 +178,7 @@ impl MediaProvider for GoogleProvider {
         }
 
         let prediction = &imagen_response.predictions[0];
-        
+
         // 解码 base64 图片
         let image_bytes = base64::decode(&prediction.bytes_base64_encoded)
             .map_err(|e| {
@@ -218,6 +218,18 @@ impl MediaProvider for GoogleProvider {
                 model: None,
             },
         })
+    }
+
+    async fn generate_audio(&self, _options: AudioOptions) -> Result<MediaOutput> {
+        Err(AgentError::InvalidInput("Google provider does not support audio generation".to_string()))
+    }
+
+    async fn generate_video(&self, _options: VideoOptions) -> Result<MediaTask> {
+        Err(AgentError::InvalidInput("Google provider does not support video generation".to_string()))
+    }
+
+    async fn get_task_status(&self, _task_id: &str) -> Result<MediaTask> {
+        Err(AgentError::InvalidInput("Google provider does not support task status".to_string()))
     }
 }
 

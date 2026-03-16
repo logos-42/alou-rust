@@ -203,6 +203,8 @@ async fn execute_generate_audio(
         speed: None,
         pitch: None,
         volume: None,
+        lyrics: None,
+        is_instrumental: None,
     };
 
     match provider.generate_audio(options).await {
@@ -255,7 +257,6 @@ async fn execute_generate_video(
         duration_secs: Some(duration as u32),
         resolution: None,
         model: None,
-        image_url: None,
     };
 
     match provider.generate_video(options).await {

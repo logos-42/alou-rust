@@ -16,11 +16,11 @@ use std::sync::Arc;
 
 mod tts;
 mod video;
-// // mod music;  // TODO: 待实现音乐生成模块
+mod music;
 
 pub use tts::MiniMaxTts;
 pub use video::MiniMaxVideo;
-// // pub use music::MiniMaxMusicProvider;  // TODO: 待实现
+pub use music::MiniMaxMusicProvider;
 
 /// MiniMax 配置
 #[derive(Debug, Clone)]
@@ -45,19 +45,21 @@ pub struct MiniMaxProvider {
     config: MiniMaxConfig,
     tts: MiniMaxTts,
     video: MiniMaxVideo,
+    music: MiniMaxMusicProvider,
 }
 
 impl MiniMaxProvider {
     pub fn new(config: &ProviderConfig) -> Result<Self> {
         let group_id = config.base_url.clone()
             .ok_or_else(|| AgentError::ConfigError("MiniMax requires group_id (put in base_url field)".to_string()))?;
-        
+
         let minimax_config = MiniMaxConfig::new(config.api_key.clone(), group_id);
 
         Ok(Self {
             config: minimax_config.clone(),
             tts: MiniMaxTts::new(minimax_config.clone()),
-            video: MiniMaxVideo::new(minimax_config),
+            video: MiniMaxVideo::new(minimax_config.clone()),
+            music: MiniMaxMusicProvider::new(config)?,
         })
     }
 }
@@ -69,43 +71,62 @@ impl MediaProvider for MiniMaxProvider {
     }
 
     fn supported_types(&self) -> Vec<MediaType> {
-        vec![MediaType::Audio, MediaType::Video]
+        vec![MediaType::Audio, MediaType::Video, MediaType::Music]
+    }
+
+    async fn generate_image(&self, _options: ImageOptions) -> Result<MediaOutput> {
+        Err(AgentError::InvalidInput("MiniMax provider does not support image generation".to_string()))
     }
 
     async fn generate_audio(
         &self,
         options: AudioOptions,
     ) -> Result<MediaOutput> {
-        let audio_bytes = self.tts.synthesize(options.text, options.voice_id).await?;
+        // 根据 model 参数判断是 TTS 还是音乐生成
+        // 音乐生成模型：music-2.5+, music-2.5, music-1.5
+        // TTS 模型：speech-01, speech-02 等
+        let is_music = options.model.as_ref()
+            .map(|m| m.starts_with("music-"))
+            .unwrap_or(false);
 
-        // 保存到本地文件
-        let file_path = crate::agent::media::storage::save_media(
-            &audio_bytes,
-            "audio",
-            "mp3",
-        )?;
+        if is_music {
+            // 使用音乐生成
+            self.music.generate_audio(options).await
+        } else {
+            // 使用 TTS
+            let audio_bytes = self.tts.synthesize(options.text, options.voice_id).await?;
 
-        Ok(MediaOutput {
-            media_type: MediaType::Audio,
-            provider: self.name().to_string(),
-            url: None,
-            file_path: Some(file_path),
-            ipfs_cid: None,
-            metadata: MediaMetadata {
-                duration_secs: Some(audio_bytes.len() as f32 / 16000.0),
-                format: Some("mp3".to_string()),
-                model: options.model,
-                ..Default::default()
-            },
-        })
+            // 保存到本地文件
+            let file_path = crate::agent::media::storage::save_media(
+                &audio_bytes,
+                "audio",
+                "mp3",
+            )?;
+
+            Ok(MediaOutput {
+                media_type: MediaType::Audio,
+                provider: self.name().to_string(),
+                url: None,
+                file_path: Some(file_path),
+                ipfs_cid: None,
+                metadata: MediaMetadata {
+                    duration_secs: Some(audio_bytes.len() as f32 / 16000.0),
+                    format: Some("mp3".to_string()),
+                    model: options.model,
+                    ..Default::default()
+                },
+            })
+        }
     }
 
     async fn generate_video(
         &self,
         options: VideoOptions,
     ) -> Result<MediaTask> {
+        let prompt = options.prompt;
+        let duration = options.duration_secs.unwrap_or(5);
         let task_id = self.video
-            .generate(options.prompt.unwrap_or_default(), options.duration_secs.unwrap_or(5))
+            .generate(prompt, duration)
             .await?;
 
         Ok(MediaTask {
@@ -122,6 +143,6 @@ impl MediaProvider for MiniMaxProvider {
     }
 
     async fn get_task_status(&self, task_id: &str) -> Result<MediaTask> {
-        self.video.get_status(task_id).await
+        self.video.get_status(task_id.to_string()).await
     }
 }

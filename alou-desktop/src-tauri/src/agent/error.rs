@@ -73,4 +73,10 @@ impl From<ExecutorError> for AgentError {
     }
 }
 
+impl From<String> for AgentError {
+    fn from(err: String) -> Self {
+        AgentError::InternalError(err)
+    }
+}
+
 pub type Result<T> = std::result::Result<T, AgentError>;

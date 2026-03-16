@@ -35,10 +35,10 @@ impl MediaProviderFactory {
                 let provider = crate::agent::providers::minimax::MiniMaxProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
-            // "minimax_music" => {
-            //     let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
-            //     Ok(Arc::new(provider))
-            // }
+            "minimax_music" => {
+                let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
             "google" => {
                 let provider = crate::agent::providers::google::GoogleProvider::new(config)?;
                 Ok(Arc::new(provider))
@@ -132,19 +132,19 @@ impl MediaProviderFactory {
                     "vocal_synthesis".to_string(),
                 ],
             },
-            // ProviderInfo {
-            //     name: "minimax_music".to_string(),
-            //     description:
-            //         "MiniMax Music 是 MiniMax 推出的 AI 音乐生成模型，支持歌词生成和纯音乐模式"
-            //             .to_string(),
-            //     supported_types: vec![super::media_provider::MediaType::Audio],
-            //     capabilities: vec![
-            //         "music_generation".to_string(),
-            //         "lyrics_generation".to_string(),
-            //         "instrumental_mode".to_string(),
-            //         "chinese_optimized".to_string(),
-            //     ],
-            // },
+            ProviderInfo {
+                name: "minimax_music".to_string(),
+                description:
+                    "MiniMax Music 是 MiniMax 推出的 AI 音乐生成模型，支持歌词生成和纯音乐模式"
+                        .to_string(),
+                supported_types: vec![super::media_provider::MediaType::Music],
+                capabilities: vec![
+                    "music_generation".to_string(),
+                    "lyrics_generation".to_string(),
+                    "instrumental_mode".to_string(),
+                    "chinese_optimized".to_string(),
+                ],
+            },
             ProviderInfo {
                 name: "seedance".to_string(),
                 description: "Seedance 是即梦 1.0 视频生成模型，支持文生视频和图片生视频"
@@ -178,7 +178,7 @@ impl MediaProviderFactory {
             "image" => Some("google".to_string()),
             "image_cn" => Some("seedream".to_string()),
             "audio" | "tts" => Some("minimax".to_string()),
-            "music" | "music_generation" => Some("suno".to_string()),
+            "music" | "music_generation" => Some("minimax_music".to_string()),
             "music_cn" => Some("haimian".to_string()),
             "video" => Some("seedance".to_string()),
             "video_cn" => Some("seedance".to_string()),
@@ -194,11 +194,11 @@ mod tests {
     #[test]
     fn test_list_providers() {
         let providers = MediaProviderFactory::list_providers();
-        assert_eq!(providers.len(), 8);
+        assert_eq!(providers.len(), 9);
 
         let names: Vec<String> = providers.iter().map(|p| p.name.clone()).collect();
         assert!(names.contains(&"minimax".to_string()));
-        // assert!(names.contains(&"minimax_music".to_string()));
+        assert!(names.contains(&"minimax_music".to_string()));
         assert!(names.contains(&"google".to_string()));
         assert!(names.contains(&"jimeng".to_string()));
         assert!(names.contains(&"haimian".to_string()));

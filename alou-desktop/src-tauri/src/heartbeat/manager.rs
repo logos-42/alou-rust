@@ -265,9 +265,9 @@ impl HeartbeatManager {
         }
 
         // Save TASKS.md
-        match TasksManager::new(&base_dir).load() {
-            Ok(tasks) => {
-                actions.push(format!("[{}] Tasks module: {} tasks loaded", now, tasks.len()));
+        match TasksManager::new() {
+            Ok(tasks_manager) => {
+                actions.push(format!("[{}] Tasks module: initialized", now));
             }
             Err(e) => {
                 actions.push(format!("[{}] Tasks module: created default ({})", now, e));

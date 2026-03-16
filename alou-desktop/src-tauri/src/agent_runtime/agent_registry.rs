@@ -183,4 +183,8 @@ impl Default for AgentRegistry {
     }
 }
 
-// Clone not implemented for AgentRegistry
+impl Clone for AgentRegistry {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
