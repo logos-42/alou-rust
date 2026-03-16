@@ -188,6 +188,7 @@ impl SeedanceProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("网络请求失败：{}", e)))?;
 
+        let status = response.status();
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
@@ -216,6 +217,7 @@ impl SeedanceProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("网络请求失败：{}", e)))?;
 
+        let status = response.status();
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(

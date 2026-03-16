@@ -58,6 +58,7 @@ pub enum Action {
 #[derive(Debug, Clone)]
 pub struct ActionResult {
     pub action_id: String,
+    pub tool_name: String,  // 工具名称（用于事件发送）
     pub success: bool,
     pub output: Option<Value>,
     pub error: Option<String>,
@@ -288,9 +289,11 @@ impl RalphLoopExecutor {
         }
     }
 
-    /// 执行完整的 Ralph Loop
+    /// 执行完整的 Agent Reasoning Loop
+    /// 
+    /// 核心循环：Perceive → Reason(一次 LLM) → Act → Integrate
     pub async fn execute(&self, task_id: &str) -> std::result::Result<TaskFinalResult, ExecutorError> {
-        log::info!("[RalphLoop] 开始执行任务: {}", task_id);
+        log::info!("[AgentReasoning] 开始执行任务：{}", task_id);
 
         // 更新任务状态为运行中
         self.task_manager
@@ -306,116 +309,115 @@ impl RalphLoopExecutor {
 
         loop {
             let loop_start = std::time::Instant::now();
-            // 获取当前任务状态
-            let task = self
-                .task_manager
-                .get_task(task_id)
-                .await
-                .ok_or_else(|| ExecutorError::TaskNotFound(task_id.to_string()))?;
+
+            // 1. 感知环境状态（无 LLM 调用）
+            log::info!("[AgentReasoning:{}] 迭代开始 - 感知环境 (+{:?})", task_id, loop_start.elapsed());
+            let state = self.perceive_environment(task_id).await?;
 
             log::info!(
-                "[RalphLoop] 任务 {} 迭代 {}/{}",
+                "[AgentReasoning:{}] 迭代 {} - 工具调用 {}",
                 task_id,
-                task.metadata.iteration_count,
-                task.metadata.max_iterations
+                state.iteration_count,
+                state.tool_call_count
             );
 
-            // 1. 调用 AI
-            log::info!("[RalphLoop:{}] 迭代 {} - AI 调用开始 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
+            // 2. 推理决策（单次 LLM 调用 - 核心）
+            log::info!("[AgentReasoning:{}] 推理决策开始 (+{:?})", task_id, loop_start.elapsed());
             let ai_start = std::time::Instant::now();
-            let ai_response = match self.call_ai(&task).await {
-                Ok(response) => {
-                    log::info!("[RalphLoop:{}] AI 调用完成 (+{:?} 迭代耗时 {:?})", task_id, loop_start.elapsed(), ai_start.elapsed());
-                    response
-                }
-                Err(e) => {
-                    log::error!("[RalphLoop] AI 调用失败: {}", e);
-                    self.handle_error(task_id, &e.to_string()).await?;
-                    return Err(ExecutorError::AiError(e.to_string()));
-                }
-            };
+            let thought = self.reason(&state).await?;
+            log::info!("[AgentReasoning:{}] 推理完成 (+{:?} 耗时 {:?})", task_id, loop_start.elapsed(), ai_start.elapsed());
 
-            // 发送 AI 响应事件
-            if !ai_response.content.is_empty() {
-                self.emit_event(task_id, TaskEvent::AiResponse {
-                    task_id: task_id.to_string(),
-                    content: ai_response.content.clone(),
-                })
-                .await;
-            }
+            // 发送 AI 响应事件（分析过程）
+            self.emit_event(task_id, TaskEvent::AiResponse {
+                task_id: task_id.to_string(),
+                content: thought.analysis.clone(),
+            })
+            .await;
 
-            // 2. 检查是否有工具调用
-            log::info!("[RalphLoop:{}] 迭代 {} - 检查工具调用 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
-            if ai_response.tool_calls.is_empty() {
-                // 没有工具调用，任务完成
-                let final_content = ai_response.content;
+            // 3. 终止判断（多重策略）
+            if self.should_terminate(&state, &thought) {
+                log::info!("[AgentReasoning:{}] 终止条件满足", task_id);
+
+                // 提取最终结果
+                let final_content = match &thought.action {
+                    Action::Complete(content) => {
+                        log::info!("[AgentReasoning:{}] 任务完成：{}", task_id, content.chars().take(50).collect::<String>());
+                        content.clone()
+                    }
+                    Action::Fail(reason) => {
+                        log::error!("[AgentReasoning:{}] 任务失败：{}", task_id, reason);
+                        self.handle_error(task_id, reason).await?;
+                        return Err(ExecutorError::InternalError(reason.clone()));
+                    }
+                    Action::Continue => {
+                        // 迭代次数超限
+                        log::warn!("[AgentReasoning:{}] 达到最大迭代次数", task_id);
+                        "达到最大迭代次数，任务终止".to_string()
+                    }
+                    Action::ToolCall { .. } => unreachable!(),
+                };
+
                 self.handle_completion(task_id, &final_content).await?;
+
                 return Ok(TaskFinalResult {
                     task_id: task_id.to_string(),
                     success: true,
                     result: final_content,
                     error: None,
-                    iteration_count: self
-                        .task_manager
-                        .get_task(task_id)
-                        .await
-                        .map(|t| t.metadata.iteration_count)
-                        .unwrap_or(0),
+                    iteration_count: state.iteration_count,
                 });
             }
 
-            // 3. 执行工具调用
+            // 4. 执行行动（支持并发工具调用）
+            log::info!("[AgentReasoning:{}] 执行行动 (+{:?})", task_id, loop_start.elapsed());
             let tool_start = std::time::Instant::now();
-            log::info!("[RalphLoop:{}] 迭代 {} - 工具执行开始 (+{:?})", task_id, task.metadata.iteration_count, loop_start.elapsed());
+
+            // 更新任务状态：工具执行中
             self.task_manager
                 .update_task(task_id, |task| {
                     task.status = TaskStatus::ProcessingTools;
-                    task.pending_tools = ai_response
-                        .tool_calls
-                        .iter()
-                        .map(|tc| ToolCall {
-                            id: tc.id.clone(),
-                            name: tc.name.clone(),
-                            arguments: tc.arguments.clone(),
-                        })
-                        .collect();
+                    // 如果是工具调用，记录 pending tools
+                    if let Action::ToolCall { tool, args, id } = &thought.action {
+                        task.pending_tools = vec![ToolCall {
+                            id: id.clone(),
+                            name: tool.clone(),
+                            arguments: args.clone(),
+                        }];
+                    }
                 })
                 .await?;
 
-            self.emit_event(task_id, TaskEvent::ToolCallsPending {
-                task_id: task_id.to_string(),
-                count: ai_response.tool_calls.len(),
-            })
-            .await;
+            // 发送工具执行开始事件
+            if let Action::ToolCall { tool, args, id } = &thought.action {
+                self.emit_event(task_id, TaskEvent::ToolExecuting {
+                    task_id: task_id.to_string(),
+                    tool_name: tool.clone(),
+                    arguments: Some(args.clone()),
+                })
+                .await;
+            }
 
-            // 执行所有工具调用
-            let tool_results = match self.execute_tools(task_id, &ai_response.tool_calls).await {
-                Ok(results) => results,
-                Err(e) => {
-                    log::error!("[RalphLoop] 工具执行失败: {}", e);
-                    self.handle_error(task_id, &e.to_string()).await?;
-                    return Err(ExecutorError::ToolError(e.to_string()));
-                }
-            };
+            // 执行行动
+            let results = self.execute_actions(&thought).await?;
 
-            log::info!("[RalphLoop:{}] 迭代 {} - 工具执行完成 (+{:?} 耗时 {:?})", task_id, task.metadata.iteration_count, loop_start.elapsed(), tool_start.elapsed());
-            
-            // 4. 将工具结果添加到消息历史
-            self.add_tool_results_to_task(task_id, &ai_response.tool_calls, &tool_results)
-                .await?;
+            log::info!("[AgentReasoning:{}] 行动执行完成 (+{:?} 耗时 {:?})", task_id, loop_start.elapsed(), tool_start.elapsed());
 
-            // 5. 增加迭代计数
-            let _ = self.task_manager
+            // 5. 整合结果（转换为 AiMessage 并添加到历史）
+            log::info!("[AgentReasoning:{}] 整合结果", task_id);
+            self.integrate_results(task_id, &results, &thought).await?;
+
+            // 6. 更新迭代计数
+            self.task_manager
                 .update_task(task_id, |task| {
                     task.metadata.iteration_count += 1;
                 })
-                .await;
+                .await?;
 
-            // 继续下一次迭代（Ralph Loop 的核心）
-            log::info!("[RalphLoop] 继续下一次迭代");
+            log::info!("[AgentReasoning] 继续下一次迭代");
         }
     }
 
+    // ============== Agent Reasoning Loop 核心方法 ==============
     // ============== Agent Reasoning Loop 核心方法 ==============
 
     /// 1. 感知环境状态（无 LLM 调用）
@@ -588,6 +590,7 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
             Ok(ToolCallResponse { success, result, error }) => {
                 Ok(ActionResult {
                     action_id: action_id.to_string(),
+                    tool_name: tool.to_string(),
                     success,
                     output: result.and_then(|r| Some(r.data)),
                     error,
@@ -595,6 +598,7 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
             }
             Err(e) => Ok(ActionResult {
                 action_id: action_id.to_string(),
+                tool_name: tool.to_string(),
                 success: false,
                 output: None,
                 error: Some(e.to_string()),
@@ -602,18 +606,65 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
         }
     }
 
-    /// 5. 整合行动结果
-    async fn integrate_results(&self, results: &[ActionResult]) -> Result<(), ExecutorError> {
+    /// 5. 整合行动结果（转换为 AiMessage 并添加到历史）
+    async fn integrate_results(&self, task_id: &str, results: &[ActionResult], thought: &Thought) -> Result<(), ExecutorError> {
         for result in results {
             if result.success {
-                log::info!("[AgentReasoning] 行动完成：{} - 成功", result.action_id);
+                log::info!("[AgentReasoning] 行动完成：{} ({}) - 成功", result.tool_name, result.action_id);
             } else {
-                log::warn!("[AgentReasoning] 行动失败：{} - {:?}", result.action_id, result.error);
+                log::warn!("[AgentReasoning] 行动失败：{} ({}) - {:?}", result.tool_name, result.action_id, result.error);
             }
         }
 
-        // 将结果添加到消息历史（简化实现）
-        // TODO: 实际实现需要将 ActionResult 转换为 AiMessage
+        // 将 ActionResult 转换为 AiMessage 并添加到任务消息历史
+        match &thought.action {
+            Action::ToolCall { .. } => {
+                // 为每个工具调用结果创建 tool message
+                for result in results {
+                    let result_content = match &result.output {
+                        Some(value) => value.to_string(),
+                        None => result.error.clone().unwrap_or_else(|| "未知错误".to_string()),
+                    };
+
+                    let tool_message = AiMessage::tool_result(
+                        result.action_id.clone(),
+                        result_content,
+                    );
+
+                    // 添加到任务消息历史
+                    self.task_manager
+                        .update_task(task_id, |task| {
+                            task.messages.push(tool_message);
+                            // 同时更新 tool_results
+                            task.tool_results.push(ToolResult {
+                                tool_call_id: result.action_id.clone(),
+                                success: result.success,
+                                data: result.output.clone(),
+                                error: result.error.clone(),
+                            });
+                        })
+                        .await?;
+                }
+            }
+            Action::Complete(_) | Action::Continue | Action::Fail(_) => {
+                // 不需要添加到消息历史
+            }
+        }
+
+        // 发送工具完成事件
+        for result in results {
+            self.emit_event(task_id, TaskEvent::ToolCompleted {
+                task_id: task_id.to_string(),
+                tool_name: result.tool_name.clone(),
+                result: ToolResult {
+                    tool_call_id: result.action_id.clone(),
+                    success: result.success,
+                    data: result.output.clone(),
+                    error: result.error.clone(),
+                }.summary(),
+            })
+            .await;
+        }
 
         Ok(())
     }
