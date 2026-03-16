@@ -19,11 +19,11 @@ pub mod agent_registry;
 pub mod agent_actor;
 pub mod agent_supervisor;
 pub mod agent_router;
+pub mod agent_scheduler;  // Agent 调度器
 pub mod js_runtime;
 pub mod tool_bus;
 pub mod task_queue;
 pub mod storage;
-pub mod media_tools;
 pub mod group_chat_bridge;
 pub mod manager;  // 统一管理入口
 pub mod commands;  // Tauri 命令
@@ -34,6 +34,7 @@ pub use agent_registry::*;
 pub use agent_actor::*;
 pub use agent_supervisor::*;
 pub use agent_router::*;
+pub use agent_scheduler::AgentScheduler;  // ← 导出 AgentScheduler
 pub use js_runtime::*;
 pub use tool_bus::*;
 pub use task_queue::*;
@@ -44,6 +45,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::agent::providers::ProviderRegistry;
 use crate::agent::media_config::MediaApiConfig;
+use crate::agent::ai_client_pool::AiClientPool;
 use crate::tools::{ToolRegistry, ToolFacade};
 use crate::bridges::BridgeManager;
 
@@ -62,6 +64,8 @@ pub struct AgentRuntimeState {
     pub tool_registry: Arc<ToolRegistry>,
     pub tool_facade: Arc<ToolFacade>,
     pub bridge_manager: Arc<BridgeManager>,
+    pub ai_client_pool: Arc<AiClientPool>,
+    pub agent_scheduler: Arc<AgentScheduler>,  // ← 新增：Agent 调度器
 }
 
 impl AgentRuntimeState {
@@ -69,6 +73,16 @@ impl AgentRuntimeState {
         tool_registry: Arc<ToolRegistry>,
         bridge_manager: Arc<BridgeManager>,
     ) -> Result<Self, String> {
+        // 加载媒体配置并创建 Provider Registry（需要先创建）
+        let media_config = MediaApiConfig::load().unwrap_or_else(|_| MediaApiConfig::default());
+        let provider_registry = Arc::new(
+            ProviderRegistry::new(&media_config)
+                .unwrap_or_else(|e| {
+                    log::warn!("ProviderRegistry 创建失败：{}, 使用空配置", e);
+                    ProviderRegistry::new(&MediaApiConfig::default()).unwrap()
+                })
+        );
+        
         let message_bus = MessageBus::with_default_capacity();
         let event_router = EventRouter::new(message_bus.clone()).await;
         let agent_registry = AgentRegistry::new();
@@ -81,27 +95,25 @@ impl AgentRuntimeState {
         
         // 创建统一工具入口
         let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), tool_bus.clone()));
-        
-        // 创建 Agent Supervisor
+
+        // 创建 AI Client Pool（复用 AI Client 实例）
+        let ai_client_pool = Arc::new(AiClientPool::new());
+
+        // 创建 Agent Supervisor（传入共享的 tool_registry）
         let agent_supervisor = AgentSupervisor::new(
             RestartPolicy::OnFailure(3),
             tool_facade.clone(),
             bridge_manager.clone(),
+            ai_client_pool.clone(),
+            tool_registry.clone(),  // ← 传递共享的 ToolRegistry
         );
         
         let js_runtime_pool = JsRuntimePool::new(JsRuntimeConfig::default()).await?;
         let task_queue = TaskQueue::new();
         let storage = Storage::new("./alou_runtime.db").await?;
 
-        // 加载媒体配置并创建 Provider Registry
-        let media_config = MediaApiConfig::load().unwrap_or_else(|_| MediaApiConfig::default());
-        let provider_registry = Arc::new(
-            ProviderRegistry::new(&media_config)
-                .unwrap_or_else(|e| {
-                    log::warn!("ProviderRegistry 创建失败：{}, 使用空配置", e);
-                    ProviderRegistry::new(&MediaApiConfig::default()).unwrap()
-                })
-        );
+        // 创建 Agent 调度器（每 3 秒 tick 一次）
+        let agent_scheduler = Arc::new(AgentScheduler::new(3000));
 
         Ok(Self {
             message_bus,
@@ -117,6 +129,8 @@ impl AgentRuntimeState {
             tool_registry,
             tool_facade,
             bridge_manager,
+            ai_client_pool,
+            agent_scheduler,  // ← 新增：Agent 调度器
         })
     }
 }

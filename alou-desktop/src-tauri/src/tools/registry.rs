@@ -1,30 +1,34 @@
 //! 工具注册表
 //!
 //! 管理所有已注册的工具，提供工具查询、执行、状态管理等功能
+//!
+//! 优化：使用 DashMap 替代 RwLock<HashMap> 以实现无锁并发读取
 
 use super::{ToolExecutor, ToolMetadata, ToolStatus, ExecutionContext, ToolResult, ToolError, ToolCategory};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use dashmap::DashMap;
 
 /// 工具注册表
+///
+/// 使用 DashMap 实现无锁并发读取，适合读多写少的场景
 pub struct ToolRegistry {
-    /// 工具映射
-    tools: Arc<RwLock<HashMap<String, Arc<dyn ToolExecutor>>>>,
-    /// 工具分类索引
-    category_index: Arc<RwLock<HashMap<ToolCategory, Vec<String>>>>,
-    /// 工具状态
-    tool_status: Arc<RwLock<HashMap<String, ToolStatus>>>,
+    /// 工具映射 - 使用 DashMap 实现并发无锁读取
+    tools: Arc<DashMap<String, Arc<dyn ToolExecutor>>>,
+    /// 工具分类索引 - 使用 DashMap
+    category_index: Arc<DashMap<ToolCategory, Vec<String>>>,
+    /// 工具状态 - 使用 DashMap
+    tool_status: Arc<DashMap<String, ToolStatus>>,
 }
 
 impl ToolRegistry {
     /// 创建新的工具注册表
     pub fn new() -> Self {
         Self {
-            tools: Arc::new(RwLock::new(HashMap::new())),
-            category_index: Arc::new(RwLock::new(HashMap::new())),
-            tool_status: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(DashMap::new()),
+            category_index: Arc::new(DashMap::new()),
+            tool_status: Arc::new(DashMap::new()),
         }
     }
 
@@ -34,34 +38,23 @@ impl ToolRegistry {
         let tool_id = metadata.id.clone();
 
         // 检查是否已存在
-        {
-            let tools = self.tools.read().await;
-            if tools.contains_key(&tool_id) {
-                return Err(ToolError::ExecutionFailed(format!(
-                    "Tool '{}' already registered", tool_id
-                )));
-            }
+        if self.tools.contains_key(&tool_id) {
+            return Err(ToolError::ExecutionFailed(format!(
+                "Tool '{}' already registered", tool_id
+            )));
         }
 
         // 添加工具
-        {
-            let mut tools = self.tools.write().await;
-            tools.insert(tool_id.clone(), tool);
-        }
+        self.tools.insert(tool_id.clone(), tool);
 
         // 更新分类索引
-        {
-            let mut index = self.category_index.write().await;
-            index.entry(metadata.category)
-                .or_insert_with(Vec::new)
-                .push(tool_id.clone());
-        }
+        self.category_index
+            .entry(metadata.category)
+            .or_insert_with(Vec::new)
+            .push(tool_id.clone());
 
         // 更新状态
-        {
-            let mut status = self.tool_status.write().await;
-            status.insert(tool_id.clone(), metadata.status);
-        }
+        self.tool_status.insert(tool_id.clone(), metadata.status);
 
         log::info!("Tool '{}' registered successfully", tool_id);
         Ok(())
@@ -71,34 +64,24 @@ impl ToolRegistry {
     pub async fn unregister(&self, tool_id: &str) -> Result<(), ToolError> {
         // 获取工具信息（用于清理索引）
         let metadata = {
-            let tools = self.tools.read().await;
-            let tool = tools.get(tool_id)
+            let tool = self.tools.get(tool_id)
                 .ok_or_else(|| ToolError::ToolUnavailable(format!("Tool '{}' not found", tool_id)))?;
             tool.metadata().clone()
         };
 
         // 移除工具
-        {
-            let mut tools = self.tools.write().await;
-            tools.remove(tool_id);
-        }
+        self.tools.remove(tool_id);
 
         // 从分类索引中移除
-        {
-            let mut index = self.category_index.write().await;
-            if let Some(tool_list) = index.get_mut(&metadata.category) {
-                tool_list.retain(|id| id != tool_id);
-                if tool_list.is_empty() {
-                    index.remove(&metadata.category);
-                }
+        if let Some(mut tool_list) = self.category_index.get_mut(&metadata.category) {
+            tool_list.retain(|id| id != tool_id);
+            if tool_list.is_empty() {
+                self.category_index.remove(&metadata.category);
             }
         }
 
         // 移除状态
-        {
-            let mut status = self.tool_status.write().await;
-            status.remove(tool_id);
-        }
+        self.tool_status.remove(tool_id);
 
         log::info!("Tool '{}' unregistered successfully", tool_id);
         Ok(())
@@ -106,33 +89,28 @@ impl ToolRegistry {
 
     /// 获取工具
     pub async fn get_tool(&self, tool_id: &str) -> Option<Arc<dyn ToolExecutor>> {
-        let tools = self.tools.read().await;
-        tools.get(tool_id).cloned()
+        self.tools.get(tool_id).map(|ref_multi| ref_multi.clone())
     }
 
     /// 检查工具是否存在
     pub async fn has_tool(&self, tool_id: &str) -> bool {
-        let tools = self.tools.read().await;
-        tools.contains_key(tool_id)
+        self.tools.contains_key(tool_id)
     }
 
     /// 列出所有工具
     pub async fn list_all(&self) -> Vec<ToolMetadata> {
-        let tools = self.tools.read().await;
-        tools.values()
-            .map(|tool| tool.metadata().clone())
+        // DashMap 迭代不需要显式加锁
+        self.tools.iter()
+            .map(|ref_multi| ref_multi.value().metadata().clone())
             .collect()
     }
 
     /// 按分类列出工具
     pub async fn list_by_category(&self, category: ToolCategory) -> Vec<ToolMetadata> {
-        let index = self.category_index.read().await;
-        let tools = self.tools.read().await;
-
-        if let Some(tool_ids) = index.get(&category) {
+        if let Some(tool_ids) = self.category_index.get(&category) {
             tool_ids.iter()
-                .filter_map(|id| tools.get(id))
-                .map(|tool| tool.metadata().clone())
+                .filter_map(|id| self.tools.get(id))
+                .map(|ref_multi| ref_multi.metadata().clone())
                 .collect()
         } else {
             Vec::new()
@@ -141,27 +119,22 @@ impl ToolRegistry {
 
     /// 按状态列出工具
     pub async fn list_by_status(&self, status: ToolStatus) -> Vec<ToolMetadata> {
-        let tool_status = self.tool_status.read().await;
-        let tools = self.tools.read().await;
-
-        tool_status.iter()
-            .filter(|(_, s)| *s == &status)
-            .filter_map(|(id, _)| tools.get(id))
-            .map(|tool| tool.metadata().clone())
+        self.tool_status.iter()
+            .filter(|ref_multi| *ref_multi.value() == status)
+            .filter_map(|ref_multi| self.tools.get(ref_multi.key()))
+            .map(|ref_multi| ref_multi.metadata().clone())
             .collect()
     }
 
     /// 获取工具数量
     pub async fn count(&self) -> usize {
-        let tools = self.tools.read().await;
-        tools.len()
+        self.tools.len()
     }
 
     /// 按分类统计工具数量
     pub async fn count_by_category(&self) -> HashMap<ToolCategory, usize> {
-        let index = self.category_index.read().await;
-        index.iter()
-            .map(|(category, tools)| (*category, tools.len()))
+        self.category_index.iter()
+            .map(|ref_multi| (*ref_multi.key(), ref_multi.value().len()))
             .collect()
     }
 
@@ -196,42 +169,39 @@ impl ToolRegistry {
 
     /// 更新工具状态
     pub async fn update_tool_status(&self, tool_id: &str, status: ToolStatus) -> Result<(), ToolError> {
-        let mut tool_status = self.tool_status.write().await;
-
-        if !tool_status.contains_key(tool_id) {
+        if !self.tool_status.contains_key(tool_id) {
             return Err(ToolError::ToolUnavailable(format!("Tool '{}' not found", tool_id)));
         }
 
-        tool_status.insert(tool_id.to_string(), status);
+        self.tool_status.insert(tool_id.to_string(), status);
         Ok(())
     }
 
     /// 获取工具状态
     pub async fn get_tool_status(&self, tool_id: &str) -> Option<ToolStatus> {
-        let tool_status = self.tool_status.read().await;
-        tool_status.get(tool_id).copied()
+        self.tool_status.get(tool_id).map(|ref_multi| *ref_multi.value())
     }
 
     /// 搜索工具
     pub async fn search(&self, query: &str) -> Vec<ToolMetadata> {
         let query_lower = query.to_lowercase();
-        let tools = self.tools.read().await;
 
-        tools.values()
-            .filter(|tool| {
-                let metadata = tool.metadata();
+        self.tools.iter()
+            .filter(|ref_multi| {
+                let metadata = ref_multi.value().metadata();
                 metadata.name.to_lowercase().contains(&query_lower)
                     || metadata.description.to_lowercase().contains(&query_lower)
                     || metadata.id.to_lowercase().contains(&query_lower)
             })
-            .map(|tool| tool.metadata().clone())
+            .map(|ref_multi| ref_multi.value().metadata().clone())
             .collect()
     }
 
     /// 获取所有分类
     pub async fn get_categories(&self) -> Vec<ToolCategory> {
-        let index = self.category_index.read().await;
-        index.keys().copied().collect()
+        self.category_index.iter()
+            .map(|ref_multi| *ref_multi.key())
+            .collect()
     }
 
     /// 检查工具是否可用
@@ -262,13 +232,9 @@ impl ToolRegistry {
 
     /// 清理所有工具
     pub async fn clear(&self) {
-        let mut tools = self.tools.write().await;
-        let mut index = self.category_index.write().await;
-        let mut status = self.tool_status.write().await;
-
-        tools.clear();
-        index.clear();
-        status.clear();
+        self.tools.clear();
+        self.category_index.clear();
+        self.tool_status.clear();
     }
 }
 
@@ -291,7 +257,7 @@ impl Default for ToolRegistry {
 /// 工具执行请求
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolExecutionRequest {
-    /// 工具ID
+    /// 工具 ID
     pub tool_id: String,
     /// 参数
     pub args: serde_json::Value,
@@ -302,7 +268,7 @@ pub struct ToolExecutionRequest {
 /// 工具定义
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolDefinition {
-    /// 工具ID
+    /// 工具 ID
     pub id: String,
     /// 工具名称
     pub name: String,

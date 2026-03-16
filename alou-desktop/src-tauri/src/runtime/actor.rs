@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tauri::Emitter;
 use crate::runtime::session::SessionRuntime;
 use crate::runtime::message::SessionMessage;
 use crate::runtime::handle::ActorHandle;
@@ -75,7 +76,7 @@ impl SessionActor {
         self
     }
 
-    /// Actor 主循环
+    /// Actor 主循环（带自主心跳）
     pub async fn run(mut self) {
         let session_id = self.session_id.clone();
         let executor = self.executor.clone();
@@ -85,7 +86,33 @@ impl SessionActor {
         // 发送 SessionCreated 消息
         self.runtime = Self::handle_message(&session_id, SessionMessage::SessionCreated, self.runtime, executor.clone(), task_manager.clone(), app_handle.clone()).await;
 
+        // 🔥 启动自主心跳循环（每 5 秒发送 AgentTick）
+        let tick_session_id = session_id.clone();
+        let tick_executor = executor.clone();
+        let tick_task_manager = task_manager.clone();
+        let tick_app_handle = app_handle.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+            loop {
+                interval.tick().await;
+                // 发送 AgentTick 消息（让 Agent 自主思考）
+                let _ = Self::handle_message(
+                    &tick_session_id,
+                    SessionMessage::AgentTick { timestamp: chrono::Utc::now().timestamp() },
+                    SessionRuntime::new(tick_session_id.clone()),
+                    tick_executor.clone(),
+                    tick_task_manager.clone(),
+                    tick_app_handle.clone(),
+                ).await;
+            }
+        });
+
+        // 主消息循环
         while let Some(msg) = self.message_rx.recv().await {
+            // 如果是 AgentTick，跳过（心跳循环已处理）
+            if matches!(msg, SessionMessage::AgentTick { .. }) {
+                continue;
+            }
             self.runtime = Self::handle_message(&session_id, msg, self.runtime, executor.clone(), task_manager.clone(), app_handle.clone()).await;
         }
 
@@ -113,20 +140,20 @@ impl SessionActor {
                 );
 
                 // 🔥 异步并发执行：启动独立 task，不阻塞消息队列
-                // 注意：这里不执行任务，只记录状态，实际执行由命令完成
                 let session_id = session_id.to_string();
                 let task_manager = task_manager.clone();
+                let executor = executor.clone();
                 let app_handle = app_handle.clone();
                 let content_clone = content.clone();
                 let metadata_clone = metadata.clone();
 
                 tokio::spawn(async move {
-                    // 创建任务（仅用于状态跟踪）
+                    // 创建任务（用于状态跟踪）
                     let task_id = task_manager.create_task(session_id.clone(), content_clone.clone()).await;
                     log::info!("[SessionActor:{}] Task created for tracking: {}", session_id, task_id);
 
                     // 如果提供了 AppHandle，发送任务创建事件到前端
-                    if let Some(app) = app_handle {
+                    if let Some(app) = &app_handle {
                         let _ = app.emit("session:task_created", serde_json::json!({
                             "task_id": task_id,
                             "session_id": session_id,
@@ -134,6 +161,15 @@ impl SessionActor {
                             "stream": metadata_clone.stream.unwrap_or(false),
                             "timestamp": metadata_clone.timestamp.unwrap_or_else(|| chrono::Utc::now().timestamp()),
                         }));
+                    }
+
+                    // 🔥 关键优化：立即启动 executor.execute，而不是等待 AgentTick
+                    // 这样 Agent 可以立即响应用户消息，而不是被动等待心跳
+                    log::info!("[SessionActor:{}] Starting task execution: {}", session_id, task_id);
+                    if let Err(e) = executor.execute(&task_id).await {
+                        log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id, task_id, e);
+                    } else {
+                        log::info!("[SessionActor:{}] Task {} completed successfully", session_id, task_id);
                     }
                 });
 
@@ -231,6 +267,41 @@ impl SessionActor {
                     workflow_id,
                     input
                 );
+            }
+
+            SessionMessage::AgentTick { timestamp } => {
+                // 🔥 自主心跳：让 Agent 定期自主思考
+                log::info!("[SessionActor:{}] AgentTick received at {}", session_id, timestamp);
+
+                // 检查是否有待处理的任务或需要自主执行的操作
+                let pending_tasks = task_manager.get_pending_tasks().await;
+                if !pending_tasks.is_empty() {
+                    log::info!(
+                        "[SessionActor:{}] Found {} pending tasks, continuing execution",
+                        session_id,
+                        pending_tasks.len()
+                    );
+
+                    // 继续执行待处理任务
+                    for task in pending_tasks {
+                        let task_id = task.task_id.clone();
+                        let exec = executor.clone();
+                        tokio::spawn(async move {
+                            log::info!("[SessionActor:{}] Resuming task: {}", session_id, task_id);
+                            if let Err(e) = exec.execute(&task_id).await {
+                                log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id, task_id, e);
+                            }
+                        });
+                    }
+                } else {
+                    // 没有待处理任务，Agent 可以自主决定做什么
+                    log::debug!("[SessionActor:{}] No pending tasks, agent is idle", session_id);
+
+                    // 这里可以添加更多自主逻辑，例如：
+                    // 1. 检查长期记忆是否需要更新
+                    // 2. 检查是否有定时任务需要执行
+                    // 3. 主动学习或总结之前的交互
+                }
             }
         }
 

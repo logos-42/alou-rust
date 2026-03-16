@@ -3,8 +3,10 @@
 use crate::agent_runtime::agent_registry::{AgentInfo, AgentConfig};
 use crate::agent_runtime::agent_actor::{AgentActor, AgentHandle, ActorMessage};
 use crate::agent_runtime::message_bus::GroupMessage;
+use crate::agent::ai_client_pool::AiClientPool;
 use crate::tools::ToolFacade;
 use crate::bridges::BridgeManager;
+use crate::tools::ToolRegistry;
 use tokio::sync::{mpsc, RwLock};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,6 +27,8 @@ pub struct AgentSupervisor {
     restart_policy: RestartPolicy,
     tool_facade: Arc<ToolFacade>,
     bridge_manager: Arc<BridgeManager>,
+    ai_client_pool: Arc<AiClientPool>,
+    tool_registry: Arc<ToolRegistry>,  // ← 新增：共享的 ToolRegistry
 }
 
 impl AgentSupervisor {
@@ -32,6 +36,8 @@ impl AgentSupervisor {
         restart_policy: RestartPolicy,
         tool_facade: Arc<ToolFacade>,
         bridge_manager: Arc<BridgeManager>,
+        ai_client_pool: Arc<AiClientPool>,
+        tool_registry: Arc<ToolRegistry>,  // ← 新增：共享的 ToolRegistry
     ) -> Self {
         Self {
             actors: RwLock::new(HashMap::new()),
@@ -40,6 +46,8 @@ impl AgentSupervisor {
             restart_policy,
             tool_facade,
             bridge_manager,
+            ai_client_pool,
+            tool_registry,
         }
     }
 
@@ -58,6 +66,8 @@ impl AgentSupervisor {
             rx,
             self.tool_facade.clone(),
             self.bridge_manager.clone(),
+            self.ai_client_pool.clone(),
+            self.tool_registry.clone(),  // ← 传递共享的 ToolRegistry
         );
 
         // 启动监控 task
@@ -136,6 +146,7 @@ impl Clone for AgentSupervisor {
             restart_policy: self.restart_policy.clone(),
             tool_facade: self.tool_facade.clone(),
             bridge_manager: self.bridge_manager.clone(),
+            ai_client_pool: self.ai_client_pool.clone(),
         }
     }
 }

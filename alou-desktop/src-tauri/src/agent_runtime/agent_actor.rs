@@ -11,6 +11,7 @@ use crate::agent_runtime::message_bus::GroupMessage;
 use crate::agent::executor::RalphLoopExecutor;
 use crate::agent::task::TaskManager;
 use crate::agent::ai_client::{AiClient, AiMessage};
+use crate::agent::ai_client_pool::AiClientPool;
 use crate::tools::ToolFacade;
 use crate::bridges::BridgeManager;
 use tokio::sync::mpsc;
@@ -64,6 +65,7 @@ pub struct AgentActor {
     pub inbox: mpsc::Receiver<ActorMessage>,
     pub executor: Arc<RalphLoopExecutor>,
     pub task_manager: Arc<TaskManager>,
+    pub ai_client_pool: Arc<AiClientPool>,
 }
 
 impl AgentActor {
@@ -74,13 +76,17 @@ impl AgentActor {
         inbox: mpsc::Receiver<ActorMessage>,
         tool_facade: Arc<ToolFacade>,
         bridge_manager: Arc<BridgeManager>,
+        ai_client_pool: Arc<AiClientPool>,
     ) -> Self {
-        // 创建 AI Client
-        let ai_client = Arc::new(AiClient::new(&agent.api_config).unwrap());
-        
+        // 从 Pool 获取 AI Client（复用）
+        let api_config = &agent.api_config;
+        let ai_client = Arc::new(
+            ai_client_pool.get(api_config).await.unwrap()
+        );
+
         // 创建 TaskManager
         let task_manager = Arc::new(TaskManager::new());
-        
+
         // 创建 RalphLoopExecutor
         let executor = Arc::new(RalphLoopExecutor::new(
             ai_client,
@@ -95,6 +101,7 @@ impl AgentActor {
             inbox,
             executor,
             task_manager,
+            ai_client_pool,
         }
     }
 
@@ -227,6 +234,7 @@ impl Clone for AgentActor {
             inbox: mpsc::channel(100).1,
             executor: self.executor.clone(),
             task_manager: self.task_manager.clone(),
+            ai_client_pool: self.ai_client_pool.clone(),
         }
     }
 }
