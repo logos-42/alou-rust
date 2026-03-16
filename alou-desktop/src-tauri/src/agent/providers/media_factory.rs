@@ -2,11 +2,13 @@
 //!
 //! 根据配置创建不同的媒体 Provider 实例
 //! 参考官方 API 文档：
-//! - MiniMax: https://platform.minimaxi.com/document
+//! - MiniMax: https://platform.minimaxi.com/docs/api-reference/text-intro
 //! - Google Imagen: https://cloud.google.com/vertex-ai/docs/generative-ai/image/overview
 //! - Jimeng (即梦): https://api.jimeng.pro/docs
 //! - Seedance (即梦视频): https://doc.302.ai/305249446e0
 //! - Seedream (即梦图片): https://apidoc.deerapi.com/seedream-%E5%9B%BE%E5%83%8F%E7%94%9F%E6%88%90-331149260e0
+//! - Suno AI: https://docs.sunoapi.org/
+//! - Haimian Music: https://www.haimianyinyue.com/
 
 use std::sync::Arc;
 use crate::agent::media_config::ProviderConfig;
@@ -33,6 +35,10 @@ impl MediaProviderFactory {
                 let provider = crate::agent::providers::minimax::MiniMaxProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
+            "minimax_music" => {
+                let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
             "google" => {
                 let provider = crate::agent::providers::google::GoogleProvider::new(config)?;
                 Ok(Arc::new(provider))
@@ -51,6 +57,10 @@ impl MediaProviderFactory {
             }
             "seedream" => {
                 let provider = crate::agent::providers::seedream::SeedreamProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            "suno" => {
+                let provider = crate::agent::providers::suno::SunoProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             _ => Err(AgentError::ConfigError(
@@ -113,6 +123,31 @@ impl MediaProviderFactory {
                 ],
             },
             ProviderInfo {
+                name: "suno".to_string(),
+                description: "Suno AI 是领先的 AI 音乐生成平台，支持高质量原创音乐生成".to_string(),
+                supported_types: vec![
+                    super::media_provider::MediaType::Audio,
+                ],
+                capabilities: vec![
+                    "music_generation".to_string(),
+                    "lyrics_generation".to_string(),
+                    "vocal_synthesis".to_string(),
+                ],
+            },
+            ProviderInfo {
+                name: "minimax_music".to_string(),
+                description: "MiniMax Music 是 MiniMax 推出的 AI 音乐生成模型，支持歌词生成和纯音乐模式".to_string(),
+                supported_types: vec![
+                    super::media_provider::MediaType::Audio,
+                ],
+                capabilities: vec![
+                    "music_generation".to_string(),
+                    "lyrics_generation".to_string(),
+                    "instrumental_mode".to_string(),
+                    "chinese_optimized".to_string(),
+                ],
+            },
+            ProviderInfo {
                 name: "seedance".to_string(),
                 description: "Seedance 是即梦 1.0 视频生成模型，支持文生视频和图片生视频".to_string(),
                 supported_types: vec![
@@ -147,7 +182,8 @@ impl MediaProviderFactory {
             "image" => Some("google".to_string()),
             "image_cn" => Some("seedream".to_string()),
             "audio" | "tts" => Some("minimax".to_string()),
-            "music" | "music_generation" => Some("haimian".to_string()),
+            "music" | "music_generation" => Some("suno".to_string()),
+            "music_cn" => Some("minimax_music".to_string()),
             "video" => Some("seedance".to_string()),
             "video_cn" => Some("seedance".to_string()),
             _ => None,
@@ -162,13 +198,15 @@ mod tests {
     #[test]
     fn test_list_providers() {
         let providers = MediaProviderFactory::list_providers();
-        assert_eq!(providers.len(), 6);
+        assert_eq!(providers.len(), 9);
 
         let names: Vec<String> = providers.iter().map(|p| p.name.clone()).collect();
         assert!(names.contains(&"minimax".to_string()));
+        assert!(names.contains(&"minimax_music".to_string()));
         assert!(names.contains(&"google".to_string()));
         assert!(names.contains(&"jimeng".to_string()));
         assert!(names.contains(&"haimian".to_string()));
+        assert!(names.contains(&"suno".to_string()));
         assert!(names.contains(&"seedance".to_string()));
         assert!(names.contains(&"seedream".to_string()));
     }
@@ -179,6 +217,7 @@ mod tests {
         assert_eq!(MediaProviderFactory::get_provider_by_capability("image_cn"), Some("seedream".to_string()));
         assert_eq!(MediaProviderFactory::get_provider_by_capability("tts"), Some("minimax".to_string()));
         assert_eq!(MediaProviderFactory::get_provider_by_capability("video"), Some("seedance".to_string()));
-        assert_eq!(MediaProviderFactory::get_provider_by_capability("music"), Some("haimian".to_string()));
+        assert_eq!(MediaProviderFactory::get_provider_by_capability("music"), Some("suno".to_string()));
+        assert_eq!(MediaProviderFactory::get_provider_by_capability("music_cn"), Some("minimax_music".to_string()));
     }
 }

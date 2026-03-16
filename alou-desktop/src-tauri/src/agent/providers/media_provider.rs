@@ -2,6 +2,9 @@
 //!
 //! 定义所有媒体 Provider 的统一接口
 
+
+use async_trait::async_trait;
+
 use serde::{Deserialize, Serialize};
 
 /// 媒体类型
@@ -107,6 +110,7 @@ pub struct VideoOptions {
 }
 
 /// 媒体 Provider trait
+#[async_trait]
 pub trait MediaProvider: Send + Sync {
     /// 获取 Provider 名称
     fn name(&self) -> &str;
@@ -115,16 +119,16 @@ pub trait MediaProvider: Send + Sync {
     fn supported_types(&self) -> Vec<MediaType>;
     
     /// 生成图片
-    fn generate_image(&self, options: ImageOptions) -> impl std::future::Future<Output = Result<MediaOutput, crate::agent::error::AgentError>> + Send;
+    async fn generate_image(&self, options: ImageOptions) -> Result<MediaOutput, crate::agent::error::AgentError>;
     
     /// 生成音频
-    fn generate_audio(&self, options: AudioOptions) -> impl std::future::Future<Output = Result<MediaOutput, crate::agent::error::AgentError>> + Send;
+    async fn generate_audio(&self, options: AudioOptions) -> Result<MediaOutput, crate::agent::error::AgentError>;
     
     /// 生成视频（异步任务）
-    fn generate_video(&self, options: VideoOptions) -> impl std::future::Future<Output = Result<MediaTask, crate::agent::error::AgentError>> + Send;
+    async fn generate_video(&self, options: VideoOptions) -> Result<MediaTask, crate::agent::error::AgentError>;
     
     /// 获取任务状态
-    fn get_task_status(&self, task_id: &str) -> impl std::future::Future<Output = Result<MediaTask, crate::agent::error::AgentError>> + Send;
+    async fn get_task_status(&self, task_id: &str) -> Result<MediaTask, crate::agent::error::AgentError>;
 }
 
 /// 占位符 Provider（用于测试和默认值）

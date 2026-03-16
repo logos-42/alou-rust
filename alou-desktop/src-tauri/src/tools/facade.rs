@@ -27,17 +27,28 @@ impl ToolFacade {
         context: crate::tools::ExecutionContext,
     ) -> Result<Value, String> {
         // 1. 先尝试 ToolBus（媒体工具，数量少，快速失败）
-        if let Ok(result) = self.toolbus.execute(name, args.clone()).await {
-            log::debug!("ToolFacade: 工具 '{}' 由 ToolBus 执行", name);
-            return Ok(result);
+        match self.toolbus.execute(name, args.clone()).await {
+            Ok(result) => {
+                log::debug!("ToolFacade: 工具 '{}' 由 ToolBus 执行", name);
+                return Ok(result);
+            }
+            Err(_) => {}
         }
 
         // 2. Fallback 到 ToolRegistry（核心工具）
-        if let Some(tool) = self.registry.get_tool(name).await {
-            log::debug!("ToolFacade: 工具 '{}' 由 ToolRegistry 执行", name);
-            let result = tool.execute(args, context).await
-                .map_err(|e| format!("工具执行失败：{}", e))?;
-            return Ok(serde_json::to_value(result).unwrap_or(Value::Null));
+        match self.registry.get_tool(name).await {
+            Some(tool) => {
+                log::debug!("ToolFacade: 工具 '{}' 由 ToolRegistry 执行", name);
+                match tool.execute(args, &context).await {
+                    Ok(result) => {
+                        return Ok(serde_json::to_value(result).unwrap_or(Value::Null));
+                    }
+                    Err(e) => {
+                        return Err(format!("工具执行失败：{}", e));
+                    }
+                }
+            }
+            None => {}
         }
 
         // 3. 工具不存在
@@ -72,14 +83,13 @@ impl ToolFacade {
     /// 获取工具详情
     pub async fn get_tool_info(&self, name: &str) -> Option<ToolInfo> {
         // 先查 ToolBus
-        if let Ok(tools) = self.toolbus.list_tools().await {
-            if let Some(tool) = tools.iter().find(|t| t.name == name) {
-                return Some(ToolInfo {
-                    name: tool.name.clone(),
-                    description: tool.description.clone(),
-                    source: "toolbus".to_string(),
-                });
-            }
+        let tools = self.toolbus.list_tools().await;
+        if let Some(tool) = tools.iter().find(|t| t.name == name) {
+            return Some(ToolInfo {
+                name: tool.name.clone(),
+                description: tool.description.clone(),
+                source: "toolbus".to_string(),
+            });
         }
 
         // 再查 ToolRegistry

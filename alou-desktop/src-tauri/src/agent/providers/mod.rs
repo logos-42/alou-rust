@@ -1,7 +1,7 @@
 //! AI Provider 实现
 //!
 //! 文本 LLM Provider: DeepSeek, OpenAI, Claude, Kimi, OpenRouter, GLM, Gemini, MiniMax
-//! 媒体 Provider: MiniMax, Google, Jimeng, 海绵音乐 (Haimian), Seedance, Seedream
+//! 媒体 Provider: MiniMax, Google, Jimeng, 海绵音乐 (Haimian), Seedance, Seedream, Suno, MiniMax Music
 
 pub mod deepseek;
 pub mod openai;
@@ -22,6 +22,7 @@ pub mod jimeng;
 pub mod haimian;
 pub mod seedance;
 pub mod seedream;
+pub mod suno;
 
 pub use deepseek::DeepSeekProvider;
 pub use openai::OpenAiProvider;
@@ -38,3 +39,7 @@ pub use registry::ProviderRegistry;
 // 即梦系列 Provider
 pub use seedance::SeedanceProvider;
 pub use seedream::SeedreamProvider;
+
+// 音乐 Provider
+pub use suno::SunoProvider;
+pub use minimax::MiniMaxMusicProvider;

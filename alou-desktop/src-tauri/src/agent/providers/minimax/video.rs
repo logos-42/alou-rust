@@ -13,6 +13,9 @@
 //! 2. 轮询状态接口，直到状态为 completed
 //! 3. 下载生成的视频
 
+
+use async_trait::async_trait;
+
 use super::MiniMaxConfig;
 use crate::agent::providers::media_provider::{MediaTask, MediaOutput, MediaType, TaskStatus};
 use crate::agent::error::{AgentError, Result};
@@ -261,10 +264,10 @@ impl MiniMaxVideo {
                 AgentError::ExternalApiError(format!("网络请求失败：{}", e))
             })?;
 
-        if !response.status().is_success() {
+        if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
-                format!("查询状态失败 ({}): {}", response.status(), error)
+                format!("查询状态失败 ({}): {}", status, error)
             ));
         }
 

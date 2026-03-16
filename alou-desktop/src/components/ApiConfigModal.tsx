@@ -48,11 +48,13 @@ const PROVIDERS = [
   { value: 'kimi', label: 'Kimi', category: 'text', capabilities: ['text'] },
   // 媒体生成
   { value: 'minimax', label: 'MiniMax', category: 'media', capabilities: ['tts', 'video'] },
+  { value: 'minimax_music', label: 'MiniMax Music', category: 'media', capabilities: ['music'] },
   { value: 'google', label: 'Google Imagen', category: 'media', capabilities: ['image'] },
   { value: 'jimeng', label: '即梦', category: 'media', capabilities: ['image', 'video'] },
   { value: 'seedance', label: 'Seedance', category: 'media', capabilities: ['video'] },
   { value: 'seedream', label: 'Seedream', category: 'media', capabilities: ['image'] },
   { value: 'haimian', label: '海绵音乐', category: 'media', capabilities: ['music'] },
+  { value: 'suno', label: 'Suno AI', category: 'media', capabilities: ['music'] },
   { value: 'stability', label: 'Stability AI', category: 'media', capabilities: ['image'] },
   { value: 'elevenlabs', label: 'ElevenLabs', category: 'media', capabilities: ['tts'] },
 ]
@@ -73,6 +75,8 @@ const MEDIA_PROVIDER_FIELDS = {
   seedance: { label: 'Base URL', placeholder: 'https://api.302.ai/doubao' },
   seedream: { label: 'Base URL', placeholder: 'https://api.deerapi.com' },
   haimian: { label: 'API Secret', placeholder: '输入 API Secret' },
+  suno: { label: 'Base URL', placeholder: 'https://api.sunoapi.org' },
+  minimax_music: { label: 'Base URL', placeholder: 'https://api.minimaxi.com' },
 }
 
 function ApiConfigModal({ isOpen, onClose, isDarkMode }) {

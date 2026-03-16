@@ -70,7 +70,7 @@ pub struct AgentActor {
 
 impl AgentActor {
     /// 创建新的 Agent Actor（带 RalphLoop 执行器）
-    pub fn new(
+    pub async fn new(
         agent: AgentInfo,
         config: AgentConfig,
         inbox: mpsc::Receiver<ActorMessage>,

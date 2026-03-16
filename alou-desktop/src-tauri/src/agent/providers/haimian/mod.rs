@@ -208,10 +208,10 @@ impl HaimianMusicProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("网络请求失败：{}", e)))?;
 
-        if !response.status().is_success() {
+        if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
-                format!("Haimian Music API 错误 ({}): {}", response.status(), error)
+                format!("Haimian Music API 错误 ({}): {}", status, error)
             ));
         }
 
@@ -247,10 +247,10 @@ impl HaimianMusicProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("网络请求失败：{}", e)))?;
 
-        if !response.status().is_success() {
+        if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
-                format!("查询状态失败 ({}): {}", response.status(), error)
+                format!("查询状态失败 ({}): {}", status, error)
             ));
         }
 
@@ -351,10 +351,10 @@ impl HaimianMusicProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("下载音乐失败：{}", e)))?;
 
-        if !response.status().is_success() {
+        if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
-                format!("下载音乐失败 ({}): {}", response.status(), error)
+                format!("下载音乐失败 ({}): {}", status, error)
             ));
         }
 

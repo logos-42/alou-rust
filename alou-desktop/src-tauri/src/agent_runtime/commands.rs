@@ -92,7 +92,7 @@ pub struct AgentInfoResponse {
 // ============================================================================
 
 /// 初始化 Agent Runtime
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn init_agent_runtime(
     state: State<'_, AgentRuntimeState>,
     app_handle: AppHandle,
@@ -162,10 +162,10 @@ pub async fn agent_join_group_chat(
 }
 
 /// 注册后端 Agent
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn register_backend_agent(
-    agent: message_bus::AgentInfo,
-    config: message_bus::AgentConfig,
+    agent: crate::agent_runtime::agent_registry::AgentInfo,
+    config: crate::agent_runtime::agent_registry::AgentConfig,
     state: State<'_, AgentRuntimeState>,
 ) -> Result<String, String> {
     let runtime = state.runtime.read().await;
@@ -203,7 +203,7 @@ pub async fn stop_agent(
 }
 
 /// 获取群聊历史消息
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn get_group_history(
     group_id: String,
     limit: i32,
@@ -216,7 +216,7 @@ pub async fn get_group_history(
 }
 
 /// 提交任务到队列
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn submit_task(
     agent_id: String,
     action: String,
@@ -267,6 +267,24 @@ pub async fn list_tools(
     Ok(rt.state.tool_bus.list_tools().await)
 }
 
+/// 获取运行时状态
+#[tauri::command]
+pub async fn get_runtime_status(
+    state: State<'_, AgentRuntimeState>,
+) -> Result<serde_json::Value, String> {
+    let runtime = state.runtime.read().await;
+    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
+    
+    let active_agents = rt.state.agent_supervisor.list_active_agents().await;
+    let task_queue_size = rt.state.task_queue.get_queue_size().await;
+    
+    Ok(serde_json::json!({
+        "initialized": true,
+        "active_agents": active_agents,
+        "task_queue_size": task_queue_size,
+    }))
+}
+
 
 
 
@@ -292,7 +310,7 @@ pub struct SubscribeGroupResponse {
 }
 
 /// Agent 订阅群聊
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn agent_subscribe_group(
     request: SubscribeGroupRequest,
     state: State<'_, AgentRuntimeState>,
@@ -330,7 +348,7 @@ pub async fn agent_subscribe_group(
 }
 
 /// Agent 取消订阅群聊
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn agent_unsubscribe_group(
     agent_id: String,
     group_id: String,
@@ -351,55 +369,11 @@ pub struct GroupSubscriptionInfo {
     pub mode: String,
 }
 
-// #[tauri::command] 已注释
+#[tauri::command]
 pub async fn agent_list_subscriptions(
     _agent_id: String,
     _state: State<'_, AgentRuntimeState>,
 ) -> Result<Vec<GroupSubscriptionInfo>, String> {
     // TODO: 实现查询逻辑
-    
-    Ok(vec![])
-}
-
-// ============================================================================
-// 群聊订阅管理命令
-// ============================================================================
-
-/// 订阅群聊请求
-#[derive(Debug, Deserialize)]
-pub struct SubscribeGroupRequest {
-    pub agent_id: String,
-    pub group_id: String,
-    pub mode: String,
-}
-
-/// Agent 订阅群聊
-#[tauri::command]
-pub async fn agent_subscribe_group(
-    request: SubscribeGroupRequest,
-    _state: State<'_, AgentRuntimeState>,
-) -> Result<bool, String> {
-    log::info!("Agent 订阅群聊：{} -> {} ({})", request.agent_id, request.group_id, request.mode);
-    Ok(true)
-}
-
-/// Agent 取消订阅群聊
-#[tauri::command]
-pub async fn agent_unsubscribe_group(
-    agent_id: String,
-    group_id: String,
-    _state: State<'_, AgentRuntimeState>,
-) -> Result<bool, String> {
-    log::info!("Agent 取消订阅群聊：{} -> {}", agent_id, group_id);
-    Ok(true)
-}
-
-/// 列出 Agent 的群聊订阅
-#[tauri::command]
-pub async fn agent_list_subscriptions(
-    agent_id: String,
-    _state: State<'_, AgentRuntimeState>,
-) -> Result<Vec<serde_json::Value>, String> {
-    log::info!("列出 Agent 群聊订阅：{}", agent_id);
     Ok(vec![])
 }

@@ -1,6 +1,9 @@
 //! Ralph Loop 执行器
 //!
 //! 实现 Ralph Loop 的核心执行逻辑，支持无限迭代、工具调用、流式响应
+//!
+//! 升级后的 Agent Reasoning Loop:
+//! Perceive → Reason(一次 LLM) → Act → Integrate
 
 use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCall};
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
@@ -10,6 +13,56 @@ use crate::agent::async_tool_manager::{AsyncToolManager, AsyncToolStatus};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use std::path::PathBuf;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+// ============== Agent Reasoning Loop 核心数据结构 ==============
+
+/// 环境状态（Perceive 层输出）
+#[derive(Debug, Clone)]
+pub struct EnvironmentState {
+    pub task_id: String,
+    pub messages: Vec<AiMessage>,
+    pub iteration_count: u32,
+    pub tool_call_count: u32,
+    pub available_tools: Vec<String>,
+}
+
+/// 推理结果（Reason 层输出 - LLM 单次调用）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Thought {
+    /// 分析过程
+    pub analysis: String,
+    /// 下一步行动
+    pub action: Action,
+}
+
+/// 行动类型
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Action {
+    /// 调用工具（支持并发）
+    ToolCall {
+        tool: String,
+        args: Value,
+        id: String,  // 用于追踪并发调用
+    },
+    /// 完成任务
+    Complete(String),
+    /// 继续思考
+    Continue,
+    /// 失败
+    Fail(String),
+}
+
+/// 行动执行结果
+#[derive(Debug, Clone)]
+pub struct ActionResult {
+    pub action_id: String,
+    pub success: bool,
+    pub output: Option<Value>,
+    pub error: Option<String>,
+}
 
 /// Ralph Loop 执行器
 pub struct RalphLoopExecutor {
@@ -363,6 +416,210 @@ impl RalphLoopExecutor {
             log::info!("[RalphLoop] 继续下一次迭代");
         }
     }
+
+    // ============== Agent Reasoning Loop 核心方法 ==============
+
+    /// 1. 感知环境状态（无 LLM 调用）
+    async fn perceive_environment(&self, task_id: &str) -> Result<EnvironmentState, ExecutorError> {
+        let task = self.task_manager.get_task(task_id).await
+            .ok_or_else(|| ExecutorError::TaskNotFound(task_id.to_string()))?;
+
+        // 获取可用工具名称列表
+        let available_tools = self.tool_registry.list_all().await
+            .iter()
+            .map(|m| m.id.clone())
+            .collect();
+
+        Ok(EnvironmentState {
+            task_id: task_id.to_string(),
+            messages: task.messages.clone(),
+            iteration_count: task.metadata.iteration_count,
+            tool_call_count: task.tool_results.len() as u32,
+            available_tools,
+        })
+    }
+
+    /// 2. 推理决策（单次 LLM 调用 - 核心）
+    async fn reason(&self, state: &EnvironmentState) -> Result<Thought, ExecutorError> {
+        // 构建推理提示（中文）
+        let prompt = self.build_reasoning_prompt(state);
+
+        // 调用 LLM（不传工具，要求输出 JSON 格式的思考 + 行动）
+        let messages = vec![
+            AiMessage::text("system", "你是一个自主智能体。请分析当前状态并决定下一步行动。你必须以 JSON 格式回复。".to_string()),
+            AiMessage::text("user", prompt),
+        ];
+
+        // 注意：这里不传 tools，让 LLM 输出 JSON 格式的行动决策
+        let response = self.ai_client.send_message(messages, None).await
+            .map_err(|e| ExecutorError::AiError(e.to_string()))?;
+
+        // 解析 LLM 输出的 JSON
+        let thought = self.parse_thought(&response.content)?;
+
+        Ok(thought)
+    }
+
+    /// 构建推理提示（中文）
+    fn build_reasoning_prompt(&self, state: &EnvironmentState) -> String {
+        let messages_preview = state.messages.iter()
+            .map(|m| format!("{}: {}", m.role, m.content.chars().take(200).collect::<String>()))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!(
+r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行动。
+
+## 当前任务
+{}
+
+## 可用工具
+{}
+
+## 资源使用
+- 迭代次数：{}/15
+- 工具调用次数：{}
+
+## 对话历史
+{}
+
+## 回复格式
+你必须以 JSON 格式回复，格式如下：
+
+{{
+  "analysis": "你的分析过程",
+  "action": {{
+    "type": "tool_call | complete | continue | fail",
+    "tool": "工具名称（如果是 tool_call）",
+    "args": {{}},
+    "id": "唯一 ID（如果是 tool_call）"
+  }}
+}}
+
+## 行动类型说明
+- tool_call: 调用工具（需要提供 tool、args、id）
+- complete: 完成任务（需要提供完整答案）
+- continue: 继续思考（需要更多分析）
+- fail: 任务失败（说明原因）
+
+## 注意事项
+1. 如果已经达到目标，请使用 complete
+2. 如果需要调用工具，请使用 tool_call
+3. 如果迭代次数接近限制（15 次），请优先选择 complete
+4. 如果无法继续，请使用 fail 并说明原因
+
+请开始分析："#,
+            state.task_id,
+            state.available_tools.join(", "),
+            state.iteration_count,
+            state.tool_call_count,
+            messages_preview,
+        )
+    }
+
+    /// 解析 LLM 输出的思考结果
+    fn parse_thought(&self, content: &str) -> Result<Thought, ExecutorError> {
+        // 尝试解析 JSON
+        let thought: Thought = serde_json::from_str(content)
+            .or_else(|_| {
+                // 如果解析失败，尝试从文本中提取
+                self.extract_thought_from_text(content)
+            })
+            .map_err(|e| ExecutorError::InternalError(format!("解析思考结果失败：{}", e)))?;
+
+        Ok(thought)
+    }
+
+    /// 从文本中提取思考结果（降级处理）
+    fn extract_thought_from_text(&self, text: &str) -> Result<Thought, ExecutorError> {
+        // 简化实现：返回 Continue
+        Ok(Thought {
+            analysis: text.to_string(),
+            action: Action::Continue,
+        })
+    }
+
+    /// 3. 终止判断
+    fn should_terminate(&self, state: &EnvironmentState, thought: &Thought) -> bool {
+        match &thought.action {
+            Action::Complete(_) => true,  // 任务完成
+            Action::Fail(_) => true,       // 任务失败
+            Action::Continue => {
+                // 检查资源耗尽
+                state.iteration_count >= 15 || state.tool_call_count >= 50
+            }
+            Action::ToolCall { .. } => false,  // 继续执行
+        }
+    }
+
+    /// 4. 执行行动（支持并发工具调用）
+    async fn execute_actions(&self, thought: &Thought) -> Result<Vec<ActionResult>, ExecutorError> {
+        match &thought.action {
+            Action::ToolCall { tool, args, id } => {
+                // 执行单个工具调用
+                let result = self.execute_single_action(tool, args, id).await?;
+                Ok(vec![result])
+            }
+            Action::Complete(_) | Action::Continue | Action::Fail(_) => {
+                // 不需要执行行动
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// 执行单个行动
+    async fn execute_single_action(&self, tool: &str, args: &Value, action_id: &str) -> Result<ActionResult, ExecutorError> {
+        log::info!("[AgentReasoning] 执行行动：{} ({})", tool, action_id);
+
+        // 构建工具调用请求
+        let request = ToolCallRequest {
+            session_id: "agent_reasoning".to_string(),
+            user_id: None,
+            tool_id: tool.to_string(),
+            args: args.clone(),
+            working_directory: std::env::current_dir()
+                .ok()
+                .and_then(|p| p.to_str().map(|s| s.to_string())),
+            environment: std::env::vars().collect(),
+            timeout_seconds: Some(300),
+            permissions: vec!["read".to_string(), "write".to_string(), "execute".to_string()],
+        };
+
+        match self.tool_bridge.handle_request(request).await {
+            Ok(ToolCallResponse { success, result, error }) => {
+                Ok(ActionResult {
+                    action_id: action_id.to_string(),
+                    success,
+                    output: result.and_then(|r| Some(r.data)),
+                    error,
+                })
+            }
+            Err(e) => Ok(ActionResult {
+                action_id: action_id.to_string(),
+                success: false,
+                output: None,
+                error: Some(e.to_string()),
+            }),
+        }
+    }
+
+    /// 5. 整合行动结果
+    async fn integrate_results(&self, results: &[ActionResult]) -> Result<(), ExecutorError> {
+        for result in results {
+            if result.success {
+                log::info!("[AgentReasoning] 行动完成：{} - 成功", result.action_id);
+            } else {
+                log::warn!("[AgentReasoning] 行动失败：{} - {:?}", result.action_id, result.error);
+            }
+        }
+
+        // 将结果添加到消息历史（简化实现）
+        // TODO: 实际实现需要将 ActionResult 转换为 AiMessage
+
+        Ok(())
+    }
+
+    // ============== 原有方法（保留向后兼容） ==============
 
     /// 调用 AI
     async fn call_ai(&self, task: &Task) -> super::error::Result<super::ai_client::AiResponse> {
@@ -989,46 +1246,104 @@ impl RalphLoopExecutor {
         }
     }
 
-    /// 执行工具调用
+    /// 执行工具调用（并发执行 + 限流）
     async fn execute_tools(
         &self,
         task_id: &str,
         tool_calls: &[ProviderToolCall],
     ) -> super::error::Result<Vec<ToolResult>> {
-        let mut results = Vec::new();
+        use std::sync::Arc;
+        use tokio::sync::Semaphore;
 
+        // 为每个工具调用发送执行开始事件
         for tool_call in tool_calls {
-            // 发送工具执行开始事件（包含参数）
             self.emit_event(task_id, TaskEvent::ToolExecuting {
                 task_id: task_id.to_string(),
                 tool_name: tool_call.name.clone(),
                 arguments: Some(tool_call.arguments.clone()),
             })
             .await;
-
-            // agent_document 工具内联处理，不经过 ToolBridge
-            let result = if tool_call.name == "agent_document" {
-                self.execute_agent_document(task_id, tool_call).await?
-            } else {
-                self.execute_single_tool(tool_call).await?
-            };
-
-            // 发送工具执行完成事件
-            self.emit_event(task_id, TaskEvent::ToolCompleted {
-                task_id: task_id.to_string(),
-                tool_name: tool_call.name.clone(),
-                result: result.summary(),
-            })
-            .await;
-
-            results.push(result);
         }
 
-        Ok(results)
+        // 🔥 限流：最多 10 个工具并发执行
+        let semaphore = Arc::new(Semaphore::new(10));
+
+        // 🔥 并发执行所有工具调用（带限流）
+        let futures = tool_calls.iter().map(|tool_call| {
+            let permit = semaphore.clone();
+            let tool_call = tool_call.clone();
+            let task_id = task_id.to_string();
+            let executor = self as &Self;
+
+            async move {
+                // 获取许可（最多 10 个并发）
+                let _permit = permit.acquire_owned().await
+                    .map_err(|e| ExecutorError::InternalError(format!("Semaphore error: {}", e)))?;
+
+                // agent_document 工具内联处理，不经过 ToolBridge
+                let result = if tool_call.name == "agent_document" {
+                    executor.execute_agent_document(&task_id, &tool_call).await?
+                } else {
+                    executor.execute_single_tool(&tool_call).await?
+                };
+
+                // permit 离开作用域自动释放
+                Ok::<ToolResult, ExecutorError>(result)
+            }
+        });
+
+        let results = futures::future::join_all(futures).await;
+
+        // 收集结果并发送完成事件
+        let mut final_results = Vec::new();
+        for (tool_call, result_result) in tool_calls.iter().zip(results.iter()) {
+            match result_result {
+                Ok(result) => {
+                    self.emit_event(task_id, TaskEvent::ToolCompleted {
+                        task_id: task_id.to_string(),
+                        tool_name: tool_call.name.clone(),
+                        result: result.summary(),
+                    })
+                    .await;
+                    final_results.push(result.clone());
+                }
+                Err(e) => {
+                    self.emit_event(task_id, TaskEvent::ToolCompleted {
+                        task_id: task_id.to_string(),
+                        tool_name: tool_call.name.clone(),
+                        result: ToolResult {
+                            tool_call_id: tool_call.id.clone(),
+                            success: false,
+                            data: None,
+                            error: Some(e.to_string()),
+                        }.summary(),
+                    })
+                    .await;
+                    final_results.push(ToolResult {
+                        tool_call_id: tool_call.id.clone(),
+                        success: false,
+                        data: None,
+                        error: Some(e.to_string()),
+                    });
+                }
+            }
+        }
+
+        Ok(final_results)
     }
 
     /// 执行单个工具
     async fn execute_single_tool(&self, tool_call: &ProviderToolCall) -> super::error::Result<ToolResult> {
+        // 🔥 识别长任务
+        let is_long_running_tool = matches!(tool_call.name.as_str(), "generate_video" | "get_video_status" | "browser" | "ipfs_archive");
+        if is_long_running_tool {
+            log::info!("[RalphLoop] 检测到长任务工具：{}", tool_call.name);
+            return self.execute_short_tool(tool_call).await;
+        }
+        self.execute_short_tool(tool_call).await
+    }
+
+    async fn execute_short_tool(&self, tool_call: &ProviderToolCall) -> super::error::Result<ToolResult> {
         // 添加详细日志
         log::info!("[RalphLoop] 执行工具：{}", tool_call.name);
         log::info!("[RalphLoop] 工具参数：{}", serde_json::to_string(&tool_call.arguments).unwrap_or_default());

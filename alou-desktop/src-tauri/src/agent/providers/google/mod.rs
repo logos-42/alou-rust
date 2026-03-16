@@ -213,7 +213,9 @@ impl MediaProvider for GoogleProvider {
                 height: options.height,
                 format: Some(format),
                 prompt: Some(options.prompt),
-                ..Default::default()
+                duration: None,
+                duration_secs: None,
+                model: None,
             },
         })
     }

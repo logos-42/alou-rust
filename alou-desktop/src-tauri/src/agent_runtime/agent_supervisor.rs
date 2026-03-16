@@ -67,8 +67,7 @@ impl AgentSupervisor {
             self.tool_facade.clone(),
             self.bridge_manager.clone(),
             self.ai_client_pool.clone(),
-            self.tool_registry.clone(),  // ← 传递共享的 ToolRegistry
-        );
+        ).await;
 
         // 启动监控 task
         let supervisor = self.clone();

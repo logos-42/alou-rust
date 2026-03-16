@@ -49,6 +49,10 @@ pub enum SessionMessage {
     SessionDestroy,
     Ping,
     Pong,
+    /// 🔥 自主心跳消息（每 5 秒触发一次，让 Agent 自主思考）
+    AgentTick {
+        timestamp: i64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

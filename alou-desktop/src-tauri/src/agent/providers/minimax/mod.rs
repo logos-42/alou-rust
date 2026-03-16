@@ -1,6 +1,6 @@
 //! MiniMax Provider 实现
 //!
-//! 支持：语音合成 (TTS) + 视频生成
+//! 支持：语音合成 (TTS) + 视频生成 + 音乐生成
 
 use crate::agent::media_config::ProviderConfig;
 use crate::agent::providers::media_provider::{
@@ -16,9 +16,11 @@ use std::sync::Arc;
 
 mod tts;
 mod video;
+mod music;
 
 pub use tts::MiniMaxTts;
 pub use video::MiniMaxVideo;
+pub use music::MiniMaxMusicProvider;
 
 /// MiniMax 配置
 #[derive(Debug, Clone)]

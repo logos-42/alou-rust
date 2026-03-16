@@ -2,11 +2,11 @@
 //!
 //! 启动时创建所有 Provider，运行时复用
 
+use crate::agent::error::{AgentError, Result};
+use crate::agent::media_config::{Capability, MediaApiConfig, ProviderConfig};
+use crate::agent::providers::media_provider::MediaProvider;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::agent::media_config::{MediaApiConfig, ProviderConfig, Capability};
-use crate::agent::providers::media_provider::MediaProvider;
-use crate::agent::error::{AgentError, Result};
 
 /// Provider 注册表
 pub struct ProviderRegistry {
@@ -35,35 +35,47 @@ impl ProviderRegistry {
         })
     }
 
-    fn create_media_provider(name: &str, config: &ProviderConfig) -> Result<Arc<dyn MediaProvider>> {
+    fn create_media_provider(
+        name: &str,
+        config: &ProviderConfig,
+    ) -> Result<Arc<dyn MediaProvider>> {
         match name {
             "minimax" => {
-                let provider = minimax::MiniMaxProvider::new(config)?;
+                let provider = crate::agent::providers::minimax::MiniMaxProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             "google" => {
-                let provider = google::GoogleProvider::new(config)?;
+                let provider = crate::agent::providers::google::GoogleProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             "jimeng" => {
-                let provider = jimeng::JimengProvider::new(config)?;
+                let provider = crate::agent::providers::jimeng::JimengProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             "haimian" => {
-                let provider = haimian::HaimianMusicProvider::new(config)?;
+                let provider = crate::agent::providers::haimian::HaimianMusicProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             "seedance" => {
-                let provider = seedance::SeedanceProvider::new(config)?;
+                let provider = crate::agent::providers::seedance::SeedanceProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
             "seedream" => {
-                let provider = seedream::SeedreamProvider::new(config)?;
+                let provider = crate::agent::providers::seedream::SeedreamProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
-            _ => Err(AgentError::ConfigError(
-                format!("Unknown media provider: {}", name)
-            )),
+            "suno" => {
+                let provider = crate::agent::providers::suno::SunoProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            "minimax_music" => {
+                let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
+                Ok(Arc::new(provider))
+            }
+            _ => Err(AgentError::ConfigError(format!(
+                "Unknown media provider: {}",
+                name
+            ))),
         }
     }
 

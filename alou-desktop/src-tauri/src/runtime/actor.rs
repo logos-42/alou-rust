@@ -157,7 +157,7 @@ impl SessionActor {
                         let _ = app.emit("session:task_created", serde_json::json!({
                             "task_id": task_id,
                             "session_id": session_id,
-                            "content": content_clone.chars().take(200).to_string(),
+                            "content": content_clone.chars().take(200).collect::<String>(),
                             "stream": metadata_clone.stream.unwrap_or(false),
                             "timestamp": metadata_clone.timestamp.unwrap_or_else(|| chrono::Utc::now().timestamp()),
                         }));
@@ -270,37 +270,36 @@ impl SessionActor {
             }
 
             SessionMessage::AgentTick { timestamp } => {
-                // 🔥 自主心跳：让 Agent 定期自主思考
-                log::info!("[SessionActor:{}] AgentTick received at {}", session_id, timestamp);
+                // 🔥 自主心跳：检查是否有待处理任务
+                // 注意：不直接调用 AI，只检查 TaskQueue
+                log::debug!("[SessionActor:{}] AgentTick received at {}", session_id, timestamp);
 
-                // 检查是否有待处理的任务或需要自主执行的操作
+                // 检查是否有 Pending 状态的任务
                 let pending_tasks = task_manager.get_pending_tasks().await;
-                if !pending_tasks.is_empty() {
-                    log::info!(
-                        "[SessionActor:{}] Found {} pending tasks, continuing execution",
-                        session_id,
-                        pending_tasks.len()
-                    );
+                
+                if pending_tasks.is_empty() {
+                    // ✅ 没有任务，跳过，不调用 AI
+                    log::debug!("[SessionActor:{}] No pending tasks, skipping tick", session_id);
+                    return runtime;
+                }
 
-                    // 继续执行待处理任务
-                    for task in pending_tasks {
-                        let task_id = task.task_id.clone();
-                        let exec = executor.clone();
-                        tokio::spawn(async move {
-                            log::info!("[SessionActor:{}] Resuming task: {}", session_id, task_id);
-                            if let Err(e) = exec.execute(&task_id).await {
-                                log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id, task_id, e);
-                            }
-                        });
-                    }
-                } else {
-                    // 没有待处理任务，Agent 可以自主决定做什么
-                    log::debug!("[SessionActor:{}] No pending tasks, agent is idle", session_id);
+                // 有任务，执行
+                log::info!(
+                    "[SessionActor:{}] Found {} pending tasks, executing...",
+                    session_id,
+                    pending_tasks.len()
+                );
 
-                    // 这里可以添加更多自主逻辑，例如：
-                    // 1. 检查长期记忆是否需要更新
-                    // 2. 检查是否有定时任务需要执行
-                    // 3. 主动学习或总结之前的交互
+                // 并发执行待处理任务
+                for task in pending_tasks {
+                    let task_id = task.id.clone();
+                    let exec = executor.clone();
+                    tokio::spawn(async move {
+                        log::info!("[SessionActor:{}] Executing task: {}", session_id, task_id);
+                        if let Err(e) = exec.execute(&task_id).await {
+                            log::error!("[SessionActor:{}] Task {} execution failed: {}", session_id, task_id, e);
+                        }
+                    });
                 }
             }
         }

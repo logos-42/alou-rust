@@ -40,6 +40,14 @@ pub enum AgentError {
     /// 内部错误
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    /// 外部 API 错误（新增）
+    #[error("External API error: {0}")]
+    ExternalApiError(String),
+
+    /// 通用 Agent 错误（别名，用于兼容旧代码）
+    #[error("Agent error: {0}")]
+    AgentError(String),
 }
 
 impl From<reqwest::Error> for AgentError {

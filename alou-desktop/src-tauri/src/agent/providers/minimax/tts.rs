@@ -11,6 +11,9 @@
 //! - Authorization: Bearer {API_KEY}
 //! - Content-Type: application/json
 
+
+use async_trait::async_trait;
+
 use super::MiniMaxConfig;
 use crate::agent::error::{AgentError, Result};
 use reqwest::Client;
@@ -279,10 +282,11 @@ impl MiniMaxTts {
                 AgentError::ExternalApiError(format!("网络请求失败：{}", e))
             })?;
 
-        if !response.status().is_success() {
+        let status = response.status();
+        if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(
-                format!("获取声音列表失败 ({}): {}", response.status(), error)
+                format!("获取声音列表失败 ({}): {}", status, error)
             ));
         }
 

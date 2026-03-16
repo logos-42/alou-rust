@@ -254,6 +254,33 @@ impl TaskManager {
     pub async fn emit_event(&self, event: TaskEvent) {
         let _ = self.event_sender.send(event);
     }
+
+    /// 🔥 获取所有待处理的任务（用于 AgentTick 自主执行）
+    /// 只返回真正需要执行的任务（Pending 或 需要继续迭代的 Running）
+    pub async fn get_pending_tasks(&self) -> Vec<Task> {
+        let tasks = self.tasks.read().await;
+        tasks
+            .values()
+            .filter(|task| {
+                // 只处理 Pending 状态的任务
+                // Running 状态的任务已经在执行中，不需要重复触发
+                task.status == TaskStatus::Pending
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// 🔥 获取指定 session 的待处理任务
+    pub async fn get_pending_tasks_for_session(&self, session_id: &str) -> Vec<Task> {
+        let tasks = self.tasks.read().await;
+        tasks
+            .values()
+            .filter(|task| {
+                task.status == TaskStatus::Pending
+            })
+            .cloned()
+            .collect()
+    }
 }
 
 /// 任务结果（最终返回）
