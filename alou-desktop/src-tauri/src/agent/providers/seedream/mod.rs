@@ -242,12 +242,7 @@ impl MediaProvider for SeedreamProvider {
             url: Some(urls[0].clone()),
             file_path: Some(file_path),
             ipfs_cid: None,
-            metadata: serde_json::to_value(MediaMetadata {
-                width: options.width,
-                height: options.height,
-                format: Some("png".to_string()),
-                prompt: Some(options.prompt),
-            }).unwrap_or_default(),
+            metadata: serde_json::to_value(MediaMetadata::default()).ok(),
         })
     }
 

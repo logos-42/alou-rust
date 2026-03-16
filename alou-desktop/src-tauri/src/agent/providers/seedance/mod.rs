@@ -245,13 +245,7 @@ impl SeedanceProvider {
                 url: Some(video.play_addr),
                 file_path: None,
                 ipfs_cid: None,
-                metadata: serde_json::to_value(MediaMetadata {
-                    duration: video.duration,
-                    width: video.width,
-                    height: video.height,
-                    format: Some("mp4".to_string()),
-                    prompt: None,
-                }).unwrap_or_default(),
+                metadata: serde_json::to_value(MediaMetadata::default()).ok(),
             })
         } else {
             None

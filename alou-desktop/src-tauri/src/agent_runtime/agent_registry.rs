@@ -183,12 +183,4 @@ impl Default for AgentRegistry {
     }
 }
 
-impl Clone for AgentRegistry {
-    fn clone(&self) -> Self {
-        Self {
-            agents: self.agents.clone(),
-            index_capability: self.index_capability.clone(),
-            index_group: self.index_group.clone(),
-        }
-    }
-}
+// Clone not implemented for AgentRegistry

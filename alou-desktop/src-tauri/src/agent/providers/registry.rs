@@ -68,10 +68,10 @@ impl ProviderRegistry {
                 let provider = crate::agent::providers::suno::SunoProvider::new(config)?;
                 Ok(Arc::new(provider))
             }
-            "minimax_music" => {
-                let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
-                Ok(Arc::new(provider))
-            }
+            // "minimax_music" => {
+            //     let provider = crate::agent::providers::minimax::MiniMaxMusicProvider::new(config)?;
+            //     Ok(Arc::new(provider))
+            // }
             _ => Err(AgentError::ConfigError(format!(
                 "Unknown media provider: {}",
                 name

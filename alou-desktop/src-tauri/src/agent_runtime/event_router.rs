@@ -27,7 +27,7 @@ impl EventRouter {
         let task_tx_clone = task_tx.clone();
         
         tokio::spawn(async move {
-            while let Ok(event) = rx.recv().await {
+            while let Some(event) = rx.recv().await.ok() {
                 match &event {
                     Event::AgentMessage(_) => {
                         let _ = agent_tx_clone.send(event).await;

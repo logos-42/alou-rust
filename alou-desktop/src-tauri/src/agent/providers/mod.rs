@@ -42,4 +42,4 @@ pub use seedream::SeedreamProvider;
 
 // 音乐 Provider
 pub use suno::SunoProvider;
-pub use minimax::MiniMaxMusicProvider;
+// pub use minimax::MiniMaxMusicProvider;

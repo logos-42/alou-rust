@@ -139,7 +139,7 @@ impl AgentSupervisor {
 impl Clone for AgentSupervisor {
     fn clone(&self) -> Self {
         Self {
-            actors: self.actors.clone(),
+            actors: RwLock::new(HashMap::new()),  // Cannot clone
             configs: self.configs.clone(),
             restart_counts: self.restart_counts.clone(),
             restart_policy: self.restart_policy.clone(),

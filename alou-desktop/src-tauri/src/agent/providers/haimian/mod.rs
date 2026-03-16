@@ -353,6 +353,7 @@ impl HaimianMusicProvider {
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("下载音乐失败：{}", e)))?;
 
+        let status = response.status();
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
             return Err(AgentError::ExternalApiError(

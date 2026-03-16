@@ -16,11 +16,11 @@ use std::sync::Arc;
 
 mod tts;
 mod video;
-mod music;
+// // mod music;  // TODO: 待实现音乐生成模块
 
 pub use tts::MiniMaxTts;
 pub use video::MiniMaxVideo;
-pub use music::MiniMaxMusicProvider;
+// // pub use music::MiniMaxMusicProvider;  // TODO: 待实现
 
 /// MiniMax 配置
 #[derive(Debug, Clone)]
