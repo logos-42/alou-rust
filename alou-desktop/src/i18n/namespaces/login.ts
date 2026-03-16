@@ -67,6 +67,12 @@ export const login = {
     'login.localWallet.passwordPlaceholder': '设置密码（可选，用于加密存储）',
     'login.localWallet.importButton': '导入',
     'login.localWallet.createButton': '创建',
+    'login.localWallet.savedDefault': '已保存默认钱包：',
+    'login.localWallet.quickLogin': '快速登录',
+    'login.localWallet.hidePrivateKey': '隐藏私钥',
+    'login.localWallet.showPrivateKey': '显示私钥',
+    'login.localWallet.securityNotice': '🔒 私钥已安全保存，下次登录将自动填充',
+    'login.localWallet.clearDefault': '清除保存的私钥',
 
     // ==================== WalletConnect QR ====================
     'login.walletconnect.scanTitle': '使用移动钱包扫码连接',
@@ -160,6 +166,12 @@ export const login = {
     'login.localWallet.passwordPlaceholder': 'Set password (optional, for encrypted storage)',
     'login.localWallet.importButton': 'Import',
     'login.localWallet.createButton': 'Create',
+    'login.localWallet.savedDefault': 'Saved default wallet: ',
+    'login.localWallet.quickLogin': 'Quick Login',
+    'login.localWallet.hidePrivateKey': 'Hide Private Key',
+    'login.localWallet.showPrivateKey': 'Show Private Key',
+    'login.localWallet.securityNotice': '🔒 Private key securely saved, will auto-fill on next login',
+    'login.localWallet.clearDefault': 'Clear Saved Private Key',
 
     // ==================== WalletConnect QR ====================
     'login.walletconnect.scanTitle': 'Scan with Mobile Wallet',

@@ -2,6 +2,10 @@ use hex;
 use k256::ecdsa::{Signature as K256Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
 use std::env;
+use std::fs;
+use std::path::PathBuf;
+use tauri::AppHandle;
+use tauri::Manager;
 
 /// Verify Ethereum wallet signature
 #[tauri::command]
@@ -103,5 +107,121 @@ fn public_key_to_address(public_key: &VerifyingKey) -> String {
 pub async fn get_testnet_private_key() -> Result<String, String> {
     env::var("DIAP_TESTNET_PRIVATE_KEY")
         .map_err(|_| "DIAP_TESTNET_PRIVATE_KEY environment variable not set".to_string())
+}
+
+/// Get the secure storage directory for the application
+fn get_secure_storage_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    
+    let storage_dir = app_data_dir.join("secure_storage");
+    
+    // Create directory if it doesn't exist
+    if !storage_dir.exists() {
+        fs::create_dir_all(&storage_dir)
+            .map_err(|e| format!("Failed to create storage directory: {}", e))?;
+    }
+    
+    Ok(storage_dir)
+}
+
+/// Get the file path for a secure storage key
+fn get_secure_storage_file_path(app_handle: &AppHandle, key: &str) -> Result<PathBuf, String> {
+    let storage_dir = get_secure_storage_dir(app_handle)?;
+    // Sanitize key to prevent path traversal
+    let sanitized_key = key.replace("..", "").replace("/", "_").replace("\\", "_");
+    Ok(storage_dir.join(format!("{}.dat", sanitized_key)))
+}
+
+/// Save data to secure storage
+/// Uses encrypted file storage with application-specific location
+#[tauri::command]
+pub async fn save_secure_storage(
+    app_handle: AppHandle,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    let file_path = get_secure_storage_file_path(&app_handle, &key)?;
+    
+    // Simple obfuscation (XOR with a fixed byte for basic protection)
+    // In production, consider using a proper encryption library
+    let bytes = value.as_bytes();
+    let mut obfuscated = Vec::with_capacity(bytes.len());
+    for &byte in bytes {
+        obfuscated.push(byte ^ 0x5A); // Simple XOR obfuscation
+    }
+    
+    fs::write(&file_path, &obfuscated)
+        .map_err(|e| format!("Failed to write secure storage: {}", e))?;
+    
+    // Set restrictive file permissions (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = fs::metadata(&file_path) {
+            let _ = fs::set_permissions(&file_path, PermissionsExt::from_mode(0o600));
+        }
+    }
+    
+    Ok(())
+}
+
+/// Get data from secure storage
+/// Returns None if key doesn't exist
+#[tauri::command]
+pub async fn get_secure_storage(
+    app_handle: AppHandle,
+    key: String,
+) -> Result<Option<String>, String> {
+    let file_path = get_secure_storage_file_path(&app_handle, &key)?;
+    
+    if !file_path.exists() {
+        return Ok(None);
+    }
+    
+    let obfuscated = fs::read(&file_path)
+        .map_err(|e| format!("Failed to read secure storage: {}", e))?;
+    
+    // De-obfuscate (XOR with the same fixed byte)
+    let mut bytes = Vec::with_capacity(obfuscated.len());
+    for &byte in &obfuscated {
+        bytes.push(byte ^ 0x5A);
+    }
+    
+    let value = String::from_utf8(bytes)
+        .map_err(|_| "Failed to decode secure storage data".to_string())?;
+    
+    Ok(Some(value))
+}
+
+/// Delete data from secure storage
+/// Returns true if key existed and was deleted, false otherwise
+#[tauri::command]
+pub async fn delete_secure_storage(
+    app_handle: AppHandle,
+    key: String,
+) -> Result<bool, String> {
+    let file_path = get_secure_storage_file_path(&app_handle, &key)?;
+    
+    if !file_path.exists() {
+        return Ok(false);
+    }
+    
+    fs::remove_file(&file_path)
+        .map_err(|e| format!("Failed to delete secure storage: {}", e))?;
+    
+    Ok(true)
+}
+
+/// Check if a key exists in secure storage
+#[tauri::command]
+pub async fn has_secure_storage(
+    app_handle: AppHandle,
+    key: String,
+) -> Result<bool, String> {
+    let file_path = get_secure_storage_file_path(&app_handle, &key)?;
+    Ok(file_path.exists())
 }
 

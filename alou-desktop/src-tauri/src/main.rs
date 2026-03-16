@@ -76,7 +76,7 @@ use crate::diap::{
     test_ipns_on_public_gateway,
     ipfs_publish_ipns,
 };
-use crate::wallet::{verify_wallet_signature, get_testnet_private_key};
+use crate::wallet::{verify_wallet_signature, get_testnet_private_key, save_secure_storage, get_secure_storage, delete_secure_storage, has_secure_storage};
 use crate::browser::{open_browser, test_ipfs_node_connection};
 use crate::sync::{
     read_wallet_sync_data, start_wallet_sync_server, write_wallet_sync_data,
@@ -650,6 +650,10 @@ fn main() {
             load_template_content,
             verify_wallet_signature,
             get_testnet_private_key,
+            save_secure_storage,
+            get_secure_storage,
+            delete_secure_storage,
+            has_secure_storage,
             open_browser,
             test_ipfs_node_connection,
             write_wallet_sync_data,
