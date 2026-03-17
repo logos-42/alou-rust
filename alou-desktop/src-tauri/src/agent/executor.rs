@@ -8,7 +8,8 @@
 use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCall};
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
 use super::error::AgentError;
-use super::perception::{PerceptionEngine, RetrievedContext, DocumentLoader, GoalTracker};
+use super::perception::{PerceptionEngine, RetrievedContext};
+use super::Importance;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
 use crate::agent::async_tool_manager::AsyncToolManager;
 use std::sync::Arc;
@@ -35,8 +36,85 @@ pub struct EnvironmentState {
 pub struct Thought {
     /// 分析过程
     pub analysis: String,
+    /// 🔥 新增：强制反思
+    pub reflection: Option<Reflection>,
     /// 下一步行动
     pub action: Action,
+}
+
+/// 🔥 反思层结构
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reflection {
+    /// 信息充分性评估
+    pub information_assessment: InformationAssessment,
+    /// 任务进度评估
+    pub task_progress: TaskProgress,
+    /// 决策置信度 (0.0-1.0)
+    pub confidence: f32,
+    /// 决策理由
+    pub reasoning: String,
+    /// 建议的下一步
+    pub suggested_next_step: String,
+}
+
+/// 信息充分性评估
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InformationAssessment {
+    /// 状态："sufficient" | "insufficient" | "uncertain"
+    pub status: String,
+    /// 缺少的信息
+    #[serde(default)]
+    pub missing_info: Vec<String>,
+    /// 建议："proceed" | "gather_more" | "ask_user"
+    pub suggestion: String,
+}
+
+/// 任务进度评估
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskProgress {
+    /// 整体进度 (0.0-1.0)
+    pub overall_progress: f32,
+    /// 已完成的步骤
+    #[serde(default)]
+    pub completed_steps: Vec<String>,
+    /// 待处理的步骤
+    #[serde(default)]
+    pub pending_steps: Vec<String>,
+    /// 预计剩余迭代次数
+    pub estimated_remaining_iterations: u32,
+}
+
+impl Default for InformationAssessment {
+    fn default() -> Self {
+        Self {
+            status: "uncertain".to_string(),
+            missing_info: vec![],
+            suggestion: "proceed".to_string(),
+        }
+    }
+}
+
+impl Default for TaskProgress {
+    fn default() -> Self {
+        Self {
+            overall_progress: 0.0,
+            completed_steps: vec![],
+            pending_steps: vec![],
+            estimated_remaining_iterations: 0,
+        }
+    }
+}
+
+impl Default for Reflection {
+    fn default() -> Self {
+        Self {
+            information_assessment: InformationAssessment::default(),
+            task_progress: TaskProgress::default(),
+            confidence: 0.5,
+            reasoning: String::new(),
+            suggested_next_step: String::new(),
+        }
+    }
 }
 
 /// 行动类型
@@ -499,7 +577,7 @@ impl RalphLoopExecutor {
         Ok(thought)
     }
 
-    /// 构建推理提示（中文）- 增强版，包含智能感知上下文
+    /// 构建推理提示（中文）- 增强版，包含智能感知上下文和详细决策指南
     fn build_reasoning_prompt(&self, state: &EnvironmentState) -> String {
         let messages_preview = state.messages.iter()
             .map(|m| format!("{}: {}", m.role, m.content.chars().take(200).collect::<String>()))
@@ -508,6 +586,14 @@ impl RalphLoopExecutor {
 
         // 格式化检索到的上下文
         let context_section = self.format_retrieved_context(&state.retrieved_context);
+        
+        // 检测是否为简单对话
+        let is_simple = self.is_simple_conversation(&state.messages);
+        let simple_hint = if is_simple {
+            "⚠️ 注意：这看起来是一个简单对话，建议直接回复 (complete)\n"
+        } else {
+            ""
+        };
 
         format!(
 r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能力。
@@ -528,11 +614,13 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
 ## 对话历史
 {}
 
+{}
+
 ## 回复格式
 你必须以 JSON 格式回复，格式如下：
 
 {{
-  "analysis": "你的分析过程",
+  "analysis": "你的分析过程（必须具体说明为什么选择某个 action）",
   "action": {{
     "type": "tool_call | complete | continue | fail",
     "tool": "工具名称（如果是 tool_call）",
@@ -541,37 +629,69 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
   }}
 }}
 
-## 行动类型说明
-- tool_call: 调用工具（需要提供 tool、args、id）
-- complete: 完成任务（需要提供完整答案）
-- continue: 继续思考（需要更多分析）
-- fail: 任务失败（说明原因）
+## 决策流程图
 
-## 决策指南
+1. 分析用户输入 → 识别意图
+        ↓
+2. 检查检索到的上下文 → 是否有用信息？
+        ↓
+3. 评估信息充分性
+   ├─ 充分 → 判断任务类型
+   │          ├─ 简单对话 → complete
+   │          └─ 复杂任务 → tool_call 或 complete
+   └─ 不充分 → tool_call (memory_search/read_document)
+        ↓
+4. 选择 action 类型
 
-### 简单对话识别（直接 complete）
-以下情况请直接回复，不需要工具：
-- 问候（你好/嗨/hello）→ 友好回应
-- 感谢（谢谢/thanks）→ 礼貌回应
-- 确认（好的/ok/没问题）→ 确认收到
-- 简短闲聊（今天天气怎么样）→ 自然回应
+## 详细决策指南
 
-### 信息充分性评估
-在决定 action 之前，问自己：
-1. 我是否已掌握回答/执行所需的所有信息？
-2. 如果不够，应该调用哪个工具获取？
-3. 检索到的上下文是否有用？
+### 1️⃣ 简单对话识别（直接 complete）
+以下情况**必须**直接回复，不需要工具：
+- **问候**：你好/您好/hi/hello/hey → 友好回应
+- **感谢**：谢谢/thanks/感谢 → 礼貌回应
+- **确认**：好的/ok/没问题/收到 → 确认收到
+- **闲聊**：今天天气怎么样/最近如何 → 自然回应
+- **简单问答**：你叫什么名字/你能做什么 → 直接回答
 
-### Continue 使用规范
-**禁止场景**：
-- 没有任何 tool_call 的情况下单独使用 Continue
+### 2️⃣ 信息充分性评估
+在决定 action 之前，必须回答：
+- [ ] 我是否已掌握回答/执行所需的所有信息？
+- [ ] 检索到的上下文是否相关且有用？
+- [ ] 如果信息不够，应该调用哪个工具获取？
+
+**信息充分** → 直接 complete 或执行 tool_call
+**信息不充分** → 调用工具获取（如 memory_search, read_document）
+
+### 3️⃣ Action 类型选择指南
+
+| 场景 | 选择 | 说明 |
+|------|------|------|
+| 简单问候/闲聊 | **complete** | 直接友好回复 |
+| 需要执行具体操作 | **tool_call** | 调用相应工具 |
+| 信息不足需要搜索 | **tool_call** | 调用 memory_search/read_document |
+| 已完成任务 | **complete** | 提供最终答案 |
+| 无法完成 | **fail** | 说明原因 |
+
+### 4️⃣ Continue 使用规范（⚠️ 重要）
+
+**Continue 的含义**：系统会自动继续下一次迭代，**不需要**你显式选择 Continue。
+
+**🚫 禁止场景**：
+- 没有任何 tool_call 的情况下使用 Continue
 - 用 Continue 来回避决策
+- 不确定时选择 Continue
 
-**允许场景**：
-- 已执行 tool_call，等待结果后继续
-- 需要主动等待用户输入时
+**✅ 正确处理**：
+- 如果需要更多信息 → 使用 tool_call (memory_search)
+- 如果可以直接回答 → 使用 complete
+- 如果无法处理 → 使用 fail
 
-请开始分析："#,
+### 5️⃣ 迭代限制处理
+当前迭代: {}/15
+- 如果接近限制 (>=12) → 优先 complete，总结当前进展
+- 如果在早期 (<5) → 可以充分使用工具
+
+请开始分析（确保你的分析具体到可以支撑你的 action 选择）："#,
             state.task_id,
             context_section,
             state.available_tools.join(", "),
@@ -650,6 +770,39 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
         } else {
             sections.join("\n\n")
         }
+    }
+
+    /// 检测是否为简单对话
+    fn is_simple_conversation(&self, messages: &[AiMessage]) -> bool {
+        if messages.is_empty() {
+            return false;
+        }
+        
+        // 只检查最后一条用户消息
+        let last_user_msg = messages.iter()
+            .rev()
+            .find(|m| m.role == "user")
+            .map(|m| m.content.as_str())
+            .unwrap_or("");
+        
+        let content_lower = last_user_msg.to_lowercase();
+        
+        // 问候词
+        let greetings = ["你好", "您好", "hi", "hello", "hey", "在吗", "在不在", "早上好", "下午好", "晚上好"];
+        // 感谢词
+        let thanks = ["谢谢", "thanks", "感谢", "多谢"];
+        // 确认词
+        let confirms = ["好的", "ok", "okay", "没问题", "收到", "明白了", "了解了"];
+        // 闲聊开头
+        let chitchat = ["今天", "最近", "天气", "怎么样", "如何"];
+        
+        let is_greeting = greetings.iter().any(|g| content_lower.contains(g));
+        let is_thanks = thanks.iter().any(|t| content_lower.contains(t));
+        let is_confirm = confirms.iter().any(|c| content_lower.contains(c));
+        let is_chitchat = chitchat.iter().any(|c| content_lower.contains(c));
+        
+        // 短消息（<50字符）且有以上特征
+        (is_greeting || is_thanks || is_confirm || is_chitchat) && last_user_msg.len() < 50
     }
 
     /// 解析 LLM 输出的思考结果

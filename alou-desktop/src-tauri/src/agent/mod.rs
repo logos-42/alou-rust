@@ -17,6 +17,7 @@ pub mod hook_commands;
 pub mod agent_hook;  // 新增
 pub mod async_tool_manager;  // 异步工具调用管理器
 pub mod perception;  // 智能感知层
+pub mod memory;  // 记忆系统
 
 // 重新导出常用类型
 pub use config::ApiConfig;
@@ -26,3 +27,4 @@ pub use ai_client_pool::AiClientPool;
 pub use providers::ProviderRegistry;
 pub use async_tool_manager::{AsyncToolManager, AsyncToolStatus, AsyncToolTask, ToolExecutor};
 pub use perception::{PerceptionEngine, RetrievedContext, Intent};
+pub use memory::{MemoryManager, Memory, MemoryType, Importance};

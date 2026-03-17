@@ -47,7 +47,9 @@ use tokio::sync::RwLock;
 use crate::agent::providers::ProviderRegistry;
 use crate::agent::media_config::MediaApiConfig;
 use crate::agent::ai_client_pool::AiClientPool;
-use crate::agent::perception::{PerceptionEngine, DocumentLoader, GoalTracker};
+use crate::agent::perception::{PerceptionEngine};
+use crate::agent::memory::MemoryManager;
+use crate::agent::task::TaskManager;
 use crate::tools::{ToolRegistry, ToolFacade};
 use crate::bridges::BridgeManager;
 
@@ -119,20 +121,16 @@ impl AgentRuntimeState {
         let agent_scheduler = Arc::new(AgentScheduler::new(3000));
 
         // 🔥 创建智能感知引擎
-        let document_loader = Arc::new(DocumentLoader::new("."));
-        let goal_tracker = Arc::new(GoalTracker::new(Arc::new(
-            crate::agent::perception::InMemoryGoalStorage::new()
-        )));
-        
-        // 需要 memory_manager，从 storage 中获取
         let memory_manager = Arc::new(
-            crate::context::memory::MemoryManager::new(3600)  // 1 小时过期
+            MemoryManager::new().map_err(|e| format!("MemoryManager 创建失败: {}", e))?
         );
+        
+        // 创建一个共享的 TaskManager 给 PerceptionEngine
+        let perception_task_manager = Arc::new(TaskManager::new());
         
         let perception_engine = Arc::new(PerceptionEngine::new(
             memory_manager,
-            document_loader,
-            goal_tracker,
+            perception_task_manager,
         ));
 
         Ok(Self {
