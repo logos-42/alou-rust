@@ -5,6 +5,7 @@
 
 use super::memory::{Memory, MemoryManager, MemoryType, Importance};
 use super::task::{Task, TaskManager};
+use super::goal::{GoalTracker, GoalSummary as GoalInfo};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -45,7 +46,7 @@ pub struct RetrievedContext {
     /// 工作目录中的相关文件
     pub related_files: Vec<String>,
     /// 活跃目标
-    pub active_goals: Vec<GoalSummary>,
+    pub active_goals: Vec<GoalInfo>,
     /// 最后一条消息的分析
     pub intent_analysis: String,
 }
@@ -58,14 +59,7 @@ pub struct DocumentContent {
     pub relevance_score: f32,
 }
 
-/// 目标摘要
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GoalSummary {
-    pub id: String,
-    pub description: String,
-    pub progress: f32,
-    pub priority: String,
-}
+
 
 /// 感知引擎
 pub struct PerceptionEngine {
@@ -73,6 +67,8 @@ pub struct PerceptionEngine {
     memory_manager: Arc<MemoryManager>,
     /// 任务管理器
     task_manager: Arc<TaskManager>,
+    /// 目标追踪器
+    goal_tracker: Option<Arc<GoalTracker>>,
     /// 文档加载路径
     docs_path: RwLock<std::path::PathBuf>,
 }
@@ -89,8 +85,15 @@ impl PerceptionEngine {
         Self {
             memory_manager,
             task_manager,
+            goal_tracker: None,
             docs_path: RwLock::new(docs_path),
         }
+    }
+
+    /// 设置目标追踪器
+    pub fn with_goal_tracker(mut self, goal_tracker: Arc<GoalTracker>) -> Self {
+        self.goal_tracker = Some(goal_tracker);
+        self
     }
 
     /// 设置文档路径
@@ -224,7 +227,7 @@ impl PerceptionEngine {
     }
 
     /// 获取活跃目标
-    pub async fn get_active_goals(&self) -> Vec<GoalSummary> {
+    pub async fn get_active_goals(&self) -> Vec<GoalInfo> {
         self.load_active_goals().await
     }
 
@@ -436,8 +439,20 @@ impl PerceptionEngine {
     }
 
     /// 加载活跃目标
-    async fn load_active_goals(&self) -> Vec<GoalSummary> {
-        // 从记忆中检索活跃目标
+    async fn load_active_goals(&self) -> Vec<GoalInfo> {
+        // 优先使用 GoalTracker
+        if let Some(ref tracker) = self.goal_tracker {
+            let goals = tracker.get_active_goals().await;
+            return goals.into_iter().map(|g| GoalInfo {
+                id: g.id,
+                description: g.description,
+                progress: g.progress,
+                priority: format!("{:?}", g.priority),
+                status: "active".to_string(),
+            }).collect();
+        }
+
+        // 降级：从记忆中检索
         let goal_memories = self
             .memory_manager
             .retrieve("active goal task objective", None, 10)
@@ -446,7 +461,7 @@ impl PerceptionEngine {
         goal_memories
             .into_iter()
             .filter(|m| m.tags.contains(&"goal".to_string()))
-            .map(|m| GoalSummary {
+            .map(|m| GoalInfo {
                 id: m.id.clone(),
                 description: m.content.clone(),
                 progress: m
@@ -455,6 +470,7 @@ impl PerceptionEngine {
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0) as f32,
                 priority: format!("{:?}", m.importance),
+                status: "active".to_string(),
             })
             .collect()
     }
