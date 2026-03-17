@@ -21,7 +21,7 @@
 .api-config-modal {
   width: min(560px, calc(100vw - 40px));
   max-height: calc(100vh - 80px);
-  min-height: 300px;
+  min-height: 400px;
   background: #000000;
   color: #f1f5f9;
   border-radius: 16px;
@@ -454,32 +454,26 @@
 .api-config-tab {
   padding: 6px 12px;
   border: none;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  color: #94a3b8;
 }
 
 .api-config-tab:hover {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  transform: translateY(-1px);
 }
 
 .api-config-tab.active {
-  background: #007AFF;
-  color: white;
-}
-
-.api-config-tab-add {
-  margin-left: auto;
-  background: #34C759;
-  color: white;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
-.api-config-tab-add:hover {
-  background: #2DB84F;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.1);
 }
 
 /* 配置列表 */
@@ -647,6 +641,57 @@
   margin-top: 2px;
 }
 
+/* Model 选择器布局 */
+.api-config-model-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-config-model-select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.api-config-model-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.dark .api-config-model-select,
+.dark .api-config-model-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.dark .api-config-model-select:focus,
+.dark .api-config-model-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.api-config-modal.light .api-config-model-select,
+.api-config-modal.light .api-config-model-input {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+}
+
+.api-config-modal.light .api-config-model-select:focus,
+.api-config-modal.light .api-config-model-input:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
 .api-config-actions-inline {
   display: flex;
   gap: 8px;
@@ -690,10 +735,30 @@
 
 .dark .api-config-tab {
   background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
 }
 
 .dark .api-config-tab:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.api-config-modal.light .api-config-tab {
+  background: rgba(0, 0, 0, 0.05);
+  color: #94a3b8;
+}
+
+.api-config-modal.light .api-config-tab:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #475569;
+  transform: translateY(-1px);
+}
+
+.api-config-modal.light .api-config-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 500;
+  border: 1px solid rgba(15, 23, 42, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .dark .api-config-item {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
-import CloseIcon from '@/assets/关闭0.3.png'
+import CloseIcon from '@/assets/关闭 0.3.png'
 import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
 import './ApiConfigModal.css'
 
@@ -46,25 +46,160 @@ const PROVIDERS = [
   { value: 'claude', label: 'Claude', category: 'text', capabilities: ['text'] },
   { value: 'qwen', label: 'Qwen', category: 'text', capabilities: ['text'] },
   { value: 'kimi', label: 'Kimi', category: 'text', capabilities: ['text'] },
+  { value: 'minimax', label: 'MiniMax', category: 'text', capabilities: ['text'] },
+  { value: 'glm', label: 'GLM', category: 'text', capabilities: ['text'] },
+  { value: 'gemini', label: 'Gemini', category: 'text', capabilities: ['text'] },
   // 媒体生成
-  { value: 'minimax', label: 'MiniMax', category: 'media', capabilities: ['tts', 'video'] },
-  { value: 'minimax_music', label: 'MiniMax Music', category: 'media', capabilities: ['music'] },
+  { value: 'seedance', label: 'Seedance', category: 'media', capabilities: ['video'] },
   { value: 'google', label: 'Google Imagen', category: 'media', capabilities: ['image'] },
   { value: 'jimeng', label: '即梦', category: 'media', capabilities: ['image', 'video'] },
-  { value: 'seedance', label: 'Seedance', category: 'media', capabilities: ['video'] },
   { value: 'seedream', label: 'Seedream', category: 'media', capabilities: ['image'] },
   { value: 'haimian', label: '海绵音乐', category: 'media', capabilities: ['music'] },
   { value: 'suno', label: 'Suno AI', category: 'media', capabilities: ['music'] },
   { value: 'stability', label: 'Stability AI', category: 'media', capabilities: ['image'] },
   { value: 'elevenlabs', label: 'ElevenLabs', category: 'media', capabilities: ['tts'] },
+  { value: 'minimax_music', label: 'MiniMax Music', category: 'media', capabilities: ['music'] },
 ]
 
 const DEFAULT_MODELS = {
-  deepseek: 'deepseek-chat',
-  openai: 'gpt-4o',
-  claude: 'claude-3-5-sonnet-20241022',
-  qwen: 'qwen-plus',
-  kimi: 'moonshot-v1-8k',
+  // 文本 LLM
+  deepseek: 'deepseek-v3.2',
+  openai: 'gpt-5.4',
+  claude: 'claude-sonnet-4-6-20260218',
+  qwen: 'qwen3.5-plus',
+  kimi: 'kimi-k2.5',
+  minimax: 'minimax-m2.5',
+  glm: 'glm-5',
+  gemini: 'gemini-3.1-pro',
+  // 媒体生成
+  seedance: 'seedance-1.0',
+  google: 'imagen-4',
+  jimeng: 'seedream-5.0',
+  seedream: 'seedream-5.0',
+  haimian: 'haimian-v2',
+  suno: 'suno-v5',
+  stability: 'stable-diffusion-3.5',
+  elevenlabs: 'eleven_multilingual_v2',
+  minimax_music: 'music-2.5',
+}
+
+// 媒体 Provider 的模型列表
+const MEDIA_MODELS = {
+  google: [
+    { value: 'imagen-4', label: 'Imagen 4 (最新)' },
+    { value: 'imagen-4-ultra', label: 'Imagen 4 Ultra (高端版)' },
+    { value: 'imagen-3.0-generate-002', label: 'Imagen 3.0 Generate 002' },
+    { value: 'imagen-3.0-generate-001', label: 'Imagen 3.0 Generate 001' },
+  ],
+  jimeng: [
+    { value: 'seedream-5.0', label: 'Seedream 5.0 (最新)' },
+    { value: 'seedream-5.0-lite', label: 'Seedream 5.0 Lite' },
+    { value: 'seedream-4.0', label: 'Seedream 4.0' },
+    { value: 'seedance-2.0', label: 'Seedance 2.0 (视频)' },
+  ],
+  seedance: [
+    { value: 'seedance-1.0', label: 'Seedance 1.0 (最新可用)' },
+  ],
+  seedream: [
+    { value: 'seedream-5.0', label: 'Seedream 5.0 (最新)' },
+    { value: 'seedream-4.5', label: 'Seedream 4.5' },
+    { value: 'seedream-4.0', label: 'Seedream 4.0' },
+  ],
+  suno: [
+    { value: 'suno-v5', label: 'Suno V5 (最新，44.1kHz 立体声)' },
+    { value: 'suno-v4.5', label: 'Suno V4.5' },
+    { value: 'suno-v4', label: 'Suno V4' },
+  ],
+  stability: [
+    { value: 'stable-diffusion-3.5', label: 'Stable Diffusion 3.5 (最新)' },
+    { value: 'stable-diffusion-3', label: 'Stable Diffusion 3' },
+    { value: 'stable-diffusion-xl', label: 'Stable Diffusion XL' },
+    { value: 'stable-audio-open-1.0', label: 'Stable Audio Open 1.0' },
+  ],
+  elevenlabs: [
+    { value: 'eleven_multilingual_v2', label: 'Eleven Multilingual V2 (28 种语言)' },
+    { value: 'eleven_flash_v2.5', label: 'Eleven Flash V2.5' },
+    { value: 'eleven_turbo_v2.5', label: 'Eleven Turbo V2.5' },
+    { value: 'eleven_monolingual_v1', label: 'Eleven Monolingual V1' },
+  ],
+  minimax_music: [
+    { value: 'music-2.5', label: 'Music 2.5 (最新)' },
+    { value: 'music-2.0', label: 'Music 2.0' },
+    { value: 'music-01', label: 'Music 01' },
+  ],
+  haimian: [
+    { value: 'haimian-v2', label: '海绵音乐 V2 (最新)' },
+    { value: 'haimian-v1', label: '海绵音乐 V1' },
+  ],
+  minimax: [
+    { value: 'video-01', label: 'Video 01' },
+  ],
+}
+
+// 文本 Provider 的模型列表
+const TEXT_MODELS = {
+  deepseek: [
+    { value: 'deepseek-v3.2', label: 'DeepSeek V3.2 (最新，671B MoE)' },
+    { value: 'deepseek-v3.2-speciale', label: 'DeepSeek V3.2 Speciale (长思考增强版)' },
+    { value: 'deepseek-v3.1-terminus', label: 'DeepSeek V3.1 Terminus' },
+    { value: 'deepseek-v3', label: 'DeepSeek V3' },
+    { value: 'deepseek-r1', label: 'DeepSeek R1 (推理模型)' },
+  ],
+  openai: [
+    { value: 'gpt-5.4', label: 'GPT-5.4 (最新)' },
+    { value: 'o3', label: 'O3' },
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+  ],
+  claude: [
+    { value: 'claude-sonnet-4-6-20260218', label: 'Claude Sonnet 4.6 (最新)' },
+    { value: 'claude-opus-4-6-20260218', label: 'Claude Opus 4.6 (最新)' },
+    { value: 'claude-sonnet-4-5-20251101', label: 'Claude Sonnet 4.5' },
+    { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
+  ],
+  qwen: [
+    { value: 'qwen3.5-plus', label: 'Qwen3.5 Plus (最新)' },
+    { value: 'qwen3.5', label: 'Qwen3.5' },
+    { value: 'qwen3-max-thinking', label: 'Qwen3 Max Thinking (推理模型)' },
+    { value: 'qwen3-max', label: 'Qwen3 Max' },
+    { value: 'qwen3-plus', label: 'Qwen3 Plus' },
+    { value: 'qwen-plus', label: 'Qwen Plus' },
+    { value: 'qwen-turbo', label: 'Qwen Turbo' },
+  ],
+  kimi: [
+    { value: 'kimi-k2.5', label: 'Kimi K2.5 (最新，万亿参数)' },
+    { value: 'kimi-k2-thinking', label: 'Kimi K2 Thinking (推理版)' },
+    { value: 'kimi-k2', label: 'Kimi K2' },
+    { value: 'kimi-k1.5', label: 'Kimi K1.5' },
+  ],
+  minimax: [
+    { value: 'minimax-m2.5', label: 'MiniMax M2.5 (最新)' },
+    { value: 'abab6.5s-chat', label: 'ABAB 6.5s Chat' },
+    { value: 'abab6.5t-chat', label: 'ABAB 6.5t Chat' },
+    { value: 'abab6.5g-chat', label: 'ABAB 6.5g Chat' },
+    { value: 'm2.5', label: 'M2.5 (最新)' },
+    { value: 'm2.1', label: 'M2.1 (Coding & Agent)' },
+  ],
+  glm: [
+    { value: 'glm-5', label: 'GLM-5 (最新旗舰，Coding & Agent)' },
+    { value: 'glm-4.5-flash', label: 'GLM-4.5 Flash (免费)' },
+    { value: 'glm-4-plus', label: 'GLM-4 Plus' },
+    { value: 'glm-4-air', label: 'GLM-4 Air' },
+    { value: 'glm-4-air-250414', label: 'GLM-4 Air 250414' },
+    { value: 'glm-4-flash', label: 'GLM-4 Flash' },
+    { value: 'glm-z1-air', label: 'GLM-Z1 Air (推理模型)' },
+    { value: 'glm-z1-rumination', label: 'GLM-Z1 Rumination (沉思模型)' },
+  ],
+  gemini: [
+    { value: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (最新，原生多模态推理)' },
+    { value: 'gemini-3-pro', label: 'Gemini 3 Pro' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (快速响应)' },
+    { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (轻量版)' },
+  ],
 }
 
 // 媒体 Provider 的特殊配置字段
@@ -86,8 +221,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   // 多 API 配置列表
   const [apiConfigs, setApiConfigs] = useState([])
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'text' | 'media'
-  const [editingId, setEditingId] = useState(null)
-  const [expandedConfig, setExpandedConfig] = useState(null)
+  const [editingId, setEditingId] = useState('new') // 默认显示编辑表单
 
   // 当前编辑的配置
   const [currentConfig, setCurrentConfig] = useState({
@@ -112,12 +246,33 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       loadConfigs()
     }
   }, [isOpen])
+  
+  // 当切换标签页时，更新表单的 Provider
+  useEffect(() => {
+    if (isOpen) {
+      const firstProvider = activeTab === 'media' 
+        ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+        : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+      const provider = PROVIDERS.find(p => p.value === firstProvider)
+      setEditingId('new')
+      setCurrentConfig({
+        id: `new_${Date.now()}`,
+        provider: firstProvider,
+        api_key: '',
+        base_url: '',
+        model: DEFAULT_MODELS[firstProvider],
+        enabled: true,
+        is_active: apiConfigs.length === 0,
+        capabilities: provider?.capabilities || [],
+      })
+    }
+  }, [activeTab, isOpen])
 
   const loadConfigs = async () => {
     try {
       const invoke = await getInvoke()
       const config = await invoke('get_agent_config')
-      
+
       if (config && config.user_apis) {
         setApiConfigs(config.user_apis.map(api => ({
           ...api,
@@ -133,49 +288,54 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         setApiConfigs([{ ...localConfig, base_url: localConfig.base_url || '', enabled: true }])
       }
     }
+    
+    // 直接开始编辑（显示 Provider/Model 选择页面）
+    const firstProvider = activeTab === 'media' 
+      ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+      : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+    const provider = PROVIDERS.find(p => p.value === firstProvider)
+    setEditingId('new')
+    setCurrentConfig({
+      id: `new_${Date.now()}`,
+      provider: firstProvider,
+      api_key: '',
+      base_url: '',
+      model: DEFAULT_MODELS[firstProvider],
+      enabled: true,
+      is_active: apiConfigs.length === 0,
+      capabilities: provider?.capabilities || [],
+    })
+    
     setError(null)
     setSuccess(null)
   }
 
-  // 添加新配置
+  // 添加新配置 - 直接开始编辑
   const handleAddNew = () => {
+    const firstProvider = activeTab === 'media'
+      ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+      : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+    const provider = PROVIDERS.find(p => p.value === firstProvider)
+
     setEditingId('new')
     setCurrentConfig({
       id: `new_${Date.now()}`,
-      provider: 'deepseek',
+      provider: firstProvider,
       api_key: '',
       base_url: '',
-      model: DEFAULT_MODELS.deepseek,
+      model: DEFAULT_MODELS[firstProvider],
       enabled: true,
       is_active: apiConfigs.length === 0,
-      capabilities: ['text'],
+      capabilities: provider?.capabilities || [],
     })
-    setExpandedConfig(null)
   }
 
-  // 编辑现有配置
-  const handleEdit = (config) => {
-    setEditingId(config.id)
-    setCurrentConfig({
-      ...config,
-      base_url: config.base_url || '',
-    })
-    setExpandedConfig(null)
-  }
-
-  // 取消编辑
+  // 取消编辑 - 关闭模态框
   const handleCancel = () => {
+    setError(null)
+    setSuccess(null)
     setEditingId(null)
-    setCurrentConfig({
-      id: '',
-      provider: 'deepseek',
-      api_key: '',
-      base_url: '',
-      model: '',
-      enabled: true,
-      is_active: false,
-      capabilities: [],
-    })
+    onClose()
   }
 
   // 保存配置
@@ -191,14 +351,14 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     setIsLoading(true)
     try {
       const invoke = await getInvoke()
-      
+
       let newConfigs
       if (editingId === 'new') {
         // 添加新配置
         newConfigs = [...apiConfigs, { ...currentConfig, id: `api_${Date.now()}` }]
       } else {
         // 更新现有配置
-        newConfigs = apiConfigs.map(c => 
+        newConfigs = apiConfigs.map(c =>
           c.id === editingId ? currentConfig : c
         )
       }
@@ -214,68 +374,35 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       })
 
       setApiConfigs(newConfigs)
-      setEditingId(null)
       setSuccess('配置已保存')
-      
+
       window.dispatchEvent(new CustomEvent('api-config-changed'))
+
+      // 重置为新的编辑状态，继续添加
+      const nextProvider = activeTab === 'media'
+        ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+        : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+      const provider = PROVIDERS.find(p => p.value === nextProvider)
+      setEditingId('new')
+      setCurrentConfig({
+        id: `new_${Date.now()}`,
+        provider: nextProvider,
+        api_key: '',
+        base_url: '',
+        model: DEFAULT_MODELS[nextProvider],
+        enabled: true,
+        is_active: false,
+        capabilities: provider?.capabilities || [],
+      })
       
       setTimeout(() => {
-        handleClose()
-      }, 1000)
+        setSuccess(null)
+      }, 2000)
     } catch (err) {
       console.error('保存配置失败:', err)
       setError(`保存失败：${err.message || '未知错误'}`)
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  // 删除配置
-  const handleDelete = async (id) => {
-    if (!confirm('确定要删除此配置吗？')) return
-
-    try {
-      const invoke = await getInvoke()
-      const newConfigs = apiConfigs.filter(c => c.id !== id)
-      
-      await invoke('update_agent_config', {
-        config: {
-          user_apis: newConfigs,
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: newConfigs[0]?.provider || 'deepseek',
-        },
-      })
-
-      setApiConfigs(newConfigs)
-      if (editingId === id) handleCancel()
-    } catch (err) {
-      setError(`删除失败：${err.message}`)
-    }
-  }
-
-  // 设置激活状态
-  const handleSetActive = async (id) => {
-    try {
-      const invoke = await getInvoke()
-      const newConfigs = apiConfigs.map(c => ({
-        ...c,
-        is_active: c.id === id,
-      }))
-
-      await invoke('update_agent_config', {
-        config: {
-          user_apis: newConfigs,
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: newConfigs.find(c => c.is_active)?.provider || 'deepseek',
-        },
-      })
-
-      setApiConfigs(newConfigs)
-      window.dispatchEvent(new CustomEvent('api-config-changed'))
-    } catch (err) {
-      setError(`设置失败：${err.message}`)
     }
   }
 
@@ -308,27 +435,21 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     }
   }
 
-  // 切换展开/收起
-  const toggleExpand = (id) => {
-    setExpandedConfig(expandedConfig === id ? null : id)
-  }
-
   const handleClose = () => {
     setError(null)
     setSuccess(null)
     setEditingId(null)
-    setExpandedConfig(null)
     onClose()
   }
 
-  const filteredConfigs = activeTab === 'all' 
-    ? apiConfigs 
+  const filteredConfigs = activeTab === 'all'
+    ? apiConfigs
     : apiConfigs.filter(c => {
         const provider = PROVIDERS.find(p => p.value === c.provider)
         return provider?.category === activeTab
       })
 
-  const isEditingMedia = currentConfig.provider && 
+  const isEditingMedia = currentConfig.provider &&
     PROVIDERS.find(p => p.value === currentConfig.provider)?.category === 'media'
 
   if (!isOpen) return null
@@ -367,100 +488,10 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             >
               媒体生成
             </button>
-            <button className="api-config-tab api-config-tab-add" onClick={handleAddNew}>
-              + 添加配置
-            </button>
           </div>
 
-          {/* 配置列表 */}
-          {editingId === null && (
-            <div className="api-config-list">
-              {filteredConfigs.length === 0 ? (
-                <div className="api-config-empty">
-                  <p>暂无配置</p>
-                  <button onClick={handleAddNew}>添加第一个配置</button>
-                </div>
-              ) : (
-                filteredConfigs.map((config) => {
-                  const provider = PROVIDERS.find(p => p.value === config.provider)
-                  const isExpanded = expandedConfig === config.id
-                  const isActive = config.is_active
-
-                  return (
-                    <div key={config.id} className={`api-config-item ${isActive ? 'active' : ''}`}>
-                      <div className="api-config-item-header" onClick={() => toggleExpand(config.id)}>
-                        <div className="api-config-item-info">
-                          <span className="api-config-provider-icon">
-                            {provider?.category === 'media' ? '🎨' : '💬'}
-                          </span>
-                          <div>
-                            <div className="api-config-item-name">
-                              {provider?.label || config.provider}
-                              {isActive && <span className="api-config-active-badge">使用中</span>}
-                            </div>
-                            <div className="api-config-item-meta">
-                              {config.model && <span>模型：{config.model}</span>}
-                              {provider?.capabilities && (
-                                <span className="api-config-capabilities">
-                                  {provider.capabilities.map(cap => (
-                                    <span key={cap} className="capability-tag">{cap}</span>
-                                  ))}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="api-config-item-actions">
-                          <button
-                            className="api-config-btn-icon"
-                            onClick={(e) => { e.stopPropagation(); handleSetActive(config.id); }}
-                            title={isActive ? '取消激活' : '设为激活'}
-                          >
-                            {isActive ? '✅' : '⭕'}
-                          </button>
-                          <button
-                            className="api-config-btn-icon"
-                            onClick={(e) => { e.stopPropagation(); handleEdit(config); }}
-                            title="编辑"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className="api-config-btn-icon"
-                            onClick={(e) => { e.stopPropagation(); handleDelete(config.id); }}
-                            title="删除"
-                          >
-                            🗑️
-                          </button>
-                          <button className="api-config-expand-icon">
-                            {isExpanded ? '▲' : '▼'}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {isExpanded && (
-                        <div className="api-config-item-detail">
-                          <div className="api-config-detail-row">
-                            <strong>API Key:</strong> {config.api_key ? '••••••' + config.api_key.slice(-4) : '未设置'}
-                          </div>
-                          {config.base_url && (
-                            <div className="api-config-detail-row">
-                              <strong>Base URL:</strong> {config.base_url}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-
-          {/* 编辑/添加配置表单 */}
-          {editingId !== null && (
-            <div className="api-config-form">
-              {/* Provider 选择 */}
+          {/* Provider/Model 选择表单 */}
+          <div className="api-config-form">
               <div className="api-config-field">
                 <label>
                   <span>Provider</span>
@@ -478,16 +509,34 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                     }}
                     disabled={isLoading}
                   >
-                    <optgroup label="文本 LLM">
-                      {PROVIDERS.filter(p => p.category === 'text').map(p => (
-                        <option key={p.value} value={p.value}>{p.label}</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="媒体生成">
-                      {PROVIDERS.filter(p => p.category === 'media').map(p => (
-                        <option key={p.value} value={p.value}>{p.label}</option>
-                      ))}
-                    </optgroup>
+                    {activeTab === 'all' && (
+                      <>
+                        <optgroup label="文本 LLM">
+                          {PROVIDERS.filter(p => p.category === 'text').map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="媒体生成">
+                          {PROVIDERS.filter(p => p.category === 'media').map(p => (
+                            <option key={p.value} value={p.value}>{p.label}</option>
+                          ))}
+                        </optgroup>
+                      </>
+                    )}
+                    {activeTab === 'text' && (
+                      <optgroup label="文本 LLM">
+                        {PROVIDERS.filter(p => p.category === 'text').map(p => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {activeTab === 'media' && (
+                      <optgroup label="媒体生成">
+                        {PROVIDERS.filter(p => p.category === 'media').map(p => (
+                          <option key={p.value} value={p.value}>{p.label}</option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
               </div>
@@ -527,13 +576,31 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                 <div className="api-config-field">
                   <label>
                     <span>Model</span>
-                    <input
-                      type="text"
-                      value={currentConfig.model}
-                      onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
-                      placeholder="输入模型名称"
-                      disabled={isLoading}
-                    />
+                    <div className="api-config-model-selector">
+                      <select
+                        value={currentConfig.model}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setCurrentConfig({ ...currentConfig, model: e.target.value })
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="api-config-model-select"
+                      >
+                        <option value="">选择模型...</option>
+                        {TEXT_MODELS[currentConfig.provider]?.map((m) => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={currentConfig.model}
+                        onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
+                        placeholder="或手动输入模型名称"
+                        disabled={isLoading}
+                        className="api-config-model-input"
+                      />
+                    </div>
                   </label>
                   {DEFAULT_MODELS[currentConfig.provider] && (
                     <p className="api-config-hint">
@@ -547,14 +614,32 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
               {isEditingMedia && (
                 <div className="api-config-field">
                   <label>
-                    <span>Model（可选）</span>
-                    <input
-                      type="text"
-                      value={currentConfig.model}
-                      onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
-                      placeholder="使用默认模型"
-                      disabled={isLoading}
-                    />
+                    <span>Model</span>
+                    <div className="api-config-model-selector">
+                      <select
+                        value={currentConfig.model}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setCurrentConfig({ ...currentConfig, model: e.target.value })
+                          }
+                        }}
+                        disabled={isLoading}
+                        className="api-config-model-select"
+                      >
+                        <option value="">选择模型...</option>
+                        {MEDIA_MODELS[currentConfig.provider]?.map((m) => (
+                          <option key={m.value} value={m.value}>{m.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={currentConfig.model}
+                        onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
+                        placeholder="或手动输入模型名称"
+                        disabled={isLoading}
+                        className="api-config-model-input"
+                      />
+                    </div>
                   </label>
                 </div>
               )}
@@ -587,40 +672,35 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 
               {error && <div className="api-config-error">{error}</div>}
               {success && <div className="api-config-success">{success}</div>}
-            </div>
-          )}
 
-          {/* 保存/取消按钮 */}
-          {editingId !== null && (
-            <div className="api-config-modal__actions">
-              <button
-                type="button"
-                className="api-config-modal__btn-ghost"
-                onClick={handleCancel}
-                disabled={isLoading}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="api-config-modal__btn-save"
-                onClick={handleSave}
-                disabled={isLoading || isVerifying}
-              >
-                {isLoading ? '保存中...' : '保存'}
-              </button>
+              {/* 保存和取消按钮 */}
+              <div className="api-config-modal__actions">
+                <button
+                  type="button"
+                  className="api-config-modal__btn-ghost"
+                  onClick={handleCancel}
+                  disabled={isLoading}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  className="api-config-modal__btn-save"
+                  onClick={handleSave}
+                  disabled={isLoading || isVerifying}
+                >
+                  {isLoading ? '保存中...' : '保存'}
+                </button>
+              </div>
             </div>
-          )}
 
-          {editingId === null && (
             <div className="api-config-modal__info">
               <p>🔒 所有 API Key 加密存储在本地</p>
               <p>💡 智能体根据任务类型自动选择有对应能力的 Provider</p>
             </div>
-          )}
+          </div>
         </div>
       </div>
-    </div>
   )
 }
 
