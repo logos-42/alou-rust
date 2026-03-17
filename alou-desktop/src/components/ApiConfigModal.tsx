@@ -512,9 +512,9 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       if (isMediaProvider(currentConfig.provider)) {
         // 媒体 Provider - 保存到 media_config.json
         console.log('[ApiConfigModal] 保存媒体 Provider 配置:', currentConfig.provider);
-        
+
         // 构建媒体配置
-        const capabilityMap: Record<string, string[]> = {
+        const capabilityMap = {
           'seedance': ['video'],
           'google': ['image'],
           'jimeng': ['image', 'video'],
@@ -525,23 +525,29 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
           'elevenlabs': ['tts'],
           'minimax_music': ['music'],
         };
-        
-        const mediaConfig = {
-          providers: {
-            [currentConfig.provider]: {
-              name: currentConfig.provider,
-              api_key: currentConfig.api_key.trim(),
-              base_url: currentConfig.base_url || null,
-              model: currentConfig.model || null,
-              enabled: true,
-              capabilities: capabilityMap[currentConfig.provider] || [],
-              config: null,
-            }
+
+        const providers = {
+          [currentConfig.provider]: {
+            name: currentConfig.provider,
+            api_key: currentConfig.api_key.trim(),
+            base_url: currentConfig.base_url || null,
+            model: currentConfig.model || null,
+            enabled: true,
+            capabilities: capabilityMap[currentConfig.provider] || [],
+            config: null,
           }
         };
+
+        console.log('[ApiConfigModal] 发送媒体配置到后端:', providers);
         
-        await invoke('update_media_config', mediaConfig);
-        setSuccess('媒体配置已保存');
+        try {
+          await invoke('update_media_config', { providers });
+          console.log('[ApiConfigModal] 媒体配置保存成功');
+          setSuccess('媒体配置已保存');
+        } catch (err) {
+          console.error('[ApiConfigModal] 媒体配置保存失败:', err);
+          throw err;
+        }
       } else {
         // 文本 LLM - 保存到 agent_config.json
         await invoke('update_agent_config', {

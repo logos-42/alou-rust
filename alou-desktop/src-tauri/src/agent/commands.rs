@@ -170,16 +170,24 @@ pub async fn update_media_config(
 ) -> std::result::Result<(), String> {
     use crate::agent::media_config::MediaApiConfig;
     
+    log::info!("[update_media_config] 接收到的配置：{:?}", providers);
+    
     // 加载现有配置
     let mut existing = MediaApiConfig::load()?;
+    log::info!("[update_media_config] 现有配置中的 providers: {:?}", existing.providers.keys());
     
     // 合并新配置
     for (name, config) in providers {
+        log::info!("[update_media_config] 添加/更新 provider: {}", name);
         existing.providers.insert(name, config);
     }
     
+    log::info!("[update_media_config] 合并后的 providers: {:?}", existing.providers.keys());
+    
     // 保存合并后的配置
-    existing.save()
+    let result = existing.save();
+    log::info!("[update_media_config] 保存结果：{:?}", result);
+    result
 }
 
 /// Tauri 命令：测试媒体 Provider 连接
