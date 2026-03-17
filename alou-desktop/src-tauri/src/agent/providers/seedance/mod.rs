@@ -14,7 +14,12 @@
 //! - 创建任务：POST https://api.302.ai/doubao/doubao-seedance
 //! - 查询状态：GET https://api.302.ai/doubao/doubao-seedance/{task_id}
 //!
-//! 支持模型：
+//! 支持模型（火山方舟官方）：
+//! - doubao-seedance-1.0-pro: 标准版，高质量视频生成
+//! - doubao-seedance-1.0-pro-fast: 快速版，优化推理速度
+//! - doubao-seedance-1.0-lite: 精简版，低成本快速生成
+//!
+//! 支持模型（302.AI 代理）：
 //! - seedance-1.0-pro: 标准版
 //! - seedance-1.0-pro-fast: 快速版
 //! - seedance-1.0-lite: 精简版
@@ -57,7 +62,8 @@ impl SeedanceConfig {
         Self {
             api_key,
             base_url: base_url.unwrap_or(default_url),
-            default_model: "seedance-1.0-pro".to_string(),
+            // 火山方舟官方模型名称（带 doubao- 前缀）
+            default_model: "doubao-seedance-1.0-pro".to_string(),
         }
     }
 }

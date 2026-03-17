@@ -71,7 +71,7 @@ const DEFAULT_MODELS = {
   glm: 'glm-5',
   gemini: 'gemini-3.1-pro',
   // 媒体生成
-  seedance: 'seedance-1.0',
+  seedance: 'doubao-seedance-1.0-pro',
   google: 'imagen-4',
   jimeng: 'seedream-5.0',
   seedream: 'seedream-5.0',
@@ -97,7 +97,9 @@ const MEDIA_MODELS = {
     { value: 'seedance-2.0', label: 'Seedance 2.0 (视频)' },
   ],
   seedance: [
-    { value: 'seedance-1.0', label: 'Seedance 1.0 (最新可用)' },
+    { value: 'doubao-seedance-1.0-pro', label: 'Doubao-Seedance 1.0 Pro (标准版)' },
+    { value: 'doubao-seedance-1.0-pro-fast', label: 'Doubao-Seedance 1.0 Pro Fast (快速版)' },
+    { value: 'doubao-seedance-1.0-lite', label: 'Doubao-Seedance 1.0 Lite (精简版)' },
   ],
   seedream: [
     { value: 'seedream-5.0', label: 'Seedream 5.0 (最新)' },
@@ -585,9 +587,29 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 
     try {
       const invoke = await getInvoke()
-      const result = await invoke('test_api_connection', {
-        config: currentConfig,
-      })
+      const isMediaProvider = PROVIDERS.find(p => p.value === currentConfig.provider)?.category === 'media'
+      
+      let result
+      if (isMediaProvider) {
+        // 媒体 Provider - 调用专门的测试接口
+        result = await invoke('test_media_provider_connection', {
+          providerName: currentConfig.provider,
+          config: {
+            name: currentConfig.provider,
+            api_key: currentConfig.api_key.trim(),
+            base_url: currentConfig.base_url || null,
+            model: currentConfig.model || null,
+            enabled: true,
+            capabilities: [],
+            config: null,
+          },
+        })
+      } else {
+        // LLM Provider - 使用通用测试接口
+        result = await invoke('test_api_connection', {
+          config: currentConfig,
+        })
+      }
 
       if (result?.success) {
         setSuccess('连接测试成功')
