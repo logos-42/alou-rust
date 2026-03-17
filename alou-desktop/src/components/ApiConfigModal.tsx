@@ -297,7 +297,18 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       console.log('[ApiConfigModal] 加载的配置:', config)
 
       if (config && Array.isArray(config.user_apis)) {
-        const loadedConfigs = config.user_apis.map(api => ({
+        // 过滤掉媒体 Provider（它们应该保存在 media_config.json 中）
+        const mediaProviders = ['seedance', 'google', 'jimeng', 'seedream', 'haimian', 'suno', 'stability', 'elevenlabs', 'minimax_music'];
+        const textConfigs = config.user_apis.filter(api => !mediaProviders.includes(api.provider));
+        const mediaConfigsInWrongPlace = config.user_apis.filter(api => mediaProviders.includes(api.provider));
+        
+        // 如果有媒体配置被错误保存到文本配置中，提示用户
+        if (mediaConfigsInWrongPlace.length > 0) {
+          console.warn('[ApiConfigModal] 发现错误保存的媒体配置:', mediaConfigsInWrongPlace);
+          console.log('[ApiConfigModal] 这些配置应该保存在 media_config.json 中，请重新保存');
+        }
+        
+        const loadedConfigs = textConfigs.map(api => ({
           ...api,
           base_url: api.base_url || '',
           enabled: api.is_active !== false,
@@ -694,6 +705,71 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                       }}
                     >
                       测试配置加载
+                    </button>
+                    <button
+                      type="button"
+                      className="api-config-test-btn"
+                      style={{marginTop: '10px', background: '#ff9800'}}
+                      onClick={async () => {
+                        const invoke = await getInvoke()
+                        try {
+                          const config = await invoke('get_agent_config')
+                          const mediaProviders = ['seedance', 'google', 'jimeng', 'seedream', 'haimian', 'suno', 'stability', 'elevenlabs', 'minimax_music'];
+                          const mediaConfigsInWrongPlace = config.user_apis?.filter(api => mediaProviders.includes(api.provider)) || [];
+                          
+                          if (mediaConfigsInWrongPlace.length === 0) {
+                            alert('没有发现需要迁移的配置')
+                            return
+                          }
+                          
+                          // 构建媒体配置
+                          const capabilityMap = {
+                            'seedance': ['video'],
+                            'google': ['image'],
+                            'jimeng': ['image', 'video'],
+                            'seedream': ['image'],
+                            'haimian': ['music'],
+                            'suno': ['music'],
+                            'stability': ['image'],
+                            'elevenlabs': ['tts'],
+                            'minimax_music': ['music'],
+                          };
+                          
+                          const mediaConfig = {}
+                          mediaConfigsInWrongPlace.forEach(api => {
+                            mediaConfig[api.provider] = {
+                              name: api.provider,
+                              api_key: api.api_key,
+                              base_url: api.base_url || null,
+                              model: api.model || null,
+                              enabled: true,
+                              capabilities: capabilityMap[api.provider] || [],
+                              config: null,
+                            }
+                          })
+                          
+                          await invoke('update_media_config', { providers: mediaConfig })
+                          
+                          // 删除错误配置
+                          const textConfigs = config.user_apis.filter(api => !mediaProviders.includes(api.provider))
+                          await invoke('update_agent_config', {
+                            config: {
+                              user_apis: textConfigs,
+                              workers_api: { base_url: '', enabled: false },
+                              execution_strategy: 'LocalOnly',
+                              default_provider: textConfigs.find(c => c.is_active)?.provider || textConfigs[0]?.provider || 'deepseek',
+                            }
+                          })
+                          
+                          alert(`已迁移 ${mediaConfigsInWrongPlace.length} 个媒体配置到 media_config.json\n请重新打开模态框查看`)
+                          window.location.reload()
+                        } catch (err) {
+                          console.error('[迁移按钮] 失败:', err)
+                          alert(`迁移失败：${err}`)
+                        }
+                      }}
+                    >
+                      迁移媒体配置到正确位置
                     </button>
                   </div>
                 ) : (
