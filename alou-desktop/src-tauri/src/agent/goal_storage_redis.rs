@@ -5,7 +5,7 @@
 //! - 目标状态变更的实时通知
 //! - 自动过期的临时目标
 
-use super::goal::{Goal, GoalId, GoalStorage, GoalStatus};
+use super::goal::{Goal, GoalId, GoalStatus, GoalStorage};
 use async_trait::async_trait;
 use redis::{AsyncCommands, Client, aio::MultiplexedConnection};
 use serde_json;
@@ -63,6 +63,46 @@ impl RedisGoalStorage {
     fn make_active_key(&self) -> String {
         format!("{}index:active", self.key_prefix)
     }
+
+    /// 按 Agent 加载目标
+    pub async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+        let index_key = self.make_index_key(agent_id);
+        let mut conn = self.conn.write().await;
+
+        let goal_ids: Vec<String> = conn.smembers(&index_key).await?;
+        let mut goals = Vec::new();
+
+        for goal_id in goal_ids {
+            if let Ok(Some(goal)) = self.load(&goal_id).await {
+                goals.push(goal);
+            }
+        }
+
+        Ok(goals)
+    }
+
+    /// 加载活跃目标
+    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+        let active_key = self.make_active_key();
+        let mut conn = self.conn.write().await;
+
+        let goal_ids: Vec<String> = conn.smembers(&active_key).await?;
+        let mut goals = Vec::new();
+
+        for goal_id in goal_ids {
+            if let Ok(Some(goal)) = self.load(&goal_id).await {
+                // 双重检查状态
+                if matches!(goal.status, GoalStatus::Active | GoalStatus::Pending | GoalStatus::Blocked { .. }) {
+                    goals.push(goal);
+                } else {
+                    // 状态已变更，从活跃索引移除
+                    let _: () = conn.srem(&active_key, &goal_id).await?;
+                }
+            }
+        }
+
+        Ok(goals)
+    }
 }
 
 #[async_trait]
@@ -104,16 +144,6 @@ impl GoalStorage for RedisGoalStorage {
                 conn.expire(&active_key, ttl).await?;
             }
         }
-
-        // 发布状态变更通知
-        let channel = format!("{}events", self.key_prefix);
-        let event = json!({
-            "event": "goal_updated",
-            "goal_id": &goal.id,
-            "status": format!("{:?}", goal.status),
-            "progress": goal.progress,
-        });
-        let _: () = conn.publish(&channel, event.to_string()).await?;
 
         Ok(())
     }
@@ -174,44 +204,6 @@ impl GoalStorage for RedisGoalStorage {
         Ok(goals)
     }
 
-    async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
-        let index_key = self.make_index_key(agent_id);
-        let mut conn = self.conn.write().await;
-
-        let goal_ids: Vec<String> = conn.smembers(&index_key).await?;
-        let mut goals = Vec::new();
-
-        for goal_id in goal_ids {
-            if let Ok(Some(goal)) = self.load(&goal_id).await {
-                goals.push(goal);
-            }
-        }
-
-        Ok(goals)
-    }
-
-    async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
-        let active_key = self.make_active_key();
-        let mut conn = self.conn.write().await;
-
-        let goal_ids: Vec<String> = conn.smembers(&active_key).await?;
-        let mut goals = Vec::new();
-
-        for goal_id in goal_ids {
-            if let Ok(Some(goal)) = self.load(&goal_id).await {
-                // 双重检查状态
-                if matches!(goal.status, GoalStatus::Active | GoalStatus::Pending | GoalStatus::Blocked { .. }) {
-                    goals.push(goal);
-                } else {
-                    // 状态已变更，从活跃索引移除
-                    let _: () = conn.srem(&active_key, &goal_id).await?;
-                }
-            }
-        }
-
-        Ok(goals)
-    }
-
     async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
         let key = self.make_key(goal_id);
         let mut conn = self.conn.write().await;
@@ -234,30 +226,4 @@ impl GoalStorage for RedisGoalStorage {
 
         Ok(())
     }
-
-    /// 订阅目标变更事件
-    pub async fn subscribe_events(&self) -> Result<tokio::sync::mpsc::Receiver<String>, Box<dyn std::error::Error>> {
-        let client = Client::open("redis://127.0.0.1/")?;
-        let mut pubsub = client.get_async_pubsub().await?;
-        
-        let channel = format!("{}events", self.key_prefix);
-        pubsub.subscribe(&channel).await?;
-
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
-
-        tokio::spawn(async move {
-            let mut msg_stream = pubsub.on_message();
-            while let Some(msg) = msg_stream.next().await {
-                if let Ok(payload) = msg.get_payload::<String>() {
-                    let _ = tx.send(payload).await;
-                }
-            }
-        });
-
-        Ok(rx)
-    }
 }
-
-use redis::AsyncPubsub;
-use futures::StreamExt;
-use serde_json::json;
