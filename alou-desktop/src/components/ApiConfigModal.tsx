@@ -61,15 +61,15 @@ const PROVIDERS = [
 ]
 
 const DEFAULT_MODELS = {
-  // 文本 LLM
-  deepseek: 'deepseek-v3.2',
-  openai: 'gpt-5.4',
-  claude: 'claude-sonnet-4-6-20260218',
-  qwen: 'qwen3.5-plus',
-  kimi: 'kimi-k2.5',
-  minimax: 'minimax-m2.5',
-  glm: 'glm-5',
-  gemini: 'gemini-3.1-pro',
+  // 文本 LLM - 使用 API 正确的模型名称
+  deepseek: 'deepseek-chat',  // DeepSeek API 使用 deepseek-chat 而不是 deepseek-v3.2
+  openai: 'gpt-4o',
+  claude: 'claude-3-5-sonnet-20241022',
+  qwen: 'qwen-plus',
+  kimi: 'moonshot-v1-8k',
+  minimax: 'abab6.5s-chat',
+  glm: 'glm-4',
+  gemini: 'gemini-1.5-pro',
   // 媒体生成
   seedance: 'doubao-seedance-1.0-pro',
   google: 'imagen-4',
@@ -140,11 +140,9 @@ const MEDIA_MODELS = {
 // 文本 Provider 的模型列表
 const TEXT_MODELS = {
   deepseek: [
-    { value: 'deepseek-v3.2', label: 'DeepSeek V3.2 (最新，671B MoE)' },
-    { value: 'deepseek-v3.2-speciale', label: 'DeepSeek V3.2 Speciale (长思考增强版)' },
-    { value: 'deepseek-v3.1-terminus', label: 'DeepSeek V3.1 Terminus' },
-    { value: 'deepseek-v3', label: 'DeepSeek V3' },
-    { value: 'deepseek-r1', label: 'DeepSeek R1 (推理模型)' },
+    { value: 'deepseek-chat', label: 'DeepSeek V3 (最新，671B MoE)' },
+    { value: 'deepseek-reasoner', label: 'DeepSeek R1 (推理模型)' },
+    { value: 'deepseek-coder', label: 'DeepSeek Coder (代码模型)' },
   ],
   openai: [
     { value: 'gpt-5.4', label: 'GPT-5.4 (最新)' },
