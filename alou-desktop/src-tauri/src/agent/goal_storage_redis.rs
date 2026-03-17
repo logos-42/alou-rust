@@ -115,33 +115,33 @@ impl GoalStorage for RedisGoalStorage {
 
         // 保存目标数据
         if let Some(ttl) = self.default_ttl {
-            redis::cmd("SETEX")
+            let _: () = redis::cmd("SETEX")
                 .arg(&key)
                 .arg(ttl as i64)
                 .arg(&value)
                 .query_async(&mut *conn)
                 .await?;
         } else {
-            conn.set(&key, &value).await?;
+            let _: () = conn.set(&key, &value).await?;
         }
 
         // 更新索引
         if let Some(ref agent_id) = goal.agent_id {
             let index_key = self.make_index_key(agent_id);
-            conn.sadd(&index_key, &goal.id).await?;
+            let _: () = conn.sadd(&index_key, &goal.id).await?;
             
             // 索引也设置 TTL
             if let Some(ttl) = self.default_ttl {
-                conn.expire(&index_key, ttl as i64).await?;
+                let _: () = conn.expire(&index_key, ttl as i64).await?;
             }
         }
 
         // 活跃目标索引
         if matches!(goal.status, GoalStatus::Active | GoalStatus::Pending | GoalStatus::Blocked { .. }) {
             let active_key = self.make_active_key();
-            conn.sadd(&active_key, &goal.id).await?;
+            let _: () = conn.sadd(&active_key, &goal.id).await?;
             if let Some(ttl) = self.default_ttl {
-                conn.expire(&active_key, ttl as i64).await?;
+                let _: () = conn.expire(&active_key, ttl as i64).await?;
             }
         }
 
@@ -226,7 +226,7 @@ impl GoalStorage for RedisGoalStorage {
         }
 
         // 删除目标
-        conn.del(&key).await?;
+        let _: () = conn.del(&key).await?;
 
         Ok(())
     }
