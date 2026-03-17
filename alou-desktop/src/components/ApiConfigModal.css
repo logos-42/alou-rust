@@ -812,6 +812,35 @@
   opacity: 0.6;
 }
 
+.api-config-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: inherit;
+}
+
+.api-config-empty-hint {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  opacity: 0.7 !important;
+}
+
+.api-config-test-btn {
+  margin-top: 15px;
+  padding: 8px 24px;
+  background: #007AFF;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.api-config-test-btn:hover {
+  background: #0056b3;
+  transform: translateY(-1px);
+}
+
 .api-config-empty button {
   margin-top: 10px;
   padding: 6px 20px;
@@ -1003,6 +1032,14 @@
 
 .dark .api-config-tab:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+.dark .api-config-empty {
+  opacity: 0.5;
+}
+
+.dark .api-config-empty p {
+  color: #cbd5e1;
 }
 
 .api-config-modal.light .api-config-tab {

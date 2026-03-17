@@ -8,22 +8,21 @@ import './ApiConfigModal.css'
 let invokeCache = null;
 async function getInvoke() {
   if (!invokeCache) {
-    const isTauri = typeof window !== 'undefined' &&
-                   (window.__TAURI__ !== undefined ||
-                    window.__TAURI_IPC__ !== undefined ||
-                    (typeof import.meta !== 'undefined' && Boolean(import.meta.env?.TAURI_PLATFORM)));
-
-    if (isTauri) {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
+    // 尝试直接导入 Tauri，如果失败则使用 Mock
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      // 检查 invoke 是否可用
+      if (typeof invoke === 'function') {
         invokeCache = invoke;
-      } catch (error) {
-        console.warn('[ApiConfigModal] 无法导入 Tauri invoke:', error);
-        invokeCache = createMockInvoke();
+        console.log('[ApiConfigModal] ✓ 使用真实 Tauri invoke')
+        return invokeCache;
       }
-    } else {
-      invokeCache = createMockInvoke();
+    } catch (error) {
+      // 忽略错误，使用 Mock
     }
+    
+    console.warn('[ApiConfigModal] ⚠️ 使用 MockInvoke (非 Tauri 环境)')
+    invokeCache = createMockInvoke();
   }
   return invokeCache;
 }
@@ -222,7 +221,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   const [apiConfigs, setApiConfigs] = useState([])
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'text' | 'media'
   const [editingId, setEditingId] = useState('new') // 默认显示编辑表单
-  const [isListExpanded, setIsListExpanded] = useState(true) // 列表展开/折叠状态
+  const [isListExpanded, setIsListExpanded] = useState(false) // 列表默认折叠
 
   // 当前编辑的配置
   const [currentConfig, setCurrentConfig] = useState({
@@ -293,22 +292,37 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   const loadConfigs = async () => {
     try {
       const invoke = await getInvoke()
+      console.log('[ApiConfigModal] 开始加载配置...')
       const config = await invoke('get_agent_config')
+      console.log('[ApiConfigModal] 加载的配置:', config)
 
-      if (config && config.user_apis) {
+      if (config && Array.isArray(config.user_apis)) {
         const loadedConfigs = config.user_apis.map(api => ({
           ...api,
           base_url: api.base_url || '',
           enabled: api.is_active !== false,
         }))
+        console.log('[ApiConfigModal] 解析后的配置列表:', loadedConfigs)
         setApiConfigs(loadedConfigs)
+        
+        // 如果没有配置，显示提示
+        if (loadedConfigs.length === 0) {
+          console.log('[ApiConfigModal] 暂无 API 配置，请添加新的配置')
+        }
+      } else {
+        console.warn('[ApiConfigModal] 没有 user_apis 字段或不是数组', config)
+        setApiConfigs([])
       }
     } catch (err) {
-      console.warn('加载配置失败:', err)
+      console.error('[ApiConfigModal] 加载配置失败:', err)
       // 回退到 localStorage
       const localConfig = await getActiveApiConfig()
       if (localConfig) {
+        console.log('[ApiConfigModal] 从 localStorage 回退加载配置:', localConfig)
         setApiConfigs([{ ...localConfig, base_url: localConfig.base_url || '', enabled: true }])
+      } else {
+        console.log('[ApiConfigModal] 无本地配置，设置为空数组')
+        setApiConfigs([])
       }
     }
 
@@ -590,36 +604,58 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
           </div>
 
           {/* 已添加的 API 列表 */}
-          {filteredConfigs.length > 0 && (
-            <div className="api-config-list">
-              <div 
-                className="api-config-list-header"
-                onClick={() => setIsListExpanded(!isListExpanded)}
+          <div className="api-config-list">
+            <div
+              className="api-config-list-header"
+              onClick={() => setIsListExpanded(!isListExpanded)}
+            >
+              <span>已添加的 API 配置 ({filteredConfigs.length})</span>
+              <button
+                type="button"
+                className="api-config-list-toggle"
+                title={isListExpanded ? '折叠' : '展开'}
               >
-                <span>已添加的 API 配置 ({filteredConfigs.length})</span>
-                <button
-                  type="button"
-                  className="api-config-list-toggle"
-                  title={isListExpanded ? '折叠' : '展开'}
+                <svg
+                  viewBox="0 0 16 16"
+                  className={`toggle-icon ${isListExpanded ? 'expanded' : ''}`}
                 >
-                  <svg 
-                    viewBox="0 0 16 16" 
-                    className={`toggle-icon ${isListExpanded ? 'expanded' : ''}`}
-                  >
-                    <path
-                      d="M4 6l4 4 4-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-              {isListExpanded && (
-                <div className="api-config-list-items">
-                  {filteredConfigs.map((config) => {
+                  <path
+                    d="M4 6l4 4 4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            {isListExpanded && (
+              <div className="api-config-list-items">
+                {filteredConfigs.length === 0 ? (
+                  <div className="api-config-empty">
+                    <p>暂无 API 配置</p>
+                    <p className="api-config-empty-hint">点击下方标签页切换，添加新的 API 配置</p>
+                    <button
+                      type="button"
+                      className="api-config-test-btn"
+                      onClick={async () => {
+                        const invoke = await getInvoke()
+                        try {
+                          const config = await invoke('get_agent_config')
+                          console.log('[测试按钮] 配置详情:', config)
+                          alert(`配置加载成功！\nuser_apis: ${JSON.stringify(config?.user_apis || 'undefined', null, 2)}`)
+                        } catch (err) {
+                          console.error('[测试按钮] 失败:', err)
+                          alert(`获取配置失败：${err}`)
+                        }
+                      }}
+                    >
+                      测试配置加载
+                    </button>
+                  </div>
+                ) : (
+                  filteredConfigs.map((config) => {
                     const provider = PROVIDERS.find(p => p.value === config.provider)
                     const isEditing = editingId === config.id
                     return (
@@ -665,11 +701,11 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                         </div>
                       </div>
                     )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                  })
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Provider/Model 选择表单 */}
           <div className="api-config-form">

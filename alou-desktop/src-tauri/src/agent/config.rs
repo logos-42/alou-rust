@@ -168,10 +168,11 @@ impl ApiConfig {
 
     /// 获取加密密钥（基于机器信息生成固定密钥）
     fn get_encryption_key() -> aes_gcm::Key<Aes256Gcm> {
+        use sha2::{Digest, Sha256};
         use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
 
-        // 使用机器信息生成密钥
+        // 使用机器信息生成密钥种子
         let mut hasher = DefaultHasher::new();
 
         // 使用机器名称
@@ -192,9 +193,14 @@ impl ApiConfig {
         "alou-agent-config-encryption-v1".hash(&mut hasher);
 
         let hash = hasher.finish();
+        
+        // 使用 SHA-256 将 8 字节扩展为 32 字节
+        let mut sha_hasher = Sha256::new();
+        sha_hasher.update(&hash.to_be_bytes());
+        let sha_result = sha_hasher.finalize();
+        
         let mut key_bytes = [0u8; 32];
-        let hash_bytes = hash.to_be_bytes();
-        key_bytes.copy_from_slice(&hash_bytes[..32]);
+        key_bytes.copy_from_slice(&sha_result[..32]);
 
         *aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes)
     }
