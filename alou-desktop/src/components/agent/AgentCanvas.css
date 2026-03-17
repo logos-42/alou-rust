@@ -57,7 +57,7 @@
   overflow: hidden;
   box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
   position: relative;
-  z-index: 10000 !important;
+  z-index: 100 !important;
   cursor: grab;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
   -webkit-user-select: none;
@@ -76,6 +76,13 @@
 
 .agent-canvas .agent-avatar:hover {
   box-shadow: 0 10px 28px rgba(99, 102, 241, 0.25);
+}
+
+/* 当有模态框打开时，降低头像层级 */
+.api-config-modal-backdrop ~ .agent-canvas .agent-avatar,
+body:has(.api-config-modal-backdrop) .agent-canvas .agent-avatar {
+  z-index: 1 !important;
+  pointer-events: none !important;
 }
 
 .agent-canvas .agent-avatar img {
