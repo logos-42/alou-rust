@@ -462,6 +462,12 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   }
 
   // 保存配置
+  // 判断是否是媒体 Provider
+  const isMediaProvider = (provider: string) => {
+    const mediaProviders = ['seedance', 'google', 'jimeng', 'seedream', 'haimian', 'suno', 'stability', 'elevenlabs', 'minimax_music'];
+    return mediaProviders.includes(provider);
+  };
+
   const handleSave = async () => {
     setError(null)
     setSuccess(null)
@@ -489,18 +495,54 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         )
       }
 
-      // 保存到 Tauri
-      await invoke('update_agent_config', {
-        config: {
-          user_apis: newConfigs,
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
-        },
-      })
+      // 区分保存：文本 LLM 保存到 agent_config.json，媒体 Provider 保存到 media_config.json
+      if (isMediaProvider(currentConfig.provider)) {
+        // 媒体 Provider - 保存到 media_config.json
+        console.log('[ApiConfigModal] 保存媒体 Provider 配置:', currentConfig.provider);
+        
+        // 构建媒体配置
+        const capabilityMap: Record<string, string[]> = {
+          'seedance': ['video'],
+          'google': ['image'],
+          'jimeng': ['image', 'video'],
+          'seedream': ['image'],
+          'haimian': ['music'],
+          'suno': ['music'],
+          'stability': ['image'],
+          'elevenlabs': ['tts'],
+          'minimax_music': ['music'],
+        };
+        
+        const mediaConfig = {
+          providers: {
+            [currentConfig.provider]: {
+              name: currentConfig.provider,
+              api_key: currentConfig.api_key.trim(),
+              base_url: currentConfig.base_url || null,
+              model: currentConfig.model || null,
+              enabled: true,
+              capabilities: capabilityMap[currentConfig.provider] || [],
+              config: null,
+            }
+          }
+        };
+        
+        await invoke('update_media_config', mediaConfig);
+        setSuccess('媒体配置已保存');
+      } else {
+        // 文本 LLM - 保存到 agent_config.json
+        await invoke('update_agent_config', {
+          config: {
+            user_apis: newConfigs,
+            workers_api: { base_url: '', enabled: false },
+            execution_strategy: 'LocalOnly',
+            default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+          },
+        });
+        setSuccess('配置已保存');
+      }
 
       setApiConfigs(newConfigs)
-      setSuccess('配置已保存')
 
       window.dispatchEvent(new CustomEvent('api-config-changed'))
 

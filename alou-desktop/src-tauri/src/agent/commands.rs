@@ -163,10 +163,23 @@ pub async fn get_media_config() -> std::result::Result<MediaApiConfig, String> {
     MediaApiConfig::load()
 }
 
-/// Tauri 命令：更新媒体配置
+/// Tauri 命令：更新媒体配置（合并模式）
 #[tauri::command]
-pub async fn update_media_config(config: MediaApiConfig) -> std::result::Result<(), String> {
-    config.save()
+pub async fn update_media_config(
+    providers: std::collections::HashMap<String, MediaProviderConfig>
+) -> std::result::Result<(), String> {
+    use crate::agent::media_config::MediaApiConfig;
+    
+    // 加载现有配置
+    let mut existing = MediaApiConfig::load()?;
+    
+    // 合并新配置
+    for (name, config) in providers {
+        existing.providers.insert(name, config);
+    }
+    
+    // 保存合并后的配置
+    existing.save()
 }
 
 /// Tauri 命令：测试媒体 Provider 连接
