@@ -4,7 +4,7 @@
 //! - Redis: 活跃目标的快速读写 + 实时通知
 //! - PostgreSQL: 完整持久化 + 复杂查询 + 历史归档
 
-use super::goal::{Goal, GoalId};
+use super::goal::{Goal, GoalId, GoalStorage};
 use super::goal_storage_postgres::PostgresGoalStorage;
 use super::goal_storage_redis::RedisGoalStorage;
 use std::sync::Arc;

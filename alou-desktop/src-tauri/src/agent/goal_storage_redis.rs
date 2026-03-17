@@ -117,9 +117,9 @@ impl GoalStorage for RedisGoalStorage {
         if let Some(ttl) = self.default_ttl {
             redis::cmd("SETEX")
                 .arg(&key)
-                .arg(ttl)
+                .arg(ttl as i64)
                 .arg(&value)
-                .query_async::<_, ()>(&mut *conn)
+                .query_async(&mut *conn)
                 .await?;
         } else {
             conn.set(&key, &value).await?;
@@ -132,7 +132,7 @@ impl GoalStorage for RedisGoalStorage {
             
             // 索引也设置 TTL
             if let Some(ttl) = self.default_ttl {
-                conn.expire(&index_key, ttl).await?;
+                conn.expire(&index_key, ttl as i64).await?;
             }
         }
 
@@ -141,7 +141,7 @@ impl GoalStorage for RedisGoalStorage {
             let active_key = self.make_active_key();
             conn.sadd(&active_key, &goal.id).await?;
             if let Some(ttl) = self.default_ttl {
-                conn.expire(&active_key, ttl).await?;
+                conn.expire(&active_key, ttl as i64).await?;
             }
         }
 
@@ -206,10 +206,14 @@ impl GoalStorage for RedisGoalStorage {
 
     async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
         let key = self.make_key(goal_id);
+        
+        // 先获取目标信息以清理索引（在获取锁之前）
+        let goal = self.load(goal_id).await.ok().flatten();
+        
         let mut conn = self.conn.write().await;
 
-        // 先获取目标信息以清理索引
-        if let Ok(Some(goal)) = self.load(goal_id).await {
+        // 清理索引
+        if let Some(goal) = goal {
             // 清理 agent 索引
             if let Some(ref agent_id) = goal.agent_id {
                 let index_key = self.make_index_key(agent_id);
