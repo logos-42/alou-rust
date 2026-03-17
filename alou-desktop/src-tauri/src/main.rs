@@ -946,23 +946,9 @@ fn main() {
             });
 
             // Start media API server on startup (for frontend media generation)
-            let app_handle_media = app.handle().clone();
-            let runtime_state_for_media = app.state::<Arc<crate::agent_runtime::AgentRuntimeState>>().inner().clone();
-            tauri::async_runtime::spawn(async move {
-                match start_media_api_server(runtime_state_for_media).await {
-                    Ok(port) => {
-                        println!("Media API server started on port {}", port);
-                        // Write port to config file for frontend to read
-                        let config_dir = dirs::config_dir()
-                            .unwrap_or_else(|| std::path::PathBuf::from("."))
-                            .join("alou");
-                        let _ = std::fs::create_dir_all(&config_dir);
-                        let port_file = config_dir.join("media_api_port");
-                        let _ = std::fs::write(port_file, port.to_string());
-                    }
-                    Err(e) => eprintln!("Failed to start media API server: {}", e),
-                }
-            });
+            // Note: Media API server will be started after AgentRuntime is initialized
+            // via init_agent_runtime command, since it requires AgentRuntimeState
+            log::info!("[main] Media API server will be started after AgentRuntime initialization");
 
             // Ensure Kubo binary exists and auto-start IPFS
             let ipfs_app_handle = app.handle().clone();

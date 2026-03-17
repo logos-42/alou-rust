@@ -254,10 +254,14 @@ pub async fn health_check() -> std::result::Result<serde_json::Value, String> {
 #[tauri::command]
 pub async fn get_available_providers() -> Vec<ProviderInfo> {
     vec![
-        ProviderInfo { id: "deepseek".to_string(), name: "DeepSeek".to_string(), models: vec!["deepseek-chat".to_string(), "deepseek-reasoner".to_string()], requires_base_url: false },
-        ProviderInfo { id: "openai".to_string(), name: "OpenAI".to_string(), models: vec!["gpt-4".to_string(), "gpt-4-turbo".to_string(), "gpt-3.5-turbo".to_string(), "gpt-5".to_string()], requires_base_url: false },
-        ProviderInfo { id: "claude".to_string(), name: "Claude".to_string(), models: vec!["claude-3-opus-20240229".to_string(), "claude-3-sonnet-20240229".to_string(), "claude-4-5-sonnet-20241022".to_string()], requires_base_url: false },
-        ProviderInfo { id: "kimi".to_string(), name: "Kimi".to_string(), models: vec!["kimi-k2-turbo-preview".to_string()], requires_base_url: false },
+        ProviderInfo { id: "deepseek".to_string(), name: "DeepSeek".to_string(), models: vec!["deepseek-v3.2".to_string(), "deepseek-v3.2-speciale".to_string(), "deepseek-r1".to_string()], requires_base_url: false },
+        ProviderInfo { id: "openai".to_string(), name: "OpenAI".to_string(), models: vec!["gpt-5.4".to_string(), "gpt-5.3".to_string(), "gpt-5".to_string(), "o3-pro".to_string(), "o4-mini".to_string()], requires_base_url: false },
+        ProviderInfo { id: "claude".to_string(), name: "Claude".to_string(), models: vec!["claude-sonnet-4-6-20260218".to_string(), "claude-opus-4-6-20260218".to_string(), "claude-sonnet-4-5-20251101".to_string()], requires_base_url: false },
+        ProviderInfo { id: "kimi".to_string(), name: "Kimi".to_string(), models: vec!["kimi-k2.5".to_string(), "kimi-k2-thinking".to_string(), "kimi-k2".to_string()], requires_base_url: false },
+        ProviderInfo { id: "qwen".to_string(), name: "Qwen".to_string(), models: vec!["qwen3.5-plus".to_string(), "qwen3.5".to_string(), "qwen3-max".to_string()], requires_base_url: false },
+        ProviderInfo { id: "glm".to_string(), name: "GLM".to_string(), models: vec!["glm-5".to_string(), "glm-4.5-flash".to_string(), "glm-4-plus".to_string()], requires_base_url: false },
+        ProviderInfo { id: "gemini".to_string(), name: "Gemini".to_string(), models: vec!["gemini-3.1-pro".to_string(), "gemini-3-pro".to_string(), "gemini-2.5-pro".to_string()], requires_base_url: false },
+        ProviderInfo { id: "minimax".to_string(), name: "MiniMax".to_string(), models: vec!["minimax-m2.5".to_string(), "minimax-m2.1".to_string(), "abab6.5s-chat".to_string()], requires_base_url: false },
     ]
 }
 

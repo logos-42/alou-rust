@@ -137,43 +137,43 @@ impl AiClient {
         let provider: Box<dyn AiProvider> = match config.provider.to_lowercase().as_str() {
             "deepseek" => Box::new(providers::DeepSeekProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "deepseek-chat".to_string()),
+                config.model.clone().unwrap_or_else(|| "deepseek-v3.2".to_string()),
                 config.base_url.clone(),
             )),
             "openai" | "opencode" => Box::new(providers::OpenAiProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "gpt-4".to_string()),
+                config.model.clone().unwrap_or_else(|| "gpt-5.4".to_string()),
                 config.base_url.clone(),
             )),
             "claude" => Box::new(providers::ClaudeProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "claude-3-opus-20240229".to_string()),
+                config.model.clone().unwrap_or_else(|| "claude-sonnet-4-6-20260218".to_string()),
                 config.base_url.clone(),
             )),
             "kimi" => Box::new(providers::KimiProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "kimi-k2-turbo-preview".to_string()),
+                config.model.clone().unwrap_or_else(|| "kimi-k2.5".to_string()),
                 config.base_url.clone(),
             )),
             // 新增的 Provider
             "openrouter" => Box::new(providers::OpenRouterProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "anthropic/claude-3.5-sonnet".to_string()),
+                config.model.clone().unwrap_or_else(|| "anthropic/claude-sonnet-4-6-20260218".to_string()),
                 config.base_url.clone(),
             )),
             "glm" | "zhipuai" | "智谱" => Box::new(providers::GlmProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "glm-4".to_string()),
+                config.model.clone().unwrap_or_else(|| "glm-5".to_string()),
                 config.base_url.clone(),
             )),
             "gemini" | "google" => Box::new(providers::GeminiProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "gemini-2.0-flash-exp".to_string()),
+                config.model.clone().unwrap_or_else(|| "gemini-3.1-pro".to_string()),
                 config.base_url.clone(),
             )),
             "minimax" | "minimax-text" => Box::new(providers::MiniMaxTextProvider::new(
                 config.api_key.clone(),
-                config.model.clone().unwrap_or_else(|| "minimax-01".to_string()),
+                config.model.clone().unwrap_or_else(|| "minimax-m2.5".to_string()),
                 config.base_url.clone(),
                 "".to_string(),
             )),
