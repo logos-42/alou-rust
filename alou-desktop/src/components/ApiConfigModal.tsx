@@ -295,24 +295,36 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('api-config-modal-open')
-      // 直接设置头像的 z-index
+      // 直接设置头像和标签的隐藏
       const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      const labels = document.querySelectorAll('.agent-canvas .agent-label')
       avatars.forEach(avatar => {
         avatar.classList.add('hidden-by-modal')
+      })
+      labels.forEach(label => {
+        label.classList.add('hidden-by-modal')
       })
     } else {
       document.body.classList.remove('api-config-modal-open')
       const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      const labels = document.querySelectorAll('.agent-canvas .agent-label')
       avatars.forEach(avatar => {
         avatar.classList.remove('hidden-by-modal')
+      })
+      labels.forEach(label => {
+        label.classList.remove('hidden-by-modal')
       })
     }
     
     return () => {
       document.body.classList.remove('api-config-modal-open')
       const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      const labels = document.querySelectorAll('.agent-canvas .agent-label')
       avatars.forEach(avatar => {
         avatar.classList.remove('hidden-by-modal')
+      })
+      labels.forEach(label => {
+        label.classList.remove('hidden-by-modal')
       })
     }
   }, [isOpen])
@@ -490,13 +502,23 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       } else {
         // 删除文本配置
         const newConfigs = apiConfigs.filter(c => c.id !== id && !c.isMedia)
+        
+        // 修复：将 enabled 映射为 is_active
+        const configsForBackend = newConfigs.map(c => ({
+          id: c.id,
+          provider: c.provider,
+          api_key: c.api_key,
+          base_url: c.base_url || null,
+          model: c.model || null,
+          is_active: c.enabled !== false,
+        }));
 
         await invoke('update_agent_config', {
           config: {
-            user_apis: newConfigs,
+            user_apis: configsForBackend,
             workers_api: { base_url: '', enabled: false },
             execution_strategy: 'LocalOnly',
-            default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+            default_provider: configsForBackend.find(c => c.is_active)?.provider || configsForBackend[0]?.provider || 'deepseek',
           },
         })
 
@@ -554,14 +576,25 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       const newConfigs = apiConfigs.map(c => ({
         ...c,
         is_active: c.id === id,
+        enabled: c.id === id, // 同步更新 enabled 字段
       }))
+      
+      // 修复：将 enabled 映射为 is_active
+      const configsForBackend = newConfigs.map(c => ({
+        id: c.id,
+        provider: c.provider,
+        api_key: c.api_key,
+        base_url: c.base_url || null,
+        model: c.model || null,
+        is_active: c.id === id,
+      }));
 
       await invoke('update_agent_config', {
         config: {
-          user_apis: newConfigs,
+          user_apis: configsForBackend,
           workers_api: { base_url: '', enabled: false },
           execution_strategy: 'LocalOnly',
-          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+          default_provider: configsForBackend.find(c => c.is_active)?.provider || configsForBackend[0]?.provider || 'deepseek',
         },
       })
 
@@ -648,12 +681,24 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         }
       } else {
         // 文本 LLM - 保存到 agent_config.json
+        // 修复：将前端的 enabled 字段映射回后端的 is_active 字段
+        const configsForBackend = newConfigs.map(c => ({
+          id: c.id,
+          provider: c.provider,
+          api_key: c.api_key,
+          base_url: c.base_url || null,
+          model: c.model || null,
+          is_active: c.enabled !== false, // 将 enabled 映射为 is_active
+        }));
+        
+        console.log('[ApiConfigModal] 保存文本配置到后端:', configsForBackend);
+        
         await invoke('update_agent_config', {
           config: {
-            user_apis: newConfigs,
+            user_apis: configsForBackend,
             workers_api: { base_url: '', enabled: false },
             execution_strategy: 'LocalOnly',
-            default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+            default_provider: configsForBackend.find(c => c.is_active)?.provider || configsForBackend[0]?.provider || 'deepseek',
           },
         });
         setSuccess('配置已保存');

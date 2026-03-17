@@ -85,6 +85,13 @@
   pointer-events: none !important;
 }
 
+/* 当模态框打开时，隐藏标签 */
+.agent-canvas .agent-label.hidden-by-modal {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
 .agent-canvas .agent-avatar img {
   width: 100%;
   height: 100%;
