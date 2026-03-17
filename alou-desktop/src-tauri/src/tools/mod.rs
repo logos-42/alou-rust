@@ -41,6 +41,7 @@ pub mod wallet_manager;           // 钱包管理器工具
 pub mod query_blockchain;         // 区块链查询工具
 pub mod build_transaction;        // 交易构建工具
 pub mod broadcast_transaction;    // 交易广播工具
+pub mod meta_tool;                // 元行动工具（记忆、目标管理）
 // pub mod notification;             // 通知工具（工具执行过程中的消息通知）- 暂时注释，文件不存在
 
 // 重新导出核心类型和接口
