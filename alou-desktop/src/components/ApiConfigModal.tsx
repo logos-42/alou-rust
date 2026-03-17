@@ -291,6 +291,32 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     }
   }, [isListExpanded])
 
+  // 当模态框打开时，降低头像层级
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('api-config-modal-open')
+      // 直接设置头像的 z-index
+      const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      avatars.forEach(avatar => {
+        avatar.classList.add('hidden-by-modal')
+      })
+    } else {
+      document.body.classList.remove('api-config-modal-open')
+      const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      avatars.forEach(avatar => {
+        avatar.classList.remove('hidden-by-modal')
+      })
+    }
+    
+    return () => {
+      document.body.classList.remove('api-config-modal-open')
+      const avatars = document.querySelectorAll('.agent-canvas .agent-avatar')
+      avatars.forEach(avatar => {
+        avatar.classList.remove('hidden-by-modal')
+      })
+    }
+  }, [isOpen])
+
   const loadConfigs = async () => {
     try {
       const invoke = await getInvoke()
