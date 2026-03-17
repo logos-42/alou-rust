@@ -478,6 +478,167 @@
 
 /* 配置列表 */
 .api-config-list {
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.api-config-modal.light .api-config-list {
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.api-config-list-header {
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.api-config-modal.light .api-config-list-header {
+  background: #f1f5f9;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+  color: #475569;
+}
+
+.api-config-list-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.api-config-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.2s;
+}
+
+.api-config-modal.light .api-config-list-item {
+  border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.api-config-list-item:last-child {
+  border-bottom: none;
+}
+
+.api-config-list-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.api-config-modal.light .api-config-list-item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.api-config-list-item.editing {
+  background: rgba(99, 102, 241, 0.1);
+  border-left: 3px solid #6366f1;
+  padding-left: 11px;
+}
+
+.api-config-list-item.active {
+  background: rgba(16, 185, 129, 0.05);
+  border-left: 3px solid #10b981;
+  padding-left: 11px;
+}
+
+.api-config-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.api-config-item-provider {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.api-config-modal.light .api-config-item-provider {
+  color: #1e293b;
+}
+
+.api-config-item-active-tag {
+  font-size: 11px;
+  font-weight: 400;
+  color: #10b981;
+  opacity: 0.8;
+}
+
+.api-config-item-model {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.api-config-modal.light .api-config-item-model {
+  color: #64748b;
+}
+
+.api-config-item-key {
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+  opacity: 0.7;
+}
+
+.api-config-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.api-config-item-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.api-config-modal.light .api-config-item-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #475569;
+}
+
+.api-config-item-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.api-config-modal.light .api-config-item-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #0f172a;
+}
+
+.api-config-item-btn.delete {
+  color: #f87171;
+}
+
+.api-config-item-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.api-config-modal.light .api-config-item-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+/* 配置列表 */
+.api-config-list {
   max-height: 320px;
   overflow-y: auto;
 }

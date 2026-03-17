@@ -556,7 +556,7 @@ const AgentSidebarLeft = ({
           aria-label="模型筛选"
         >
           <div className="model-filter-header">
-            <span>筛选模型</span>
+            <span>模型筛选</span>
             <button
               type="button"
               className="reset-btn"
@@ -581,6 +581,7 @@ const AgentSidebarLeft = ({
                 tabIndex={0}
               >
                 <span className="model-name">{mode.name}</span>
+                {mode.id === 'auto' && <span className="model-mode-hint">（全部显示）</span>}
               </div>
             ))}
           </div>

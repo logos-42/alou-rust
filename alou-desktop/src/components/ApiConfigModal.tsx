@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useI18n } from '@/hooks/useI18n'
-import CloseIcon from '@/assets/关闭 0.3.png'
+import CloseIcon from '@/assets/关闭0.3.png'
 import { saveApiConfig, getActiveApiConfig } from '@/hooks/useApiConfig'
 import './ApiConfigModal.css'
 
@@ -338,6 +338,91 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     onClose()
   }
 
+  // 编辑现有配置
+  const handleEdit = (config) => {
+    setEditingId(config.id)
+    setCurrentConfig({
+      ...config,
+      capabilities: PROVIDERS.find(p => p.value === config.provider)?.capabilities || [],
+    })
+    setError(null)
+    setSuccess(null)
+  }
+
+  // 删除配置
+  const handleDelete = async (id) => {
+    const configToDelete = apiConfigs.find(c => c.id === id)
+    if (!configToDelete) return
+
+    if (!window.confirm(`确定要删除 "${configToDelete.provider}" 的配置吗？`)) {
+      return
+    }
+
+    try {
+      const invoke = await getInvoke()
+      const newConfigs = apiConfigs.filter(c => c.id !== id)
+
+      await invoke('update_agent_config', {
+        config: {
+          user_apis: newConfigs,
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+        },
+      })
+
+      setApiConfigs(newConfigs)
+      window.dispatchEvent(new CustomEvent('api-config-changed'))
+
+      // 如果删除的是当前正在编辑的，重置为新增状态
+      if (editingId === id) {
+        const firstProvider = activeTab === 'media'
+          ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+          : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+        const provider = PROVIDERS.find(p => p.value === firstProvider)
+        setEditingId('new')
+        setCurrentConfig({
+          id: `new_${Date.now()}`,
+          provider: firstProvider,
+          api_key: '',
+          base_url: '',
+          model: DEFAULT_MODELS[firstProvider],
+          enabled: true,
+          is_active: newConfigs.length === 0,
+          capabilities: provider?.capabilities || [],
+        })
+      }
+    } catch (err) {
+      console.error('删除配置失败:', err)
+      alert(`删除失败：${err.message || '未知错误'}`)
+    }
+  }
+
+  // 设为激活
+  const handleSetActive = async (id) => {
+    try {
+      const invoke = await getInvoke()
+      const newConfigs = apiConfigs.map(c => ({
+        ...c,
+        is_active: c.id === id,
+      }))
+
+      await invoke('update_agent_config', {
+        config: {
+          user_apis: newConfigs,
+          workers_api: { base_url: '', enabled: false },
+          execution_strategy: 'LocalOnly',
+          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+        },
+      })
+
+      setApiConfigs(newConfigs)
+      window.dispatchEvent(new CustomEvent('api-config-changed'))
+    } catch (err) {
+      console.error('设置激活配置失败:', err)
+    }
+  }
+
   // 保存配置
   const handleSave = async () => {
     setError(null)
@@ -353,11 +438,14 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
       const invoke = await getInvoke()
 
       let newConfigs
+      let savedId
       if (editingId === 'new') {
         // 添加新配置
-        newConfigs = [...apiConfigs, { ...currentConfig, id: `api_${Date.now()}` }]
+        savedId = `api_${Date.now()}`
+        newConfigs = [...apiConfigs, { ...currentConfig, id: savedId }]
       } else {
         // 更新现有配置
+        savedId = editingId
         newConfigs = apiConfigs.map(c =>
           c.id === editingId ? currentConfig : c
         )
@@ -378,23 +466,10 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 
       window.dispatchEvent(new CustomEvent('api-config-changed'))
 
-      // 重置为新的编辑状态，继续添加
-      const nextProvider = activeTab === 'media'
-        ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
-        : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
-      const provider = PROVIDERS.find(p => p.value === nextProvider)
-      setEditingId('new')
-      setCurrentConfig({
-        id: `new_${Date.now()}`,
-        provider: nextProvider,
-        api_key: '',
-        base_url: '',
-        model: DEFAULT_MODELS[nextProvider],
-        enabled: true,
-        is_active: false,
-        capabilities: provider?.capabilities || [],
-      })
-      
+      // 保存后停留在编辑状态，显示刚保存的配置，方便用户继续编辑
+      setEditingId(savedId)
+      setCurrentConfig(newConfigs.find(c => c.id === savedId))
+
       setTimeout(() => {
         setSuccess(null)
       }, 2000)
@@ -490,6 +565,64 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             </button>
           </div>
 
+          {/* 已添加的 API 列表 */}
+          {filteredConfigs.length > 0 && (
+            <div className="api-config-list">
+              <div className="api-config-list-header">
+                <span>已添加的 API 配置</span>
+              </div>
+              <div className="api-config-list-items">
+                {filteredConfigs.map((config) => {
+                  const provider = PROVIDERS.find(p => p.value === config.provider)
+                  const isEditing = editingId === config.id
+                  return (
+                    <div
+                      key={config.id}
+                      className={`api-config-list-item ${isEditing ? 'editing' : ''} ${config.is_active ? 'active' : ''}`}
+                    >
+                      <div className="api-config-item-info">
+                        <span className="api-config-item-provider">
+                          {provider?.label || config.provider}
+                          {config.is_active && <span className="api-config-item-active-tag">（当前使用）</span>}
+                        </span>
+                        <span className="api-config-item-model">{config.model || '默认模型'}</span>
+                        <span className="api-config-item-key">{config.api_key?.slice(0, 8)}...{config.api_key?.slice(-4)}</span>
+                      </div>
+                      <div className="api-config-item-actions">
+                        <button
+                          type="button"
+                          className="api-config-item-btn"
+                          onClick={() => handleEdit(config)}
+                          title="编辑"
+                        >
+                          编辑
+                        </button>
+                        {!config.is_active && (
+                          <button
+                            type="button"
+                            className="api-config-item-btn"
+                            onClick={() => handleSetActive(config.id)}
+                            title="设为激活"
+                          >
+                            激活
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="api-config-item-btn delete"
+                          onClick={() => handleDelete(config.id)}
+                          title="删除"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Provider/Model 选择表单 */}
           <div className="api-config-form">
               <div className="api-config-field">
@@ -576,7 +709,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                 <div className="api-config-field">
                   <label>
                     <span>Model</span>
-                    <div className="api-config-model-selector">
+                    <div className="api-config-model-combined">
                       <select
                         value={currentConfig.model}
                         onChange={(e) => {
@@ -585,9 +718,9 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                           }
                         }}
                         disabled={isLoading}
-                        className="api-config-model-select"
+                        className="api-config-model-select-combined"
                       >
-                        <option value="">选择模型...</option>
+                        <option value="">选择或输入模型名称...</option>
                         {TEXT_MODELS[currentConfig.provider]?.map((m) => (
                           <option key={m.value} value={m.value}>{m.label}</option>
                         ))}
@@ -598,7 +731,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                         onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
                         placeholder="或手动输入模型名称"
                         disabled={isLoading}
-                        className="api-config-model-input"
+                        className="api-config-model-input-combined"
                       />
                     </div>
                   </label>
@@ -615,7 +748,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                 <div className="api-config-field">
                   <label>
                     <span>Model</span>
-                    <div className="api-config-model-selector">
+                    <div className="api-config-model-combined">
                       <select
                         value={currentConfig.model}
                         onChange={(e) => {
@@ -624,9 +757,9 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                           }
                         }}
                         disabled={isLoading}
-                        className="api-config-model-select"
+                        className="api-config-model-select-combined"
                       >
-                        <option value="">选择模型...</option>
+                        <option value="">选择或输入模型名称...</option>
                         {MEDIA_MODELS[currentConfig.provider]?.map((m) => (
                           <option key={m.value} value={m.value}>{m.label}</option>
                         ))}
@@ -637,7 +770,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                         onChange={(e) => setCurrentConfig({ ...currentConfig, model: e.target.value })}
                         placeholder="或手动输入模型名称"
                         disabled={isLoading}
-                        className="api-config-model-input"
+                        className="api-config-model-input-combined"
                       />
                     </div>
                   </label>
