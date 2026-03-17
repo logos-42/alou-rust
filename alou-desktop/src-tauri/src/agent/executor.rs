@@ -15,7 +15,7 @@ use crate::agent::async_tool_manager::AsyncToolManager;
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 // ============== Agent Reasoning Loop 核心数据结构 ==============
 
@@ -572,7 +572,60 @@ impl RalphLoopExecutor {
         log::info!("[AgentReasoning:{}] AI 调用成功，响应长度: {}", state.task_id, response.content.len());
 
         // 解析 LLM 输出的 JSON
-        let thought = self.parse_thought(&response.content)?;
+        let mut thought = self.parse_thought(&response.content)?;
+
+        // 🔥 基于反思的干预逻辑
+        if let Some(ref reflection) = thought.reflection {
+            // 干预 1: AI 建议获取更多信息但没有调用工具
+            if reflection.information_assessment.suggestion == "gather_more" {
+                if !matches!(thought.action, Action::ToolCall { .. }) {
+                    log::warn!(
+                        "[AgentReasoning:{}] 干预：AI 建议获取更多信息但未调用工具，置信度={}",
+                        state.task_id,
+                        reflection.confidence
+                    );
+                    
+                    // 如果置信度低，强制调用 memory_search
+                    if reflection.confidence < 0.6 {
+                        log::info!("[AgentReasoning:{}] 自动干预：调用 memory_search 获取信息", state.task_id);
+                        thought.action = Action::ToolCall {
+                            tool: "memory_search".to_string(),
+                            args: json!({
+                                "query": reflection.information_assessment.missing_info.join(" "),
+                                "limit": 5
+                            }),
+                            id: format!("auto_{}", uuid::Uuid::new_v4()),
+                        };
+                    }
+                }
+            }
+
+            // 干预 2: AI 置信度过低
+            if reflection.confidence < 0.3 {
+                log::warn!(
+                    "[AgentReasoning:{}] 警告：AI 置信度过低 ({}), 建议询问用户",
+                    state.task_id,
+                    reflection.confidence
+                );
+            }
+
+            // 干预 3: AI 选择 Continue 但没有理由
+            if matches!(thought.action, Action::Continue) && reflection.reasoning.is_empty() {
+                log::warn!(
+                    "[AgentReasoning:{}] 警告：AI 选择 Continue 但没有提供理由",
+                    state.task_id
+                );
+            }
+
+            // 记录反思信息
+            log::info!(
+                "[AgentReasoning:{}] 反思评估: 信息={}, 进度={:.0}%, 置信度={:.2}",
+                state.task_id,
+                reflection.information_assessment.status,
+                reflection.task_progress.overall_progress * 100.0,
+                reflection.confidence
+            );
+        }
 
         Ok(thought)
     }
@@ -616,11 +669,28 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
 
 {}
 
-## 回复格式
+## 回复格式（必须包含 reflection）
 你必须以 JSON 格式回复，格式如下：
 
+```json
 {{
-  "analysis": "你的分析过程（必须具体说明为什么选择某个 action）",
+  "analysis": "详细分析用户输入、检索到的上下文和当前状态",
+  "reflection": {{
+    "information_assessment": {{
+      "status": "sufficient | insufficient | uncertain",
+      "missing_info": ["如果 insufficient，列出缺少的信息"],
+      "suggestion": "proceed | gather_more | ask_user"
+    }},
+    "task_progress": {{
+      "overall_progress": 0.5,
+      "completed_steps": ["已完成步骤1", "已完成步骤2"],
+      "pending_steps": ["待处理步骤1"],
+      "estimated_remaining_iterations": 3
+    }},
+    "confidence": 0.85,
+    "reasoning": "详细解释为什么选择这个 action，必须具体",
+    "suggested_next_step": "描述建议的具体下一步"
+  }},
   "action": {{
     "type": "tool_call | complete | continue | fail",
     "tool": "工具名称（如果是 tool_call）",
@@ -628,6 +698,9 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
     "id": "唯一 ID（如果是 tool_call）"
   }}
 }}
+```
+
+⚠️ **重要**: reflection 字段是强制性的！不填写 reflection 会导致解析错误。
 
 ## 决策流程图
 
@@ -811,21 +884,39 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
     fn parse_thought(&self, content: &str) -> Result<Thought, ExecutorError> {
         // 尝试解析 JSON
         let thought: Thought = serde_json::from_str(content)
-            .or_else(|_| {
+            .or_else(|e| {
+                log::warn!("[AgentReasoning] JSON 解析失败，尝试降级处理: {}", e);
                 // 如果解析失败，尝试从文本中提取
                 self.extract_thought_from_text(content)
             })
             .map_err(|e| ExecutorError::InternalError(format!("解析思考结果失败：{}", e)))?;
+
+        // 检查 reflection 是否存在
+        if thought.reflection.is_none() {
+            log::warn!("[AgentReasoning] AI 未提供 reflection，使用默认值");
+        }
 
         Ok(thought)
     }
 
     /// 从文本中提取思考结果（降级处理）
     fn extract_thought_from_text(&self, text: &str) -> Result<Thought, ExecutorError> {
-        // 简化实现：返回 Continue
+        // 尝试从文本中提取 action 类型
+        let action = if text.contains("complete") || text.contains("完成") {
+            Action::Complete(text.to_string())
+        } else if text.contains("fail") || text.contains("失败") {
+            Action::Fail(text.to_string())
+        } else if text.contains("tool_call") || text.contains("工具") {
+            // 无法提取具体工具调用，返回 Continue 让系统重试
+            Action::Continue
+        } else {
+            Action::Continue
+        };
+
         Ok(Thought {
             analysis: text.to_string(),
-            action: Action::Continue,
+            reflection: Some(Reflection::default()),
+            action,
         })
     }
 
