@@ -12,6 +12,7 @@ use crate::agent::executor::RalphLoopExecutor;
 use crate::agent::task::TaskManager;
 use crate::agent::ai_client::{AiClient, AiMessage};
 use crate::agent::ai_client_pool::AiClientPool;
+use crate::agent::perception::PerceptionEngine;
 use crate::tools::ToolFacade;
 use crate::bridges::BridgeManager;
 use tokio::sync::mpsc;

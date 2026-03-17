@@ -6,6 +6,8 @@
 use super::ai_client::{AiClient, AiMessage};
 use super::task::TaskManager;
 use super::executor::RalphLoopExecutor;
+use super::perception::PerceptionEngine;
+use super::memory::MemoryManager;
 use super::swarm::SwarmCoordinator;
 use crate::bridges::ToolBridge;
 use crate::tools::{ToolRegistry, ToolMetadata, ToolExecutor};
@@ -230,6 +232,8 @@ pub struct AgentAutonomy {
     swarm_coordinator: Option<Arc<SwarmCoordinator>>,
     discovered_skills: Arc<Mutex<Vec<String>>>,
     learned_patterns: Arc<Mutex<HashMap<String, Vec<String>>>>,
+    perception_engine: Option<Arc<PerceptionEngine>>,
+    memory_manager: Option<Arc<MemoryManager>>,
 }
 
 impl AgentAutonomy {
@@ -249,7 +253,20 @@ impl AgentAutonomy {
             swarm_coordinator: None,
             discovered_skills: Arc::new(Mutex::new(Vec::new())),
             learned_patterns: Arc::new(Mutex::new(HashMap::new())),
+            perception_engine: None,
+            memory_manager: None,
         }
+    }
+
+    /// 设置记忆管理器
+    pub fn with_memory_manager(mut self, memory_manager: Arc<MemoryManager>) -> Self {
+        self.memory_manager = Some(memory_manager.clone());
+        // 同时创建感知引擎
+        self.perception_engine = Some(Arc::new(PerceptionEngine::new(
+            memory_manager,
+            self.task_manager.clone(),
+        )));
+        self
     }
 
     /// Set autonomy configuration
@@ -363,12 +380,17 @@ impl AgentAutonomy {
 
     /// Execute task directly
     async fn execute_direct(&self, task_id: &str) -> Result<AutonomousExecutionResult, AutonomyError> {
-        let executor = RalphLoopExecutor::new(
+        let mut executor = RalphLoopExecutor::new(
             self.ai_client.clone(),
             self.task_manager.clone(),
             self.tool_bridge.clone(),
             self.tool_registry.clone(),
         );
+
+        // 🔥 配置感知引擎
+        if let Some(ref perception) = self.perception_engine {
+            executor = executor.with_perception_engine(perception.clone());
+        }
 
         match executor.execute(task_id).await {
             Ok(result) => Ok(AutonomousExecutionResult {

@@ -344,6 +344,12 @@ impl MemoryManager {
             .collect()
     }
 
+    /// 获取所有用户偏好（简化接口）
+    pub async fn get_all_preferences(&self) -> Vec<UserPreference> {
+        let prefs = self.preferences.read().await;
+        prefs.values().cloned().collect()
+    }
+
     /// 观察并记录行为模式
     pub async fn observe_pattern(
         &self,

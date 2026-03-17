@@ -8,6 +8,7 @@
 use super::ai_client::{AiClient, AiMessage, AiTool, AiToolCall as ProviderToolCall};
 use super::task::{Task, TaskManager, TaskStatus, TaskEvent, ToolCall, ToolResult, TaskFinalResult};
 use super::error::AgentError;
+use super::perception::{PerceptionEngine, RetrievedContext, DocumentLoader, GoalTracker};
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
 use crate::agent::async_tool_manager::AsyncToolManager;
 use std::sync::Arc;
@@ -25,6 +26,8 @@ pub struct EnvironmentState {
     pub iteration_count: u32,
     pub tool_call_count: u32,
     pub available_tools: Vec<String>,
+    /// 智能感知层检索到的上下文
+    pub retrieved_context: RetrievedContext,
 }
 
 /// 推理结果（Reason 层输出 - LLM 单次调用）
@@ -72,6 +75,8 @@ pub struct RalphLoopExecutor {
     tool_registry: Arc<crate::tools::ToolRegistry>,
     async_tool_manager: Option<Arc<AsyncToolManager>>,
     app_handle: Option<tauri::AppHandle>,
+    /// 智能感知引擎
+    perception_engine: Option<Arc<PerceptionEngine>>,
 }
 
 /// 执行结果
@@ -130,7 +135,14 @@ impl RalphLoopExecutor {
             tool_registry,
             async_tool_manager: None,
             app_handle: None,
+            perception_engine: None,
         }
+    }
+
+    /// 设置感知引擎
+    pub fn with_perception_engine(mut self, perception_engine: Arc<PerceptionEngine>) -> Self {
+        self.perception_engine = Some(perception_engine);
+        self
     }
 
     /// 设置 AppHandle（用于向前端发送进度事件）
@@ -420,7 +432,7 @@ impl RalphLoopExecutor {
     // ============== Agent Reasoning Loop 核心方法 ==============
     // ============== Agent Reasoning Loop 核心方法 ==============
 
-    /// 1. 感知环境状态（无 LLM 调用）
+    /// 1. 感知环境状态（智能感知层）
     async fn perceive_environment(&self, task_id: &str) -> Result<EnvironmentState, ExecutorError> {
         let task = self.task_manager.get_task(task_id).await
             .ok_or_else(|| ExecutorError::TaskNotFound(task_id.to_string()))?;
@@ -431,12 +443,31 @@ impl RalphLoopExecutor {
             .map(|m| m.id.clone())
             .collect();
 
+        // 🔥 智能感知：收集相关上下文
+        let retrieved_context = if let Some(ref engine) = self.perception_engine {
+            log::info!("[AgentReasoning:{}] 启动智能感知层...", task_id);
+            engine.gather_context(&task).await
+        } else {
+            log::debug!("[AgentReasoning:{}] 感知引擎未配置，使用默认上下文", task_id);
+            RetrievedContext::default()
+        };
+
+        log::info!(
+            "[AgentReasoning:{}] 感知完成: 意图={}, {} 条记忆, {} 个文档, {} 个目标",
+            task_id,
+            retrieved_context.intent_analysis,
+            retrieved_context.relevant_memories.len(),
+            retrieved_context.relevant_docs.len(),
+            retrieved_context.active_goals.len()
+        );
+
         Ok(EnvironmentState {
             task_id: task_id.to_string(),
             messages: task.messages.clone(),
             iteration_count: task.metadata.iteration_count,
             tool_call_count: task.tool_results.len() as u32,
             available_tools,
+            retrieved_context,
         })
     }
 
@@ -468,17 +499,23 @@ impl RalphLoopExecutor {
         Ok(thought)
     }
 
-    /// 构建推理提示（中文）
+    /// 构建推理提示（中文）- 增强版，包含智能感知上下文
     fn build_reasoning_prompt(&self, state: &EnvironmentState) -> String {
         let messages_preview = state.messages.iter()
             .map(|m| format!("{}: {}", m.role, m.content.chars().take(200).collect::<String>()))
             .collect::<Vec<_>>()
             .join("\n");
 
+        // 格式化检索到的上下文
+        let context_section = self.format_retrieved_context(&state.retrieved_context);
+
         format!(
-r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行动。
+r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能力。
 
 ## 当前任务
+{}
+
+## 智能感知上下文
 {}
 
 ## 可用工具
@@ -510,19 +547,109 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
 - continue: 继续思考（需要更多分析）
 - fail: 任务失败（说明原因）
 
-## 注意事项
-1. 如果已经达到目标，请使用 complete
-2. 如果需要调用工具，请使用 tool_call
-3. 如果迭代次数接近限制（15 次），请优先选择 complete
-4. 如果无法继续，请使用 fail 并说明原因
+## 决策指南
+
+### 简单对话识别（直接 complete）
+以下情况请直接回复，不需要工具：
+- 问候（你好/嗨/hello）→ 友好回应
+- 感谢（谢谢/thanks）→ 礼貌回应
+- 确认（好的/ok/没问题）→ 确认收到
+- 简短闲聊（今天天气怎么样）→ 自然回应
+
+### 信息充分性评估
+在决定 action 之前，问自己：
+1. 我是否已掌握回答/执行所需的所有信息？
+2. 如果不够，应该调用哪个工具获取？
+3. 检索到的上下文是否有用？
+
+### Continue 使用规范
+**禁止场景**：
+- 没有任何 tool_call 的情况下单独使用 Continue
+- 用 Continue 来回避决策
+
+**允许场景**：
+- 已执行 tool_call，等待结果后继续
+- 需要主动等待用户输入时
 
 请开始分析："#,
             state.task_id,
+            context_section,
             state.available_tools.join(", "),
             state.iteration_count,
             state.tool_call_count,
             messages_preview,
         )
+    }
+
+    /// 格式化检索到的上下文
+    fn format_retrieved_context(&self, context: &RetrievedContext) -> String {
+        let mut sections = Vec::new();
+
+        // 意图分析
+        if !context.intent_analysis.is_empty() {
+            sections.push(format!("📍 意图分析: {}", context.intent_analysis));
+        }
+
+        // 用户画像
+        if let Some(ref profile) = context.user_profile {
+            sections.push(format!("👤 {}\n", profile));
+        }
+
+        // 活跃目标
+        if !context.active_goals.is_empty() {
+            let goals = context.active_goals.iter()
+                .map(|g| format!("  • [{}] {} (进度: {:.0}%)", g.priority, g.description, g.progress * 100.0))
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("🎯 活跃目标:\n{}", goals));
+        }
+
+        // 相关记忆
+        if !context.relevant_memories.is_empty() {
+            let memories = context.relevant_memories.iter()
+                .map(|m| format!("  • [{}] {}", 
+                    match m.importance {
+                        Importance::Critical => "🔴",
+                        Importance::High => "🟠",
+                        Importance::Medium => "🟡",
+                        Importance::Low => "⚪",
+                    },
+                    m.content.chars().take(100).collect::<String>()
+                ))
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("💭 相关记忆 ({} 条):\n{}", context.relevant_memories.len(), memories));
+        }
+
+        // 相关文档
+        if !context.relevant_docs.is_empty() {
+            let docs = context.relevant_docs.iter()
+                .map(|d| format!("  • {} (相关度: {:.0}%)", d.name, d.relevance_score * 100.0))
+                .collect::<Vec<_>>()
+                .join("\n");
+            sections.push(format!("📄 相关文档 ({} 个):\n{}", context.relevant_docs.len(), docs));
+        }
+
+        // 工作目录文件
+        if !context.related_files.is_empty() {
+            let files = context.related_files.iter()
+                .take(10)
+                .map(|f| format!("  • {}", f))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let more = if context.related_files.len() > 10 {
+                format!("\n  ... 还有 {} 个文件", context.related_files.len() - 10)
+            } else {
+                String::new()
+            };
+            sections.push(format!("📁 工作目录文件:\n{}{}", files, more));
+        }
+
+        if sections.is_empty() {
+            "（无额外上下文）".to_string()
+        } else {
+            sections.join("\n\n")
+        }
     }
 
     /// 解析 LLM 输出的思考结果

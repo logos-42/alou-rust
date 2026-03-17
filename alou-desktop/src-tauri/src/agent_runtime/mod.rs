@@ -47,6 +47,7 @@ use tokio::sync::RwLock;
 use crate::agent::providers::ProviderRegistry;
 use crate::agent::media_config::MediaApiConfig;
 use crate::agent::ai_client_pool::AiClientPool;
+use crate::agent::perception::{PerceptionEngine, DocumentLoader, GoalTracker};
 use crate::tools::{ToolRegistry, ToolFacade};
 use crate::bridges::BridgeManager;
 
@@ -66,7 +67,8 @@ pub struct AgentRuntimeState {
     pub tool_facade: Arc<ToolFacade>,
     pub bridge_manager: Arc<BridgeManager>,
     pub ai_client_pool: Arc<AiClientPool>,
-    pub agent_scheduler: Arc<AgentScheduler>,  // ← 新增：Agent 调度器
+    pub agent_scheduler: Arc<AgentScheduler>,
+    pub perception_engine: Arc<PerceptionEngine>,  // ← 新增：智能感知引擎
 }
 
 impl AgentRuntimeState {
@@ -116,6 +118,23 @@ impl AgentRuntimeState {
         // 创建 Agent 调度器（每 3 秒 tick 一次）
         let agent_scheduler = Arc::new(AgentScheduler::new(3000));
 
+        // 🔥 创建智能感知引擎
+        let document_loader = Arc::new(DocumentLoader::new("."));
+        let goal_tracker = Arc::new(GoalTracker::new(Arc::new(
+            crate::agent::perception::InMemoryGoalStorage::new()
+        )));
+        
+        // 需要 memory_manager，从 storage 中获取
+        let memory_manager = Arc::new(
+            crate::context::memory::MemoryManager::new(3600)  // 1 小时过期
+        );
+        
+        let perception_engine = Arc::new(PerceptionEngine::new(
+            memory_manager,
+            document_loader,
+            goal_tracker,
+        ));
+
         Ok(Self {
             message_bus,
             event_router,
@@ -131,7 +150,8 @@ impl AgentRuntimeState {
             tool_facade,
             bridge_manager,
             ai_client_pool,
-            agent_scheduler,  // ← 新增：Agent 调度器
+            agent_scheduler,
+            perception_engine,  // ← 新增：智能感知引擎
         })
     }
 }
