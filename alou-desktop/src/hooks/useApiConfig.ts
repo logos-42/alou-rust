@@ -29,16 +29,16 @@ export interface ApiConfig {
 }
 
 const DEFAULT_PROVIDER = 'deepseek'
-// 各平台 API 正确的默认模型名称
+// 各平台 API 最新默认模型名称 (2025-2026)
 const DEFAULT_MODELS: Record<string, string> = {
-  deepseek: 'deepseek-chat',              // DeepSeek API
-  openai: 'gpt-4o',                       // OpenAI API
-  claude: 'claude-3-5-sonnet-20241022',   // Claude API
-  qwen: 'qwen-plus',                      // 通义千问 API
-  kimi: 'moonshot-v1-8k',                 // Kimi API
-  minimax: 'abab6.5s-chat',               // MiniMax API
-  glm: 'glm-4-plus',                      // 智谱 API
-  gemini: 'gemini-1.5-pro',               // Gemini API
+  deepseek: 'deepseek-chat',              // DeepSeek V3.2
+  openai: 'gpt-5.4',                      // OpenAI GPT-5.4 (2026)
+  claude: 'claude-sonnet-4-6-20260218',   // Claude Sonnet 4.6 (2026)
+  qwen: 'qwen3.5-plus',                   // Qwen3.5 Plus
+  kimi: 'kimi-k2.5',                      // Kimi K2.5
+  minimax: 'minimax-m2.5',                // MiniMax M2.5
+  glm: 'glm-5',                           // GLM-5
+  gemini: 'gemini-3.1-pro',               // Gemini 3.1 Pro
 }
 
 /**

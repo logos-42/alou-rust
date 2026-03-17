@@ -61,15 +61,15 @@ const PROVIDERS = [
 ]
 
 const DEFAULT_MODELS = {
-  // 文本 LLM - 使用各平台 API 正确的模型名称
-  deepseek: 'deepseek-chat',      // DeepSeek: deepseek-chat / deepseek-reasoner
-  openai: 'gpt-4o',               // OpenAI: gpt-4o / gpt-4-turbo / gpt-4o-mini
-  claude: 'claude-3-5-sonnet-20241022', // Claude: claude-3-5-sonnet-20241022
-  qwen: 'qwen-plus',              // 通义千问: qwen-plus / qwen-max / qwen-turbo
-  kimi: 'moonshot-v1-8k',         // Kimi: moonshot-v1-8k / moonshot-v1-32k / moonshot-v1-128k
-  minimax: 'abab6.5s-chat',       // MiniMax: abab6.5s-chat / abab6.5t-chat
-  glm: 'glm-4-plus',              // 智谱: glm-4-plus / glm-4-air / glm-4-flash
-  gemini: 'gemini-1.5-pro',       // Gemini: gemini-1.5-pro / gemini-1.5-flash
+  // 文本 LLM - 使用各平台 API 最新模型名称 (2025-2026)
+  deepseek: 'deepseek-chat',              // DeepSeek V3.2
+  openai: 'gpt-5.4',                      // OpenAI GPT-5.4 (最新旗舰)
+  claude: 'claude-sonnet-4-6-20260218',   // Claude Sonnet 4.6 (最新)
+  qwen: 'qwen3.5-plus',                   // Qwen3.5 Plus (最新)
+  kimi: 'kimi-k2.5',                      // Kimi K2.5 (最新)
+  minimax: 'minimax-m2.5',                // MiniMax M2.5 (最新)
+  glm: 'glm-5',                           // GLM-5 (最新旗舰)
+  gemini: 'gemini-3.1-pro',               // Gemini 3.1 Pro (最新)
   // 媒体生成
   seedance: 'doubao-seedance-1.0-pro',
   google: 'imagen-4',
@@ -137,62 +137,82 @@ const MEDIA_MODELS = {
   ],
 }
 
-// 文本 Provider 的模型列表 - 使用各平台 API 正确的模型名称
+// 文本 Provider 的模型列表 - 使用各平台 API 最新模型名称 (2025-2026)
 const TEXT_MODELS = {
+  // DeepSeek API: https://api-docs.deepseek.com/quick_start/pricing
   deepseek: [
-    { value: 'deepseek-chat', label: 'DeepSeek V3 (最新，671B MoE)' },
-    { value: 'deepseek-reasoner', label: 'DeepSeek R1 (推理模型)' },
-    { value: 'deepseek-coder', label: 'DeepSeek Coder (代码模型)' },
+    { value: 'deepseek-chat', label: 'DeepSeek V3.2 (最新)' },
+    { value: 'deepseek-reasoner', label: 'DeepSeek R1 (推理)' },
+    { value: 'deepseek-coder', label: 'DeepSeek Coder (代码)' },
   ],
-  // OpenAI API 模型: https://platform.openai.com/docs/models
+  // OpenAI API 最新模型 (2026): gpt-5.4, gpt-5.3, gpt-5.2 系列
   openai: [
-    { value: 'gpt-4o', label: 'GPT-4o (最新，推荐)' },
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'gpt-4o-mini', label: 'GPT-4o Mini (轻量)' },
-    { value: 'o1', label: 'O1 (推理模型)' },
-    { value: 'o1-mini', label: 'O1 Mini' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+    { value: 'gpt-5.4', label: 'GPT-5.4 (最新旗舰)' },
+    { value: 'gpt-5.4-pro', label: 'GPT-5.4 Pro' },
+    { value: 'gpt-5.3-chat', label: 'GPT-5.3 Chat' },
+    { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex (代码)' },
+    { value: 'gpt-5.2', label: 'GPT-5.2 (推理)' },
+    { value: 'gpt-5.2-codex', label: 'GPT-5.2 Codex (代码)' },
+    { value: 'gpt-5.1', label: 'GPT-5.1' },
+    { value: 'gpt-5.1-codex', label: 'GPT-5.1 Codex' },
+    { value: 'gpt-5-pro', label: 'GPT-5 Pro' },
+    { value: 'gpt-5-codex', label: 'GPT-5 Codex' },
+    { value: 'gpt-5', label: 'GPT-5' },
+    { value: 'gpt-5-mini', label: 'GPT-5 Mini (轻量)' },
+    { value: 'o3-pro', label: 'O3 Pro (推理)' },
+    { value: 'o3', label: 'O3 (推理)' },
+    { value: 'o4-mini', label: 'O4 Mini (轻量)' },
   ],
-  // Claude API 模型: https://docs.anthropic.com/en/docs/about-claude/models
+  // Claude API 最新模型 (2025): Claude 4 系列
   claude: [
-    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (最新，推荐)' },
-    { value: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet (2024-06)' },
-    { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus (最强)' },
-    { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' },
-    { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku (轻量)' },
+    { value: 'claude-sonnet-4-6-20260218', label: 'Claude Sonnet 4.6 (最新)' },
+    { value: 'claude-opus-4-6-20260218', label: 'Claude Opus 4.6 (最强)' },
+    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (2025-05)' },
+    { value: 'claude-opus-4-20250514', label: 'Claude Opus 4 (2025-05)' },
+    { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
+    { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
   ],
-  // 通义千问 API 模型: https://help.aliyun.com/zh/model-studio/models
+  // 通义千问 API 最新模型: https://help.aliyun.com/zh/model-studio/models
   qwen: [
-    { value: 'qwen-plus', label: 'Qwen Plus (推荐)' },
-    { value: 'qwen-max', label: 'Qwen Max (最强)' },
+    { value: 'qwen3.5-plus', label: 'Qwen3.5 Plus (最新)' },
+    { value: 'qwen3.5-flash', label: 'Qwen3.5 Flash (轻量)' },
+    { value: 'qwen3-max', label: 'Qwen3 Max (最强)' },
+    { value: 'qwen-plus', label: 'Qwen Plus' },
     { value: 'qwen-turbo', label: 'Qwen Turbo (轻量)' },
     { value: 'qwen-coder-plus', label: 'Qwen Coder Plus (代码)' },
-    { value: 'qwen-math-plus', label: 'Qwen Math Plus (数学)' },
   ],
-  // Kimi API 模型: https://platform.moonshot.cn/docs/guide/choose-model
+  // Kimi API 最新模型: https://platform.moonshot.cn/docs/guide/choose-model
   kimi: [
-    { value: 'moonshot-v1-8k', label: 'Moonshot V1 8K' },
-    { value: 'moonshot-v1-32k', label: 'Moonshot V1 32K' },
+    { value: 'kimi-k2.5', label: 'Kimi K2.5 (最新，256K)' },
+    { value: 'kimi-k2-thinking', label: 'Kimi K2 Thinking (推理)' },
+    { value: 'kimi-k2-turbo-preview', label: 'Kimi K2 Turbo (快速)' },
     { value: 'moonshot-v1-128k', label: 'Moonshot V1 128K' },
+    { value: 'moonshot-v1-32k', label: 'Moonshot V1 32K' },
+    { value: 'moonshot-v1-8k', label: 'Moonshot V1 8K' },
   ],
   // MiniMax API 模型
   minimax: [
+    { value: 'minimax-m2.5', label: 'MiniMax M2.5 (最新)' },
     { value: 'abab6.5s-chat', label: 'ABAB 6.5s Chat' },
     { value: 'abab6.5t-chat', label: 'ABAB 6.5t Chat' },
-    { value: 'abab6.5g-chat', label: 'ABAB 6.5g Chat' },
+    { value: 'm2.5', label: 'M2.5' },
+    { value: 'm2.1', label: 'M2.1' },
   ],
-  // 智谱 GLM API 模型: https://open.bigmodel.cn/modelcenter/square
+  // 智谱 GLM API 最新模型: https://open.bigmodel.cn/modelcenter/square
   glm: [
-    { value: 'glm-4-plus', label: 'GLM-4 Plus (最强)' },
-    { value: 'glm-4-air', label: 'GLM-4 Air (推荐)' },
-    { value: 'glm-4-flash', label: 'GLM-4 Flash (轻量)' },
+    { value: 'glm-5', label: 'GLM-5 (最新旗舰)' },
+    { value: 'glm-4.5-flash', label: 'GLM-4.5 Flash (轻量)' },
+    { value: 'glm-4-plus', label: 'GLM-4 Plus' },
+    { value: 'glm-4-air', label: 'GLM-4 Air' },
+    { value: 'glm-4-flash', label: 'GLM-4 Flash' },
   ],
-  // Gemini API 模型: https://ai.google.dev/gemini-api/docs/models
+  // Gemini API 最新模型 (2025-2026): Gemini 3 系列
   gemini: [
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (推荐)' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (轻量)' },
-    { value: 'gemini-1.5-pro-002', label: 'Gemini 1.5 Pro 002' },
-    { value: 'gemini-1.5-flash-002', label: 'Gemini 1.5 Flash 002' },
+    { value: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (最新)' },
+    { value: 'gemini-3-pro', label: 'Gemini 3 Pro' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (轻量)' },
+    { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
   ],
 }
 

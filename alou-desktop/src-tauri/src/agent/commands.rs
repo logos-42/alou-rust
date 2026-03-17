@@ -280,93 +280,104 @@ pub async fn get_available_providers() -> Vec<ProviderInfo> {
             id: "deepseek".to_string(), 
             name: "DeepSeek".to_string(), 
             models: vec![
-                "deepseek-chat".to_string(),      // DeepSeek-V3.2 (非思考模式)
-                "deepseek-reasoner".to_string(),  // DeepSeek-V3.2 (思考模式)
+                "deepseek-chat".to_string(),      // DeepSeek-V3.2
+                "deepseek-reasoner".to_string(),  // DeepSeek-R1
                 "deepseek-coder".to_string(),     // DeepSeek Coder
             ], 
             requires_base_url: false 
         },
-        // OpenAI API: https://platform.openai.com/docs/models
+        // OpenAI API 最新模型 (2026): https://platform.openai.com/docs/models
         ProviderInfo { 
             id: "openai".to_string(), 
             name: "OpenAI".to_string(), 
             models: vec![
-                "gpt-4o".to_string(),           // 最新旗舰
-                "gpt-4-turbo".to_string(),      // GPT-4 Turbo
-                "gpt-4o-mini".to_string(),      // 轻量版
-                "o1".to_string(),               // 推理模型
-                "o1-mini".to_string(),          // 轻量推理
-                "gpt-3.5-turbo".to_string(),    // GPT-3.5
+                "gpt-5.4".to_string(),           // GPT-5.4 (最新旗舰)
+                "gpt-5.4-pro".to_string(),       // GPT-5.4 Pro
+                "gpt-5.3-chat".to_string(),      // GPT-5.3 Chat
+                "gpt-5.3-codex".to_string(),     // GPT-5.3 Codex
+                "gpt-5.2".to_string(),           // GPT-5.2
+                "gpt-5.2-codex".to_string(),     // GPT-5.2 Codex
+                "gpt-5.1".to_string(),           // GPT-5.1
+                "gpt-5-pro".to_string(),         // GPT-5 Pro
+                "o3-pro".to_string(),            // O3 Pro
+                "o3".to_string(),                // O3
+                "o4-mini".to_string(),           // O4 Mini
             ], 
             requires_base_url: false 
         },
-        // Claude API: https://docs.anthropic.com/en/docs/about-claude/models
+        // Claude API 最新模型 (2026): https://docs.anthropic.com/en/docs/about-claude/models
         ProviderInfo { 
             id: "claude".to_string(), 
             name: "Claude".to_string(), 
             models: vec![
-                "claude-3-5-sonnet-20241022".to_string(), // Claude 3.5 Sonnet (最新)
-                "claude-3-5-sonnet-20240620".to_string(), // Claude 3.5 Sonnet (旧版)
-                "claude-3-opus-20240229".to_string(),     // Claude 3 Opus (最强)
-                "claude-3-sonnet-20240229".to_string(),   // Claude 3 Sonnet
-                "claude-3-haiku-20240307".to_string(),    // Claude 3 Haiku (轻量)
+                "claude-sonnet-4-6-20260218".to_string(),  // Claude Sonnet 4.6 (最新)
+                "claude-opus-4-6-20260218".to_string(),    // Claude Opus 4.6 (最强)
+                "claude-sonnet-4-20250514".to_string(),    // Claude Sonnet 4 (2025)
+                "claude-opus-4-20250514".to_string(),      // Claude Opus 4 (2025)
+                "claude-3-5-sonnet-20241022".to_string(),  // Claude 3.5 Sonnet
             ], 
             requires_base_url: false 
         },
-        // Kimi API: https://platform.moonshot.cn/docs/guide/choose-model
+        // Kimi API 最新模型: https://platform.moonshot.cn/docs/guide/choose-model
         ProviderInfo { 
             id: "kimi".to_string(), 
             name: "Kimi".to_string(), 
             models: vec![
-                "moonshot-v1-8k".to_string(),    // 8K 上下文
-                "moonshot-v1-32k".to_string(),   // 32K 上下文
-                "moonshot-v1-128k".to_string(),  // 128K 上下文
+                "kimi-k2.5".to_string(),            // Kimi K2.5 (最新，256K)
+                "kimi-k2-thinking".to_string(),     // Kimi K2 Thinking
+                "kimi-k2-turbo-preview".to_string(), // Kimi K2 Turbo
+                "moonshot-v1-128k".to_string(),     // Moonshot V1 128K
+                "moonshot-v1-32k".to_string(),      // Moonshot V1 32K
+                "moonshot-v1-8k".to_string(),       // Moonshot V1 8K
             ], 
             requires_base_url: false 
         },
-        // 通义千问 API: https://help.aliyun.com/zh/model-studio/models
+        // 通义千问 API 最新模型: https://help.aliyun.com/zh/model-studio/models
         ProviderInfo { 
             id: "qwen".to_string(), 
             name: "Qwen".to_string(), 
             models: vec![
-                "qwen-plus".to_string(),        // 均衡型
-                "qwen-max".to_string(),         // 最强型
-                "qwen-turbo".to_string(),       // 轻量型
-                "qwen-coder-plus".to_string(),  // 代码型
+                "qwen3.5-plus".to_string(),     // Qwen3.5 Plus (最新)
+                "qwen3.5-flash".to_string(),    // Qwen3.5 Flash
+                "qwen3-max".to_string(),        // Qwen3 Max
+                "qwen-plus".to_string(),        // Qwen Plus
+                "qwen-turbo".to_string(),       // Qwen Turbo
             ], 
             requires_base_url: false 
         },
-        // 智谱 GLM API: https://open.bigmodel.cn/modelcenter/square
+        // 智谱 GLM API 最新模型: https://open.bigmodel.cn/modelcenter/square
         ProviderInfo { 
             id: "glm".to_string(), 
             name: "GLM".to_string(), 
             models: vec![
-                "glm-4-plus".to_string(),   // 最强
-                "glm-4-air".to_string(),    // 均衡
-                "glm-4-flash".to_string(),  // 轻量
+                "glm-5".to_string(),           // GLM-5 (最新旗舰)
+                "glm-4.5-flash".to_string(),   // GLM-4.5 Flash
+                "glm-4-plus".to_string(),      // GLM-4 Plus
+                "glm-4-air".to_string(),       // GLM-4 Air
             ], 
             requires_base_url: false 
         },
-        // Gemini API: https://ai.google.dev/gemini-api/docs/models
+        // Gemini API 最新模型 (2026): https://ai.google.dev/gemini-api/docs/models
         ProviderInfo { 
             id: "gemini".to_string(), 
             name: "Gemini".to_string(), 
             models: vec![
-                "gemini-1.5-pro".to_string(),       // 专业版
-                "gemini-1.5-flash".to_string(),     // 轻量版
-                "gemini-1.5-pro-002".to_string(),   // Pro 002
-                "gemini-1.5-flash-002".to_string(), // Flash 002
+                "gemini-3.1-pro".to_string(),    // Gemini 3.1 Pro (最新)
+                "gemini-3-pro".to_string(),      // Gemini 3 Pro
+                "gemini-2.5-pro".to_string(),    // Gemini 2.5 Pro
+                "gemini-2.5-flash".to_string(),  // Gemini 2.5 Flash
+                "gemini-2.0-flash".to_string(),  // Gemini 2.0 Flash
             ], 
             requires_base_url: false 
         },
-        // MiniMax API
+        // MiniMax API 最新模型
         ProviderInfo { 
             id: "minimax".to_string(), 
             name: "MiniMax".to_string(), 
             models: vec![
-                "abab6.5s-chat".to_string(),
-                "abab6.5t-chat".to_string(),
-                "abab6.5g-chat".to_string(),
+                "minimax-m2.5".to_string(),    // MiniMax M2.5 (最新)
+                "abab6.5s-chat".to_string(),   // ABAB 6.5s Chat
+                "abab6.5t-chat".to_string(),   // ABAB 6.5t Chat
             ], 
             requires_base_url: false 
         },
