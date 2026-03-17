@@ -222,6 +222,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   const [apiConfigs, setApiConfigs] = useState([])
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'text' | 'media'
   const [editingId, setEditingId] = useState('new') // 默认显示编辑表单
+  const [isListExpanded, setIsListExpanded] = useState(true) // 列表展开/折叠状态
 
   // 当前编辑的配置
   const [currentConfig, setCurrentConfig] = useState({
@@ -244,17 +245,79 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
   useEffect(() => {
     if (isOpen) {
       loadConfigs()
+      // 打开模态框时从 localStorage 读取展开状态
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem('alou-api-config-list-expanded')
+        console.log('[ApiConfigModal] 打开模态框，从 localStorage 读取展开状态:', saved)
+        setIsListExpanded(saved !== 'false')
+      }
     }
   }, [isOpen])
-  
-  // 当切换标签页时，更新表单的 Provider
+
+  // 当切换标签页时，更新表单的 Provider（但不重置编辑状态）
   useEffect(() => {
-    if (isOpen) {
-      const firstProvider = activeTab === 'media' 
+    if (isOpen && editingId === 'new') {
+      const firstProvider = activeTab === 'media'
         ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
         : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
       const provider = PROVIDERS.find(p => p.value === firstProvider)
-      setEditingId('new')
+      setCurrentConfig(prev => {
+        // 如果当前没有编辑内容或者是新的 Provider 类别，才更新
+        if (!prev.provider || prev.api_key === '') {
+          return {
+            id: prev.id.startsWith('new_') ? prev.id : `new_${Date.now()}`,
+            provider: firstProvider,
+            api_key: '',
+            base_url: '',
+            model: DEFAULT_MODELS[firstProvider],
+            enabled: true,
+            is_active: apiConfigs.length === 0,
+            capabilities: provider?.capabilities || [],
+          }
+        }
+        // 否则保持当前编辑状态
+        return prev
+      })
+    }
+  }, [activeTab, isOpen])
+
+  // 持久化列表展开状态
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      const value = String(isListExpanded)
+      localStorage.setItem('alou-api-config-list-expanded', value)
+      console.log('[ApiConfigModal] 保存展开状态到 localStorage:', value)
+    }
+  }, [isListExpanded])
+
+  const loadConfigs = async () => {
+    try {
+      const invoke = await getInvoke()
+      const config = await invoke('get_agent_config')
+
+      if (config && config.user_apis) {
+        const loadedConfigs = config.user_apis.map(api => ({
+          ...api,
+          base_url: api.base_url || '',
+          enabled: api.is_active !== false,
+        }))
+        setApiConfigs(loadedConfigs)
+      }
+    } catch (err) {
+      console.warn('加载配置失败:', err)
+      // 回退到 localStorage
+      const localConfig = await getActiveApiConfig()
+      if (localConfig) {
+        setApiConfigs([{ ...localConfig, base_url: localConfig.base_url || '', enabled: true }])
+      }
+    }
+
+    // 只在首次打开或没有编辑内容时，初始化表单
+    if (editingId === 'new' && (!currentConfig.provider || currentConfig.api_key === '')) {
+      const firstProvider = activeTab === 'media'
+        ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
+        : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
+      const provider = PROVIDERS.find(p => p.value === firstProvider)
       setCurrentConfig({
         id: `new_${Date.now()}`,
         provider: firstProvider,
@@ -266,46 +329,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         capabilities: provider?.capabilities || [],
       })
     }
-  }, [activeTab, isOpen])
 
-  const loadConfigs = async () => {
-    try {
-      const invoke = await getInvoke()
-      const config = await invoke('get_agent_config')
-
-      if (config && config.user_apis) {
-        setApiConfigs(config.user_apis.map(api => ({
-          ...api,
-          base_url: api.base_url || '',
-          enabled: api.is_active !== false,
-        })))
-      }
-    } catch (err) {
-      console.warn('加载配置失败:', err)
-      // 回退到 localStorage
-      const localConfig = await getActiveApiConfig()
-      if (localConfig) {
-        setApiConfigs([{ ...localConfig, base_url: localConfig.base_url || '', enabled: true }])
-      }
-    }
-    
-    // 直接开始编辑（显示 Provider/Model 选择页面）
-    const firstProvider = activeTab === 'media' 
-      ? PROVIDERS.find(p => p.category === 'media')?.value || 'seedance'
-      : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
-    const provider = PROVIDERS.find(p => p.value === firstProvider)
-    setEditingId('new')
-    setCurrentConfig({
-      id: `new_${Date.now()}`,
-      provider: firstProvider,
-      api_key: '',
-      base_url: '',
-      model: DEFAULT_MODELS[firstProvider],
-      enabled: true,
-      is_active: apiConfigs.length === 0,
-      capabilities: provider?.capabilities || [],
-    })
-    
     setError(null)
     setSuccess(null)
   }
@@ -568,58 +592,82 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
           {/* 已添加的 API 列表 */}
           {filteredConfigs.length > 0 && (
             <div className="api-config-list">
-              <div className="api-config-list-header">
-                <span>已添加的 API 配置</span>
+              <div 
+                className="api-config-list-header"
+                onClick={() => setIsListExpanded(!isListExpanded)}
+              >
+                <span>已添加的 API 配置 ({filteredConfigs.length})</span>
+                <button
+                  type="button"
+                  className="api-config-list-toggle"
+                  title={isListExpanded ? '折叠' : '展开'}
+                >
+                  <svg 
+                    viewBox="0 0 16 16" 
+                    className={`toggle-icon ${isListExpanded ? 'expanded' : ''}`}
+                  >
+                    <path
+                      d="M4 6l4 4 4-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
               </div>
-              <div className="api-config-list-items">
-                {filteredConfigs.map((config) => {
-                  const provider = PROVIDERS.find(p => p.value === config.provider)
-                  const isEditing = editingId === config.id
-                  return (
-                    <div
-                      key={config.id}
-                      className={`api-config-list-item ${isEditing ? 'editing' : ''} ${config.is_active ? 'active' : ''}`}
-                    >
-                      <div className="api-config-item-info">
-                        <span className="api-config-item-provider">
-                          {provider?.label || config.provider}
-                          {config.is_active && <span className="api-config-item-active-tag">（当前使用）</span>}
-                        </span>
-                        <span className="api-config-item-model">{config.model || '默认模型'}</span>
-                        <span className="api-config-item-key">{config.api_key?.slice(0, 8)}...{config.api_key?.slice(-4)}</span>
-                      </div>
-                      <div className="api-config-item-actions">
-                        <button
-                          type="button"
-                          className="api-config-item-btn"
-                          onClick={() => handleEdit(config)}
-                          title="编辑"
-                        >
-                          编辑
-                        </button>
-                        {!config.is_active && (
+              {isListExpanded && (
+                <div className="api-config-list-items">
+                  {filteredConfigs.map((config) => {
+                    const provider = PROVIDERS.find(p => p.value === config.provider)
+                    const isEditing = editingId === config.id
+                    return (
+                      <div
+                        key={config.id}
+                        className={`api-config-list-item ${isEditing ? 'editing' : ''} ${config.is_active ? 'active' : ''}`}
+                      >
+                        <div className="api-config-item-info">
+                          <span className="api-config-item-provider">
+                            {provider?.label || config.provider}
+                            {config.is_active && <span className="api-config-item-active-tag">（当前使用）</span>}
+                          </span>
+                          <span className="api-config-item-model">{config.model || '默认模型'}</span>
+                          <span className="api-config-item-key">{config.api_key?.slice(0, 8)}...{config.api_key?.slice(-4)}</span>
+                        </div>
+                        <div className="api-config-item-actions">
                           <button
                             type="button"
                             className="api-config-item-btn"
-                            onClick={() => handleSetActive(config.id)}
-                            title="设为激活"
+                            onClick={() => handleEdit(config)}
+                            title="编辑"
                           >
-                            激活
+                            编辑
                           </button>
-                        )}
-                        <button
-                          type="button"
-                          className="api-config-item-btn delete"
-                          onClick={() => handleDelete(config.id)}
-                          title="删除"
-                        >
-                          删除
-                        </button>
+                          {!config.is_active && (
+                            <button
+                              type="button"
+                              className="api-config-item-btn"
+                              onClick={() => handleSetActive(config.id)}
+                              title="设为激活"
+                            >
+                              激活
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="api-config-item-btn delete"
+                            onClick={() => handleDelete(config.id)}
+                            title="删除"
+                          >
+                            删除
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 
