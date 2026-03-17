@@ -177,6 +177,13 @@ impl AiClient {
                 config.base_url.clone(),
                 "".to_string(),
             )),
+            // 媒体生成 Provider - 不支持文本对话
+            "seedance" | "seedream" | "jimeng" | "haimian" | "suno" | "stability" | "elevenlabs" | "minimax_music" | "google" => {
+                return Err(AgentError::InvalidInput(format!(
+                    "'{}' 是媒体生成模型，不支持文本对话。请选择一个文本 LLM Provider（如 deepseek, openai, claude 等）",
+                    config.provider
+                )))
+            }
             _ => {
                 return Err(AgentError::InvalidInput(format!(
                     "未知的 provider: {}",

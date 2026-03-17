@@ -582,40 +582,11 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     }
   }
 
-  // 设为激活
-  const handleSetActive = async (id) => {
-    try {
-      const invoke = await getInvoke()
-      const newConfigs = apiConfigs.map(c => ({
-        ...c,
-        is_active: c.id === id,
-        enabled: c.id === id, // 同步更新 enabled 字段
-      }))
-      
-      // 修复：将 enabled 映射为 is_active
-      const configsForBackend = newConfigs.map(c => ({
-        id: c.id,
-        provider: c.provider,
-        api_key: c.api_key,
-        base_url: c.base_url || null,
-        model: c.model || null,
-        is_active: c.id === id,
-      }));
-
-      await invoke('update_agent_config', {
-        config: {
-          user_apis: configsForBackend,
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: configsForBackend.find(c => c.is_active)?.provider || configsForBackend[0]?.provider || 'deepseek',
-        },
-      })
-
-      setApiConfigs(newConfigs)
-      window.dispatchEvent(new CustomEvent('api-config-changed'))
-    } catch (err) {
-      console.error('设置激活配置失败:', err)
-    }
+  // 【已废弃】激活功能 - 现在所有配置都可用，根据任务自动选择
+  // 保留此函数但置空，以避免破坏现有代码
+  const handleSetActive = async (_id) => {
+    console.log('[ApiConfigModal] 激活功能已废弃，所有配置都可用')
+    // 不再执行任何操作
   }
 
   // 保存配置
@@ -694,14 +665,14 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         }
       } else {
         // 文本 LLM - 保存到 agent_config.json
-        // 修复：将前端的 enabled 字段映射回后端的 is_active 字段
+        // 简化：所有配置都可用，不需要 is_active 标记
         const configsForBackend = newConfigs.map(c => ({
           id: c.id,
           provider: c.provider,
           api_key: c.api_key,
           base_url: c.base_url || null,
           model: c.model || null,
-          is_active: c.enabled !== false, // 将 enabled 映射为 is_active
+          is_active: true, // 所有配置都标记为可用
         }));
         
         console.log('[ApiConfigModal] 保存文本配置到后端:', configsForBackend);
@@ -711,7 +682,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             user_apis: configsForBackend,
             workers_api: { base_url: '', enabled: false },
             execution_strategy: 'LocalOnly',
-            default_provider: configsForBackend.find(c => c.is_active)?.provider || configsForBackend[0]?.provider || 'deepseek',
+            default_provider: 'deepseek', // 默认使用 deepseek，实际根据任务选择
           },
         });
         setSuccess('配置已保存');
@@ -840,6 +811,14 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
             </button>
           </div>
 
+          {/* 提示说明 */}
+          <div className="api-config-info-banner">
+            <p>💡 <strong>所有配置的 API 都可用</strong>，系统会根据任务类型自动选择合适的 Provider</p>
+            <p style={{fontSize: '12px', marginTop: '4px', opacity: 0.8}}>
+              文本对话 → 使用 LLM Provider | 图片/视频/音乐生成 → 使用对应的媒体 Provider
+            </p>
+          </div>
+
           {/* 已添加的 API 列表 */}
           <div className="api-config-list">
             <div
@@ -960,15 +939,18 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                   filteredConfigs.map((config) => {
                     const provider = PROVIDERS.find(p => p.value === config.provider)
                     const isEditing = editingId === config.id
+                    const category = provider?.category || 'text'
                     return (
                       <div
                         key={config.id}
-                        className={`api-config-list-item ${isEditing ? 'editing' : ''} ${config.is_active ? 'active' : ''}`}
+                        className={`api-config-list-item ${isEditing ? 'editing' : ''}`}
                       >
                         <div className="api-config-item-info">
                           <span className="api-config-item-provider">
                             {provider?.label || config.provider}
-                            {config.is_active && <span className="api-config-item-active-tag">（当前使用）</span>}
+                            <span className={`api-config-item-tag ${category}`}>
+                              {category === 'text' ? '文本' : '媒体'}
+                            </span>
                           </span>
                           <span className="api-config-item-model">{config.model || '默认模型'}</span>
                           <span className="api-config-item-key">{config.api_key?.slice(0, 8)}...{config.api_key?.slice(-4)}</span>
@@ -982,16 +964,6 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
                           >
                             编辑
                           </button>
-                          {!config.is_active && (
-                            <button
-                              type="button"
-                              className="api-config-item-btn"
-                              onClick={() => handleSetActive(config.id)}
-                              title="设为激活"
-                            >
-                              激活
-                            </button>
-                          )}
                           <button
                             type="button"
                             className="api-config-item-btn delete"

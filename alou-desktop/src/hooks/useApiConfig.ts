@@ -41,20 +41,44 @@ const DEFAULT_MODELS: Record<string, string> = {
   gemini: 'gemini-3.1-pro',               // Gemini 3.1 Pro
 }
 
+// 媒体 Provider 列表（这些不能直接用于文本对话）
+const MEDIA_PROVIDERS = [
+  'seedance', 'seedream', 'jimeng', 'haimian', 'suno', 
+  'stability', 'elevenlabs', 'minimax_music', 'google'
+]
+
+// 文本 LLM Provider 列表
+const TEXT_LLM_PROVIDERS = [
+  'deepseek', 'openai', 'claude', 'kimi', 'qwen', 'glm', 'gemini', 'minimax', 'openrouter'
+]
+
 /**
- * 获取当前激活的 API 配置（Tauri invoke）
- * 如果 Tauri 不可用，回退到 localStorage
+ * 获取用于文本对话的 LLM 配置
+ * 自动过滤，只返回文本 LLM Provider，排除媒体 Provider
  */
 export async function getActiveApiConfig(): Promise<UserApiConfig | null> {
   try {
     const config = await invoke<ApiConfig>('get_agent_config')
-    const active = config.user_apis.find((api) => api.is_active)
+    
+    // 过滤出文本 LLM Provider，排除媒体 Provider
+    const textLLMProviders = config.user_apis.filter(
+      (api) => !MEDIA_PROVIDERS.includes(api.provider.toLowerCase())
+    )
+    
+    // 优先使用标记为激活的文本 LLM
+    const active = textLLMProviders.find((api) => api.is_active)
     if (active && active.api_key) {
       return active
     }
-    // 有配置但没有激活的，取第一个
-    if (config.user_apis.length > 0 && config.user_apis[0].api_key) {
-      return config.user_apis[0]
+    
+    // 有配置但没有激活的，取第一个文本 LLM
+    if (textLLMProviders.length > 0 && textLLMProviders[0].api_key) {
+      return textLLMProviders[0]
+    }
+    
+    // 如果没有文本 LLM 配置，但配置了媒体 provider，给出警告
+    if (config.user_apis.length > 0) {
+      console.warn('[useApiConfig] 只配置了媒体 Provider，没有配置文本 LLM Provider')
     }
   } catch (e) {
     console.warn('[useApiConfig] Tauri invoke 失败，回退到 localStorage:', e)
@@ -75,6 +99,67 @@ export async function getActiveApiConfig(): Promise<UserApiConfig | null> {
     base_url: null,
     model,
     is_active: true,
+  }
+}
+
+/**
+ * 获取所有配置的 API（包括文本 LLM 和媒体）
+ * 用于工具调用时根据任务类型选择
+ */
+export async function getAllApiConfigs(): Promise<{
+  llmProviders: UserApiConfig[]
+  mediaProviders: UserApiConfig[]
+}> {
+  try {
+    const config = await invoke<ApiConfig>('get_agent_config')
+    
+    const llmProviders = config.user_apis.filter(
+      (api) => !MEDIA_PROVIDERS.includes(api.provider.toLowerCase())
+    )
+    
+    const mediaProviders = config.user_apis.filter(
+      (api) => MEDIA_PROVIDERS.includes(api.provider.toLowerCase())
+    )
+    
+    return { llmProviders, mediaProviders }
+  } catch (e) {
+    console.warn('[useApiConfig] 获取所有配置失败:', e)
+    return { llmProviders: [], mediaProviders: [] }
+  }
+}
+
+/**
+ * 根据任务类型获取合适的 Provider
+ */
+export async function getProviderForTask(taskType: 'text' | 'image' | 'video' | 'audio' | 'tts'): Promise<UserApiConfig | null> {
+  const { llmProviders, mediaProviders } = await getAllApiConfigs()
+  
+  switch (taskType) {
+    case 'text':
+      // 返回第一个可用的文本 LLM
+      return llmProviders.find(p => p.is_active) || llmProviders[0] || null
+      
+    case 'image':
+      // 找图片生成 provider: seedream, jimeng, google, stability
+      return mediaProviders.find(p => 
+        ['seedream', 'jimeng', 'google', 'stability'].includes(p.provider.toLowerCase())
+      ) || null
+      
+    case 'video':
+      // 找视频生成 provider: seedance
+      return mediaProviders.find(p => 
+        p.provider.toLowerCase() === 'seedance'
+      ) || null
+      
+    case 'audio':
+    case 'tts':
+      // 找音乐/TTS provider: suno, haimian, elevenlabs, minimax_music
+      return mediaProviders.find(p => 
+        ['suno', 'haimian', 'elevenlabs', 'minimax_music'].includes(p.provider.toLowerCase())
+      ) || null
+      
+    default:
+      return null
   }
 }
 
