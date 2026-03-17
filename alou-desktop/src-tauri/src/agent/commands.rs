@@ -275,14 +275,101 @@ pub async fn health_check() -> std::result::Result<serde_json::Value, String> {
 #[tauri::command]
 pub async fn get_available_providers() -> Vec<ProviderInfo> {
     vec![
-        ProviderInfo { id: "deepseek".to_string(), name: "DeepSeek".to_string(), models: vec!["deepseek-v3.2".to_string(), "deepseek-v3.2-speciale".to_string(), "deepseek-r1".to_string()], requires_base_url: false },
-        ProviderInfo { id: "openai".to_string(), name: "OpenAI".to_string(), models: vec!["gpt-5.4".to_string(), "gpt-5.3".to_string(), "gpt-5".to_string(), "o3-pro".to_string(), "o4-mini".to_string()], requires_base_url: false },
-        ProviderInfo { id: "claude".to_string(), name: "Claude".to_string(), models: vec!["claude-sonnet-4-6-20260218".to_string(), "claude-opus-4-6-20260218".to_string(), "claude-sonnet-4-5-20251101".to_string()], requires_base_url: false },
-        ProviderInfo { id: "kimi".to_string(), name: "Kimi".to_string(), models: vec!["kimi-k2.5".to_string(), "kimi-k2-thinking".to_string(), "kimi-k2".to_string()], requires_base_url: false },
-        ProviderInfo { id: "qwen".to_string(), name: "Qwen".to_string(), models: vec!["qwen3.5-plus".to_string(), "qwen3.5".to_string(), "qwen3-max".to_string()], requires_base_url: false },
-        ProviderInfo { id: "glm".to_string(), name: "GLM".to_string(), models: vec!["glm-5".to_string(), "glm-4.5-flash".to_string(), "glm-4-plus".to_string()], requires_base_url: false },
-        ProviderInfo { id: "gemini".to_string(), name: "Gemini".to_string(), models: vec!["gemini-3.1-pro".to_string(), "gemini-3-pro".to_string(), "gemini-2.5-pro".to_string()], requires_base_url: false },
-        ProviderInfo { id: "minimax".to_string(), name: "MiniMax".to_string(), models: vec!["minimax-m2.5".to_string(), "minimax-m2.1".to_string(), "abab6.5s-chat".to_string()], requires_base_url: false },
+        // DeepSeek API: https://api-docs.deepseek.com/quick_start/pricing
+        ProviderInfo { 
+            id: "deepseek".to_string(), 
+            name: "DeepSeek".to_string(), 
+            models: vec![
+                "deepseek-chat".to_string(),      // DeepSeek-V3.2 (非思考模式)
+                "deepseek-reasoner".to_string(),  // DeepSeek-V3.2 (思考模式)
+                "deepseek-coder".to_string(),     // DeepSeek Coder
+            ], 
+            requires_base_url: false 
+        },
+        // OpenAI API: https://platform.openai.com/docs/models
+        ProviderInfo { 
+            id: "openai".to_string(), 
+            name: "OpenAI".to_string(), 
+            models: vec![
+                "gpt-4o".to_string(),           // 最新旗舰
+                "gpt-4-turbo".to_string(),      // GPT-4 Turbo
+                "gpt-4o-mini".to_string(),      // 轻量版
+                "o1".to_string(),               // 推理模型
+                "o1-mini".to_string(),          // 轻量推理
+                "gpt-3.5-turbo".to_string(),    // GPT-3.5
+            ], 
+            requires_base_url: false 
+        },
+        // Claude API: https://docs.anthropic.com/en/docs/about-claude/models
+        ProviderInfo { 
+            id: "claude".to_string(), 
+            name: "Claude".to_string(), 
+            models: vec![
+                "claude-3-5-sonnet-20241022".to_string(), // Claude 3.5 Sonnet (最新)
+                "claude-3-5-sonnet-20240620".to_string(), // Claude 3.5 Sonnet (旧版)
+                "claude-3-opus-20240229".to_string(),     // Claude 3 Opus (最强)
+                "claude-3-sonnet-20240229".to_string(),   // Claude 3 Sonnet
+                "claude-3-haiku-20240307".to_string(),    // Claude 3 Haiku (轻量)
+            ], 
+            requires_base_url: false 
+        },
+        // Kimi API: https://platform.moonshot.cn/docs/guide/choose-model
+        ProviderInfo { 
+            id: "kimi".to_string(), 
+            name: "Kimi".to_string(), 
+            models: vec![
+                "moonshot-v1-8k".to_string(),    // 8K 上下文
+                "moonshot-v1-32k".to_string(),   // 32K 上下文
+                "moonshot-v1-128k".to_string(),  // 128K 上下文
+            ], 
+            requires_base_url: false 
+        },
+        // 通义千问 API: https://help.aliyun.com/zh/model-studio/models
+        ProviderInfo { 
+            id: "qwen".to_string(), 
+            name: "Qwen".to_string(), 
+            models: vec![
+                "qwen-plus".to_string(),        // 均衡型
+                "qwen-max".to_string(),         // 最强型
+                "qwen-turbo".to_string(),       // 轻量型
+                "qwen-coder-plus".to_string(),  // 代码型
+            ], 
+            requires_base_url: false 
+        },
+        // 智谱 GLM API: https://open.bigmodel.cn/modelcenter/square
+        ProviderInfo { 
+            id: "glm".to_string(), 
+            name: "GLM".to_string(), 
+            models: vec![
+                "glm-4-plus".to_string(),   // 最强
+                "glm-4-air".to_string(),    // 均衡
+                "glm-4-flash".to_string(),  // 轻量
+            ], 
+            requires_base_url: false 
+        },
+        // Gemini API: https://ai.google.dev/gemini-api/docs/models
+        ProviderInfo { 
+            id: "gemini".to_string(), 
+            name: "Gemini".to_string(), 
+            models: vec![
+                "gemini-1.5-pro".to_string(),       // 专业版
+                "gemini-1.5-flash".to_string(),     // 轻量版
+                "gemini-1.5-pro-002".to_string(),   // Pro 002
+                "gemini-1.5-flash-002".to_string(), // Flash 002
+            ], 
+            requires_base_url: false 
+        },
+        // MiniMax API
+        ProviderInfo { 
+            id: "minimax".to_string(), 
+            name: "MiniMax".to_string(), 
+            models: vec![
+                "abab6.5s-chat".to_string(),
+                "abab6.5t-chat".to_string(),
+                "abab6.5g-chat".to_string(),
+            ], 
+            requires_base_url: false 
+        },
     ]
 }
 
