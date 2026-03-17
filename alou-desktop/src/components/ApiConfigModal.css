@@ -802,7 +802,60 @@
   margin-top: 2px;
 }
 
-/* Model 选择器布局 */
+/* Model 选择器布局 - 合并选择与输入 */
+.api-config-model-combined {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.api-config-model-select-combined,
+.api-config-model-input-combined {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.dark .api-config-model-select-combined,
+.dark .api-config-model-input-combined {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+}
+
+.dark .api-config-model-select-combined:focus,
+.dark .api-config-model-input-combined:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.api-config-modal.light .api-config-model-select-combined,
+.api-config-modal.light .api-config-model-input-combined {
+  background: #f8fafc;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1e293b;
+}
+
+.api-config-modal.light .api-config-model-select-combined:focus,
+.api-config-modal.light .api-config-model-input-combined:focus {
+  outline: none;
+  border-color: #6366f1;
+}
+
+.api-config-model-select-combined option {
+  background: #1a1a1a;
+  color: #f1f5f9;
+}
+
+.api-config-modal.light .api-config-model-select-combined option {
+  background: #ffffff;
+  color: #1e293b;
+}
+
+/* 旧的选择器布局（保留向后兼容） */
 .api-config-model-selector {
   display: flex;
   align-items: center;

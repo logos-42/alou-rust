@@ -87,7 +87,7 @@ class MemoryStorage {
    */
   setItem(key: string, value: any, options: MemoryStorageOptions = {}): boolean {
     const { persist = false, ttl = this.maxAge } = options
-    
+
     try {
       // 序列化数据
       const serializedValue = JSON.stringify({
@@ -96,25 +96,34 @@ class MemoryStorage {
         ttl,
         persist
       })
-      
+
       // 检查存储限制
       if (this.data.size >= this.maxItems && !this.data.has(key)) {
         this.evictOldest()
       }
-      
+
       // 存储到内存
       this.data.set(key, serializedValue)
       this.timestamps.set(key, Date.now())
-      
-      // 如果需要持久化，存储到 sessionStorage
-      if (persist && typeof window !== 'undefined' && window.sessionStorage) {
+
+      // 如果需要持久化，存储到 localStorage（应用重启后仍然保留）
+      if (persist && typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem(`memory_persist_${key}`, serializedValue)
+        } catch (error: any) {
+          console.warn('[MemoryStorage] localStorage 存储失败:', error)
+        }
+      }
+
+      // 同时存储到 sessionStorage（当前会话内快速访问）
+      if (typeof window !== 'undefined' && window.sessionStorage) {
         try {
           window.sessionStorage.setItem(`memory_${key}`, serializedValue)
         } catch (error: any) {
           console.warn('[MemoryStorage] sessionStorage 存储失败:', error)
         }
       }
-      
+
       return true
     } catch (error: any) {
       console.error('[MemoryStorage] 设置数据失败:', error)
@@ -129,8 +138,18 @@ class MemoryStorage {
     try {
       // 首先从内存获取
       let serializedValue = this.data.get(key)
-      
-      // 如果内存中没有，尝试从 sessionStorage 恢复
+
+      // 如果内存中没有，尝试从 localStorage 恢复（持久化数据）
+      if (!serializedValue && typeof window !== 'undefined' && window.localStorage) {
+        const persistValue = window.localStorage.getItem(`memory_persist_${key}`)
+        if (persistValue) {
+          serializedValue = persistValue
+          this.data.set(key, persistValue)
+          this.timestamps.set(key, Date.now())
+        }
+      }
+
+      // 如果仍然没有，尝试从 sessionStorage 恢复（会话数据）
       if (!serializedValue && typeof window !== 'undefined' && window.sessionStorage) {
         const sessionValue = window.sessionStorage.getItem(`memory_${key}`)
         if (sessionValue) {
@@ -139,24 +158,24 @@ class MemoryStorage {
           this.timestamps.set(key, Date.now())
         }
       }
-      
+
       if (!serializedValue) {
         return defaultValue
       }
-      
+
       // 解析数据
       const parsed: StoredDataWrapper<T> = JSON.parse(serializedValue)
       const now = Date.now()
-      
+
       // 检查是否过期
       if (now - parsed.timestamp > parsed.ttl) {
         this.removeItem(key)
         return defaultValue
       }
-      
+
       // 更新访问时间
       this.timestamps.set(key, now)
-      
+
       return parsed.data
     } catch (error: any) {
       console.error('[MemoryStorage] 获取数据失败:', error)
@@ -170,8 +189,17 @@ class MemoryStorage {
   removeItem(key: string): boolean {
     const deleted = this.data.delete(key)
     this.timestamps.delete(key)
-    
-    // 同时从 sessionStorage 删除
+
+    // 同时从 localStorage 删除（持久化数据）
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.removeItem(`memory_persist_${key}`)
+      } catch (error: any) {
+        console.warn('[MemoryStorage] localStorage 删除失败:', error)
+      }
+    }
+
+    // 同时从 sessionStorage 删除（会话数据）
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
         window.sessionStorage.removeItem(`memory_${key}`)
@@ -179,7 +207,7 @@ class MemoryStorage {
         console.warn('[MemoryStorage] sessionStorage 删除失败:', error)
       }
     }
-    
+
     return deleted
   }
 
@@ -203,7 +231,23 @@ class MemoryStorage {
   clear(): void {
     this.data.clear()
     this.timestamps.clear()
-    
+
+    // 清空 localStorage 中的持久化数据
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const keysToRemove: string[] = []
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i)
+          if (key && key.startsWith('memory_persist_')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => window.localStorage.removeItem(key))
+      } catch (error: any) {
+        console.warn('[MemoryStorage] 清空 localStorage 失败:', error)
+      }
+    }
+
     // 清空 sessionStorage 中的内存数据
     if (typeof window !== 'undefined' && window.sessionStorage) {
       try {
@@ -323,45 +367,81 @@ class MemoryStorage {
   }
 
   /**
-   * 从 sessionStorage 恢复数据
+   * 从 localStorage 和 sessionStorage 恢复数据
    */
   private recoverFromSession(): void {
-    if (typeof window === 'undefined' || !window.sessionStorage) {
-      return
-    }
-    
-    try {
-      const recovered: string[] = []
-      for (let i = 0; i < window.sessionStorage.length; i++) {
-        const key = window.sessionStorage.key(i)
-        if (key && key.startsWith('memory_')) {
-          const memoryKey = key.replace('memory_', '')
-          const value = window.sessionStorage.getItem(key)
-          
-          if (value) {
-            try {
-              const parsed: StoredDataWrapper = JSON.parse(value)
-              const now = Date.now()
-              
-              // 只恢复未过期的持久化数据
-              if (parsed.persist && now - parsed.timestamp <= parsed.ttl) {
-                this.data.set(memoryKey, value)
-                this.timestamps.set(memoryKey, parsed.timestamp)
-                recovered.push(memoryKey)
+    // 从 localStorage 恢复持久化数据（应用重启后）
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const recovered: string[] = []
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i)
+          if (key && key.startsWith('memory_persist_')) {
+            const memoryKey = key.replace('memory_persist_', '')
+            const value = window.localStorage.getItem(key)
+
+            if (value) {
+              try {
+                const parsed: StoredDataWrapper = JSON.parse(value)
+                const now = Date.now()
+
+                // 只恢复未过期的持久化数据
+                if (parsed.persist && now - parsed.timestamp <= parsed.ttl) {
+                  this.data.set(memoryKey, value)
+                  this.timestamps.set(memoryKey, parsed.timestamp)
+                  recovered.push(memoryKey)
+                }
+              } catch (error) {
+                // 清理损坏的数据
+                window.localStorage.removeItem(key)
               }
-            } catch (error) {
-              // 清理损坏的数据
-              window.sessionStorage.removeItem(key)
             }
           }
         }
+
+        if (recovered.length > 0) {
+          console.log(`[MemoryStorage] 从本地存储恢复了 ${recovered.length} 个持久化项目`)
+        }
+      } catch (error: any) {
+        console.warn('[MemoryStorage] 本地存储恢复失败:', error)
       }
-      
-      if (recovered.length > 0) {
-        console.log(`[MemoryStorage] 从会话恢复了 ${recovered.length} 个项目`)
+    }
+
+    // 从 sessionStorage 恢复会话数据（当前会话）
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const recovered: string[] = []
+        for (let i = 0; i < window.sessionStorage.length; i++) {
+          const key = window.sessionStorage.key(i)
+          if (key && key.startsWith('memory_')) {
+            const memoryKey = key.replace('memory_', '')
+            const value = window.sessionStorage.getItem(key)
+
+            if (value) {
+              try {
+                const parsed: StoredDataWrapper = JSON.parse(value)
+                const now = Date.now()
+
+                // 只恢复未过期的持久化数据
+                if (parsed.persist && now - parsed.timestamp <= parsed.ttl) {
+                  this.data.set(memoryKey, value)
+                  this.timestamps.set(memoryKey, parsed.timestamp)
+                  recovered.push(memoryKey)
+                }
+              } catch (error) {
+                // 清理损坏的数据
+                window.sessionStorage.removeItem(key)
+              }
+            }
+          }
+        }
+
+        if (recovered.length > 0) {
+          console.log(`[MemoryStorage] 从会话恢复了 ${recovered.length} 个项目`)
+        }
+      } catch (error: any) {
+        console.warn('[MemoryStorage] 会话恢复失败:', error)
       }
-    } catch (error: any) {
-      console.warn('[MemoryStorage] 会话恢复失败:', error)
     }
   }
 
