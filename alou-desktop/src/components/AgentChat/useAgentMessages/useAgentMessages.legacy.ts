@@ -659,6 +659,17 @@ export const useAgentMessages = ({
       // 3. 通过 Tauri invoke 执行 AI 对话（本地 Rust 直接调用 AI API）
       // Rust 返回 { success, result: TaskFinalResult, execution_mode, timestamp }
       // TaskFinalResult = { task_id, success, result: string, error, iteration_count }
+      
+      // 修复：确保 base_url 不为空字符串，否则会导致 "relative URL without a base" 错误
+      const baseUrl = localApiConfig.base_url?.trim()
+      const sanitizedBaseUrl = baseUrl && baseUrl.length > 0 ? baseUrl : null
+      
+      console.log('[useAgentMessages] API 配置:', {
+        provider: localApiConfig.provider,
+        model: localApiConfig.model,
+        base_url: sanitizedBaseUrl || '(使用默认)',
+      })
+      
       const tauri_result = await invoke<{
         success: boolean
         result?: {
@@ -681,7 +692,7 @@ export const useAgentMessages = ({
           id: localApiConfig.id || 'primary',
           provider: localApiConfig.provider,
           api_key: localApiConfig.api_key,
-          base_url: localApiConfig.base_url != null ? localApiConfig.base_url : null,
+          base_url: sanitizedBaseUrl,
           model: localApiConfig.model != null ? localApiConfig.model : null,
           is_active: true,
         },
@@ -766,10 +777,40 @@ export const useAgentMessages = ({
       const errorMessage = errMessage || '未知错误'
       console.error('[useAgentMessages] 本地 AI 执行错误:', errorMessage, error)
 
+      // 根据错误类型提供友好的提示
+      let userFriendlyMessage = `❌ 执行出错：${errorMessage}`
+      
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('Authentication Fails')) {
+        userFriendlyMessage = `🔑 **API Key 无效**
+
+您的 DeepSeek API Key 认证失败，可能原因：
+1. API Key 填写错误或已失效
+2. 账户余额不足或已欠费
+3. Key 被删除或禁用
+
+**解决方法：**
+• 前往 [DeepSeek 开放平台](https://platform.deepseek.com/) 检查 API Key 状态
+• 确认账户有足够余额
+• 重新生成 API Key 并在设置中更新`}
+      else if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+        userFriendlyMessage = `⏳ **请求太频繁**
+
+已达到 API 速率限制，请稍后再试。`
+      }
+      else if (errorMessage.includes('Network') || errorMessage.includes('relative URL')) {
+        userFriendlyMessage = `🌐 **网络错误**
+
+${errorMessage}
+
+请检查网络连接或 API 配置。`}
+      else {
+        userFriendlyMessage += '\n\n请检查 API Key 配置是否正确，或查看控制台获取详细错误信息。'
+      }
+
       appendMessage({
         id: `error_${Date.now()}`,
         type: 'assistant',
-        content: `❌ 执行出错：${errorMessage}\n\n请检查 API Key 配置是否正确。`,
+        content: userFriendlyMessage,
         timestamp: Date.now(),
         source: 'error',
       }, targetAgentId)

@@ -18,10 +18,15 @@ pub struct KimiProvider {
 
 impl KimiProvider {
     pub fn new(api_key: String, model: String, base_url: Option<String>) -> Self {
+        // 修复：处理空字符串的情况，避免 "relative URL without a base" 错误
+        let final_base_url = base_url
+            .filter(|url| !url.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_API_URL.to_string());
+
         Self {
             api_key,
             model,
-            base_url: base_url.unwrap_or_else(|| DEFAULT_API_URL.to_string()),
+            base_url: final_base_url,
         }
     }
 }
