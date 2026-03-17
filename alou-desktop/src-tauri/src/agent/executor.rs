@@ -350,9 +350,30 @@ impl RalphLoopExecutor {
                         return Err(ExecutorError::InternalError(reason.clone()));
                     }
                     Action::Continue => {
-                        // 迭代次数超限
-                        log::warn!("[AgentReasoning:{}] 达到最大迭代次数", task_id);
-                        "达到最大迭代次数，任务终止".to_string()
+                        // 检查是否是简单对话强制终止
+                        let last_user_message = state.messages.iter()
+                            .filter(|m| m.role == "user")
+                            .last()
+                            .map(|m| m.content.trim())
+                            .unwrap_or("");
+                        let is_simple_chat = last_user_message.len() < 50 
+                            && !last_user_message.contains("工具")
+                            && !last_user_message.contains("任务");
+                        
+                        if is_simple_chat {
+                            // 使用 AI 的分析内容作为回复，或者给出友好问候
+                            let reply = if thought.analysis.len() > 10 {
+                                format!("{}", thought.analysis)
+                            } else {
+                                "你好！我是你的 AI 助手。请问有什么我可以帮助你的吗？".to_string()
+                            };
+                            log::info!("[AgentReasoning:{}] 简单对话强制终止，生成友好回复", task_id);
+                            reply
+                        } else {
+                            // 迭代次数超限
+                            log::warn!("[AgentReasoning:{}] 达到最大迭代次数", task_id);
+                            "达到最大迭代次数，任务终止。请尝试简化您的需求或重新描述任务。".to_string()
+                        }
                     }
                     Action::ToolCall { .. } => unreachable!(),
                 };
@@ -475,6 +496,22 @@ impl RalphLoopExecutor {
             .collect::<Vec<_>>()
             .join("\n");
 
+        // 获取最后一条用户消息，用于判断是否是简单对话
+        let last_user_message = state.messages.iter()
+            .filter(|m| m.role == "user")
+            .last()
+            .map(|m| m.content.trim())
+            .unwrap_or("");
+        
+        // 判断是否是简单问候或对话
+        let is_simple_chat = last_user_message.len() < 50 
+            && !last_user_message.contains("工具")
+            && !last_user_message.contains("调用")
+            && !last_user_message.contains("任务")
+            && !last_user_message.contains("执行")
+            && !last_user_message.contains("文件")
+            && !last_user_message.contains("代码");
+
         format!(
 r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行动。
 
@@ -506,22 +543,29 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
 
 ## 行动类型说明
 - tool_call: 调用工具（需要提供 tool、args、id）
-- complete: 完成任务（需要提供完整答案）
-- continue: 继续思考（需要更多分析）
+- complete: 完成任务（需要提供完整答案）- **重要：简单对话、问候、闲聊直接用这个**
+- continue: 继续思考（仅当确实需要更多信息时才用）
 - fail: 任务失败（说明原因）
 
-## 注意事项
-1. 如果已经达到目标，请使用 complete
-2. 如果需要调用工具，请使用 tool_call
-3. 如果迭代次数接近限制（15 次），请优先选择 complete
-4. 如果无法继续，请使用 fail 并说明原因
+## 决策指南
+1. **简单对话/问候（如"你好"、"谢谢"、闲聊）→ 直接 complete，友好回复**
+2. **用户提出具体问题 → 分析后选择 tool_call 或 complete**
+3. **需要工具才能完成 → tool_call**
+4. **迭代次数 >= 10 → 必须 complete，给出当前最佳答案**
+5. **无法继续或无明确任务 → complete，询问用户需要什么帮助**
 
-请开始分析："#,
+## 当前判断
+用户最后消息："{}"
+是否为简单对话：{}
+
+请开始分析并给出 JSON 回复："#,
             state.task_id,
             state.available_tools.join(", "),
             state.iteration_count,
             state.tool_call_count,
             messages_preview,
+            last_user_message,
+            if is_simple_chat { "是 → 请直接 complete 回复" } else { "否 → 分析任务需求" }
         )
     }
 
@@ -549,10 +593,31 @@ r#"你是一个自主 AI 智能体。请分析当前状态并决定下一步行�
 
     /// 3. 终止判断
     fn should_terminate(&self, state: &EnvironmentState, thought: &Thought) -> bool {
+        // 获取最后一条用户消息
+        let last_user_message = state.messages.iter()
+            .filter(|m| m.role == "user")
+            .last()
+            .map(|m| m.content.trim())
+            .unwrap_or("");
+        
+        // 判断是否是简单对话（兜底逻辑）
+        let is_simple_chat = last_user_message.len() < 50 
+            && !last_user_message.contains("工具")
+            && !last_user_message.contains("调用")
+            && !last_user_message.contains("任务")
+            && !last_user_message.contains("执行")
+            && !last_user_message.contains("文件")
+            && !last_user_message.contains("代码");
+        
         match &thought.action {
             Action::Complete(_) => true,  // 任务完成
             Action::Fail(_) => true,       // 任务失败
             Action::Continue => {
+                // 关键修复：简单对话不应该 continue，强制终止
+                if is_simple_chat {
+                    log::info!("[AgentReasoning] 检测到简单对话但 AI 选择了 Continue，强制终止循环");
+                    return true;
+                }
                 // 检查资源耗尽
                 state.iteration_count >= 15 || state.tool_call_count >= 50
             }
