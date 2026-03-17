@@ -698,6 +698,8 @@ r#"你是 Alou AI 智能体，拥有记忆、上下文感知和自主决策能�
             state.iteration_count,
             state.tool_call_count,
             messages_preview,
+            simple_hint,
+            state.iteration_count,
         )
     }
 
