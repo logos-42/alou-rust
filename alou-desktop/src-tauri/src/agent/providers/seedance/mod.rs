@@ -3,17 +3,21 @@
 //! 即梦 (Jimeng) Seedance 1.0 视频生成 API
 //!
 //! 官方文档：
-//! - 302.AI API: https://doc.302.ai/305249446e0
 //! - 火山方舟：https://www.volcengine.com/docs/82379/1520757
+//! - 302.AI 代理：https://doc.302.ai/344076582e0
 //!
-//! API 端点：
+//! API 端点（火山方舟官方）：
+//! - 创建任务：POST https://ark.cn-beijing.volces.com/api/v3/videos/generations
+//! - 查询状态：GET https://ark.cn-beijing.volces.com/api/v3/videos/generations/{task_id}
+//!
+//! API 端点（302.AI 代理）：
 //! - 创建任务：POST https://api.302.ai/doubao/doubao-seedance
 //! - 查询状态：GET https://api.302.ai/doubao/doubao-seedance/{task_id}
 //!
 //! 支持模型：
-//! - seedance-1.0-pro: 标准版，2.2 PTC/1M tokens
-//! - seedance-1.0-pro-fast: 快速版，0.6 PTC/1M tokens
-//! - seedance-1.0-lite: 精简版，1.5 PTC/1M tokens
+//! - seedance-1.0-pro: 标准版
+//! - seedance-1.0-pro-fast: 快速版
+//! - seedance-1.0-lite: 精简版
 //!
 //! 认证方式：Bearer Token (API Key)
 
@@ -39,9 +43,20 @@ pub struct SeedanceConfig {
 
 impl SeedanceConfig {
     pub fn new(api_key: String, base_url: Option<String>) -> Self {
+        // 根据 API Key 前缀自动判断使用哪个端点
+        // 火山方舟 API Key 通常以 "ark-" 开头或不带前缀
+        // 302.AI API Key 通常较短
+        let default_url = if api_key.starts_with("ark-") || !api_key.contains("302") {
+            // 火山方舟官方 API
+            "https://ark.cn-beijing.volces.com/api/v3".to_string()
+        } else {
+            // 302.AI 代理 API
+            "https://api.302.ai/doubao".to_string()
+        };
+        
         Self {
             api_key,
-            base_url: base_url.unwrap_or_else(|| "https://api.302.ai/doubao".to_string()),
+            base_url: base_url.unwrap_or(default_url),
             default_model: "seedance-1.0-pro".to_string(),
         }
     }
@@ -165,25 +180,45 @@ impl SeedanceProvider {
         resolution: Option<String>,
         ratio: Option<String>,
     ) -> Result<String> {
-        let request = SeedanceVideoRequest {
-            model: model.unwrap_or_else(|| self.config.default_model.clone()),
-            content: vec![ContentItem::Text { text: prompt }],
-            resolution,
-            ratio,
-            duration,
-            generate_audio: Some(true),
-            service_tier: Some("default".to_string()),
+        // 判断使用哪个 API 格式
+        let is_volcengine = self.config.base_url.contains("volces.com");
+        
+        let url = if is_volcengine {
+            format!("{}/videos/generations", self.config.base_url)
+        } else {
+            format!("{}/doubao-seedance", self.config.base_url)
         };
 
-        let url = format!("{}/doubao-seedance", self.config.base_url);
-
         log::info!("[Seedance] 创建视频任务，URL: {}", url);
+        log::info!("[Seedance] 使用 API 类型：{}", if is_volcengine { "火山方舟官方" } else { "302.AI 代理" });
+
+        // 构建请求体
+        let request_body = if is_volcengine {
+            // 火山方舟官方 API 格式
+            serde_json::json!({
+                "model": model.unwrap_or_else(|| self.config.default_model.clone()),
+                "prompt": prompt,
+                "duration": duration.unwrap_or(5),
+                "ratio": ratio.unwrap_or_else(|| "adaptive".to_string()),
+                "generate_audio": true
+            })
+        } else {
+            // 302.AI 代理 API 格式
+            serde_json::json!({
+                "model": model.unwrap_or_else(|| self.config.default_model.clone()),
+                "content": vec![serde_json::json!({"type": "text", "text": prompt})],
+                "duration": duration,
+                "ratio": ratio,
+                "generate_audio": true,
+                "service_tier": "default"
+            })
+        };
 
         let response = self.client
             .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_key))
             .header("Content-Type", "application/json")
-            .json(&request)
+            .json(&request_body)
             .send()
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("网络请求失败：{}", e)))?;
@@ -191,24 +226,49 @@ impl SeedanceProvider {
         let status = response.status();
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
+            log::error!("[Seedance] API 响应错误 ({}): {}", status, error);
             return Err(AgentError::ExternalApiError(
                 format!("Seedance API 错误 ({}): {}", status, error)
             ));
         }
 
-        let result: SeedanceCreateResponse = response
+        let response_json: serde_json::Value = response
             .json()
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("解析响应失败：{}", e)))?;
 
-        log::info!("[Seedance] 任务创建成功，task_id: {}", result.id);
+        log::info!("[Seedance] API 响应：{:?}", response_json);
 
-        Ok(result.id)
+        // 根据不同 API 格式解析 task_id
+        let task_id = if is_volcengine {
+            // 火山方舟：{"id": "xxx", "data": {...}}
+            response_json["id"].as_str().unwrap_or_default().to_string()
+        } else {
+            // 302.AI: {"id": "xxx"}
+            response_json["id"].as_str().unwrap_or_default().to_string()
+        };
+
+        if task_id.is_empty() {
+            return Err(AgentError::ExternalApiError(
+                "未能获取 task_id".to_string()
+            ));
+        }
+
+        log::info!("[Seedance] 任务创建成功，task_id: {}", task_id);
+
+        Ok(task_id)
     }
 
     /// 查询任务状态
     pub async fn get_status(&self, task_id: &str) -> Result<MediaTask> {
-        let url = format!("{}/doubao-seedance/{}", self.config.base_url, task_id);
+        // 判断使用哪个 API 格式
+        let is_volcengine = self.config.base_url.contains("volces.com");
+        
+        let url = if is_volcengine {
+            format!("{}/videos/generations/{}", self.config.base_url, task_id)
+        } else {
+            format!("{}/doubao-seedance/{}", self.config.base_url, task_id)
+        };
 
         let response = self.client
             .get(&url)
@@ -220,41 +280,86 @@ impl SeedanceProvider {
         let status = response.status();
         if !status.is_success() {
             let error = response.text().await.unwrap_or_default();
+            log::error!("[Seedance] 查询状态失败 ({}): {}", status, error);
             return Err(AgentError::ExternalApiError(
                 format!("查询状态失败 ({}): {}", status, error)
             ));
         }
 
-        let status_response: SeedanceStatusResponse = response
+        let status_response: serde_json::Value = response
             .json()
             .await
             .map_err(|e| AgentError::ExternalApiError(format!("解析响应失败：{}", e)))?;
 
-        let status = match status_response.status.as_str() {
-            "succeeded" | "completed" => TaskStatus::Completed,
-            "failed" => TaskStatus::Failed,
-            "running" => TaskStatus::Processing,
+        log::info!("[Seedance] 任务状态响应：{:?}", status_response);
+
+        // 根据不同 API 格式解析状态
+        let status_str = if is_volcengine {
+            // 火山方舟：{"data": {"status": "xxx"}}
+            status_response["data"]["status"].as_str().unwrap_or("pending")
+        } else {
+            // 302.AI: {"status": "xxx"}
+            status_response["status"].as_str().unwrap_or("pending")
+        };
+
+        let status = match status_str {
+            "succeeded" | "completed" | "success" => TaskStatus::Completed,
+            "failed" | "error" => TaskStatus::Failed,
+            "running" | "processing" => TaskStatus::Processing,
             _ => TaskStatus::Pending,
         };
 
-        let result = if status == TaskStatus::Completed && status_response.video.is_some() {
-            let video = status_response.video.unwrap();
-            Some(MediaOutput {
-                media_type: MediaType::Video,
-                provider: "seedance".to_string(),
-                url: Some(video.play_addr),
-                file_path: None,
-                ipfs_cid: None,
-                metadata: MediaMetadata::default(),
-            })
+        // 解析结果
+        let result = if status == TaskStatus::Completed {
+            let video_info = if is_volcengine {
+                // 火山方舟：{"data": {"video": {"play_addr": "xxx", "cover": "xxx"}}}
+                &status_response["data"]["video"]
+            } else {
+                // 302.AI: {"video": {"play_addr": "xxx", "cover": "xxx"}}
+                &status_response["video"]
+            };
+
+            let play_addr = video_info["play_addr"].as_str().unwrap_or_default().to_string();
+            let cover = video_info["cover"].as_str().unwrap_or_default().to_string();
+
+            if !play_addr.is_empty() {
+                Some(MediaOutput {
+                    media_type: MediaType::Video,
+                    provider: "seedance".to_string(),
+                    url: Some(play_addr),
+                    file_path: None,
+                    ipfs_cid: None,
+                    metadata: MediaMetadata {
+                        width: video_info["width"].as_u64().map(|v| v as u32),
+                        height: video_info["height"].as_u64().map(|v| v as u32),
+                        duration: video_info["duration"].as_f64().map(|v| v as f32),
+                        ..Default::default()
+                    },
+                })
+            } else {
+                None
+            }
         } else {
             None
         };
 
+        // 解析错误
         let error = if status == TaskStatus::Failed {
-            status_response.error.map(|e| e.message)
+            let error_info = if is_volcengine {
+                &status_response["data"]["error"]
+            } else {
+                &status_response["error"]
+            };
+            Some(error_info["message"].as_str().unwrap_or("视频生成失败").to_string())
         } else {
             None
+        };
+
+        // 解析进度
+        let progress = if is_volcengine {
+            status_response["data"]["progress"].as_u64().unwrap_or(0) as f32
+        } else {
+            status_response["progress"].as_u64().unwrap_or(0) as f32
         };
 
         Ok(MediaTask {
@@ -266,7 +371,7 @@ impl SeedanceProvider {
             updated_at: chrono::Utc::now().timestamp(),
             result,
             error,
-            progress: status_response.progress.unwrap_or(0) as f32,
+            progress,
         })
     }
 
