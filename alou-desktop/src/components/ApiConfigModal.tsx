@@ -295,36 +295,69 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
     try {
       const invoke = await getInvoke()
       console.log('[ApiConfigModal] 开始加载配置...')
+      
+      // 加载文本配置
       const config = await invoke('get_agent_config')
-      console.log('[ApiConfigModal] 加载的配置:', config)
+      console.log('[ApiConfigModal] 加载的文本配置:', config)
 
       if (config && Array.isArray(config.user_apis)) {
         // 过滤掉媒体 Provider（它们应该保存在 media_config.json 中）
         const mediaProviders = ['seedance', 'google', 'jimeng', 'seedream', 'haimian', 'suno', 'stability', 'elevenlabs', 'minimax_music'];
         const textConfigs = config.user_apis.filter(api => !mediaProviders.includes(api.provider));
         const mediaConfigsInWrongPlace = config.user_apis.filter(api => mediaProviders.includes(api.provider));
-        
+
         // 如果有媒体配置被错误保存到文本配置中，提示用户
         if (mediaConfigsInWrongPlace.length > 0) {
           console.warn('[ApiConfigModal] 发现错误保存的媒体配置:', mediaConfigsInWrongPlace);
           console.log('[ApiConfigModal] 这些配置应该保存在 media_config.json 中，请重新保存');
         }
-        
+
         const loadedConfigs = textConfigs.map(api => ({
           ...api,
           base_url: api.base_url || '',
           enabled: api.is_active !== false,
         }))
-        console.log('[ApiConfigModal] 解析后的配置列表:', loadedConfigs)
+        console.log('[ApiConfigModal] 解析后的文本配置列表:', loadedConfigs)
         setApiConfigs(loadedConfigs)
-        
+
         // 如果没有配置，显示提示
         if (loadedConfigs.length === 0) {
-          console.log('[ApiConfigModal] 暂无 API 配置，请添加新的配置')
+          console.log('[ApiConfigModal] 暂无文本 API 配置，请添加新的配置')
         }
       } else {
         console.warn('[ApiConfigModal] 没有 user_apis 字段或不是数组', config)
         setApiConfigs([])
+      }
+      
+      // 加载媒体配置
+      try {
+        const mediaConfig = await invoke('get_media_config')
+        console.log('[ApiConfigModal] 加载的媒体配置:', mediaConfig)
+        
+        if (mediaConfig && mediaConfig.providers) {
+          const mediaProvidersList = Object.values(mediaConfig.providers).map((provider: any) => ({
+            id: `media_${provider.name}`,
+            provider: provider.name,
+            api_key: provider.api_key,
+            base_url: provider.base_url || '',
+            model: provider.model || '',
+            enabled: provider.enabled !== false,
+            is_active: false,
+            capabilities: provider.capabilities || [],
+            isMedia: true,
+          }))
+          console.log('[ApiConfigModal] 解析后的媒体配置列表:', mediaProvidersList)
+          
+          // 将媒体配置添加到列表中（如果当前在媒体标签页）
+          if (activeTab === 'media' || activeTab === 'all') {
+            setApiConfigs(prev => {
+              const existing = prev.filter(c => !c.isMedia)
+              return [...existing, ...mediaProvidersList]
+            })
+          }
+        }
+      } catch (err) {
+        console.warn('[ApiConfigModal] 加载媒体配置失败:', err)
       }
     } catch (err) {
       console.error('[ApiConfigModal] 加载配置失败:', err)
@@ -411,18 +444,57 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
 
     try {
       const invoke = await getInvoke()
-      const newConfigs = apiConfigs.filter(c => c.id !== id)
+      
+      // 判断是否是媒体配置
+      if (configToDelete.isMedia) {
+        // 删除媒体配置 - 从 media_config.json 中移除
+        console.log('[ApiConfigModal] 删除媒体配置:', configToDelete.provider)
+        
+        // 获取现有媒体配置
+        const mediaConfig = await invoke('get_media_config')
+        
+        // 删除指定的 provider
+        delete mediaConfig.providers[configToDelete.provider]
+        
+        // 保存更新后的配置
+        await invoke('update_media_config', { providers: mediaConfig.providers })
+        
+        // 更新本地状态
+        setApiConfigs(prev => prev.filter(c => c.id !== id))
+      } else {
+        // 删除文本配置
+        const newConfigs = apiConfigs.filter(c => c.id !== id && !c.isMedia)
 
-      await invoke('update_agent_config', {
-        config: {
-          user_apis: newConfigs,
-          workers_api: { base_url: '', enabled: false },
-          execution_strategy: 'LocalOnly',
-          default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
-        },
-      })
+        await invoke('update_agent_config', {
+          config: {
+            user_apis: newConfigs,
+            workers_api: { base_url: '', enabled: false },
+            execution_strategy: 'LocalOnly',
+            default_provider: newConfigs.find(c => c.is_active)?.provider || newConfigs[0]?.provider || 'deepseek',
+          },
+        })
 
-      setApiConfigs(newConfigs)
+        // 重新加载媒体配置并合并
+        try {
+          const mediaConfig = await invoke('get_media_config')
+          const mediaProvidersList = Object.values(mediaConfig.providers || {}).map((provider: any) => ({
+            id: `media_${provider.name}`,
+            provider: provider.name,
+            api_key: provider.api_key,
+            base_url: provider.base_url || '',
+            model: provider.model || '',
+            enabled: provider.enabled !== false,
+            is_active: false,
+            capabilities: provider.capabilities || [],
+            isMedia: true,
+          }))
+          
+          setApiConfigs([...newConfigs, ...mediaProvidersList])
+        } catch (err) {
+          setApiConfigs(newConfigs)
+        }
+      }
+      
       window.dispatchEvent(new CustomEvent('api-config-changed'))
 
       // 如果删除的是当前正在编辑的，重置为新增状态

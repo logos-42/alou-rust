@@ -738,10 +738,20 @@ export const useAgentMessages = ({
         }, targetAgentId)
       }
     } catch (error) {
-      const err = error as { name?: string; message?: string }
+      // 处理 Tauri 错误格式
+      let errName: string | undefined
+      let errMessage: string | undefined
+      
+      if (typeof error === 'string') {
+        errMessage = error
+      } else if (error && typeof error === 'object') {
+        const err = error as { name?: string; message?: string; error?: string }
+        errName = err.name
+        errMessage = err.message || err.error || JSON.stringify(error)
+      }
 
       // 用户主动取消
-      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+      if (errName === 'AbortError' || errName === 'CanceledError') {
         console.log('[useAgentMessages] 用户取消了智能体执行:', targetAgentId)
         appendMessage({
           id: `cancel_${Date.now()}`,
@@ -753,8 +763,8 @@ export const useAgentMessages = ({
         return
       }
 
-      const errorMessage = err?.message || '未知错误'
-      console.error('[useAgentMessages] 本地 AI 执行错误:', errorMessage)
+      const errorMessage = errMessage || '未知错误'
+      console.error('[useAgentMessages] 本地 AI 执行错误:', errorMessage, error)
 
       appendMessage({
         id: `error_${Date.now()}`,

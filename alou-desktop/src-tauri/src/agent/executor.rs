@@ -452,8 +452,15 @@ impl RalphLoopExecutor {
         ];
 
         // 注意：这里不传 tools，让 LLM 输出 JSON 格式的行动决策
-        let response = self.ai_client.send_message(messages, None).await
-            .map_err(|e| ExecutorError::AiError(e.to_string()))?;
+        log::info!("[AgentReasoning:{}] 开始调用 AI 模型...", state.task_id);
+        let response = match self.ai_client.send_message(messages, None).await {
+            Ok(resp) => resp,
+            Err(e) => {
+                log::error!("[AgentReasoning:{}] AI 调用失败: {:?}", state.task_id, e);
+                return Err(ExecutorError::AiError(format!("AI 请求失败: {}", e)));
+            }
+        };
+        log::info!("[AgentReasoning:{}] AI 调用成功，响应长度: {}", state.task_id, response.content.len());
 
         // 解析 LLM 输出的 JSON
         let thought = self.parse_thought(&response.content)?;
