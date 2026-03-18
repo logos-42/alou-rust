@@ -156,28 +156,7 @@ impl ReasoningLayer {
             });
         }
 
-        // 🔥 添加媒体工具定义（这些工具在 ToolBus 中，不在 ToolRegistry 中）
-        tools.push(AiTool {
-            name: "generate_image".to_string(),
-            description: "根据文字描述生成图片，支持风景、人物、艺术创作等。".to_string(),
-            parameters: Self::get_tool_parameters("generate_image"),
-        });
-        tools.push(AiTool {
-            name: "generate_audio".to_string(),
-            description: "文本转语音，支持多语言、多音色。".to_string(),
-            parameters: Self::get_tool_parameters("generate_audio"),
-        });
-        tools.push(AiTool {
-            name: "generate_video".to_string(),
-            description: "根据文字描述生成视频，支持风景、动画、特效等。".to_string(),
-            parameters: Self::get_tool_parameters("generate_video"),
-        });
-        tools.push(AiTool {
-            name: "get_video_status".to_string(),
-            description: "查询视频生成任务的状态。".to_string(),
-            parameters: Self::get_tool_parameters("get_video_status"),
-        });
-
+       
         // 如果 registry 为空，使用默认工具列表
         if tools.is_empty() {
             tools = Self::get_default_tools();
@@ -683,13 +662,21 @@ impl ReasoningLayer {
     async fn get_tools_description(
         &self,
         tools: &[String],
-        _tool_registry: Arc<crate::tools::ToolRegistry>,
+        tool_registry: Arc<crate::tools::ToolRegistry>,
     ) -> String {
         let mut desc = "\n## 可用工具\n".to_string();
 
+        // 添加 ToolRegistry 中的工具
         for tool_name in tools {
             desc.push_str(&format!("\n- {}", tool_name));
         }
+
+        // 🔥 添加媒体工具（这些工具在 ToolBus 中，不在 ToolRegistry 中）
+        desc.push_str("\n\n### 媒体工具\n");
+        desc.push_str("\n- generate_image: 根据文字描述生成图片，支持风景、人物、艺术创作等");
+        desc.push_str("\n- generate_audio: 文本转语音，支持多语言、多音色");
+        desc.push_str("\n- generate_video: 根据文字描述生成视频，支持风景、动画、特效等");
+        desc.push_str("\n- get_video_status: 查询视频生成任务的状态");
 
         desc
     }

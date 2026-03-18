@@ -10,16 +10,18 @@ interface AgentInfo {
 }
 
 /**
- * 创建智能体参数类型
+ * 创建智能体参数类型（与 handleCreateAgentSubmit 匹配）
  */
 interface CreateAgentParams {
   name: string;
   roleDescription: string;
-  avatarCid: null;
-  mcpConfigCid: null;
-  mcpPorts: never[];
-  diapIdentity: null;
-  tempId: null;
+  avatar_cid: string | null;
+  avatar_url: string | null;
+  mcp_config_cid: string | null;
+  mcp_ports: any[];
+  diapIdentity: any;
+  sessionId: string | null;
+  tempId: string | null;
   customPrompt?: string | null;
 }
 
@@ -27,7 +29,8 @@ interface CreateAgentParams {
  * Hook参数类型
  */
 interface UseAutoAgentCreatorParams {
-  onCreateAgent: (params: CreateAgentParams) => Promise<void>;
+  sessionId: string | null;
+  onCreateAgent: (params: CreateAgentParams) => Promise<any>;
 }
 
 /**
@@ -55,7 +58,7 @@ interface UseAutoAgentCreatorReturn {
  * @param params - 参数对象
  * @returns 自动创建状态和方法
  */
-export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams): UseAutoAgentCreatorReturn => {
+export const useAutoAgentCreator = ({ sessionId, onCreateAgent }: UseAutoAgentCreatorParams): UseAutoAgentCreatorReturn => {
   // ==================== 状态管理 ====================
   const [isAutoCreating, setIsAutoCreating] = useState<boolean>(false)
   const [autoCreationError, setAutoCreationError] = useState<string | null>(null)
@@ -98,18 +101,25 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
     setIsAutoCreating(true)
     setAutoCreationError(null)
 
+    console.log('[useAutoAgentCreator] 开始创建智能体, sessionId:', sessionId, 'agentInfo:', agentInfo)
+    
     try {
       // 使用默认值：没有头像、使用默认 MCP 配置
-      await onCreateAgent({
+      const createParams = {
         name: agentInfo.name,
         roleDescription: agentInfo.roleDescription,
-        avatarCid: null, // 没有头像
-        mcpConfigCid: null, // 使用默认配置
-        mcpPorts: [], // 空端口列表
+        avatar_cid: null, // 没有头像
+        avatar_url: null,
+        mcp_config_cid: null, // 使用默认配置
+        mcp_ports: [], // 空端口列表
         diapIdentity: null, // 自动创建 DIAP identity
+        sessionId: sessionId, // 传递 sessionId
         tempId: null, // 没有临时 ID
         customPrompt: agentInfo.customPrompt ?? null, // AI 生成的文档系统提示词
-      })
+      }
+      console.log('[useAutoAgentCreator] 调用 onCreateAgent, params:', createParams)
+      
+      await onCreateAgent(createParams)
       
       console.log('[useAutoAgentCreator] 智能体自动创建成功:', agentInfo.name)
       setLastCreatedAgent(agentInfo)
@@ -126,7 +136,7 @@ export const useAutoAgentCreator = ({ onCreateAgent }: UseAutoAgentCreatorParams
       creatingAgentsRef.current.delete(agentKey)
       setIsAutoCreating(false)
     }
-  }, [onCreateAgent])
+  }, [onCreateAgent, sessionId])
 
   // ==================== 状态重置 ====================
   const resetState = useCallback(() => {

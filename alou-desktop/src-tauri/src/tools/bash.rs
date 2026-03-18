@@ -40,6 +40,9 @@ impl BashTool {
     /// 执行命令
     async fn execute_command(&self, shell: &Shell, command: &str, working_dir: Option<&str>, env_vars: &[(String, String)]) -> Result<CommandResult, ToolError> {
         let start_time = std::time::Instant::now();
+        
+        log::info!("[BashTool] 开始执行命令：shell={:?}, command={}", shell, command);
+        log::info!("[BashTool] 工作目录：{:?}", working_dir);
 
         let mut cmd = match shell {
             Shell::Bash => {
@@ -121,6 +124,12 @@ impl BashTool {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let success = output.status.success();
+        
+        log::info!("[BashTool] 命令执行完成：success={}, exit_code={}", success, output.status.code().unwrap_or(-1));
+        log::info!("[BashTool] stdout: {}", stdout);
+        if !stderr.is_empty() {
+            log::info!("[BashTool] stderr: {}", stderr);
+        }
 
         Ok(CommandResult {
             success,
@@ -154,7 +163,10 @@ impl ToolExecutor for BashTool {
 
         match operation {
             BashOperation::Execute { shell, command, working_dir, environment, timeout_seconds } => {
-                self.execute_command_internal(shell, &command, working_dir.as_deref(), &environment, timeout_seconds).await
+                println!("[BashTool] 开始执行命令：shell={:?}, command={}", shell, command);
+                let result = self.execute_command_internal(shell, &command, working_dir.as_deref(), &environment, timeout_seconds).await;
+                println!("[BashTool] 命令执行完成：result={:?}", result.as_ref().map(|r| &r.success));
+                result
             }
         }
     }

@@ -409,6 +409,7 @@ const AgentChat = () => {
   // ==================== 自动创建智能体 Hook ====================
   // 使用专门的 hook 处理自动创建，便于 SDK 复用
   const autoAgentCreator = useAutoAgentCreator({
+    sessionId,
     onCreateAgent: handleCreateAgentSubmit,
   })
 

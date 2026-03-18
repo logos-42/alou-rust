@@ -178,6 +178,7 @@ impl ActionLayer {
         match tool_call_result {
             Ok(Ok(ToolCallResponse { success, result, error })) => {
                 log::info!("[ActionLayer] 工具执行成功：{}, success={}", tool, success);
+                log::info!("[ActionLayer] 工具返回结果：result={:?}, error={:?}", result, error);
                 log::info!("[ActionLayer] 工具参数：{}", serde_json::to_string(args).unwrap_or_default());
                 
                 // 🔥 如果是 agent_creator create 成功，通知前端更新侧边栏
@@ -191,7 +192,12 @@ impl ActionLayer {
                     if action_val == "create" {
                         log::info!("[ActionLayer] 检测到 agent_creator create 操作，准备发送事件");
                         
-                        if let Some(app_handle) = executor_core.app_handle() {
+                        let app_handle_opt = executor_core.app_handle();
+                        if app_handle_opt.is_none() {
+                            log::warn!("[ActionLayer] ⚠️ app_handle 不存在，无法发送 agent:created 事件！请检查 executor 初始化");
+                        }
+                        
+                        if let Some(app_handle) = app_handle_opt {
                             // 从 agent_config 对象中获取 display_name 和 description
                             let agent_config = args.get("agent_config").and_then(|v| v.as_object());
                             let display_name = agent_config

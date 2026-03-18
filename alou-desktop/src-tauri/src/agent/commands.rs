@@ -118,6 +118,7 @@ pub async fn execute_ai_conversation(
         .task_manager(task_manager.clone())
         .tool_bridge(tool_bridge)
         .tool_registry(Arc::new(crate::tools::ToolRegistry::new()))
+        .app_handle(app_handle.clone())  // 🔥 传递 app_handle 以便发送事件到前端
         .build() {
         Ok(exec) => exec,
         Err(e) => return Err(format!("创建执行器失败: {}", e)),

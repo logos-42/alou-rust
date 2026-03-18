@@ -1358,6 +1358,13 @@ ${errorMessage}
 
           // 通过 ref 获取最新回调，避免陈旧闭包导致 "Should have a queue" React 错误
           const cb = onAutoCreateAgentRef.current
+          console.log('[useAgentMessages] 检查回调和payload:', { 
+            hasCallback: !!cb, 
+            hasName: !!payload?.name,
+            payloadId: payload?.id,
+            payloadName: payload?.name 
+          })
+          
           if (cb && payload?.name) {
             try {
               // 只添加智能体到侧边栏，不要自动激活（autoActivate 默认为 false）
@@ -1365,13 +1372,16 @@ ${errorMessage}
               console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name, '自动激活:', shouldAutoActivate)
 
               // 调用回调添加智能体
-              await cb({
+              const agentInfo = {
                 name: payload.name,
                 // 同时传两种字段命名，兼容 useAutoAgentCreator (roleDescription) 和其他消费者 (role_description)
                 role_description: payload.role_description ?? '',
                 roleDescription: payload.role_description ?? '',
                 id: payload.id,
-              })
+              }
+              console.log('[useAgentMessages] 调用cb前的agentInfo:', agentInfo)
+              
+              await cb(agentInfo)
               
               console.log('[useAgentMessages] onAutoCreateAgent 调用完成')
             } catch (err) {

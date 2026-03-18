@@ -270,20 +270,19 @@ async fn execute_tool(
                 if tool_id == "agent_creator" {
                     if let Some(action) = args_value.get("action").and_then(|v| v.as_str()) {
                         if action == "create" {
-                            if let Some(agent_config) = data.get("agent_config") {
-                                let event_payload = serde_json::json!({
-                                    "name": agent_config.get("display_name").and_then(|v| v.as_str()).unwrap_or("New Agent"),
-                                    "role_description": agent_config.get("persona").and_then(|v| v.as_str()).unwrap_or(""),
-                                    "id": agent_config.get("id").and_then(|v| v.as_str()),
-                                    "display_name": agent_config.get("display_name").and_then(|v| v.as_str()),
-                                    "description": agent_config.get("description").and_then(|v| v.as_str()),
-                                    "avatar": agent_config.get("avatar").and_then(|v| v.as_str()).unwrap_or("🤖"),
-                                    "status": "ready",
-                                });
-                                
-                                println!("[Tauri] 发送 agent:created 事件：{:?}", event_payload);
-                                let _ = app.emit("agent:created", &event_payload);
-                            }
+                            // agent_creator 直接返回数据，没有 agent_config 包装
+                            let event_payload = serde_json::json!({
+                                "name": data.get("display_name").and_then(|v| v.as_str()).unwrap_or("New Agent"),
+                                "role_description": data.get("description").and_then(|v| v.as_str()).unwrap_or(""),
+                                "id": data.get("id").and_then(|v| v.as_str()),
+                                "display_name": data.get("display_name").and_then(|v| v.as_str()),
+                                "description": data.get("description").and_then(|v| v.as_str()),
+                                "avatar": data.get("avatar").and_then(|v| v.as_str()).unwrap_or("🤖"),
+                                "status": "ready",
+                            });
+                            
+                            println!("[Tauri] 发送 agent:created 事件：{:?}", event_payload);
+                            let _ = app.emit("agent:created", &event_payload);
                         }
                     }
                 }
