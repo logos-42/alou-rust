@@ -977,8 +977,16 @@ ${documentContents.project}
 - **broadcast_transaction**: 广播交易
 - **wallet_manager**: 钱包管理
 - **agent_wallet**: 智能体钱包操作
+- **agent_skills**: 执行技能（skill 执行后根据结果判断是否需要继续调用）
 
 ## 工具调用指南
+
+### 技能使用规范
+- **execute_skill**: 执行技能后，**仔细检查结果**
+  - 如果技能执行成功 ("success \= true") 且返回了有效数据 → **停止调用工具**，直接向用户汇报结果
+  - 如果技能执行失败 ("success \= false") → 分析错误原因，尝试修复或告知用户
+  - **不要反复调用同一个技能**，除非有新的输入参数
+  - 每个技能最多尝试 3 次，失败后向用户求助
 
 ### 文件操作示例
 - 读取文件：使用 read 工具

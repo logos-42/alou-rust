@@ -199,51 +199,7 @@ export const useAsyncTaskPolling = ({
       let hasFailure = false
       
       for (const toolCall of toolCalls) {
-        // 检查是否是媒体工具
-        const isMediaTool = ['generate_image', 'generate_audio', 'generate_video', 'get_video_status'].includes(toolCall.tool)
-
-        if (isMediaTool) {
-          // 使用 HTTP API 执行媒体工具
-          try {
-            console.log(`[MediaTool] 执行媒体工具：${toolCall.tool}`, toolCall.arguments)
-            
-            const response = await apiClient.post('/api/media/generate', {
-              tool: toolCall.tool,
-              args: toolCall.arguments,
-              timeout: 300000 // 媒体生成可能需要更长时间
-            })
-            
-            const result = {
-              tool: toolCall.tool,
-              success: response.data.success || false,
-              result: response.data.result || response.data,
-              error: response.data.error,
-              arguments: toolCall.arguments,
-              timestamp: Date.now(),
-              tool_call_id: toolCall.id,
-            }
-            
-            if (!result.success) {
-              hasFailure = true
-              console.error(`[MediaTool] 媒体工具执行失败：${toolCall.tool}`, result.error)
-            }
-            
-            toolResults.push(result)
-            continue // 继续下一个工具
-          } catch (mediaError) {
-            console.error(`[MediaTool] 媒体工具执行失败：${toolCall.tool}`, mediaError)
-            toolResults.push({
-              tool: toolCall.tool,
-              success: false,
-              error: (mediaError as Error).message,
-              arguments: toolCall.arguments,
-              timestamp: Date.now(),
-              tool_call_id: toolCall.id,
-            })
-            continue
-          }
-        }
-
+        // 🔥 所有工具统一通过 execute_tool 调用（包括媒体工具）
         try {
           // 使用 normalizeToolArguments 转换参数格式
           const normalizedArgs = normalizeToolArguments(toolCall.tool, toolCall.arguments)
@@ -253,10 +209,15 @@ export const useAsyncTaskPolling = ({
           console.log(`[pollAsyncTask] 转换后参数:`, JSON.stringify(normalizedArgs, null, 2))
 
           const { invoke } = await import('@tauri-apps/api/core')
+          // 媒体工具需要更长的超时时间
+          const timeout = toolCall.tool.includes('video') || toolCall.tool.includes('image') || toolCall.tool.includes('audio') 
+            ? 300000  // 5 分钟
+            : 30000   // 30 秒
+
           const toolResponse = await invoke<LocalToolResult>('execute_tool', {
             toolId: toolCall.tool,
             args: JSON.stringify(normalizedArgs),
-            timeout: 30000
+            timeout
           })
 
           const result = {
