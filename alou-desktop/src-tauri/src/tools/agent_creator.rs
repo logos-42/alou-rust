@@ -327,15 +327,15 @@ impl ToolExecutor for AgentCreatorTool {
                 Ok(ToolResult {
                     success: true,
                     data: serde_json::json!({
-                        "id": result.agent.id,
-                        "display_name": result.agent.display_name,
-                        "description": result.agent.description,
-                        "avatar": result.agent.avatar,
+                        "id": result.agent_id,
+                        "display_name": result.config.as_ref().map(|c| c.display_name.clone()).unwrap_or_default(),
+                        "description": result.config.as_ref().map(|c| c.description.clone()).unwrap_or_default(),
+                        "avatar": result.config.as_ref().and_then(|c| c.avatar.clone()).unwrap_or_default(),
                         "message": result.message
                     }),
                     error: None,
                     execution_time_ms: 0,
-                    output: Some(format!("Agent created successfully: {}", result.agent.display_name)),
+                    output: Some(format!("Agent created successfully: {}", result.config.as_ref().map(|c| c.display_name.clone()).unwrap_or_default())),
                     warnings: vec![],
                     context: None,
                 })
