@@ -286,15 +286,27 @@ export const useAgentMessages = ({
   // 当前频道的消息
   // 当没有选中智能体时，显示 'welcome' 虚拟频道的消息（用于对话式创建流程）
   const messages = useMemo(() => {
-    if (activeChannelId) {
-      return messagesByChannel[activeChannelId] || []
-    }
-    return messagesByChannel['welcome'] || []
+    const result = activeChannelId
+      ? messagesByChannel[activeChannelId] || []
+      : messagesByChannel['welcome'] || []
+    console.log('[useAgentMessages.messages] 消息更新:', {
+      activeChannelId,
+      messagesCount: result.length,
+      allChannels: Object.keys(messagesByChannel),
+    })
+    return result
   }, [messagesByChannel, activeChannelId])
 
   // 添加消息到指定频道
   const appendMessage = useCallback(
     (message: Message, channelId: string | null = activeChannelId) => {
+      console.log('[useAgentMessages.appendMessage] 添加消息:', {
+        messageId: message.id,
+        channelId,
+        activeChannelId,
+        messageType: message.type,
+        content: message.content.slice(0, 50),
+      })
       if (!channelId) {
         console.warn('[useAgentMessages] 无法添加消息：没有活动频道')
         return
@@ -302,9 +314,15 @@ export const useAgentMessages = ({
 
       setMessagesByChannel((prev) => {
         const channelMessages = prev[channelId] || []
+        const newMessages = [...channelMessages, message]
+        console.log('[useAgentMessages.appendMessage] 更新消息列表:', {
+          channelId,
+          beforeCount: channelMessages.length,
+          afterCount: newMessages.length,
+        })
         return {
           ...prev,
-          [channelId]: [...channelMessages, message],
+          [channelId]: newMessages,
         }
       })
 
@@ -526,11 +544,16 @@ export const useAgentMessages = ({
     const groupId = options?.groupId
 
     // 🔥 检查该智能体是否正在执行（每个 channel 的 agent 独立）
+    const currentLoadingState = loadingByAgent[targetAgentId]
     console.log('[useAgentMessages] 检查 loading 状态:', {
-      agentId: targetAgentId,
-      isLoading: loadingByAgent[targetAgentId],
+      targetAgentId,
+      activeChannelId,
+      loadingByAgentKeys: Object.keys(loadingByAgent),
+      loadingByAgentValues: loadingByAgent,
+      currentLoadingState,
+      willSkip: !!currentLoadingState,
     })
-    if (loadingByAgent[targetAgentId]) {
+    if (currentLoadingState) {
       console.log('[useAgentMessages] 智能体正在执行中，跳过:', targetAgentId)
       return
     }
@@ -1318,6 +1341,11 @@ ${errorMessage}
           const cb = onAutoCreateAgentRef.current
           if (cb && payload?.name) {
             try {
+              // 只添加智能体到侧边栏，不要自动激活（autoActivate 默认为 false）
+              const shouldAutoActivate = payload.autoActivate ?? false
+              console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name, '自动激活:', shouldAutoActivate)
+              
+              // 调用回调添加智能体
               await cb({
                 name: payload.name,
                 // 同时传两种字段命名，兼容 useAutoAgentCreator (roleDescription) 和其他消费者 (role_description)
@@ -1325,7 +1353,6 @@ ${errorMessage}
                 roleDescription: payload.role_description ?? '',
                 id: payload.id,
               })
-              console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name)
             } catch (err) {
               console.error('[useAgentMessages] 自动创建 Agent 失败:', err)
             }

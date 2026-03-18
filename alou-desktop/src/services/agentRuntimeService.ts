@@ -50,7 +50,7 @@ export interface GroupChatMessage {
 
 // 事件监听器管理
 let unlistenBackendMessage: UnlistenFn | null = null
-let messageHandlers: Set<(message: GroupChatMessage) => void> = new Set()
+const messageHandlers: Set<(message: GroupChatMessage) => void> = new Set()
 
 /**
  * 初始化 Agent Runtime

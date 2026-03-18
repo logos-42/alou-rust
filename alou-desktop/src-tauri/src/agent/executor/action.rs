@@ -190,6 +190,7 @@ impl ActionLayer {
                             let mut payload = serde_json::json!({
                                 "name": display_name,
                                 "role_description": description,
+                                "autoActivate": false, // 🔥 不要自动激活新智能体，避免循环创建
                             });
                             // 如果有 id，添加到 payload
                             if let Some(id) = agent_id {

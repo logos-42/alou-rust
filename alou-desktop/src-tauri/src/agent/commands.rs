@@ -68,6 +68,7 @@ pub async fn execute_ai_conversation(
     use super::task::TaskManager;
 
     log::info!("[Command] 执行 AI 对话：{}", &message[..20.min(message.len())]);
+    log::info!("[Command] session_id: {:?}, agent_id: {:?}", session_id, agent_id);
 
     let user_config = match serde_json::from_value::<UserApiConfig>(agent_config) {
         Ok(config) => config,
@@ -80,6 +81,7 @@ pub async fn execute_ai_conversation(
     };
 
     let target_session_id = session_id.or(agent_id).unwrap_or_else(|| format!("session_{}", chrono::Utc::now().timestamp()));
+    log::info!("[Command] 使用 session_id: {}", target_session_id);
 
     // 🔥 每个请求创建独立的任务管理器和执行器，实现真正的并发
     let task_manager = Arc::new(TaskManager::new());
@@ -128,6 +130,13 @@ pub async fn execute_ai_conversation(
         // StreamingExecutor not implemented yet
         Ok(serde_json::json!({
             "success": true,
+            "result": {
+                "task_id": task_id,
+                "success": true,
+                "result": "Streaming not implemented",
+                "error": None::<String>,
+                "iteration_count": 0,
+            },
             "task_id": task_id,
             "stream": false,
             "session_id": target_session_id,
@@ -139,9 +148,18 @@ pub async fn execute_ai_conversation(
         match executor.execute(&task_id).await {
             Ok(result) => {
                 log::info!("[Command] 对话执行成功：{}", task_id);
+                // 🔥 关键修复：返回嵌套的 result 对象，与前端期望的格式一致
+                // 前端期望：tauri_result.result.result (字符串)
                 Ok(serde_json::json!({
                     "success": true,
-                    "result": result,
+                    "result": {
+                        "task_id": task_id,
+                        "success": true,
+                        "result": result,  // AI 回复的字符串
+                        "error": None::<String>,
+                        "iteration_count": 0,
+                        "session_id": target_session_id,
+                    },
                     "task_id": task_id,
                     "session_id": target_session_id,
                     "timestamp": chrono::Utc::now().timestamp()
