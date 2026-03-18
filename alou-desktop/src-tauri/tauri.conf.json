@@ -30,10 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "app",
-      "dmg"
-    ],
+    "targets": ["app", "dmg"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -46,9 +43,7 @@
     "category": "Productivity",
     "shortDescription": "Web3 AI Agent Desktop Application",
     "longDescription": "Alou Desktop - A desktop application for Web3 AI agents with DIAP integration",
-    "resources": [
-      "kubo/*"
-    ],
+    "resources": ["kubo/*"],
     "externalBin": [],
     "macOS": {
       "signingIdentity": "-",
@@ -69,13 +64,10 @@
       "all": true
     },
     "fs": {
-      "all": true,
       "scope": {
         "allow": [
-          "/Users/apple/.alou/**",
-          "$HOME/.alou/*",
-          "$HOME/**",
-          "$HOME/*"
+          "$HOME/.alou/**",
+          "$HOME/.alou/*"
         ],
         "requireLiteralLeadingDot": false
       }
