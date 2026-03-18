@@ -234,12 +234,14 @@ impl BashTool {
                 "command": command,
                 "working_dir": working_dir,
             }),
-            error: if cmd_result.success { None } else { Some(format!("Command failed with exit code {}", cmd_result.exit_code)) },
+            error: if cmd_result.success { None } else { Some(format!("Command failed with exit code {}: {}", cmd_result.exit_code, cmd_result.stderr)) },
             execution_time_ms: cmd_result.execution_time_ms,
             output: Some(format!(
-                "Command executed in {}ms. Exit code: {}",
+                "Command executed in {}ms. Exit code: {}\n\nSTDOUT:\n{}\n\nSTDERR:\n{}",
                 cmd_result.execution_time_ms,
-                cmd_result.exit_code
+                cmd_result.exit_code,
+                cmd_result.stdout,
+                cmd_result.stderr
             )),
             warnings: vec![],
             context: None,
