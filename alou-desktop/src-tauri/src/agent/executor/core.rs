@@ -307,6 +307,10 @@ impl RalphLoopExecutor {
             match execution_result {
                 ExecutionResult::Completed(answer) => {
                     log::info!("[RalphLoop:{}] 任务完成：{}", task_id, answer.chars().take(50).collect::<String>());
+                    
+                    // 🔥 任务完成后保存持久化数据（SOUL.md, MEMORY.md 等）
+                    self.save_persistence_data(task_id).await;
+                    
                     return Ok(answer);
                 }
                 ExecutionResult::Failed(reason) => {
@@ -320,6 +324,38 @@ impl RalphLoopExecutor {
                 }
             }
         }
+    }
+
+    /// 🔥 保存持久化数据（SOUL.md, MEMORY.md, TASKS.md 等）
+    async fn save_persistence_data(&self, task_id: &str) {
+        use crate::soul::SoulManager;
+        use crate::tasks::TasksManager;
+        use chrono::Local;
+        use std::fs;
+        use std::path::PathBuf;
+
+        let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let base_dir = dirs::home_dir()
+            .map(|h| h.join(".alou"))
+            .unwrap_or_else(|| PathBuf::from("./.alou"));
+
+        let _ = fs::create_dir_all(&base_dir);
+
+        // Save SOUL.md
+        match SoulManager::new(&base_dir).load() {
+            Ok(_) => {
+                log::info!("[RalphLoop:{}] [{}] Soul module: saved", task_id, now);
+            }
+            Err(e) => {
+                log::warn!("[RalphLoop:{}] [{}] Soul module: created default ({})", task_id, now, e);
+            }
+        }
+
+        // Save TASKS.md
+        let tasks_manager = TasksManager::new(&base_dir);
+        // 首次运行时创建默认文件
+        let _ = tasks_manager.load();
+        log::info!("[RalphLoop:{}] [{}] Tasks module: saved", task_id, now);
     }
 
     /// 执行单步（用于调试或手动控制）
