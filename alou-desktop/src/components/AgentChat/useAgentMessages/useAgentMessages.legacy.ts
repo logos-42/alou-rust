@@ -57,6 +57,10 @@ function progressToText(e: AgentProgressPayload): string | null {
         tool_name: e.tool_name,
         preview: e.preview
       });
+      if (!e.tool_name) {
+        console.warn('[progressToText] tool_calling 缺少 tool_name 字段:', e)
+        return `⚙️ 调用工具中...`
+      }
       return `⚙️ 调用工具：**${e.tool_name}**`
     case 'tool_done':
       console.log(`[progressToText] tool_done:`, {
@@ -544,12 +548,11 @@ export const useAgentMessages = ({
     const groupId = options?.groupId
 
     // 🔥 检查该智能体是否正在执行（每个 channel 的 agent 独立）
-    const currentLoadingState = loadingByAgent[targetAgentId]
+    // 使用 isAgentLoading 函数而不是直接访问 loadingByAgent，避免闭包问题
+    const currentLoadingState = isAgentLoading(targetAgentId)
     console.log('[useAgentMessages] 检查 loading 状态:', {
       targetAgentId,
       activeChannelId,
-      loadingByAgentKeys: Object.keys(loadingByAgent),
-      loadingByAgentValues: loadingByAgent,
       currentLoadingState,
       willSkip: !!currentLoadingState,
     })
@@ -886,7 +889,7 @@ ${errorMessage}
     contextEventsRef,
     createSession,
     handleToolCalls,
-    loadingByAgent,
+    isAgentLoading,  // 使用函数而不是直接的 loadingByAgent
     messagesByChannel,
     onRateLimitExceeded,
     recordInteraction,
@@ -970,9 +973,23 @@ ${errorMessage}
   // 向后兼容的 sendMessage（发送到当前活动智能体）
   // 修改：接收 text 参数而不是依赖内部 currentMessage 状态
   const sendMessage = useCallback(async (text?: string) => {
+    console.log('[useAgentMessages.sendMessage] 被调用:', {
+      text,
+      activeChannelId,
+      selectedAgent: selectedAgent?.id,
+      isLoading,
+      isAgentLoadingResult: isAgentLoading(selectedAgent?.id || activeChannelId),
+    })
     // 如果没有传入 text，使用内部 currentMessage（向后兼容）
     const messageText = (text !== undefined ? text : currentMessage).trim()
-    if (!messageText || isLoading) {
+    // 🔥 修复：检查当前 agent 是否正在执行，而不是全局 isLoading
+    const currentAgentId = selectedAgent?.id || activeChannelId
+    if (!messageText || isAgentLoading(currentAgentId)) {
+      console.log('[useAgentMessages.sendMessage] 跳过：消息为空或 agent 正在执行', {
+        messageText: !!messageText,
+        isAgentLoading: isAgentLoading(currentAgentId),
+        currentAgentId,
+      })
       return
     }
 
