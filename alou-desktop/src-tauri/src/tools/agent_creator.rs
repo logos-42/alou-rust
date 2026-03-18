@@ -323,12 +323,19 @@ impl ToolExecutor for AgentCreatorTool {
                 let result = self.create_agent(config).await
                     .map_err(|e| ToolError::ExecutionFailed(e))?;
 
+                // 🔥 返回简洁的结果，避免大量空字段
                 Ok(ToolResult {
                     success: true,
-                    data: serde_json::json!(result),
+                    data: serde_json::json!({
+                        "id": result.agent.id,
+                        "display_name": result.agent.display_name,
+                        "description": result.agent.description,
+                        "avatar": result.agent.avatar,
+                        "message": result.message
+                    }),
                     error: None,
                     execution_time_ms: 0,
-                    output: Some(result.message.clone()),
+                    output: Some(format!("Agent created successfully: {}", result.agent.display_name)),
                     warnings: vec![],
                     context: None,
                 })
