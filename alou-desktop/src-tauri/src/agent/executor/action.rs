@@ -166,21 +166,38 @@ impl ActionLayer {
                         .unwrap_or("");
                     if action_val == "create" {
                         if let Some(app_handle) = executor_core.app_handle() {
-                            let display_name = args
-                                .get("display_name")
+                            // 从 agent_config 对象中获取 display_name 和 description
+                            let agent_config = args.get("agent_config").and_then(|v| v.as_object());
+                            let display_name = agent_config
+                                .and_then(|c| c.get("display_name"))
                                 .and_then(|v| v.as_str())
+                                .or_else(|| args.get("display_name").and_then(|v| v.as_str()))
                                 .unwrap_or("New Agent")
                                 .to_string();
-                            let description = args
-                                .get("description")
+                            let description = agent_config
+                                .and_then(|c| c.get("description"))
                                 .and_then(|v| v.as_str())
+                                .or_else(|| args.get("description").and_then(|v| v.as_str()))
                                 .unwrap_or("")
                                 .to_string();
+                            // 获取 agent_id（如果有）
+                            let agent_id = agent_config
+                                .and_then(|c| c.get("id"))
+                                .and_then(|v| v.as_str())
+                                .or_else(|| args.get("agent_id").and_then(|v| v.as_str()))
+                                .map(|s| s.to_string());
 
-                            let payload = serde_json::json!({
+                            let mut payload = serde_json::json!({
                                 "name": display_name,
                                 "role_description": description,
                             });
+                            // 如果有 id，添加到 payload
+                            if let Some(id) = agent_id {
+                                if let serde_json::Value::Object(ref mut map) = payload {
+                                    map.insert("id".to_string(), serde_json::Value::String(id));
+                                }
+                            }
+                            
                             if let Err(e) = app_handle.emit("agent:created", &payload) {
                                 log::warn!("[ActionLayer] 发送 agent:created 事件失败：{}", e);
                             } else {
