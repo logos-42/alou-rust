@@ -7,6 +7,7 @@ interface AgentInfo {
   name: string;
   roleDescription: string;
   customPrompt?: string | null;
+  id?: string | null;
 }
 
 /**
@@ -23,6 +24,7 @@ interface CreateAgentParams {
   sessionId: string | null;
   tempId: string | null;
   customPrompt?: string | null;
+  id?: string | null; // 来自 agent:created 事件的 ID
 }
 
 /**
@@ -116,6 +118,7 @@ export const useAutoAgentCreator = ({ sessionId, onCreateAgent }: UseAutoAgentCr
         sessionId: sessionId, // 传递 sessionId
         tempId: null, // 没有临时 ID
         customPrompt: agentInfo.customPrompt ?? null, // AI 生成的文档系统提示词
+        id: agentInfo.id ?? null, // 传递 id（来自事件）
       }
       console.log('[useAutoAgentCreator] 调用 onCreateAgent, params:', createParams)
       

@@ -912,7 +912,16 @@ export const useChannelManager = ({
 
   // 创建智能体
   const handleCreateAgentSubmit = useCallback(
-    async ({ name, roleDescription, avatar_cid, avatar_url, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId, customPrompt }) => {
+    async ({ name, roleDescription, avatar_cid, avatar_url, mcp_config_cid, mcp_ports, diapIdentity, sessionId, tempId, customPrompt, id: agentIdFromEvent }) => {
+      console.log('[useChannelManager] handleCreateAgentSubmit 接收到的参数:', { 
+        name, 
+        roleDescription, 
+        agentIdFromEvent,
+        sessionId,
+        diapIdentity,
+        tempId 
+      })
+      
       // 生成唯一键用于去重检查
       const agentKey = `${name}_${roleDescription}`.toLowerCase().trim()
 
@@ -989,7 +998,9 @@ export const useChannelManager = ({
         const diapCid = diapIdentityData?.cid || diapIdentityData?.CID
 
         // 生成统一的 ID（与 buildChannelFromAgent 保持一致）
-        const unifiedId = diapIpns || diapDid || diapCid || tempId
+        // 优先级：diapIpns > diapDid > diapCid > tempId > 传入的agentIdFromEvent
+        const unifiedId = diapIpns || diapDid || diapCid || tempId || agentIdFromEvent
+        console.log('[useChannelManager] unifiedId:', unifiedId)
 
         const metadata: any = {
           // 关键：设置统一的 ID（用于存储和删除）
