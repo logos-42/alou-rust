@@ -1,36 +1,12 @@
-//! Tasks - 任务管理（占位符）
+//! Tasks - 任务管理
 //!
-//! TODO: 实现实际的任务管理
+//! 负责任务的创建、执行、监控和持久化
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
+pub mod types;
+pub mod manager;
+pub mod queue;
+pub mod executor;
+pub mod unified_task;
 
-/// 任务管理器（占位符）
-pub struct TasksManager {
-    tasks: Arc<RwLock<Vec<TaskInfo>>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TaskInfo {
-    pub id: String,
-    pub name: String,
-    pub status: String,
-}
-
-impl TasksManager {
-    pub fn new() -> Self {
-        Self {
-            tasks: Arc::new(RwLock::new(vec![])),
-        }
-    }
-    
-    pub async fn list_tasks(&self) -> Vec<TaskInfo> {
-        self.tasks.read().await.clone()
-    }
-}
-
-impl Default for TasksManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub use manager::TasksManager;
+pub use types::{Task, TaskStatus};

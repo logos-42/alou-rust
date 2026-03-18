@@ -14,6 +14,7 @@ use crate::tools::{
     query_blockchain::QueryBlockchainTool, build_transaction::BuildTransactionTool,
     broadcast_transaction::BroadcastTransactionTool,
 };
+use crate::agent_runtime::tool_bus::ToolBus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
@@ -24,19 +25,25 @@ pub struct ToolBridge {
     registry: ToolRegistry,
     execution_manager: ToolExecutionManager,
     request_count: Arc<AtomicU64>,
+    tool_bus: Option<Arc<ToolBus>>,
 }
 
 impl ToolBridge {
     /// 创建新的工具桥接（同步版本，用于 Tauri setup）
     pub fn new_sync(config: ToolBridgeConfig) -> Self {
+        Self::new_sync_with_toolbus(config, None)
+    }
+
+    /// 创建新的工具桥接（带 ToolBus）
+    pub fn new_sync_with_toolbus(config: ToolBridgeConfig, tool_bus: Option<Arc<ToolBus>>) -> Self {
         let mut bridge = Self {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
+            tool_bus: tool_bus.clone(),
         };
 
         // 在同步上下文中注册工具
-        // 注意：这里使用 blocking_register 来避免异步问题
         let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
         rt.block_on(async {
             if let Err(e) = bridge.register_all_tools().await {
@@ -68,16 +75,38 @@ impl ToolBridge {
 
         // 创建执行上下文
         let context = ExecutionContext {
-            session_id: request.session_id,
-            user_id: request.user_id,
-            working_directory: request.working_directory,
-            environment: request.environment,
+            session_id: request.session_id.clone(),
+            user_id: request.user_id.clone(),
+            working_directory: request.working_directory.clone(),
+            environment: request.environment.clone(),
             timeout_seconds: request.timeout_seconds,
-            permissions: request.permissions,
+            permissions: request.permissions.clone(),
             timestamp: chrono::Utc::now().timestamp(),
         };
 
-        // 执行工具
+        // 1. 先尝试 ToolBus（媒体工具等）
+        if let Some(tool_bus) = &self.tool_bus {
+            match tool_bus.execute(&request.tool_id, request.args.clone()).await {
+                Ok(result) => {
+                    return Ok(ToolCallResponse {
+                        success: true,
+                        result: Some(ToolResult {
+                            success: true,
+                            data: result,
+                            error: None,
+                            execution_time_ms: 0,
+                            output: None,
+                            warnings: vec![],
+                            context: None,
+                        }),
+                        error: None,
+                    });
+                }
+                Err(_) => {}
+            }
+        }
+
+        // 2. Fallback 到 ToolRegistry
         match self.execution_manager.execute_tool(&request.tool_id, request.args, context).await {
             Ok(result) => Ok(ToolCallResponse {
                 success: true,
@@ -194,6 +223,25 @@ impl ToolBridge {
         // 注册交易广播工具
         let broadcast_transaction_tool = Arc::new(BroadcastTransactionTool::new());
         self.register_tool(broadcast_transaction_tool).await?;
+
+        // 注册媒体工具（需要 ProviderRegistry）
+        if let Some(provider_reg) = &self.provider_registry {
+            let generate_image_tool = Arc::new(GenerateImageTool::new(provider_reg.clone()));
+            self.register_tool(generate_image_tool).await?;
+
+            let generate_audio_tool = Arc::new(GenerateAudioTool::new(provider_reg.clone()));
+            self.register_tool(generate_audio_tool).await?;
+
+            let generate_video_tool = Arc::new(GenerateVideoTool::new(provider_reg.clone()));
+            self.register_tool(generate_video_tool).await?;
+
+            let get_video_status_tool = Arc::new(GetVideoStatusTool::new(provider_reg.clone()));
+            self.register_tool(get_video_status_tool).await?;
+
+            println!("✅ Media tools registered with ProviderRegistry");
+        } else {
+            println!("⚠️ ProviderRegistry not available, skipping media tools registration");
+        }
 
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())

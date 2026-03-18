@@ -333,7 +333,7 @@ impl RalphLoopExecutor {
     /// 🔥 保存持久化数据（SOUL.md, MEMORY.md, TASKS.md 等）
     async fn save_persistence_data(&self, task_id: &str) {
         use crate::soul::SoulManager;
-        use crate::tasks::TasksManager;
+        use crate::tasks::manager::TasksManager;
         use chrono::Local;
         use std::fs;
         use std::path::PathBuf;
@@ -365,7 +365,7 @@ impl RalphLoopExecutor {
     /// 🔥 加载文档到缓存上下文（执行前准备）
     async fn load_context_documents(&self, task_id: &str) -> ContextDocuments {
         use crate::soul::SoulManager;
-        use crate::tasks::TasksManager;
+        use crate::tasks::manager::TasksManager;
         use chrono::Local;
         use std::fs;
         use std::path::PathBuf;

@@ -95,7 +95,7 @@ use crate::workflow::{
     rollback_ralph_loop_execution, cleanup_ralph_loop_histories,
     start_workflow_event_listener,
 };
-use crate::bridges::{BridgeManager, create_default_bridge_manager};
+use crate::bridges::{BridgeManager, create_default_bridge_manager, create_default_bridge_manager_with_provider};
 use crate::tools::task_queue_tool::{initialize_task_queue_tool, add_task, get_next_task, update_task_status, set_task_result, list_tasks, get_task_stats, get_task_by_id};
 use crate::memory_manager::{
     set_memory_item, get_memory_item, remove_memory_item, clear_memory,
@@ -570,6 +570,26 @@ async fn agent_skills(
     }
 }
 fn main() {
+    // 尝试加载 ProviderRegistry 用于媒体工具
+    let provider_registry_for_bridge = match crate::agent::media_config::MediaApiConfig::load() {
+        Ok(media_config) => {
+            match crate::agent::providers::ProviderRegistry::new(&media_config) {
+                Ok(registry) => {
+                    log::info!("ProviderRegistry 创建成功（用于全局 BridgeManager）");
+                    Some(std::sync::Arc::new(registry))
+                }
+                Err(e) => {
+                    log::warn!("Failed to create ProviderRegistry: {}, media tools will not be available", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to load MediaApiConfig: {}, media tools will not be available", e);
+            None
+        }
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
@@ -581,10 +601,10 @@ fn main() {
         }))
         .manage(KvState::new())
         .manage(WorkflowState::default())
-        .manage(AsyncWorkflowExecutor::new().expect("Failed to create workflow executor"))
-        .manage(std::sync::Arc::new(create_default_bridge_manager()))
+        .manage(AsyncWorkflowExecutor::new_with_provider(provider_registry_for_bridge.clone()).expect("Failed to create workflow executor"))
+        .manage(std::sync::Arc::new(create_default_bridge_manager_with_provider(provider_registry_for_bridge.clone())))
         .manage(std::sync::Arc::new(SessionRouter::new(
-            std::sync::Arc::new(create_default_bridge_manager()),
+            std::sync::Arc::new(create_default_bridge_manager_with_provider(provider_registry_for_bridge.clone())),
             std::sync::Arc::new(crate::tools::ToolRegistry::new()),
         )))
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))

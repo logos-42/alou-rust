@@ -70,6 +70,7 @@ impl PerceptionLayer {
             tool_call_count,
             available_tools,
             retrieved_context,
+            context_documents: crate::agent::executor::types::ContextDocuments::default(),
         })
     }
 
@@ -107,6 +108,7 @@ impl PerceptionLayer {
             tool_call_count,
             available_tools,
             retrieved_context: RetrievedContext::default(),
+            context_documents: crate::agent::executor::types::ContextDocuments::default(),
         })
     }
 

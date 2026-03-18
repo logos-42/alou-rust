@@ -448,7 +448,8 @@ impl ReasoningLayer {
                 "type": "object",
                 "properties": {
                     "action": { "type": "string", "enum": ["read", "update"], "description": "read=读取文档内容，update=更新文档内容" },
-                    "document_type": { "type": "string", "enum": ["soul", "identity", "capabilities", "constraints", "tools", "memory", "agents"], "description": "要读取/更新的文档类型" },
+                    // 🔥 更新：支持所有 11 个文档类型
+                    "document_type": { "type": "string", "enum": ["soul", "identity", "capabilities", "constraints", "tools", "memory", "agents", "ipfs", "user", "project", "key"], "description": "要读取/更新的文档类型（支持：soul/identity/capabilities/constraints/tools/memory/agents/ipfs/user/project/key）" },
                     "new_content": { "type": "string", "description": "新文档内容（Markdown 格式，update 时必填）" },
                     "reason": { "type": "string", "description": "更新原因（建议填写）" }
                 },

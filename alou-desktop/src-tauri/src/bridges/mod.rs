@@ -61,10 +61,15 @@ pub struct BridgeManager {
 impl BridgeManager {
     /// 创建新的桥接管理器
     pub fn new(config: BridgeConfig) -> Self {
+        Self::new_with_provider(config, None)
+    }
+
+    /// 创建新的桥接管理器（带 ProviderRegistry）
+    pub fn new_with_provider(config: BridgeConfig, provider_registry: Option<Arc<crate::agent::providers::ProviderRegistry>>) -> Self {
         let semaphore = Arc::new(Semaphore::new(config.max_concurrent_calls));
-        
+
         Self {
-            tool_bridge: Arc::new(ToolBridge::new_sync(config.tool_bridge.clone())),
+            tool_bridge: Arc::new(ToolBridge::new_sync_with_provider(config.tool_bridge.clone(), provider_registry)),
             context_bridge: Arc::new(ContextBridge::new(config.context_bridge.clone())),
             config: Arc::new(config),
             semaphore,
@@ -142,7 +147,12 @@ pub struct ComponentHealthStatus {
 
 /// 创建默认桥接管理器
 pub fn create_default_bridge_manager() -> BridgeManager {
-    BridgeManager::new(BridgeConfig {
+    create_default_bridge_manager_with_provider(None)
+}
+
+/// 创建默认桥接管理器（带 ProviderRegistry）
+pub fn create_default_bridge_manager_with_provider(provider_registry: Option<Arc<crate::agent::providers::ProviderRegistry>>) -> BridgeManager {
+    BridgeManager::new_with_provider(BridgeConfig {
         tool_bridge: ToolBridgeConfig::default(),
         context_bridge: ContextBridgeConfig::default(),
         enabled: true,
@@ -151,7 +161,7 @@ pub fn create_default_bridge_manager() -> BridgeManager {
         max_retries: 3,
         retry_delay_ms: 1000,
         debug_mode: false,
-    })
+    }, provider_registry)
 }
 
 /// 桥接事件类型
