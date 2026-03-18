@@ -186,9 +186,11 @@ export const useAgentMessages = ({
   const [currentMessage, setCurrentMessage] = useState('')
   // 全局 loading 状态（向后兼容）
   const [isLoading, setIsLoading] = useState(false)
-  // 按智能体存储 loading 状态：Map<channelId, boolean>
+  // 🔥 按 agent 存储 loading 状态：每个 channel 的 agent 独立执行
+  // 由于每个 channel 对应一个不同的 agent，所以用 agentId 作为 key 即可实现隔离
   const [loadingByAgent, setLoadingByAgent] = useState<Record<string, boolean>>({})
-  // 按智能体存储 session：Map<channelId, sessionId>
+  // 🔥 按 agent 存储 session：每个 channel 的 agent 有独立的 session
+  // key: agentId (也是 channelId，因为一一对应)
   const [sessionsByAgent, setSessionsByAgent] = useState<Record<string, string>>({})
   // 按智能体缓存系统提示词（包含记忆注入）：Map<channelId, string>
   const [systemPromptCache, setSystemPromptCache] = useState<Record<string, string>>({})
@@ -261,12 +263,19 @@ export const useAgentMessages = ({
   const updateAgent = useAgentStore((state) => state.updateAgent)
   
   // 获取指定智能体的 loading 状态
+  // 🔥 获取指定智能体的 loading 状态（每个 channel 的 agent 独立）
   const isAgentLoading = useCallback((agentId: string) => {
     return loadingByAgent[agentId] || false
   }, [loadingByAgent])
-  
-  // 设置指定智能体的 loading 状态
+
+  // 🔥 设置指定智能体的 loading 状态（每个 channel 的 agent 独立）
   const setAgentLoading = useCallback((agentId: string, loading: boolean) => {
+    console.log('[useAgentMessages.setAgentLoading]', {
+      agentId,
+      activeChannelId,
+      loading,
+      before: loadingByAgent[agentId],
+    })
     setLoadingByAgent(prev => ({ ...prev, [agentId]: loading }))
     // 同时更新全局 loading（如果是当前活动智能体）
     if (agentId === activeChannelId) {
@@ -494,6 +503,19 @@ export const useAgentMessages = ({
    * 自动检测是否需要集群行动
    */
   const sendMessageToAgent = useCallback(async (targetAgentId: string, text: string, targetAgent: Agent | null = null, options?: { groupId?: string; isGroupChat?: boolean; originalMessage?: string }) => {
+    console.log('[useAgentMessages.sendMessageToAgent] ========== 开始发送消息 ==========')
+    console.log('[useAgentMessages.sendMessageToAgent] 参数:', {
+      targetAgentId,
+      text: text.slice(0, 50),
+      options,
+    })
+    console.log('[useAgentMessages.sendMessageToAgent] 当前状态:', {
+      activeChannelId,
+      sessionId,
+      sessionsByAgent: Object.keys(sessionsByAgent),
+      loadingByAgent: Object.keys(loadingByAgent),
+    })
+
     if (!text?.trim() || !targetAgentId) {
       console.warn('[useAgentMessages] 无法发送消息：缺少文本或目标智能体')
       return
@@ -503,7 +525,11 @@ export const useAgentMessages = ({
     const isGroupChat = options?.isGroupChat || false
     const groupId = options?.groupId
 
-    // 检查该智能体是否正在执行
+    // 🔥 检查该智能体是否正在执行（每个 channel 的 agent 独立）
+    console.log('[useAgentMessages] 检查 loading 状态:', {
+      agentId: targetAgentId,
+      isLoading: loadingByAgent[targetAgentId],
+    })
     if (loadingByAgent[targetAgentId]) {
       console.log('[useAgentMessages] 智能体正在执行中，跳过:', targetAgentId)
       return
@@ -533,13 +559,13 @@ export const useAgentMessages = ({
 
     // 直接调用后端 API 进行单智能体聊天
     try {
-      // 获取或创建该智能体的 session
-      let agentSessionId = sessionsByAgent[targetAgentId] || sessionId
-      
+      // 🔥 获取或创建该智能体的 session（每个 channel 的 agent 独立）
+      let agentSessionId = sessionsByAgent[targetAgentId]
+
       // 如果没有有效的 session，创建一个新的
       if (!agentSessionId || agentSessionId.startsWith('frontend_')) {
         try {
-          console.log('[useAgentMessages] 为智能体创建新会话:', targetAgentId)
+          console.log('[useAgentMessages] 为智能体创建新会话:', targetAgentId, 'channel:', activeChannelId)
           await createSession()
           setSessionReady(true)
           await new Promise((resolve) => setTimeout(resolve, 100))
@@ -558,10 +584,10 @@ export const useAgentMessages = ({
         }
       }
 
-      // 保存该智能体的 session
+      // 🔥 保存该智能体的 session
       setSessionsByAgent(prev => ({ ...prev, [targetAgentId]: agentSessionId }))
 
-      console.log('[useAgentMessages] 发送消息，sessionId:', agentSessionId, '智能体:', targetAgentId)
+      console.log('[useAgentMessages] 发送消息，sessionId:', agentSessionId, '智能体:', targetAgentId, 'channel:', activeChannelId)
 
       // 创建 AbortController 用于终止请求
       const abortController = new AbortController()
@@ -670,6 +696,13 @@ export const useAgentMessages = ({
         base_url: sanitizedBaseUrl || '(使用默认)',
       })
       
+      console.log('[useAgentMessages] 调用 execute_ai_conversation:', {
+        agentId: agentInfo?.id || targetAgentId,
+        sessionId: sessionId,  // 全局 session（来自 SessionContext）
+        agentSessionId: agentSessionId,  // ← 这是每个 agent 独立的 session
+        targetAgentId,
+      })
+
       const tauri_result = await invoke<{
         success: boolean
         result?: {
@@ -700,7 +733,7 @@ export const useAgentMessages = ({
         messages: messagesArray,    // 完整上下文数组（优先使用）
         options: { stream: false },
         agentId: agentInfo?.id || targetAgentId,  // 传递智能体 ID
-        sessionId: sessionId,       // ← 新增：传递当前 session_id
+        sessionId: agentSessionId,  // ← 修复：传递每个 agent 独立的 session，而不是全局 sessionId
       })
 
       console.log('[useAgentMessages] Tauri AI 响应:', tauri_result)
@@ -1154,8 +1187,8 @@ ${errorMessage}
 
       // 使用异步消息队列处理群聊消息（非阻塞，支持并行）
       console.log('[useAgentMessages] 触发智能体处理群聊消息（异步并行）:', agentId, messageContent.slice(0, 50))
-      
-      // 获取智能体的 session
+
+      // 🔥 获取智能体的 session（每个 channel 的 agent 独立）
       let agentSessionId = sessionsByAgent[agentId] || sessionId
       if (!agentSessionId || agentSessionId.startsWith('frontend_')) {
         agentSessionId = sessionId

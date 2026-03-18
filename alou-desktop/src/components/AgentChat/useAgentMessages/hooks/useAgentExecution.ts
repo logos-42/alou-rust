@@ -264,8 +264,21 @@ export function useAgentExecution({
     const controller = abortControllersByAgent.current[agentId]
     if (controller) {
       controller.abort()
+      delete abortControllersByAgent.current[agentId]
       console.log('[cancelAgentExecution] 已取消智能体执行:', agentId)
     }
+    
+    // 同时取消可能的轮询任务（如果有）
+    if (typeof window !== 'undefined') {
+      // 清理可能的 setTimeout
+      const timeoutId = (window as any)[`polling_${agentId}`]
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        delete (window as any)[`polling_${agentId}`]
+      }
+    }
+    
+    console.log('[cancelAgentExecution] 已清理智能体相关任务:', agentId)
   }, [])
 
   return {

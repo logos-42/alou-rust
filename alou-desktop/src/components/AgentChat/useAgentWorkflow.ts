@@ -59,6 +59,7 @@ interface WorkflowPanelConfig {
   retryStep: (workflowId: string, stepId: string, apiKey?: string, agentInfo?: AgentInfo) => Promise<unknown>;
   pauseWorkflow: (workflowId: string) => Promise<unknown>;
   resumeWorkflow: (workflowId: string, apiKey?: string, agentInfo?: AgentInfo) => Promise<unknown>;
+  cancelWorkflow: (executionId: string) => Promise<unknown>;
   startExecutionPolling: (executionId: string) => void;
   stopExecutionPolling: (executionId: string) => void;
   handleWorkflowMessage: (message: unknown) => void;
@@ -134,6 +135,7 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    cancelWorkflow,
     startExecutionPolling,
     stopExecutionPolling,
   } = useWorkflow({
@@ -236,6 +238,7 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    cancelWorkflow,
     startExecutionPolling,
     stopExecutionPolling,
     handleWorkflowMessage,
@@ -255,6 +258,7 @@ export const useAgentWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    // cancelWorkflow 是稳定的 useCallback，不需要放在依赖数组中
     startExecutionPolling,
     stopExecutionPolling,
     handleWorkflowMessage,

@@ -407,6 +407,55 @@ export const useWorkflow = ({
     }
   }, [executionPolling])
 
+  // 取消工作流执行
+  const cancelWorkflow = useCallback(async (executionId: string) => {
+    if (!sessionId) return
+
+    try {
+      const response = await workflowService.cancelExecution(executionId)
+
+      if (response.success) {
+        onWorkflowMessage?.({
+          type: 'workflow_cancelled',
+          workflowId: executionId
+        })
+
+        // 停止轮询
+        stopExecutionPolling(executionId)
+
+        // 清除执行进度
+        setExecutionProgress(prev => {
+          const newProgress = { ...prev }
+          // 找到对应的工作流 ID 并清除
+          const workflowId = Object.keys(newProgress).find(
+            key => newProgress[key].executionId === executionId
+          )
+          if (workflowId) {
+            delete newProgress[workflowId]
+          }
+          return newProgress
+        })
+
+        setExecutingWorkflowId(null)
+      } else {
+        onWorkflowMessage?.({
+          type: 'cancel_error',
+          workflowId: executionId,
+          error: response.error
+        })
+      }
+
+    } catch (error) {
+      console.error('[useWorkflow] 取消工作流异常:', error)
+      onWorkflowMessage?.({
+        type: 'cancel_error',
+        workflowId: executionId,
+        error
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, onWorkflowMessage, stopExecutionPolling])
+
   // 开始执行状态轮询
   const startExecutionPolling = useCallback((executionId: string, workflowId: string) => {
     if (executionPolling[executionId]) {
@@ -639,6 +688,7 @@ export const useWorkflow = ({
     retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    cancelWorkflow,
     clearPolling,
     startPolling,
     // 异步执行相关方法

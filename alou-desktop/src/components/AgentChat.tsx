@@ -536,6 +536,7 @@ const AgentChat = () => {
     _retryStep,
     pauseWorkflow,
     resumeWorkflow,
+    cancelWorkflow,
     handleWorkflowEvent,
     agentInfo,
   } = workflowState
@@ -559,12 +560,12 @@ const AgentChat = () => {
 
   const handleCancelExecution = useCallback(async (executionId) => {
     try {
-      // 没有直接的取消执行函数，使用暂停作为替代
-      await pauseWorkflow(executionId)
+      // 调用后端 API 取消工作流执行
+      await cancelWorkflow(executionId)
     } catch (error) {
       console.error('[AgentChat] 取消执行失败:', error)
     }
-  }, [pauseWorkflow])
+  }, [cancelWorkflow])
 
   // ==================== 10. Stream Handler ====================
   const { streamStatus, streamEvents } = useAgentStreamHandler({
@@ -586,6 +587,7 @@ const AgentChat = () => {
   )
 
   // 稳定 isLoading prop，避免每次渲染时函数调用返回新值
+  // 由于每个 channel 对应一个不同的 agent，activeChannelId = selectedAgent?.id
   const conversationIsLoading = useMemo(
     () => isAgentLoading(activeChannelId),
     [isAgentLoading, activeChannelId]
@@ -992,6 +994,7 @@ const AgentChat = () => {
 
       <AgentConsoleDock
         ref={consoleDockRef}
+        // 由于每个 channel 对应一个不同的 agent，activeChannelId = selectedAgent?.id
         isLoading={isAgentLoading(activeChannelId)}
         style={consoleDockStyle}
         showOpenButton={!showConversationPanel && messages.length > 0}
@@ -999,8 +1002,29 @@ const AgentChat = () => {
           sendMessage(text)  // 传递输入文本
         }}
         onCancel={() => {
+          // 终止当前频道/会话的所有执行
           if (activeChannelId) {
+            // 1. 取消智能体执行
             cancelAgentExecution(activeChannelId)
+            
+            // 2. 取消工作流执行（如果有）
+            if (executingWorkflowId) {
+              const executionId = executionProgress[executingWorkflowId]?.executionId
+              if (executionId) {
+                cancelWorkflow(executionId)
+              }
+            }
+            
+            // 3. 取消异步任务轮询（如果有）
+            if (typeof window !== 'undefined') {
+              const timeoutId = (window as any)[`polling_${activeChannelId}`]
+              if (timeoutId) {
+                clearTimeout(timeoutId)
+                delete (window as any)[`polling_${activeChannelId}`]
+              }
+            }
+            
+            console.log('[AgentChat] 已终止频道所有执行:', activeChannelId)
           }
         }}
         onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}

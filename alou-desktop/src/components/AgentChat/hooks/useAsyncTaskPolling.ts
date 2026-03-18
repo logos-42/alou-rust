@@ -519,6 +519,15 @@ export const useAsyncTaskPolling = ({
       delete pollingTimeoutsByAgent.current[agentId]
       delete pollingStatusByAgent.current[agentId]
     }
+    
+    // 同时清理 window 上的 timeout 引用（如果有）
+    if (typeof window !== 'undefined') {
+      const windowTimeoutId = (window as any)[`polling_${agentId}`]
+      if (windowTimeoutId) {
+        clearTimeout(windowTimeoutId)
+        delete (window as any)[`polling_${agentId}`]
+      }
+    }
   }, [])
 
   return {
