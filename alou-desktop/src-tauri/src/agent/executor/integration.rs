@@ -163,6 +163,21 @@ impl IntegrationLayer {
                 if result.success { "✓ 成功" } else { "✗ 失败" }
             ));
 
+            // 🔥 添加工具输出结果，让 agent 可以看到实际返回内容
+            if let Some(ref output) = result.output {
+                let output_str = match output {
+                    Value::String(s) => s.clone(),
+                    _ => output.to_string(),
+                };
+                // 只显示前 500 个字符，避免过长
+                let truncated = if output_str.len() > 500 {
+                    format!("{}...", &output_str[..500])
+                } else {
+                    output_str
+                };
+                summary.push_str(&format!("  - 输出：{}\n", truncated));
+            }
+
             if let Some(ref error) = result.error {
                 summary.push_str(&format!("  - 错误：{}\n", error));
             }
