@@ -34,6 +34,7 @@ pub mod core;
 pub use types::{
     Thought, Action, Reflection, InformationAssessment, TaskProgress,
     ActionResult, EnvironmentState, ExecutionResult, ExecutorError,
+    ContextDocuments, Task,
 };
 pub use perception::PerceptionLayer;
 pub use reasoning::ReasoningLayer;

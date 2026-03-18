@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::agent::ai_client::AiMessage;
 use crate::agent::perception::RetrievedContext;
-use crate::tasks::types::Task;
+pub use crate::tasks::types::Task;
 
 /// 🔥 上下文文档缓存
 #[derive(Debug, Clone, Default)]
@@ -18,7 +18,7 @@ pub struct ContextDocuments {
 }
 
 /// 环境状态（Perceive 层输出）
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnvironmentState {
     pub task_id: String,
     pub messages: Vec<AiMessage>,

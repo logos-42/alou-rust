@@ -619,7 +619,7 @@ impl HeartbeatManager {
         }
 
         // Save TASKS.md
-        let tasks_manager = TasksManager::new();
+        let tasks_manager = TasksManager::new(&base_dir);
         actions.push(format!("[{}] Tasks module: initialized", now));
 
         // Save LOGS.md

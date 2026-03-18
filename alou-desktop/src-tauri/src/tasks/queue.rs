@@ -45,12 +45,16 @@ impl TaskQueue {
         let (result_tx, result_rx) = mpsc::channel::<TaskResult>(100);
         let result_rx = Arc::new(tokio::sync::Mutex::new(result_rx));
 
+        // 为每个 worker 创建独立的 channel
         for i in 0..num_workers {
-            let task_rx = task_rx.resubscribe();
+            let (task_tx_worker, task_rx_worker) = mpsc::channel::<TaskMessage>(100);
             let result_tx = result_tx.clone();
+            
+            // 克隆主发送器到 worker
+            let main_task_tx = task_tx.clone();
             tokio::spawn(async move {
                 log::info!("Task worker {} started", i);
-                Self::worker_loop(task_rx, result_tx).await;
+                Self::worker_loop(Arc::new(tokio::sync::Mutex::new(task_rx_worker)), result_tx).await;
             });
         }
 
@@ -62,20 +66,30 @@ impl TaskQueue {
     }
 
     async fn worker_loop(
-        mut task_rx: mpsc::Receiver<TaskMessage>,
+        task_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<TaskMessage>>>,
         result_tx: mpsc::Sender<TaskResult>,
     ) {
-        while let Some(task_msg) = task_rx.recv().await {
-            // 简化实现：直接返回成功
-            let result = TaskResult {
-                task_id: task_msg.id,
-                success: true,
-                data: None,
-                ipfs_cid: None,
-                error: None,
-                execution_time_ms: 0,
+        loop {
+            let task_msg = {
+                let mut rx = task_rx.lock().await;
+                rx.recv().await
             };
-            let _ = result_tx.send(result).await;
+            
+            match task_msg {
+                Some(task_msg) => {
+                    // 简化实现：直接返回成功
+                    let result = TaskResult {
+                        task_id: task_msg.id,
+                        success: true,
+                        data: None,
+                        ipfs_cid: None,
+                        error: None,
+                        execution_time_ms: 0,
+                    };
+                    let _ = result_tx.send(result).await;
+                }
+                None => break,
+            }
         }
     }
 
