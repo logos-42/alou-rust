@@ -1,4 +1,6 @@
 //! 媒体 API 路由 - 处理媒体生成请求
+//!
+//! 媒体生成后自动存档到本地 KV 数据库
 
 use axum::{
     extract::State as AxumState,
@@ -12,6 +14,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use crate::agent::providers::ProviderRegistry;
+use crate::media_archive::MediaArchiveManager;
 use tauri::State;
 
 /// 媒体生成请求
@@ -35,6 +38,7 @@ pub struct MediaGenerateResponse {
 /// API 共享状态
 pub struct MediaApiState {
     pub provider_registry: Arc<ProviderRegistry>,
+    pub archive_manager: Arc<MediaArchiveManager>,
 }
 
 /// 添加媒体 API 路由
@@ -49,6 +53,8 @@ pub async fn add_media_routes(
     router
         .route("/api/media/generate", post(generate_media))
         .route("/api/media/tools", get(list_media_tools))
+        .route("/api/media/archive/list", get(list_media_archives))
+        .route("/api/media/archive/get/:archive_id", get(get_media_archive))
         .layer(cors)
 }
 
@@ -72,22 +78,23 @@ async fn generate_media(
 
     let start_time = std::time::Instant::now();
 
-    // 获取 ProviderRegistry
+    // 获取 ProviderRegistry 和 ArchiveManager
     let provider_registry = api_state.provider_registry.clone();
+    let archive_manager = api_state.archive_manager.clone();
 
     // 根据工具类型调用不同的媒体生成方法
     let result: Result<serde_json::Value, String> = match payload.tool.as_str() {
         "generate_image" => {
-            execute_generate_image(&provider_registry, payload.args).await
+            execute_generate_image(&provider_registry, &archive_manager, payload.args).await
         }
         "generate_audio" => {
-            execute_generate_audio(&provider_registry, payload.args).await
+            execute_generate_audio(&provider_registry, &archive_manager, payload.args).await
         }
         "generate_video" => {
-            execute_generate_video(&provider_registry, payload.args).await
+            execute_generate_video(&provider_registry, &archive_manager, payload.args).await
         }
         "get_video_status" => {
-            execute_get_video_status(&provider_registry, payload.args).await
+            execute_get_video_status(&provider_registry, &archive_manager, payload.args).await
         }
         _ => Err(format!("未知的媒体工具：{}", payload.tool)),
     };
@@ -113,6 +120,7 @@ async fn generate_media(
 /// 执行图片生成
 async fn execute_generate_image(
     provider_registry: &Arc<crate::agent::providers::ProviderRegistry>,
+    archive_manager: &Arc<MediaArchiveManager>,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     use crate::agent::providers::media_provider::{MediaProvider, ImageOptions};
@@ -152,7 +160,8 @@ async fn execute_generate_image(
 
     match provider.generate_image(options).await {
         Ok(output) => {
-            Ok(serde_json::json!({
+            // 构建返回结果
+            let mut result = serde_json::json!({
                 "success": true,
                 "media_type": "image",
                 "provider": provider_name,
@@ -164,7 +173,38 @@ async fn execute_generate_image(
                     "format": output.metadata.format,
                     "prompt": output.metadata.prompt,
                 }
-            }))
+            });
+
+            // ✅ 本地存档：保存到文件
+            if let Some(file_path) = output.file_path.as_ref() {
+                let archive_id = format!("media:image:{}", chrono::Utc::now().timestamp());
+                let archive_data = serde_json::json!({
+                    "type": "image",
+                    "file_path": file_path,
+                    "url": output.url,
+                    "metadata": output.metadata,
+                    "created_at": chrono::Utc::now().to_rfc3339(),
+                });
+
+                // 使用 archive_manager 存档
+                match archive_manager.archive(&archive_id, &archive_data).await {
+                    Ok(()) => {
+                        result["archive"] = serde_json::json!({
+                            "archive_id": archive_id,
+                            "status": "saved"
+                        });
+                    }
+                    Err(e) => {
+                        log::warn!("媒体存档失败 ({}): {}", archive_id, e);
+                        result["archive_warning"] = serde_json::json!({
+                            "error": e,
+                            "message": "本地存档失败，但媒体文件已保存"
+                        });
+                    }
+                }
+            }
+
+            Ok(result)
         }
         Err(e) => Err(format!("图片生成失败：{}", e))
     }
@@ -173,6 +213,7 @@ async fn execute_generate_image(
 /// 执行音频生成
 async fn execute_generate_audio(
     provider_registry: &Arc<crate::agent::providers::ProviderRegistry>,
+    archive_manager: &Arc<MediaArchiveManager>,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     use crate::agent::providers::media_provider::{MediaProvider, AudioOptions};
@@ -197,8 +238,8 @@ async fn execute_generate_audio(
 
     // 生成音频
     let options = AudioOptions {
-        text,
-        voice_id,
+        text: text.clone(),
+        voice_id: voice_id.clone(),
         model: None,
         speed: None,
         pitch: None,
@@ -209,7 +250,8 @@ async fn execute_generate_audio(
 
     match provider.generate_audio(options).await {
         Ok(output) => {
-            Ok(serde_json::json!({
+            // 构建返回结果
+            let mut result = serde_json::json!({
                 "success": true,
                 "media_type": "audio",
                 "provider": provider_name,
@@ -220,7 +262,43 @@ async fn execute_generate_audio(
                     "format": output.metadata.format,
                     "model": output.metadata.model,
                 }
-            }))
+            });
+
+            // ✅ 本地存档：保存到文件
+            if let Some(file_path) = output.file_path.as_ref() {
+                let archive_id = format!("media:audio:{}", chrono::Utc::now().timestamp());
+                let archive_data = serde_json::json!({
+                    "type": "audio",
+                    "file_path": file_path,
+                    "url": output.url,
+                    "metadata": {
+                        "text": text.clone(),
+                        "voice_id": voice_id.clone(),
+                        "duration_secs": output.metadata.duration_secs,
+                        "format": output.metadata.format,
+                    },
+                    "created_at": chrono::Utc::now().to_rfc3339(),
+                });
+
+                // 使用 archive_manager 存档
+                match archive_manager.archive(&archive_id, &archive_data).await {
+                    Ok(()) => {
+                        result["archive"] = serde_json::json!({
+                            "archive_id": archive_id,
+                            "status": "saved"
+                        });
+                    }
+                    Err(e) => {
+                        log::warn!("媒体存档失败 ({}): {}", archive_id, e);
+                        result["archive_warning"] = serde_json::json!({
+                            "error": e,
+                            "message": "本地存档失败，但媒体文件已保存"
+                        });
+                    }
+                }
+            }
+
+            Ok(result)
         }
         Err(e) => Err(format!("语音合成失败：{}", e))
     }
@@ -229,6 +307,7 @@ async fn execute_generate_audio(
 /// 执行视频生成
 async fn execute_generate_video(
     provider_registry: &Arc<crate::agent::providers::ProviderRegistry>,
+    archive_manager: &Arc<MediaArchiveManager>,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     use crate::agent::providers::media_provider::{MediaProvider, VideoOptions, TaskStatus};
@@ -253,7 +332,7 @@ async fn execute_generate_video(
 
     // 生成视频（异步任务）
     let options = VideoOptions {
-        prompt: prompt,
+        prompt: prompt.clone(),
         duration: Some(duration as f64),
         duration_secs: Some(duration as u32),
         resolution: None,
@@ -262,9 +341,9 @@ async fn execute_generate_video(
 
     match provider.generate_video(options).await {
         Ok(task) => {
-            let result = match task.status {
+            let mut result = match task.status {
                 TaskStatus::Completed => {
-                    if let Some(output) = task.result {
+                    if let Some(output) = task.result.as_ref() {
                         serde_json::json!({
                             "success": true,
                             "media_type": "video",
@@ -285,7 +364,7 @@ async fn execute_generate_video(
                 TaskStatus::Failed => {
                     serde_json::json!({
                         "success": false,
-                        "error": task.error.unwrap_or_else(|| "视频生成失败".to_string()),
+                        "error": task.error.as_ref().unwrap_or(&"视频生成失败".to_string()),
                         "status": "failed",
                         "task_id": task.task_id,
                     })
@@ -305,6 +384,44 @@ async fn execute_generate_video(
                 }
             };
 
+            // ✅ 本地存档：视频完成时保存到文件
+            if task.status == TaskStatus::Completed {
+                if let Some(output) = task.result.as_ref() {
+                    if let Some(file_path) = output.file_path.as_ref() {
+                        let archive_id = format!("media:video:{}", chrono::Utc::now().timestamp());
+                        let archive_data = serde_json::json!({
+                            "type": "video",
+                            "file_path": file_path,
+                            "url": output.url,
+                            "task_id": task.task_id,
+                            "metadata": {
+                                "prompt": prompt,
+                                "duration": duration,
+                                "provider": provider_name,
+                            },
+                            "created_at": chrono::Utc::now().to_rfc3339(),
+                        });
+
+                        // 使用 archive_manager 存档
+                        match archive_manager.archive(&archive_id, &archive_data).await {
+                            Ok(()) => {
+                                result["archive"] = serde_json::json!({
+                                    "archive_id": archive_id,
+                                    "status": "saved"
+                                });
+                            }
+                            Err(e) => {
+                                log::warn!("视频存档失败 ({}): {}", archive_id, e);
+                                result["archive_warning"] = serde_json::json!({
+                                    "error": e,
+                                    "message": "本地存档失败，但媒体文件已保存"
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
             Ok(result)
         }
         Err(e) => Err(format!("视频生成任务创建失败：{}", e))
@@ -314,6 +431,7 @@ async fn execute_generate_video(
 /// 执行视频状态查询
 async fn execute_get_video_status(
     provider_registry: &Arc<crate::agent::providers::ProviderRegistry>,
+    archive_manager: &Arc<MediaArchiveManager>,
     args: serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     use crate::agent::providers::media_provider::{MediaProvider, TaskStatus};
@@ -335,7 +453,10 @@ async fn execute_get_video_status(
     // 查询状态
     match provider.get_task_status(&task_id).await {
         Ok(task) => {
-            let result = match task.status {
+            let task_status = task.status.clone();
+            let task_result_for_archive = task.result.clone();
+            
+            let mut result = match task.status {
                 TaskStatus::Completed => {
                     if let Some(output) = task.result {
                         serde_json::json!({
@@ -381,6 +502,30 @@ async fn execute_get_video_status(
                     })
                 }
             };
+
+            // ✅ 本地存档：视频完成时保存到文件（如果之前没有存档）
+            if task_status == TaskStatus::Completed {
+                if let Some(output) = task_result_for_archive.as_ref() {
+                    if let Some(file_path) = output.file_path.as_ref() {
+                        let archive_id = format!("media:video:task:{}", task_id);
+                        let archive_data = serde_json::json!({
+                            "type": "video",
+                            "task_id": task_id,
+                            "file_path": file_path,
+                            "url": output.url,
+                            "metadata": output.metadata,
+                            "completed_at": chrono::Utc::now().to_rfc3339(),
+                        });
+
+                        // 使用 archive_manager 存档
+                        if let Err(e) = archive_manager.archive(&archive_id, &archive_data).await {
+                            log::warn!("视频任务存档失败 ({}): {}", archive_id, e);
+                        } else {
+                            log::info!("视频任务已存档：{} -> {}", archive_id, file_path);
+                        }
+                    }
+                }
+            }
 
             Ok(result)
         }
@@ -448,11 +593,106 @@ async fn list_media_tools(
     ])
 }
 
+/// 媒体存档列表响应
+#[derive(Serialize)]
+pub struct MediaArchiveListResponse {
+    pub success: bool,
+    pub archives: Vec<serde_json::Value>,
+    pub total: usize,
+}
+
+/// 列出媒体存档
+async fn list_media_archives(
+    AxumState(state): AxumState<Arc<Mutex<Option<MediaApiState>>>>,
+) -> Json<MediaArchiveListResponse> {
+    let state_guard = state.lock().await;
+    let api_state = match state_guard.as_ref() {
+        Some(s) => s,
+        None => {
+            return Json(MediaArchiveListResponse {
+                success: false,
+                archives: vec![],
+                total: 0,
+            });
+        }
+    };
+
+    // 使用 archive_manager 获取所有存档
+    match api_state.archive_manager.list(100).await {
+        Ok(archives) => {
+            let archives_json: Vec<serde_json::Value> = archives.into_iter()
+                .map(|(id, mut data)| {
+                    data["archive_id"] = serde_json::json!(id);
+                    data
+                })
+                .collect();
+
+            let total = archives_json.len();
+            Json(MediaArchiveListResponse {
+                success: true,
+                archives: archives_json,
+                total,
+            })
+        }
+        Err(e) => {
+            log::warn!("获取媒体存档列表失败：{}", e);
+            Json(MediaArchiveListResponse {
+                success: false,
+                archives: vec![],
+                total: 0,
+            })
+        }
+    }
+}
+
+/// 获取媒体存档详情
+async fn get_media_archive(
+    AxumState(state): AxumState<Arc<Mutex<Option<MediaApiState>>>>,
+    archive_id: String,
+) -> Json<serde_json::Value> {
+    let state_guard = state.lock().await;
+    let api_state = match state_guard.as_ref() {
+        Some(s) => s,
+        None => {
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "API server not initialized"
+            }));
+        }
+    };
+
+    match api_state.archive_manager.get(&archive_id).await {
+        Ok(Some(data)) => {
+            Json(data)
+        }
+        Ok(None) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": "Archive not found",
+                "archive_id": archive_id
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to get archive: {}", e),
+                "archive_id": archive_id
+            }))
+        }
+    }
+}
+
 /// 启动媒体 API 服务器
 pub async fn start_media_api_server(
     provider_registry: Arc<ProviderRegistry>,
 ) -> Result<u16, String> {
-    let api_state = MediaApiState { provider_registry };
+    // 创建 Archive Manager
+    let archive_manager = Arc::new(MediaArchiveManager::new()?);
+
+    let api_state = MediaApiState {
+        provider_registry,
+        archive_manager,
+    };
     let state: Arc<Mutex<Option<MediaApiState>>> = Arc::new(Mutex::new(Some(api_state)));
 
     let router = add_media_routes(Router::new()).await.with_state(state);

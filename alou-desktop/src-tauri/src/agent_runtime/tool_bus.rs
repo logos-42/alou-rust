@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 use serde_json::Value;
 use crate::agent::providers::ProviderRegistry;
 use crate::tools::trait_def::Tool;
+use crate::media_archive::MediaArchiveManager;
 
 /// 工具总线
 pub struct ToolBus {
@@ -28,7 +29,11 @@ impl ToolBus {
     }
 
     /// 创建并注册媒体工具
-    pub fn register_media_tools(&self, provider_registry: Arc<ProviderRegistry>) {
+    pub fn register_media_tools(
+        &self,
+        provider_registry: Arc<ProviderRegistry>,
+        archive_manager: Arc<MediaArchiveManager>,
+    ) {
         use crate::tools::media_tools::{
             GenerateImageTool,
             GenerateAudioTool,
@@ -36,12 +41,24 @@ impl ToolBus {
             GetVideoStatusTool,
         };
 
-        self.register_tool("generate_image", Box::new(GenerateImageTool::new(provider_registry.clone())));
-        self.register_tool("generate_audio", Box::new(GenerateAudioTool::new(provider_registry.clone())));
-        self.register_tool("generate_video", Box::new(GenerateVideoTool::new(provider_registry.clone())));
-        self.register_tool("get_video_status", Box::new(GetVideoStatusTool::new(provider_registry.clone())));
+        self.register_tool("generate_image", Box::new(GenerateImageTool::new(
+            provider_registry.clone(),
+            archive_manager.clone(),
+        )));
+        self.register_tool("generate_audio", Box::new(GenerateAudioTool::new(
+            provider_registry.clone(),
+            archive_manager.clone(),
+        )));
+        self.register_tool("generate_video", Box::new(GenerateVideoTool::new(
+            provider_registry.clone(),
+            archive_manager.clone(),
+        )));
+        self.register_tool("get_video_status", Box::new(GetVideoStatusTool::new(
+            provider_registry.clone(),
+            archive_manager.clone(),
+        )));
 
-        log::info!("媒体工具已注册：generate_image, generate_audio, generate_video, get_video_status");
+        log::info!("媒体工具已注册（直接调用 Provider）");
     }
     
     pub fn register_tool(&self, name: &str, tool: Box<dyn Tool>) {

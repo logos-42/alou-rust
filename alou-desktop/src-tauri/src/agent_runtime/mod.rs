@@ -48,6 +48,7 @@ use crate::agent::media_config::MediaApiConfig;
 use crate::agent::ai_client_pool::AiClientPool;
 use crate::agent::perception::{PerceptionEngine};
 use crate::agent::memory::MemoryManager;
+use crate::media_archive::MediaArchiveManager;
 use crate::agent::task::TaskManager;
 use crate::tools::{ToolRegistry, ToolFacade};
 use crate::bridges::BridgeManager;
@@ -92,9 +93,15 @@ impl AgentRuntimeState {
         let agent_registry = Arc::new(AgentRegistry::new());
         let agent_router = AgentRouter::new(agent_registry.clone());
         
+        // 创建媒体存档管理器
+        let archive_manager = Arc::new(
+            MediaArchiveManager::new()
+                .map_err(|e| format!("ArchiveManager 创建失败: {}", e))?
+        );
+
         // 创建 ToolBus 并注册媒体工具
         let mut tool_bus = ToolBus::new();
-        tool_bus.register_media_tools(provider_registry.clone());
+        tool_bus.register_media_tools(provider_registry.clone(), archive_manager.clone());
         let tool_bus = Arc::new(tool_bus);
         
         // 创建统一工具入口

@@ -127,10 +127,19 @@ pub async fn init_agent_runtime(
         }
     };
     
+    // 创建媒体存档管理器
+    let archive_manager = match crate::media_archive::MediaArchiveManager::new() {
+        Ok(am) => Some(Arc::new(am)),
+        Err(e) => {
+            log::warn!("Failed to create MediaArchiveManager: {}, using None", e);
+            None
+        }
+    };
+    
     // 创建 ToolBus 并注册媒体工具
     let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
-    if let Some(provider_reg) = &provider_registry {
-        tool_bus.register_media_tools(provider_reg.clone());
+    if let (Some(provider_reg), Some(archive_mgr)) = (&provider_registry, &archive_manager) {
+        tool_bus.register_media_tools(provider_reg.clone(), archive_mgr.clone());
     }
     let tool_bus = Arc::new(tool_bus);
     

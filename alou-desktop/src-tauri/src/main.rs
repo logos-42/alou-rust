@@ -35,6 +35,7 @@ mod autonomous_loop_commands; // 自主循环命令
 mod agent;  // 新增 Agent 模块
 mod diap_file_manager;  // 新增 DIAP 文件管理模块
 mod tool_api;  // 工具 API 模块
+mod media_archive;  // 媒体存档管理器（共享模块）
 mod media_api;  // 媒体 API 模块
 mod bot_gateway;  // Bot Gateway 模块
 mod heartbeat;  // 心跳模块
