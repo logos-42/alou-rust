@@ -56,10 +56,16 @@ impl ToolBridge {
 
     /// 创建新的工具桥接
     pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::new_with_toolbus(config, None).await
+    }
+
+    /// 创建新的工具桥接（带 ToolBus）
+    pub async fn new_with_toolbus(config: ToolBridgeConfig, tool_bus: Option<Arc<ToolBus>>) -> Result<Self, Box<dyn std::error::Error>> {
         let mut bridge = Self {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
+            tool_bus: tool_bus.clone(),
         };
 
         // 注册所有工具
@@ -224,24 +230,7 @@ impl ToolBridge {
         let broadcast_transaction_tool = Arc::new(BroadcastTransactionTool::new());
         self.register_tool(broadcast_transaction_tool).await?;
 
-        // 注册媒体工具（需要 ProviderRegistry）
-        if let Some(provider_reg) = &self.provider_registry {
-            let generate_image_tool = Arc::new(GenerateImageTool::new(provider_reg.clone()));
-            self.register_tool(generate_image_tool).await?;
-
-            let generate_audio_tool = Arc::new(GenerateAudioTool::new(provider_reg.clone()));
-            self.register_tool(generate_audio_tool).await?;
-
-            let generate_video_tool = Arc::new(GenerateVideoTool::new(provider_reg.clone()));
-            self.register_tool(generate_video_tool).await?;
-
-            let get_video_status_tool = Arc::new(GetVideoStatusTool::new(provider_reg.clone()));
-            self.register_tool(get_video_status_tool).await?;
-
-            println!("✅ Media tools registered with ProviderRegistry");
-        } else {
-            println!("⚠️ ProviderRegistry not available, skipping media tools registration");
-        }
+        // 注意：媒体工具通过 ToolBus 注册，不在这里注册
 
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())

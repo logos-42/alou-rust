@@ -106,7 +106,35 @@ pub async fn init_agent_runtime(
 
     // Create required dependencies
     let tool_registry = Arc::new(crate::tools::ToolRegistry::new());
-    let bridge_manager = Arc::new(crate::bridges::BridgeManager::new(
+    
+    // 创建 ProviderRegistry 用于媒体工具
+    let provider_registry = match crate::agent::media_config::MediaApiConfig::load() {
+        Ok(media_config) => {
+            match crate::agent::providers::ProviderRegistry::new(&media_config) {
+                Ok(registry) => {
+                    log::info!("ProviderRegistry 创建成功");
+                    Some(Arc::new(registry))
+                }
+                Err(e) => {
+                    log::warn!("Failed to create ProviderRegistry: {}, using None", e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to load MediaApiConfig: {}, using None", e);
+            None
+        }
+    };
+    
+    // 创建 ToolBus 并注册媒体工具
+    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
+    if let Some(provider_reg) = &provider_registry {
+        tool_bus.register_media_tools(provider_reg.clone());
+    }
+    let tool_bus = Arc::new(tool_bus);
+    
+    let bridge_manager = Arc::new(crate::bridges::BridgeManager::new_with_toolbus(
         crate::bridges::BridgeConfig {
             tool_bridge: crate::bridges::ToolBridgeConfig::default(),
             context_bridge: crate::bridges::ContextBridgeConfig::default(),
@@ -116,7 +144,8 @@ pub async fn init_agent_runtime(
             max_retries: 3,
             retry_delay_ms: 1000,
             debug_mode: false,
-        }
+        },
+        Some(tool_bus.clone())
     ));
 
     let rt = AgentRuntime::new(tool_registry, bridge_manager).await?;
@@ -129,32 +158,26 @@ pub async fn init_agent_runtime(
     log::info!("Agent Runtime 初始化完成");
 
     // Start media API server after AgentRuntime is initialized
-    let app_handle_for_media = app_handle.clone();
+    let _app_handle_for_media = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         use crate::media_api::start_media_api_server;
-        // 创建 ProviderRegistry 用于媒体 API
-        match crate::agent::media_config::MediaApiConfig::load() {
-            Ok(media_config) => {
-                match crate::agent::providers::ProviderRegistry::new(&media_config) {
-                    Ok(provider_registry) => {
-                        match start_media_api_server(Arc::new(provider_registry)).await {
-                            Ok(port) => {
-                                println!("Media API server started on port {}", port);
-                                // Write port to config file for frontend to read
-                                let config_dir = dirs::config_dir()
-                                    .unwrap_or_else(|| std::path::PathBuf::from("."))
-                                    .join("alou");
-                                let _ = std::fs::create_dir_all(&config_dir);
-                                let port_file = config_dir.join("media_api_port");
-                                let _ = std::fs::write(port_file, port.to_string());
-                            }
-                            Err(e) => eprintln!("Failed to start media API server: {}", e),
-                        }
-                    }
-                    Err(e) => eprintln!("Failed to create ProviderRegistry: {}", e),
+        // 使用已创建的 ProviderRegistry
+        if let Some(provider_reg) = provider_registry {
+            match start_media_api_server(provider_reg).await {
+                Ok(port) => {
+                    println!("Media API server started on port {}", port);
+                    // Write port to config file for frontend to read
+                    let config_dir = dirs::config_dir()
+                        .unwrap_or_else(|| std::path::PathBuf::from("."))
+                        .join("alou");
+                    let _ = std::fs::create_dir_all(&config_dir);
+                    let port_file = config_dir.join("media_api_port");
+                    let _ = std::fs::write(port_file, port.to_string());
                 }
+                Err(e) => eprintln!("Failed to start media API server: {}", e),
             }
-            Err(e) => eprintln!("Failed to load MediaApiConfig: {}", e),
+        } else {
+            eprintln!("ProviderRegistry not available, skipping media API server startup");
         }
     });
 

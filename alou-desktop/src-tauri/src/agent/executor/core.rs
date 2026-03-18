@@ -339,16 +339,26 @@ impl RalphLoopExecutor {
         use std::path::PathBuf;
 
         let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let base_dir = dirs::home_dir()
-            .map(|h| h.join(".alou"))
-            .unwrap_or_else(|| PathBuf::from("./.alou"));
+        
+        // 🔥 使用 agent-specific 路径：AppData/agent-documents/{agent_id}/
+        let agent_id = self.core.agent_id().unwrap_or_default();
+        let base_dir = if let Some(app_handle) = self.core.app_handle() {
+            app_handle.path().app_data_dir()
+                .map(|p| p.join("agent-documents").join(&agent_id))
+                .unwrap_or_else(|_| PathBuf::from("./.alou"))
+        } else {
+            // 如果没有 app_handle，使用 ~/.alou/{agent_id}/
+            dirs::home_dir()
+                .map(|h| h.join(".alou").join(&agent_id))
+                .unwrap_or_else(|| PathBuf::from("./.alou"))
+        };
 
         let _ = fs::create_dir_all(&base_dir);
 
         // Save SOUL.md
         match SoulManager::new(&base_dir).load() {
             Ok(_) => {
-                log::info!("[RalphLoop:{}] [{}] Soul module: saved", task_id, now);
+                log::info!("[RalphLoop:{}] [{}] Soul module: saved (agent: {})", task_id, now, agent_id);
             }
             Err(e) => {
                 log::warn!("[RalphLoop:{}] [{}] Soul module: created default ({})", task_id, now, e);
@@ -359,7 +369,7 @@ impl RalphLoopExecutor {
         let tasks_manager = TasksManager::new(&base_dir);
         // 首次运行时创建默认文件
         let _ = tasks_manager.load();
-        log::info!("[RalphLoop:{}] [{}] Tasks module: saved", task_id, now);
+        log::info!("[RalphLoop:{}] [{}] Tasks module: saved (agent: {})", task_id, now, agent_id);
     }
 
     /// 🔥 加载文档到缓存上下文（执行前准备）
@@ -371,13 +381,23 @@ impl RalphLoopExecutor {
         use std::path::PathBuf;
 
         let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let base_dir = dirs::home_dir()
-            .map(|h| h.join(".alou"))
-            .unwrap_or_else(|| PathBuf::from("./.alou"));
+        
+        // 🔥 使用 agent-specific 路径：AppData/agent-documents/{agent_id}/
+        let agent_id = self.core.agent_id().unwrap_or_default();
+        let base_dir = if let Some(app_handle) = self.core.app_handle() {
+            app_handle.path().app_data_dir()
+                .map(|p| p.join("agent-documents").join(&agent_id))
+                .unwrap_or_else(|_| PathBuf::from("./.alou"))
+        } else {
+            // 如果没有 app_handle，使用 ~/.alou/{agent_id}/
+            dirs::home_dir()
+                .map(|h| h.join(".alou").join(&agent_id))
+                .unwrap_or_else(|| PathBuf::from("./.alou"))
+        };
 
         let _ = fs::create_dir_all(&base_dir);
 
-        log::info!("[RalphLoop:{}] [{}] 加载上下文文档...", task_id, now);
+        log::info!("[RalphLoop:{}] [{}] 加载上下文文档 (agent: {})...", task_id, now, agent_id);
 
         // 加载 SOUL.md
         let soul_content = match SoulManager::new(&base_dir).load() {

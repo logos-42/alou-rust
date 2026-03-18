@@ -61,15 +61,15 @@ pub struct BridgeManager {
 impl BridgeManager {
     /// 创建新的桥接管理器
     pub fn new(config: BridgeConfig) -> Self {
-        Self::new_with_provider(config, None)
+        Self::new_with_toolbus(config, None)
     }
 
-    /// 创建新的桥接管理器（带 ProviderRegistry）
-    pub fn new_with_provider(config: BridgeConfig, provider_registry: Option<Arc<crate::agent::providers::ProviderRegistry>>) -> Self {
+    /// 创建新的桥接管理器（带 ToolBus）
+    pub fn new_with_toolbus(config: BridgeConfig, tool_bus: Option<Arc<crate::agent_runtime::tool_bus::ToolBus>>) -> Self {
         let semaphore = Arc::new(Semaphore::new(config.max_concurrent_calls));
 
         Self {
-            tool_bridge: Arc::new(ToolBridge::new_sync_with_provider(config.tool_bridge.clone(), provider_registry)),
+            tool_bridge: Arc::new(ToolBridge::new_sync_with_toolbus(config.tool_bridge.clone(), tool_bus)),
             context_bridge: Arc::new(ContextBridge::new(config.context_bridge.clone())),
             config: Arc::new(config),
             semaphore,
@@ -147,12 +147,12 @@ pub struct ComponentHealthStatus {
 
 /// 创建默认桥接管理器
 pub fn create_default_bridge_manager() -> BridgeManager {
-    create_default_bridge_manager_with_provider(None)
+    create_default_bridge_manager_with_toolbus(None)
 }
 
-/// 创建默认桥接管理器（带 ProviderRegistry）
-pub fn create_default_bridge_manager_with_provider(provider_registry: Option<Arc<crate::agent::providers::ProviderRegistry>>) -> BridgeManager {
-    BridgeManager::new_with_provider(BridgeConfig {
+/// 创建默认桥接管理器（带 ToolBus）
+pub fn create_default_bridge_manager_with_toolbus(tool_bus: Option<Arc<crate::agent_runtime::tool_bus::ToolBus>>) -> BridgeManager {
+    BridgeManager::new_with_toolbus(BridgeConfig {
         tool_bridge: ToolBridgeConfig::default(),
         context_bridge: ContextBridgeConfig::default(),
         enabled: true,
@@ -161,7 +161,7 @@ pub fn create_default_bridge_manager_with_provider(provider_registry: Option<Arc
         max_retries: 3,
         retry_delay_ms: 1000,
         debug_mode: false,
-    }, provider_registry)
+    }, tool_bus)
 }
 
 /// 桥接事件类型
