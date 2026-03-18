@@ -137,6 +137,20 @@ impl ActionLayer {
         log::info!("[ActionLayer] 执行工具：{} ({})", tool, id);
         log::info!("[ActionLayer] 工具参数：{}", serde_json::to_string(args).unwrap_or_default());
 
+        // 🔥 发送工具调用开始事件到前端
+        if let Some(app_handle) = executor_core.app_handle() {
+            let start_payload = serde_json::json!({
+                "task_id": id,
+                "tool_name": tool,
+                "type": "tool_calling",
+            });
+            if let Err(e) = app_handle.emit("agent:progress", &start_payload) {
+                log::warn!("[ActionLayer] 发送 tool_calling 事件失败：{}", e);
+            } else {
+                log::info!("[ActionLayer] 已发送 tool_calling 事件：{}", tool);
+            }
+        }
+
         // 构建 ToolCallRequest
         let request = ToolCallRequest {
             session_id: "executor".to_string(),
@@ -242,6 +256,23 @@ impl ActionLayer {
                                 log::info!("[ActionLayer] 已发送 tool:created 事件，工具：{}", tool_name);
                             }
                         }
+                    }
+                }
+
+                // 🔥 发送工具调用完成事件到前端
+                if let Some(app_handle) = executor_core.app_handle() {
+                    let done_payload = serde_json::json!({
+                        "task_id": id,
+                        "tool_name": tool,
+                        "type": "tool_done",
+                        "success": success,
+                        "preview": result.as_ref().and_then(|r| r.output.as_ref()).map(|s| s.as_str()).unwrap_or(""),
+                        "error": error,
+                    });
+                    if let Err(e) = app_handle.emit("agent:progress", &done_payload) {
+                        log::warn!("[ActionLayer] 发送 tool_done 事件失败：{}", e);
+                    } else {
+                        log::info!("[ActionLayer] 已发送 tool_done 事件：{} (success={})", tool, success);
                     }
                 }
 

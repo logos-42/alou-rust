@@ -1599,6 +1599,7 @@ ${errorMessage}
    * 终止指定智能体的执行
    */
   const cancelAgentExecution = useCallback((agentId: string) => {
+    console.log("[useAgentMessages.cancelAgentExecution] 开始终止:", { agentId, activeChannelId })
     const controller = abortControllersByAgent.current[agentId]
     if (controller) {
       console.log('[useAgentMessages] 终止智能体HTTP请求:', agentId)
