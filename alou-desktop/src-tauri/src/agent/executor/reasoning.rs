@@ -156,6 +156,28 @@ impl ReasoningLayer {
             });
         }
 
+        // 🔥 添加媒体工具定义（这些工具在 ToolBus 中，不在 ToolRegistry 中）
+        tools.push(AiTool {
+            name: "generate_image".to_string(),
+            description: "根据文字描述生成图片，支持风景、人物、艺术创作等。".to_string(),
+            parameters: Self::get_tool_parameters("generate_image"),
+        });
+        tools.push(AiTool {
+            name: "generate_audio".to_string(),
+            description: "文本转语音，支持多语言、多音色。".to_string(),
+            parameters: Self::get_tool_parameters("generate_audio"),
+        });
+        tools.push(AiTool {
+            name: "generate_video".to_string(),
+            description: "根据文字描述生成视频，支持风景、动画、特效等。".to_string(),
+            parameters: Self::get_tool_parameters("generate_video"),
+        });
+        tools.push(AiTool {
+            name: "get_video_status".to_string(),
+            description: "查询视频生成任务的状态。".to_string(),
+            parameters: Self::get_tool_parameters("get_video_status"),
+        });
+
         // 如果 registry 为空，使用默认工具列表
         if tools.is_empty() {
             tools = Self::get_default_tools();
@@ -617,6 +639,37 @@ impl ReasoningLayer {
                     "provider": { "type": "string", "enum": ["minimax", "jimeng"], "description": "视频生成 Provider" }
                 },
                 "required": ["task_id", "provider"]
+            }),
+            // 🔥 媒体工具参数定义
+            "generate_image" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "图片描述" },
+                    "width": { "type": "integer", "description": "图片宽度", "default": 1024 },
+                    "height": { "type": "integer", "description": "图片高度", "default": 1024 },
+                    "provider": { "type": "string", "description": "Provider 名称", "default": "google" }
+                },
+                "required": ["prompt"]
+            }),
+            "generate_audio" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "要转换的文本" },
+                    "voice": { "type": "string", "description": "音色 ID", "default": "default" },
+                    "language": { "type": "string", "description": "语言代码", "default": "zh-CN" },
+                    "provider": { "type": "string", "description": "Provider 名称", "default": "minimax" }
+                },
+                "required": ["text"]
+            }),
+            "generate_video" => serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "prompt": { "type": "string", "description": "视频描述" },
+                    "duration": { "type": "integer", "description": "视频时长（秒）", "default": 5 },
+                    "resolution": { "type": "string", "description": "分辨率", "default": "720p" },
+                    "provider": { "type": "string", "description": "Provider 名称", "default": "kling" }
+                },
+                "required": ["prompt"]
             }),
             _ => serde_json::json!({
                 "type": "object",

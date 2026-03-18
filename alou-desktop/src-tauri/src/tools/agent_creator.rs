@@ -211,11 +211,24 @@ impl AgentCreatorTool {
     async fn notify_frontend_agent_created(
         &self,
         config: &AgentConfig,
-        _frontend_data: &FrontendAgentData,
+        frontend_data: &FrontendAgentData,
     ) -> Result<(), String> {
-        // 这里应该通过 Tauri 事件系统通知前端
-        // 实际实现需要访问 AppHandle
-        println!("[AgentCreator] Notifying frontend: agent {} created", config.id);
+        // 通过 Tauri 事件系统通知前端
+        // 注意：AppHandle 需要在工具执行时通过上下文传递
+        // 这里使用 println 输出事件数据，由调用方负责发送事件
+        let payload = serde_json::json!({
+            "name": frontend_data.name,
+            "role_description": config.persona,
+            "id": config.id,
+            "display_name": config.display_name,
+            "description": config.description,
+            "avatar": frontend_data.avatar,
+            "status": frontend_data.status,
+        });
+        
+        // 输出事件数据到 stdout，由调用方解析并发送
+        println!("[AgentCreator] EVENT agent:created {}", payload);
+        
         Ok(())
     }
 

@@ -49,6 +49,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use chrono;
 use tauri::Manager;
+use tauri::Emitter;
 use tauri::menu::{Menu, Submenu, PredefinedMenuItem, MenuItem};
 
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
@@ -191,6 +192,7 @@ async fn execute_tool(
     args: String,
     timeout: Option<u64>,
     bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
+    app: tauri::AppHandle,
 ) -> Result<serde_json::Value, String> {
     // 记录工具调用开始
     println!("\n========================================");
@@ -263,6 +265,29 @@ async fn execute_tool(
                 let data = response.result.as_ref()
                     .map(|r| r.data.clone())
                     .unwrap_or_else(|| serde_json::json!({"status": "success"}));
+                
+                // 🔥 如果是 agent_creator create 操作成功，发送 agent:created 事件
+                if tool_id == "agent_creator" {
+                    if let Some(action) = args_value.get("action").and_then(|v| v.as_str()) {
+                        if action == "create" {
+                            if let Some(agent_config) = data.get("agent_config") {
+                                let event_payload = serde_json::json!({
+                                    "name": agent_config.get("display_name").and_then(|v| v.as_str()).unwrap_or("New Agent"),
+                                    "role_description": agent_config.get("persona").and_then(|v| v.as_str()).unwrap_or(""),
+                                    "id": agent_config.get("id").and_then(|v| v.as_str()),
+                                    "display_name": agent_config.get("display_name").and_then(|v| v.as_str()),
+                                    "description": agent_config.get("description").and_then(|v| v.as_str()),
+                                    "avatar": agent_config.get("avatar").and_then(|v| v.as_str()).unwrap_or("🤖"),
+                                    "status": "ready",
+                                });
+                                
+                                println!("[Tauri] 发送 agent:created 事件：{:?}", event_payload);
+                                let _ = app.emit("agent:created", &event_payload);
+                            }
+                        }
+                    }
+                }
+                
                 Ok(serde_json::json!({
                     "success": true,
                     "data": data,

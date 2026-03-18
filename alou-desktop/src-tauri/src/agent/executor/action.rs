@@ -178,13 +178,19 @@ impl ActionLayer {
         match tool_call_result {
             Ok(Ok(ToolCallResponse { success, result, error })) => {
                 log::info!("[ActionLayer] 工具执行成功：{}, success={}", tool, success);
+                log::info!("[ActionLayer] 工具参数：{}", serde_json::to_string(args).unwrap_or_default());
+                
                 // 🔥 如果是 agent_creator create 成功，通知前端更新侧边栏
                 if success && tool == "agent_creator" {
                     let action_val = args
                         .get("action")
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
+                    log::info!("[ActionLayer] agent_creator action: '{}'", action_val);
+                    
                     if action_val == "create" {
+                        log::info!("[ActionLayer] 检测到 agent_creator create 操作，准备发送事件");
+                        
                         if let Some(app_handle) = executor_core.app_handle() {
                             // 从 agent_config 对象中获取 display_name 和 description
                             let agent_config = args.get("agent_config").and_then(|v| v.as_object());
@@ -219,12 +225,18 @@ impl ActionLayer {
                                 }
                             }
 
+                            log::info!("[ActionLayer] 准备发送 agent:created 事件，payload: {}", payload);
+                            
                             if let Err(e) = app_handle.emit("agent:created", &payload) {
                                 log::warn!("[ActionLayer] 发送 agent:created 事件失败：{}", e);
                             } else {
                                 log::info!("[ActionLayer] 已发送 agent:created 事件，名称：{}", display_name);
                             }
+                        } else {
+                            log::warn!("[ActionLayer] app_handle 不存在，无法发送 agent:created 事件");
                         }
+                    } else {
+                        log::warn!("[ActionLayer] agent_creator action 不是 'create': '{}'", action_val);
                     }
                 }
 

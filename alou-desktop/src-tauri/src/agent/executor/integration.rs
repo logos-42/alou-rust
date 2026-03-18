@@ -99,7 +99,10 @@ impl IntegrationLayer {
         // 3. 构建结果摘要
         let summary = self.build_results_summary(thought, results);
 
-        // 4. 添加到对话历史
+        // 4. 🔥 分析工具执行结果，判断是否需要调整策略
+        let tool_analysis = self.analyze_tool_results(results);
+        
+        // 5. 添加到对话历史
         let _ = task_manager.update_task(task_id, |task| {
             task.messages.push(AiMessage {
                 role: "assistant".to_string(),
@@ -109,13 +112,27 @@ impl IntegrationLayer {
             });
         }).await;
 
-        // 5. 更新迭代计数
+        // 6. 更新迭代计数
         let _ = task_manager.update_task(task_id, |task| {
             task.metadata.iteration_count += 1;
         }).await;
+        
+        // 🔥 如果工具分析发现问题，提前终止或继续
+        if let Some(analysis_msg) = tool_analysis {
+            log::info!("[Integration] 工具分析结果：{}", analysis_msg);
+            // 添加到任务消息，让 AI 在下一轮能看到
+            let _ = task_manager.update_task(task_id, |task| {
+                task.messages.push(AiMessage {
+                    role: "system".to_string(),
+                    content: analysis_msg,
+                    tool_call_id: None,
+                    tool_calls: None,
+                });
+            }).await;
+        }
 
-        // 6. 检查是否需要终止
-        let should_terminate = self.check_termination_conditions(core, task_id, thought).await?;
+        // 7. 检查是否需要终止
+        let should_terminate = self.check_termination_conditions(core, task_id, thought, results).await?;
 
         if should_terminate {
             let final_answer = self.extract_final_answer(thought, results);
@@ -186,6 +203,57 @@ impl IntegrationLayer {
         summary
     }
 
+    /// 分析工具执行结果
+    fn analyze_tool_results(&self, results: &[ActionResult]) -> Option<String> {
+        let mut failed_tools = Vec::new();
+        let mut repeated_tools = std::collections::HashMap::new();
+        
+        for result in results {
+            // 记录失败的工具
+            if !result.success {
+                failed_tools.push((result.tool_name.clone(), result.error.clone()));
+            }
+            
+            // 统计工具调用次数
+            *repeated_tools.entry(result.tool_name.clone()).or_insert(0) += 1;
+        }
+        
+        // 🔥 如果有工具失败，给 AI 提示
+        if !failed_tools.is_empty() {
+            let mut msg = String::from("⚠️ **工具执行失败提醒**\n\n");
+            for (tool, error) in &failed_tools {
+                msg.push_str(&format!(
+                    "- **{}** 失败：{}\n",
+                    tool,
+                    error.as_deref().unwrap_or("未知错误")
+                ));
+            }
+            msg.push_str("\n**建议**：\n");
+            msg.push_str("1. 分析失败原因，检查参数是否正确\n");
+            msg.push_str("2. 如果工具不可用，尝试其他替代工具\n");
+            msg.push_str("3. 同一工具失败 2 次后，请切换到其他方法\n");
+            msg.push_str("4. 如果所有方法都失败，向用户报告问题\n");
+            return Some(msg);
+        }
+        
+        // 🔥 如果同一工具被调用超过 2 次，提醒 AI
+        for (tool, count) in &repeated_tools {
+            if *count > 2 && tool != "continue" {
+                return Some(format!(
+                    "⚠️ **工具重复调用提醒**\n\n\
+                     工具 **{}** 已被调用 {} 次。\n\n\
+                     **建议**：\n\
+                     1. 如果工具持续失败，请尝试其他方法\n\
+                     2. 考虑使用替代工具（如用 filesystem 代替 bash）\n\
+                     3. 如果任务已完成，请直接返回结果",
+                    tool, count
+                ));
+            }
+        }
+        
+        None
+    }
+
     /// 提取最终答案
     fn extract_final_answer(&self, thought: &Thought, results: &[ActionResult]) -> String {
         // 优先使用 Complete 动作的内容
@@ -215,13 +283,21 @@ impl IntegrationLayer {
         core: &ExecutorCore,
         task_id: &str,
         thought: &Thought,
+        results: &[ActionResult],
     ) -> Result<bool, crate::agent::executor::types::ExecutorError> {
         // 1. 检查是否显式完成
         if matches!(thought.action, Action::Complete(_)) {
             return Ok(true);
         }
+        
+        // 🔥 2. 检查是否有连续失败的工具
+        let consecutive_failures = results.iter().filter(|r| !r.success).count();
+        if consecutive_failures >= 3 {
+            log::warn!("[IntegrationLayer] 连续 {} 个工具失败，建议终止", consecutive_failures);
+            // 不强制终止，但会让 AI 知道问题
+        }
 
-        // 2. 检查最大迭代次数
+        // 3. 检查最大迭代次数
         let task_manager = core.task_manager();
         let task = task_manager
             .get_task(task_id)
@@ -235,7 +311,7 @@ impl IntegrationLayer {
             return Ok(true);
         }
 
-        // 3. 检查反思层建议
+        // 4. 检查反思层建议
         if let Some(ref reflection) = thought.reflection {
             // 如果任务已完成（进度 100%）
             if reflection.task_progress.overall_progress >= 1.0 {
