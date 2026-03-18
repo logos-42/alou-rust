@@ -1382,6 +1382,48 @@ ${errorMessage}
   // 只挂载一次；通过 onAutoCreateAgentRef 访问最新回调
   }, [])
 
+  // ── 监听 Rust 发来的 tool:created 事件（tool_creation 工具创建成功后触发）────
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+
+    const setupToolCreatedListener = async () => {
+      try {
+        const fn = await listen<{ tool_name: string; description?: string; status?: string }>('tool:created', async (event) => {
+          const payload = event.payload
+          console.log('[useAgentMessages] 收到 tool:created 事件:', payload)
+
+          // 在对话框中显示工具创建成功的消息
+          appendMessage({
+            id: `tool_created_${Date.now()}`,
+            type: 'assistant',
+            content: `✅ 工具 **${payload.tool_name}** 创建成功！\n\n${payload.description || ''}`,
+            timestamp: Date.now(),
+            source: 'system',
+          })
+        })
+        if (cancelled) {
+          fn()
+          console.log('[useAgentMessages] tool:created listener 已取消（Strict Mode cleanup）')
+        } else {
+          unlisten = fn
+        }
+      } catch (e) {
+        console.warn('[useAgentMessages] tool:created listen 不可用（非桌面环境）:', e)
+      }
+    }
+
+    setupToolCreatedListener()
+
+    return () => {
+      cancelled = true
+      if (unlisten) {
+        unlisten()
+        unlisten = null
+      }
+    }
+  }, [appendMessage]) // 依赖 appendMessage 以显示消息
+
   // ── 监听 Rust 发来的 agent:progress 进度事件 ──────────────────────────────
   // 在智能体执行期间，Rust 会通过 AppHandle 发送工具调用进度
   // 我们在当前活动频道插入进度消息（source='progress'），让用户实时可见

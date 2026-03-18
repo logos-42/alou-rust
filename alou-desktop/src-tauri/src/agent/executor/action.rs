@@ -198,11 +198,48 @@ impl ActionLayer {
                                     map.insert("id".to_string(), serde_json::Value::String(id));
                                 }
                             }
-                            
+
                             if let Err(e) = app_handle.emit("agent:created", &payload) {
                                 log::warn!("[ActionLayer] 发送 agent:created 事件失败：{}", e);
                             } else {
                                 log::info!("[ActionLayer] 已发送 agent:created 事件，名称：{}", display_name);
+                            }
+                        }
+                    }
+                }
+
+                // 🔥 如果是 tool_creation create_tool 成功，通知前端更新工具列表
+                if success && tool == "tool_creation" {
+                    let action_val = args
+                        .get("action")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if action_val == "create_tool" || action_val == "create_and_log" {
+                        if let Some(app_handle) = executor_core.app_handle() {
+                            // 从 tool_definition 对象中获取工具信息
+                            let tool_def = args.get("tool_definition").and_then(|v| v.as_object());
+                            let tool_name = tool_def
+                                .and_then(|d| d.get("name"))
+                                .and_then(|v| v.as_str())
+                                .or_else(|| args.get("tool_name").and_then(|v| v.as_str()))
+                                .unwrap_or("New Tool")
+                                .to_string();
+                            let tool_description = tool_def
+                                .and_then(|d| d.get("description"))
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+
+                            let payload = serde_json::json!({
+                                "tool_name": tool_name,
+                                "description": tool_description,
+                                "status": "created",
+                            });
+
+                            if let Err(e) = app_handle.emit("tool:created", &payload) {
+                                log::warn!("[ActionLayer] 发送 tool:created 事件失败：{}", e);
+                            } else {
+                                log::info!("[ActionLayer] 已发送 tool:created 事件，工具：{}", tool_name);
                             }
                         }
                     }
