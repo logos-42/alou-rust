@@ -5,7 +5,7 @@
 
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import { BaseDirectory, writeTextFile, readTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
+import { writeTextFile, readTextFile, exists, mkdir } from '@tauri-apps/plugin-fs';
 import useAgentStore from '@/stores/agentStore';
 
 export interface DocumentUpdatePayload {
@@ -45,7 +45,7 @@ export enum DocumentTypes {
 
 class AgentDocumentService {
   private listeners: Array<() => void> = [];
-  private agentDocsPath = 'agent-documents'; // 相对于AppData目录
+  private agentDocsPath = '.alou'; // 相对于AppData目录
 
   /**
    * 初始化文档服务，监听来自Rust后端的文档更新事件
@@ -70,9 +70,9 @@ class AgentDocumentService {
    */
   private async ensureDocumentsDirectory() {
     try {
-      const dirExists = await exists(this.agentDocsPath, { baseDir: BaseDirectory.AppData });
+      const dirExists = await exists(this.agentDocsPath, { baseDir: undefined });
       if (!dirExists) {
-        await mkdir(this.agentDocsPath, { baseDir: BaseDirectory.AppData, recursive: true });
+        await mkdir(this.agentDocsPath, { baseDir: undefined, recursive: true });
         console.log('[AgentDocumentService] 创建文档目录:', this.agentDocsPath);
       }
     } catch (error) {
@@ -173,14 +173,14 @@ class AgentDocumentService {
   async getAgentDocument(agentId: string, documentType: string): Promise<string | null> {
     try {
       const filePath = this.getDocumentPath(agentId, documentType);
-      const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData });
+      const fileExists = await exists(filePath, { baseDir: undefined });
       
       if (!fileExists) {
         console.log(`[AgentDocumentService] 文档不存在: ${filePath}`);
         return null;
       }
 
-      const content = await readTextFile(filePath, { baseDir: BaseDirectory.AppData });
+      const content = await readTextFile(filePath, { baseDir: undefined });
       return content;
     } catch (error) {
       console.error('[AgentDocumentService] 读取文档失败:', error);
@@ -212,14 +212,14 @@ class AgentDocumentService {
     try {
       // 确保agent文档目录存在
       const agentDocPath = this.getAgentDocPath(agentId);
-      const dirExists = await exists(agentDocPath, { baseDir: BaseDirectory.AppData });
+      const dirExists = await exists(agentDocPath, { baseDir: undefined });
       if (!dirExists) {
-        await mkdir(agentDocPath, { baseDir: BaseDirectory.AppData, recursive: true });
+        await mkdir(agentDocPath, { baseDir: undefined, recursive: true });
       }
 
       // 写入文档文件
       const filePath = this.getDocumentPath(agentId, documentType);
-      await writeTextFile(filePath, content, { baseDir: BaseDirectory.AppData });
+      await writeTextFile(filePath, content, { baseDir: undefined });
 
       console.log(`[AgentDocumentService] 手动更新文档成功: ${filePath}`);
       return true;
@@ -237,7 +237,7 @@ class AgentDocumentService {
 
     for (const type of documentTypes) {
       const filePath = this.getDocumentPath(agentId, type);
-      const fileExists = await exists(filePath, { baseDir: BaseDirectory.AppData });
+      const fileExists = await exists(filePath, { baseDir: undefined });
 
       if (!fileExists) {
         const initialContent = this.getDocumentInitialContent(type, agentInfo);
@@ -397,7 +397,7 @@ ${agentInfo?.role_description || '专业的AI助手'}
     try {
       // 通过Tauri API获取AppData目录的绝对路径
       const appDataPath = await invoke<string>('plugin:path|resolve', {
-        directory: BaseDirectory.AppData
+        directory: undefined
       });
       
       const relativePath = this.getDocumentPath(agentId, documentType);
