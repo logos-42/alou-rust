@@ -1447,6 +1447,23 @@ ${errorMessage}
       }
     }
 
+    // 🔥 监听 tool:log 事件（通用工具日志）
+    const setupToolLogListener = async () => {
+      try {
+        const fn = await listen<{ tool: string; action: string; success?: boolean; message: string; args?: any }>('tool:log', (event) => {
+          const payload = event.payload
+          console.log('[useAgentMessages] 🔧 tool:log:', payload.action, payload.tool, payload.message)
+        })
+        if (cancelled) {
+          fn()
+        } else {
+          unlisten = fn
+        }
+      } catch (e) {
+        console.warn('[useAgentMessages] tool:log listen 不可用（非桌面环境）:', e)
+      }
+    }
+
     setupToolCreatedListener()
 
     return () => {

@@ -64,13 +64,7 @@
       "all": true
     },
     "fs": {
-      "scope": {
-        "allow": [
-          "$HOME/.alou/**",
-          "$HOME/.alou/*"
-        ],
-        "requireLiteralLeadingDot": false
-      }
+      "requireLiteralLeadingDot": false
     }
   }
 }

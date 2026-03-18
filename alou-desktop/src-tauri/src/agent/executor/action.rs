@@ -163,6 +163,15 @@ impl ActionLayer {
             } else {
                 log::info!("[ActionLayer] 已发送 tool_calling 事件：{}", tool);
             }
+            
+            // 🔥 发送工具日志事件到前端（通用日志）
+            let tool_log_start = serde_json::json!({
+                "tool": tool,
+                "action": "start",
+                "args": args,
+                "message": format!("开始执行工具: {}", tool),
+            });
+            let _ = app_handle.emit("tool:log", &tool_log_start);
         }
 
         // 🔥 添加超时控制
@@ -298,6 +307,15 @@ impl ActionLayer {
                     } else {
                         log::info!("[ActionLayer] 已发送 tool_done 事件：{} (success={})", tool, success);
                     }
+                    
+                    // 🔥 发送工具日志事件到前端（通用日志）
+                    let tool_log_end = serde_json::json!({
+                        "tool": tool,
+                        "action": "done",
+                        "success": success,
+                        "message": format!("工具执行完成: {} (success={})", tool, success),
+                    });
+                    let _ = app_handle.emit("tool:log", &tool_log_end);
                 }
 
                 Ok(ActionResult {
