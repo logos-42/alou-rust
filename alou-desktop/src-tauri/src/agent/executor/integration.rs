@@ -209,6 +209,9 @@ impl IntegrationLayer {
         let mut repeated_tools = std::collections::HashMap::new();
         
         for result in results {
+            log::info!("[Integration] 工具结果：tool={}, success={}, error={:?}", 
+                result.tool_name, result.success, result.error);
+            
             // 记录失败的工具
             if !result.success {
                 failed_tools.push((result.tool_name.clone(), result.error.clone()));
@@ -217,6 +220,8 @@ impl IntegrationLayer {
             // 统计工具调用次数
             *repeated_tools.entry(result.tool_name.clone()).or_insert(0) += 1;
         }
+        
+        log::info!("[Integration] 失败工具数：{}, 重复工具数：{}", failed_tools.len(), repeated_tools.len());
         
         // 🔥 如果有工具失败，给 AI 提示
         if !failed_tools.is_empty() {
@@ -233,13 +238,14 @@ impl IntegrationLayer {
             msg.push_str("2. 如果工具不可用，尝试其他替代工具\n");
             msg.push_str("3. 同一工具失败 2 次后，请切换到其他方法\n");
             msg.push_str("4. 如果所有方法都失败，向用户报告问题\n");
+            log::info!("[Integration] 发送失败提醒：{}", msg);
             return Some(msg);
         }
         
         // 🔥 如果同一工具被调用超过 2 次，提醒 AI
         for (tool, count) in &repeated_tools {
             if *count > 2 && tool != "continue" {
-                return Some(format!(
+                let msg = format!(
                     "⚠️ **工具重复调用提醒**\n\n\
                      工具 **{}** 已被调用 {} 次。\n\n\
                      **建议**：\n\
@@ -247,10 +253,13 @@ impl IntegrationLayer {
                      2. 考虑使用替代工具（如用 filesystem 代替 bash）\n\
                      3. 如果任务已完成，请直接返回结果",
                     tool, count
-                ));
+                );
+                log::info!("[Integration] 发送重复调用提醒：{}", msg);
+                return Some(msg);
             }
         }
         
+        log::info!("[Integration] 无需提醒");
         None
     }
 
