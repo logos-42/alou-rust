@@ -125,9 +125,9 @@ pub struct RalphLoopExecutor {
 
 impl RalphLoopExecutor {
     /// 最大迭代次数
-    pub const MAX_ITERATIONS: u32 = 50;
+    pub const MAX_ITERATIONS: u32 = 500;  // 🔥 增加到 500 次，支持长周期任务
     /// 最大工具调用次数
-    pub const MAX_TOOL_CALLS: u32 = 100;
+    pub const MAX_TOOL_CALLS: u32 = 1000; // 🔥 增加到 1000 次，支持复杂任务
 
     /// 创建执行器
     pub fn new(core: ExecutorCore) -> Self {

@@ -468,17 +468,32 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                 <input
                   type="number"
                   className="heartbeat-form-input"
-                  min={30}
+                  min={1}
                   max={120}
-                  value={configForm.interval_minutes || 60}
+                  value={configForm.interval_minutes || 10}
                   onChange={(e) =>
                     handleConfigChange(
                       'interval_minutes',
-                      parseInt(e.target.value, 10) || 60
+                      parseInt(e.target.value, 10) || 10
                     )
                   }
                 />
-                <span className="heartbeat-form-hint">范围：30-120 分钟</span>
+                <span className="heartbeat-form-hint">范围：1-120 分钟（推荐 10-30 分钟）</span>
+              </div>
+
+              {/* 🔥 持续任务模式说明 */}
+              <div className="heartbeat-form-group">
+                <label className="heartbeat-form-label">持续任务模式</label>
+                <div className="heartbeat-form-hint" style={{ marginTop: '8px' }}>
+                  <p style={{ margin: '0 0 8px 0' }}>
+                    在 HEARTBEAT.md 文件中添加 <code># CONTINUOUS</code> 或 <code>[持续执行]</code> 标记，
+                    即可启用持续任务模式。
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    🔹 普通模式：任务执行后清空文件<br/>
+                    🔹 持续模式：保留文件内容，每次心跳继续执行
+                  </p>
+                </div>
               </div>
 
               {/* 模型选择 */}
@@ -491,7 +506,7 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                   onChange={(e) =>
                     handleConfigChange('cheap_model', e.target.value)
                   }
-                  placeholder="用于常规心跳"
+                  placeholder="用于常规心跳（如：deepseek-chat）"
                 />
               </div>
 
@@ -504,7 +519,7 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                   onChange={(e) =>
                     handleConfigChange('expensive_model', e.target.value)
                   }
-                  placeholder="用于重要操作"
+                  placeholder="用于重要操作（如：claude-sonnet-4）"
                 />
               </div>
 
@@ -514,6 +529,17 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                 <div className="heartbeat-form-path">
                   {configForm.heartbeat_file_path || '未设置'}
                 </div>
+                <button
+                  type="button"
+                  className="heartbeat-btn heartbeat-btn-secondary"
+                  style={{ marginTop: '8px' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(configForm.heartbeat_file_path || '');
+                    showMessage('success', '路径已复制到剪贴板');
+                  }}
+                >
+                  复制路径
+                </button>
               </div>
             </div>
 

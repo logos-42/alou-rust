@@ -196,12 +196,13 @@ impl HeartbeatManager {
 
         let trimmed_content = content.trim();
 
+        // 🔥 优化：支持两种模式
+        // 模式 1: 空文件 → 快速健康检查（保持活跃）
+        // 模式 2: 有内容 → 执行任务（支持持续任务队列）
+        
         if trimmed_content.is_empty() {
-            // Empty file - quick health check response
+            // 空文件 - 快速健康检查
             println!("[Heartbeat] Empty heartbeat file - quick health check");
-
-            // Clear the file to indicate we've processed it
-            let _ = fs::write(file_path, "");
 
             // Save all persistence modules
             let actions = self.save_all_persistence().await;
@@ -216,13 +217,21 @@ impl HeartbeatManager {
                 });
         }
 
-        // File has content - execute maintenance task
-        println!("[Heartbeat] Heartbeat file has content - executing maintenance task");
+        // 🔥 检查是否是持续任务模式（文件内容以 "# CONTINUOUS" 开头）
+        let is_continuous = trimmed_content.starts_with("# CONTINUOUS") || 
+                           trimmed_content.contains("[持续执行]");
+
+        // 文件有内容 - 执行维护任务
+        println!("[Heartbeat] Heartbeat file has content - executing maintenance task (continuous={})", is_continuous);
 
         let task_content = trimmed_content.to_string();
 
-        // Clear the file after reading
-        let _ = fs::write(file_path, "");
+        // 🔥 如果不是持续任务，清空文件；如果是持续任务，保留内容
+        if !is_continuous {
+            let _ = fs::write(file_path, "");
+        } else {
+            println!("[Heartbeat] Continuous mode - keeping file content for next heartbeat");
+        }
 
         // Execute the maintenance task
         let mut actions = self.execute_maintenance_task(&task_content, &model).await;
@@ -231,7 +240,11 @@ impl HeartbeatManager {
         let save_actions = self.save_all_persistence().await;
         actions.extend(save_actions);
 
-        HeartbeatResult::ok("Maintenance task executed")
+        HeartbeatResult::ok(if is_continuous { 
+            "Continuous task executed (will continue next heartbeat)" 
+        } else { 
+            "Maintenance task executed" 
+        })
             .with_actions(actions)
             .with_token_usage(TokenUsage {
                 prompt_tokens: task_content.len() as u64 / 4,
