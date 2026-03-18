@@ -1345,7 +1345,9 @@ ${errorMessage}
       try {
         const fn = await listen<{ name: string; role_description?: string; id?: string }>('agent:created', async (event) => {
           const payload = event.payload
-          console.log('[useAgentMessages] 收到 agent:created 事件:', payload)
+          console.log('[useAgentMessages] ========== 收到 agent:created 事件 ==========')
+          console.log('[useAgentMessages] payload:', payload)
+          console.log('[useAgentMessages] onAutoCreateAgentRef.current:', onAutoCreateAgentRef.current ? '存在' : '不存在')
 
           // 检查是否是前端刚触发的创建（避免重复处理）
           const agentKey = `${payload.name}_${payload.role_description || ''}`.toLowerCase().trim()
@@ -1361,7 +1363,7 @@ ${errorMessage}
               // 只添加智能体到侧边栏，不要自动激活（autoActivate 默认为 false）
               const shouldAutoActivate = payload.autoActivate ?? false
               console.log('[useAgentMessages] Agent 已自动添加到侧边栏:', payload.name, '自动激活:', shouldAutoActivate)
-              
+
               // 调用回调添加智能体
               await cb({
                 name: payload.name,
@@ -1370,9 +1372,13 @@ ${errorMessage}
                 roleDescription: payload.role_description ?? '',
                 id: payload.id,
               })
+              
+              console.log('[useAgentMessages] onAutoCreateAgent 调用完成')
             } catch (err) {
               console.error('[useAgentMessages] 自动创建 Agent 失败:', err)
             }
+          } else {
+            console.warn('[useAgentMessages] onAutoCreateAgent 回调不存在或 payload 缺少 name')
           }
         })
         if (cancelled) {
@@ -1381,6 +1387,7 @@ ${errorMessage}
           console.log('[useAgentMessages] agent:created listener 已取消（Strict Mode cleanup）')
         } else {
           unlisten = fn
+          console.log('[useAgentMessages] agent:created 监听器已设置')
         }
       } catch (e) {
         console.warn('[useAgentMessages] agent:created listen 不可用（非桌面环境）:', e)

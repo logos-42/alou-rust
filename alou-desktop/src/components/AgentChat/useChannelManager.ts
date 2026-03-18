@@ -980,25 +980,42 @@ export const useChannelManager = ({
         console.log('[useChannelManager] 将异步创建 DIAP 身份:', willCreateDiapAsync)
 
         // 构建元数据：优先使用返回的数据，但必须包含头像等关键信息
-        const metadata = {
+        const diapIdentityData = result.data?.diap_identity || (result as any).diap_identity
+        const agentMetadata = result.data?.agent_metadata || (result as any).agent_metadata
+
+        // 提取 diap_identity 的各个字段
+        const diapIpns = diapIdentityData?.ipns || diapIdentityData?.IPNS
+        const diapDid = diapIdentityData?.did || diapIdentityData?.DID
+        const diapCid = diapIdentityData?.cid || diapIdentityData?.CID
+
+        // 生成统一的 ID（与 buildChannelFromAgent 保持一致）
+        const unifiedId = diapIpns || diapDid || diapCid || tempId
+
+        const metadata: any = {
+          // 关键：设置统一的 ID（用于存储和删除）
+          id: unifiedId,
+
           // 从返回的数据中提取
-          did: result.data?.diap_identity || (result as any).diap_identity?.did || result.data?.agent_metadata || (result as any).agent_metadata?.did,
-          cid: result.data?.diap_identity || (result as any).diap_identity?.cid || result.data?.agent_metadata || (result as any).agent_metadata?.cid,
-          ipns: result.data?.diap_identity || (result as any).diap_identity?.ipns || result.data?.agent_metadata || (result as any).agent_metadata?.ipns,
-          agent_type: result.data?.agent_metadata || (result as any).agent_metadata?.agent_type || 'claude_agent_sdk',
-          display_name: result.data?.agent_metadata || (result as any).agent_metadata?.display_name || name,
-          role_description: result.data?.agent_metadata || (result as any).agent_metadata?.role_description || roleDescription,
+          did: diapDid || agentMetadata?.did,
+          cid: diapCid || agentMetadata?.cid,
+          ipns: diapIpns || agentMetadata?.ipns,
+
+          agent_type: agentMetadata?.agent_type || 'claude_agent_sdk',
+          display_name: agentMetadata?.display_name || name,
+          role_description: agentMetadata?.role_description || roleDescription,
+
           // 关键：必须包含我们上传的头像和配置
-          avatar_cid: avatar_cid || result.data?.agent_metadata || (result as any).agent_metadata?.avatar_cid,  // 优先使用我们上传的
-          avatar_url: avatar_url || result.data?.agent_metadata || (result as any).agent_metadata?.avatar_url,  // 本地 base64（无 IPFS 时）
-          mcp_config_cid: mcp_config_cid || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_config_cid,
-          mcp_ports: mcp_ports || result.data?.agent_metadata || (result as any).agent_metadata?.mcp_ports,
-          diap_identity: diapIdentity || result.data?.agent_metadata || (result as any).agent_metadata?.diap_identity,
+          avatar_cid: avatar_cid || agentMetadata?.avatar_cid,  // 优先使用我们上传的
+          avatar_url: avatar_url || agentMetadata?.avatar_url,  // 本地 base64（无 IPFS 时）
+          mcp_config_cid: mcp_config_cid || agentMetadata?.mcp_config_cid,
+          mcp_ports: mcp_ports || agentMetadata?.mcp_ports,
+          diap_identity: diapIdentity || diapIdentityData,
+
           sessionId,
           // 关键：如果是异步创建 DIAP，标记为"创建中"状态
           status: willCreateDiapAsync ? 'creating' : undefined,
-          // 生成 id：优先使用 ipns/did/cid，否则使用临时 id
-          id: result.data?.diap_identity?.ipns || result.data?.diap_identity?.did || result.data?.diap_identity?.cid || tempId,
+          // 临时 ID（用于更新匹配）
+          tempId,
         }
 
         console.log('[useChannelManager] 构建的元数据:', metadata)
@@ -1189,7 +1206,7 @@ export const useChannelManager = ({
   // 删除频道和本地存储的智能体
   const deleteChannel = useCallback(async (channel) => {
     if (!channel) return false
-    
+
     // 收集所有可能的标识符，用于匹配存储中的智能体
     const possibleIds = [
       channel.id,
@@ -1197,50 +1214,85 @@ export const useChannelManager = ({
       channel.meta?.cid,
       channel.meta?.did,
       channel.meta?.sessionId,
+      channel.meta?.id,  // 添加 meta.id
     ].filter(Boolean)
-    
+
     const agentSessionId = channel.meta?.sessionId
-    
+    const agentId = channel.meta?.id || channel.id  // 优先使用 meta.id
+
     console.log('[useChannelManager] 开始删除智能体:', {
       channelId: channel.id,
       channelName: channel.name,
-      possibleIds,
+      agentId,
       agentSessionId,
+      possibleIds,
+      metaIds: {
+        id: channel.meta?.id,
+        ipns: channel.meta?.ipns,
+        cid: channel.meta?.cid,
+        did: channel.meta?.did,
+        sessionId: channel.meta?.sessionId,
+      },
+      storeAgents: useAgentStore.getState().agents.map(a => ({ id: a.id, sessionId: a.sessionId, ipns: a.ipns, cid: a.cid, did: a.did })),
     })
-    
+
     // 1. 从频道列表中删除
     setChannels((prev: Channel[]) => {
       const filtered = prev.filter((c: Channel) => c.id !== channel.id)
       console.log('[useChannelManager] 从频道列表删除，剩余:', filtered.length)
       return filtered
     })
-    
+
     // 2. 从本地存储中删除（尝试所有可能的 ID）
     let deletedFromStore = false
     const beforeCount = useAgentStore.getState().agents.length
-    
-    for (const id of possibleIds) {
+
+    // 首先尝试使用 agentId（最可能匹配）
+    if (agentId) {
       try {
-        // 检查是否存在该智能体
         const existingAgent = useAgentStore.getState().agents.find(
-          a => a.id === id || a.sessionId === id || a.ipns === id || a.cid === id || a.did === id
+          a => a.id === agentId || a.sessionId === agentId
         )
-        
+
         if (existingAgent) {
-          removeAgentFromStore(id)
+          removeAgentFromStore(agentId)
           const afterCount = useAgentStore.getState().agents.length
-          
+
           if (afterCount < beforeCount) {
             deletedFromStore = true
-            console.log('[useChannelManager] 已从本地存储删除智能体 (使用 ID:', id, '):', channel.name, '存储中的 ID:', existingAgent.id)
-            break // 找到并删除后退出循环
+            console.log('[useChannelManager] 已从本地存储删除智能体 (使用 agentId:', agentId, '):', channel.name)
           }
         }
       } catch (error) {
-        console.warn('[useChannelManager] 尝试删除 ID', id, '失败:', error)
+        console.warn('[useChannelManager] 尝试删除 agentId', agentId, '失败:', error)
       }
     }
-    
+
+    // 如果还没删除，尝试其他 ID
+    if (!deletedFromStore) {
+      for (const id of possibleIds) {
+        try {
+          // 检查是否存在该智能体
+          const existingAgent = useAgentStore.getState().agents.find(
+            a => a.id === id || a.sessionId === id || a.ipns === id || a.cid === id || a.did === id
+          )
+
+          if (existingAgent) {
+            removeAgentFromStore(id)
+            const afterCount = useAgentStore.getState().agents.length
+
+            if (afterCount < beforeCount) {
+              deletedFromStore = true
+              console.log('[useChannelManager] 已从本地存储删除智能体 (使用 ID:', id, '):', channel.name, '存储中的 ID:', existingAgent.id)
+              break // 找到并删除后退出循环
+            }
+          }
+        } catch (error) {
+          console.warn('[useChannelManager] 尝试删除 ID', id, '失败:', error)
+        }
+      }
+    }
+
     if (!deletedFromStore) {
       console.warn('[useChannelManager] 未能从本地存储找到并删除智能体，可能 ID 不匹配。尝试的 ID:', possibleIds, '存储中的智能体:', useAgentStore.getState().agents.map(a => ({ id: a.id, sessionId: a.sessionId, ipns: a.ipns, cid: a.cid })))
       // 即使没找到，也继续执行其他清理操作

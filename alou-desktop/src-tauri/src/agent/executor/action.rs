@@ -137,6 +137,20 @@ impl ActionLayer {
         log::info!("[ActionLayer] 执行工具：{} ({})", tool, id);
         log::info!("[ActionLayer] 工具参数：{}", serde_json::to_string(args).unwrap_or_default());
 
+        // 🔥 构建 ToolCallRequest
+        let request = ToolCallRequest {
+            session_id: format!("agent_{}", id),
+            user_id: None,
+            tool_id: tool.to_string(),
+            args: args.clone(),
+            working_directory: std::env::current_dir()
+                .ok()
+                .and_then(|p| p.to_str().map(|s| s.to_string())),
+            environment: std::env::vars().collect(),
+            timeout_seconds: Some(60),
+            permissions: vec![],
+        };
+
         // 🔥 发送工具调用开始事件到前端
         if let Some(app_handle) = executor_core.app_handle() {
             let start_payload = serde_json::json!({
@@ -151,27 +165,19 @@ impl ActionLayer {
             }
         }
 
-        // 构建 ToolCallRequest
-        let request = ToolCallRequest {
-            session_id: "executor".to_string(),
-            user_id: None,
-            tool_id: tool.to_string(),
-            args: args.clone(),
-            working_directory: std::env::current_dir()
-                .ok()
-                .and_then(|p| p.to_str().map(|s| s.to_string())),
-            environment: std::env::vars().collect(),
-            timeout_seconds: Some(300),
-            permissions: vec![
-                "read".to_string(),
-                "write".to_string(),
-                "execute".to_string(),
-            ],
-        };
+        // 🔥 添加超时控制
+        log::info!("[ActionLayer] 准备调用 tool_bridge，工具：{}", tool);
+        
+        let tool_call_result = tokio::time::timeout(
+            std::time::Duration::from_secs(60),  // 60 秒超时
+            self.tool_bridge.handle_request(request)
+        ).await;
 
-        // 调用 ToolBridge
-        match self.tool_bridge.handle_request(request).await {
-            Ok(ToolCallResponse { success, result, error }) => {
+        log::info!("[ActionLayer] tool_bridge 调用返回");
+
+        match tool_call_result {
+            Ok(Ok(ToolCallResponse { success, result, error })) => {
+                log::info!("[ActionLayer] 工具执行成功：{}, success={}", tool, success);
                 // 🔥 如果是 agent_creator create 成功，通知前端更新侧边栏
                 if success && tool == "agent_creator" {
                     let action_val = args
@@ -284,13 +290,26 @@ impl ActionLayer {
                     error,
                 })
             }
-            Err(e) => Ok(ActionResult {
-                action_id: id.to_string(),
-                tool_name: tool.to_string(),
-                success: false,
-                output: None,
-                error: Some(e.to_string()),
-            }),
+            Ok(Err(e)) => {
+                log::error!("[ActionLayer] 工具执行失败：{} - {:?}", tool, e);
+                Ok(ActionResult {
+                    action_id: id.to_string(),
+                    tool_name: tool.to_string(),
+                    success: false,
+                    output: None,
+                    error: Some(format!("工具执行失败：{}", e)),
+                })
+            }
+            Err(timeout_err) => {
+                log::error!("[ActionLayer] 工具执行超时（60 秒）: {} - {:?}", tool, timeout_err);
+                Ok(ActionResult {
+                    action_id: id.to_string(),
+                    tool_name: tool.to_string(),
+                    success: false,
+                    output: None,
+                    error: Some(format!("工具执行超时：{}", timeout_err)),
+                })
+            }
         }
     }
 

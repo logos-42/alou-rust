@@ -251,6 +251,8 @@ impl RalphLoopExecutor {
             // ========== 2. 推理 ==========
             log::info!("[RalphLoop:{}] 推理决策开始 (+{:?})", task_id, loop_start.elapsed());
             let ai_start = std::time::Instant::now();
+            
+            log::info!("[RalphLoop:{}] 调用 reasoning_layer.reason...", task_id);
             let thought = self.reasoning_layer
                 .reason(&state, intent, self.core.tool_registry())
                 .await?;

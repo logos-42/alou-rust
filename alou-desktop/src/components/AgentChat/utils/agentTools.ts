@@ -420,6 +420,63 @@ export const getToolsByCategories = (categories: string[]) => {
           },
           required: ["operation"]
         }
+      },
+      // 媒体工具
+      generate_image: {
+        name: "generate_image",
+        description: "根据文字描述生成图片，支持风景、人物、艺术创作等。",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: { type: "string", description: "图片描述" },
+            width: { type: "number", description: "图片宽度", default: 1024 },
+            height: { type: "number", description: "图片高度", default: 1024 },
+            provider: { type: "string", description: "Provider 名称", default: "google" }
+          },
+          required: ["prompt"]
+        }
+      },
+
+      generate_audio: {
+        name: "generate_audio",
+        description: "文本转语音，支持多语言、多音色。",
+        parameters: {
+          type: "object",
+          properties: {
+            text: { type: "string", description: "要转换的文本" },
+            voice: { type: "string", description: "音色 ID", default: "default" },
+            language: { type: "string", description: "语言代码", default: "zh-CN" },
+            provider: { type: "string", description: "Provider 名称", default: "minimax" }
+          },
+          required: ["text"]
+        }
+      },
+
+      generate_video: {
+        name: "generate_video",
+        description: "根据文字描述生成视频，支持风景、动画、特效等。",
+        parameters: {
+          type: "object",
+          properties: {
+            prompt: { type: "string", description: "视频描述" },
+            duration: { type: "number", description: "视频时长（秒）", default: 5 },
+            resolution: { type: "string", description: "分辨率", default: "720p" },
+            provider: { type: "string", description: "Provider 名称", default: "kling" }
+          },
+          required: ["prompt"]
+        }
+      },
+
+      get_video_status: {
+        name: "get_video_status",
+        description: "查询视频生成任务的状态。",
+        parameters: {
+          type: "object",
+          properties: {
+            task_id: { type: "string", description: "视频任务 ID" }
+          },
+          required: ["task_id"]
+        }
       }
     };
 
@@ -432,7 +489,7 @@ export const getToolsByCategories = (categories: string[]) => {
       FILESYSTEM: ["filesystem"],
       SEARCH: ["search"],
       PLANNING: ["plan", "todolist"],
-      AGENT: ["agent_skills", "agent_collaboration", "agent_creator"],
+      AGENT: ["agent_skills", "agent_collaboration", "agent_creator", "generate_image", "generate_audio", "generate_video", "get_video_status"],
       DEVELOPMENT: ["tool_creation", "rollback"]
     };
 
