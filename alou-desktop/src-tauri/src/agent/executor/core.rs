@@ -21,6 +21,7 @@ use crate::agent::executor::perception::PerceptionLayer;
 use crate::agent::executor::reasoning::ReasoningLayer;
 use crate::agent::executor::action::ActionLayer;
 use crate::agent::executor::integration::IntegrationLayer;
+use crate::agent::executor::types::{ContextDocuments, Task};
 
 /// 执行器核心结构
 pub struct ExecutorCore {
@@ -198,6 +199,9 @@ impl RalphLoopExecutor {
     pub async fn execute(&self, task_id: &str) -> Result<String, ExecutorError> {
         log::info!("[RalphLoop] 开始执行任务：{}", task_id);
 
+        // 🔥 1. 加载文档到缓存上下文（执行前准备）
+        let context_docs = self.load_context_documents(task_id).await;
+
         // 更新任务状态为运行中
         let _ = self.core.task_manager().update_task(task_id, |task| {
             task.status = TaskStatus::Running;
@@ -356,6 +360,66 @@ impl RalphLoopExecutor {
         // 首次运行时创建默认文件
         let _ = tasks_manager.load();
         log::info!("[RalphLoop:{}] [{}] Tasks module: saved", task_id, now);
+    }
+
+    /// 🔥 加载文档到缓存上下文（执行前准备）
+    async fn load_context_documents(&self, task_id: &str) -> ContextDocuments {
+        use crate::soul::SoulManager;
+        use crate::tasks::TasksManager;
+        use chrono::Local;
+        use std::fs;
+        use std::path::PathBuf;
+
+        let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let base_dir = dirs::home_dir()
+            .map(|h| h.join(".alou"))
+            .unwrap_or_else(|| PathBuf::from("./.alou"));
+
+        let _ = fs::create_dir_all(&base_dir);
+
+        log::info!("[RalphLoop:{}] [{}] 加载上下文文档...", task_id, now);
+
+        // 加载 SOUL.md
+        let soul_content = match SoulManager::new(&base_dir).load() {
+            Ok(content) => {
+                log::info!("[RalphLoop:{}] [{}] SOUL.md: loaded", task_id, now);
+                Some(content)
+            }
+            Err(e) => {
+                log::warn!("[RalphLoop:{}] [{}] SOUL.md: created default ({})", task_id, now, e);
+                None
+            }
+        };
+
+        // 加载 TASKS.md
+        let tasks_content = {
+            let tasks_manager = TasksManager::new(&base_dir);
+            match tasks_manager.load() {
+                Ok(tasks) => {
+                    log::info!("[RalphLoop:{}] [{}] TASKS.md: loaded {} tasks", task_id, now, tasks.len());
+                    Some(tasks)
+                }
+                Err(_) => None
+            }
+        };
+
+        // 加载 MEMORY.md
+        let memory_content = match fs::read_to_string(base_dir.join("MEMORY.md")) {
+            Ok(content) => {
+                log::info!("[RalphLoop:{}] [{}] MEMORY.md: loaded", task_id, now);
+                Some(content)
+            }
+            Err(_) => {
+                log::info!("[RalphLoop:{}] [{}] MEMORY.md: not found", task_id, now);
+                None
+            }
+        };
+
+        ContextDocuments {
+            soul: soul_content,
+            tasks: tasks_content,
+            memory: memory_content,
+        }
     }
 
     /// 执行单步（用于调试或手动控制）

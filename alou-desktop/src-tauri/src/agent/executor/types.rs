@@ -7,6 +7,15 @@ use serde_json::Value;
 
 use crate::agent::ai_client::AiMessage;
 use crate::agent::perception::RetrievedContext;
+use crate::tasks::types::Task;
+
+/// 🔥 上下文文档缓存
+#[derive(Debug, Clone, Default)]
+pub struct ContextDocuments {
+    pub soul: Option<String>,
+    pub tasks: Option<Vec<Task>>,
+    pub memory: Option<String>,
+}
 
 /// 环境状态（Perceive 层输出）
 #[derive(Debug, Clone)]
@@ -18,6 +27,9 @@ pub struct EnvironmentState {
     pub available_tools: Vec<String>,
     /// 智能感知层检索到的上下文
     pub retrieved_context: RetrievedContext,
+    /// 🔥 文档缓存（SOUL.md, TASKS.md, MEMORY.md）
+    #[serde(skip)]
+    pub context_documents: ContextDocuments,
 }
 
 /// 推理结果（Reason 层输出 - LLM 单次调用）
