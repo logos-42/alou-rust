@@ -66,6 +66,10 @@ pub struct Memory {
     
     /// 是否已加密存储
     pub encrypted: bool,
+
+    /// 🔥 Embedding 向量缓存（语义搜索）
+    #[serde(skip_serializing, skip_deserializing)]
+    pub embedding: Option<crate::agent::embedding::Embedding>,
 }
 
 /// 智能体记忆配置
@@ -193,6 +197,7 @@ impl MemoryManager {
             metadata: HashMap::new(),
             related_memories: Vec::new(),
             encrypted: false,
+            embedding: None,
         };
         
         if is_important {
@@ -489,6 +494,36 @@ impl MemoryManager {
             let mut patterns = self.patterns.write().await;
             patterns.clear();
         }
+    }
+
+    /// 🔥 获取所有记忆（用于 embedding 计算）
+    pub async fn get_all_memories(&self) -> Vec<Memory> {
+        let mut all_memories = Vec::new();
+        let now = Utc::now().timestamp();
+
+        // 获取短期记忆
+        {
+            let short = self.short_term.read().await;
+            all_memories.extend(short.iter().cloned());
+        }
+
+        // 获取长期记忆
+        if let Ok(entries) = fs::read_dir(&self.long_term_path) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                    if let Ok(content) = fs::read_to_string(&path) {
+                        if let Ok(mut memory) = serde_json::from_str::<Memory>(&content) {
+                            memory.last_accessed = now;
+                            memory.access_count += 1;
+                            all_memories.push(memory);
+                        }
+                    }
+                }
+            }
+        }
+
+        all_memories
     }
 }
 

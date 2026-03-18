@@ -7,6 +7,8 @@ use std::sync::Arc;
 pub mod executor;
 pub mod registry;
 pub mod facade;  // 统一工具入口（新增）
+pub mod trait_def;  // 统一 Tool trait（新增）
+pub mod media_tools;  // 媒体工具（从 agent_runtime 迁移）
 pub mod bash;
 pub mod filesystem;
 pub mod search;

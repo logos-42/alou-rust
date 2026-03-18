@@ -11,11 +11,13 @@ use std::sync::Arc;
 use crate::agent::memory::{MemoryManager, MemoryType, Importance};
 use crate::agent::task::TaskManager;
 use crate::agent::perception::PerceptionEngine;
+use crate::agent::embedding::{EmbeddingService, SemanticMemorySearch};
 
 /// 元行动工具集合
 pub struct MetaActionTools {
     memory_manager: Arc<MemoryManager>,
     perception_engine: Option<Arc<PerceptionEngine>>,
+    embedding_service: Option<Arc<EmbeddingService>>,
 }
 
 impl MetaActionTools {
@@ -29,6 +31,27 @@ impl MetaActionTools {
         Self {
             memory_manager,
             perception_engine: Some(perception_engine),
+            embedding_service: None,
+        }
+    }
+
+    /// 创建带 Embedding 的元行动工具
+    pub fn with_embedding(
+        memory_manager: Arc<MemoryManager>,
+        task_manager: Arc<TaskManager>,
+        embedding_config: crate::agent::embedding::EmbeddingConfig,
+    ) -> Self {
+        let perception_engine = Arc::new(PerceptionEngine::new(
+            memory_manager.clone(),
+            task_manager,
+        ));
+
+        let embedding_service = Arc::new(EmbeddingService::new(embedding_config));
+
+        Self {
+            memory_manager,
+            perception_engine: Some(perception_engine),
+            embedding_service: Some(embedding_service),
         }
     }
 
@@ -37,6 +60,7 @@ impl MetaActionTools {
         Self {
             memory_manager,
             perception_engine: None,
+            embedding_service: None,
         }
     }
 
@@ -174,7 +198,7 @@ impl MetaActionTools {
     async fn memory_search(&self, args: Value) -> Result<Value, MetaToolError> {
         let query = args["query"].as_str()
             .ok_or_else(|| MetaToolError::InvalidArguments("缺少 query 参数".to_string()))?;
-        
+
         let memory_type = args["memory_type"].as_str().and_then(|t| match t {
             "conversation" => Some(MemoryType::Conversation),
             "preference" => Some(MemoryType::Preference),
@@ -188,7 +212,19 @@ impl MetaActionTools {
 
         log::info!("[MetaTool] memory_search: query='{}', limit={}", query, limit);
 
-        let memories = self.memory_manager.retrieve(query, memory_type, limit).await;
+        // 🔥 使用 Embedding 语义搜索（如果可用）
+        let memories = if let Some(ref embedding_service) = self.embedding_service {
+            match self.semantic_memory_search(query, limit, embedding_service).await {
+                Ok(memories) => memories,
+                Err(e) => {
+                    log::warn!("[MetaTool] 语义搜索失败，回退到关键词搜索：{}", e);
+                    self.memory_manager.retrieve(query, memory_type, limit).await
+                }
+            }
+        } else {
+            // 无 embedding 服务，使用传统关键词搜索
+            self.memory_manager.retrieve(query, memory_type, limit).await
+        };
 
         Ok(json!({
             "success": true,
@@ -201,6 +237,61 @@ impl MetaActionTools {
                 "importance": format!("{:?}", m.importance),
             })).collect::<Vec<_>>()
         }))
+    }
+
+    /// 🔥 语义记忆搜索（基于 Embedding）
+    async fn semantic_memory_search(
+        &self,
+        query: &str,
+        limit: usize,
+        embedding_service: &EmbeddingService,
+    ) -> Result<Vec<crate::agent::memory::Memory>, MetaToolError> {
+        // 1. 生成 query 的 embedding
+        let query_embedding = embedding_service
+            .embed(query)
+            .await
+            .map_err(|e| MetaToolError::ExecutionFailed(format!("Embedding 生成失败：{}", e)))?;
+
+        // 2. 获取所有记忆
+        let all_memories = self.memory_manager.get_all_memories().await;
+
+        // 3. 计算相似度并排序
+        let mut scored_memories: Vec<(crate::agent::memory::Memory, f32)> = all_memories
+            .iter()
+            .map(|memory| {
+                // 如果有缓存的 embedding，直接计算相似度
+                if let Some(ref cached_embedding) = memory.embedding {
+                    let similarity = EmbeddingService::cosine_similarity(&query_embedding, cached_embedding);
+                    (memory.clone(), similarity)
+                } else {
+                    // 没有缓存，使用关键词搜索作为 fallback
+                    let keyword_score = if memory.content.to_lowercase().contains(&query.to_lowercase())
+                        || memory.tags.iter().any(|t| t.to_lowercase().contains(&query.to_lowercase()))
+                    {
+                        0.5
+                    } else {
+                        0.0
+                    };
+                    (memory.clone(), keyword_score)
+                }
+            })
+            .collect();
+
+        // 按相似度降序排序
+        scored_memories.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        // 4. 返回 top_k
+        let results: Vec<crate::agent::memory::Memory> = scored_memories
+            .into_iter()
+            .take(limit)
+            .map(|(memory, _)| memory)
+            .collect();
+
+        log::info!("[MetaTool:SemanticSearch] 找到 {} 条相关记忆", results.len());
+
+        Ok(results)
     }
 
     async fn read_document(&self, args: Value) -> Result<Value, MetaToolError> {

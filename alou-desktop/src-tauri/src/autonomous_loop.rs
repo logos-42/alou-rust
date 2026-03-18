@@ -457,12 +457,24 @@ impl AutonomousLoop {
             crate::bridges::ToolBridge::new_sync(crate::bridges::ToolBridgeConfig::default())
         );
         
-        let executor = crate::agent::executor::RalphLoopExecutor::new(
-            ai_client,
-            task_manager.clone(),
-            tool_bridge,
-            tool_registry,
-        );
+        // 使用新的 Builder 模式创建执行器
+        let executor = match crate::agent::executor::RalphLoopExecutorBuilder::new()
+            .ai_client(ai_client)
+            .task_manager(task_manager.clone())
+            .tool_bridge(tool_bridge)
+            .tool_registry(tool_registry)
+            .build() {
+            Ok(exec) => exec,
+            Err(e) => {
+                error!("[AutonomousLoop] 创建执行器失败: {}", e);
+                return TaskExecutionResult {
+                    success: false,
+                    output: None,
+                    error: Some(format!("创建执行器失败: {}", e)),
+                    duration_ms: (Utc::now().timestamp() - start_time) as u64,
+                };
+            }
+        };
         
         // 创建任务并执行
         let task_id = task_manager.create_task(
@@ -473,14 +485,13 @@ impl AutonomousLoop {
         let duration_ms = match executor.execute(&task_id).await {
             Ok(result) => {
                 let elapsed = (Utc::now().timestamp() - start_time) as u64;
-                info!("[AutonomousLoop] AI 任务完成: {} - {}", task.title, result.result);
+                info!("[AutonomousLoop] AI 任务完成: {} - {}", task.title, result);
                 return TaskExecutionResult {
                     success: true,
                     output: Some(json!({
-                        "message": result.result,
+                        "message": result,
                         "task_id": task.id,
-                        "ai_task_id": result.task_id,
-                        "iterations": result.iteration_count,
+                        "ai_task_id": task_id,
                     })),
                     error: None,
                     duration_ms: elapsed,

@@ -27,7 +27,6 @@ pub mod storage;
 pub mod group_chat_bridge;
 pub mod manager;  // 统一管理入口
 pub mod commands;  // Tauri 命令
-pub mod media_tools;  // 媒体工具
 
 pub use message_bus::*;
 pub use event_router::*;

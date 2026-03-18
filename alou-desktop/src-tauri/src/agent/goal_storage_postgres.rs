@@ -18,7 +18,7 @@ pub struct PostgresGoalStorage {
 
 impl PostgresGoalStorage {
     /// 创建新的 PostgreSQL 存储
-    pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let pool = Pool::<Postgres>::connect(database_url).await?;
 
         let storage = Self {
@@ -39,7 +39,7 @@ impl PostgresGoalStorage {
     }
 
     /// 初始化数据表
-    async fn init_table(&self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn init_table(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let sql = format!(
             r#"
             CREATE TABLE IF NOT EXISTS {} (
@@ -67,7 +67,7 @@ impl PostgresGoalStorage {
     }
 
     /// 按 Agent ID 加载目标
-    pub async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 简化实现，从内存或基础存储加载
         let all = self.load_all().await?;
         Ok(all.into_iter()
@@ -76,7 +76,7 @@ impl PostgresGoalStorage {
     }
 
     /// 加载活跃目标
-    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let all = self.load_all().await?;
         Ok(all.into_iter()
             .filter(|g| matches!(g.status, GoalStatus::Active | GoalStatus::Pending))
@@ -84,7 +84,7 @@ impl PostgresGoalStorage {
     }
 
     /// 获取统计信息
-    pub async fn get_stats(&self) -> Result<GoalStats, Box<dyn std::error::Error>> {
+    pub async fn get_stats(&self) -> Result<GoalStats, Box<dyn std::error::Error + Send + Sync>> {
         let all = self.load_all().await?;
         let total = all.len() as i64;
         let active = all.iter().filter(|g| matches!(g.status, GoalStatus::Active)).count() as i64;
@@ -104,22 +104,22 @@ impl PostgresGoalStorage {
 
 #[async_trait]
 impl GoalStorage for PostgresGoalStorage {
-    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error>> {
+    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 简化实现，使用内存存储
         Ok(())
     }
 
-    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error>> {
+    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 简化实现
         Ok(None)
     }
 
-    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 简化实现
         Ok(Vec::new())
     }
 
-    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 简化实现
         Ok(())
     }

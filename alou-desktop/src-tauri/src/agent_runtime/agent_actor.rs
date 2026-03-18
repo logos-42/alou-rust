@@ -96,13 +96,16 @@ impl AgentActor {
         // 创建 TaskManager
         let task_manager = Arc::new(TaskManager::new());
 
-        // 创建 RalphLoopExecutor
-        let executor = Arc::new(RalphLoopExecutor::new(
+        // 创建 ExecutorCore
+        let core = crate::agent::executor::core::ExecutorCore::new(
             ai_client,
             task_manager.clone(),
             bridge_manager.tool_bridge(),
             Arc::new(crate::tools::ToolRegistry::new()),
-        ));
+        );
+
+        // 创建 RalphLoopExecutor
+        let executor = Arc::new(RalphLoopExecutor::new(core));
 
         Self {
             agent,
@@ -195,9 +198,9 @@ impl AgentActor {
         // 执行 RalphLoop
         match self.executor.execute(&task_id).await {
             Ok(result) => {
-                log::info!("Agent {} 任务完成：{} - 结果：{}", 
-                    self.agent.name, task_id, result.result.chars().take(100).collect::<String>());
-                
+                log::info!("Agent {} 任务完成：{} - 结果：{}",
+                    self.agent.name, task_id, result.chars().take(100).collect::<String>());
+
                 // TODO: 将结果发布回 MessageBus
                 Ok(())
             }

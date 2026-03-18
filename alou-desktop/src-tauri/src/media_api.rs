@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
-use crate::agent_runtime::AgentRuntimeState;
+use crate::agent::providers::ProviderRegistry;
 use tauri::State;
 
 /// 媒体生成请求
@@ -34,7 +34,7 @@ pub struct MediaGenerateResponse {
 
 /// API 共享状态
 pub struct MediaApiState {
-    pub runtime_state: Arc<AgentRuntimeState>,
+    pub provider_registry: Arc<ProviderRegistry>,
 }
 
 /// 添加媒体 API 路由
@@ -73,7 +73,7 @@ async fn generate_media(
     let start_time = std::time::Instant::now();
 
     // 获取 ProviderRegistry
-    let provider_registry = api_state.runtime_state.provider_registry.clone();
+    let provider_registry = api_state.provider_registry.clone();
 
     // 根据工具类型调用不同的媒体生成方法
     let result: Result<serde_json::Value, String> = match payload.tool.as_str() {
@@ -450,9 +450,9 @@ async fn list_media_tools(
 
 /// 启动媒体 API 服务器
 pub async fn start_media_api_server(
-    runtime_state: Arc<AgentRuntimeState>,
+    provider_registry: Arc<ProviderRegistry>,
 ) -> Result<u16, String> {
-    let api_state = MediaApiState { runtime_state };
+    let api_state = MediaApiState { provider_registry };
     let state: Arc<Mutex<Option<MediaApiState>>> = Arc::new(Mutex::new(Some(api_state)));
 
     let router = add_media_routes(Router::new()).await.with_state(state);

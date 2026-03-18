@@ -4,7 +4,7 @@
 
 use super::ai_client::AiClient;
 use super::config::{ApiConfig, UserApiConfig};
-use super::executor::RalphLoopExecutor;
+use super::executor::{RalphLoopExecutor, RalphLoopExecutorBuilder};
 // use super::streaming::StreamingExecutor;  // 暂时注释，模块不存在
 use super::task::{TaskFinalResult, TaskManager};
 use std::sync::Arc;
@@ -27,15 +27,26 @@ pub async fn execute_agent_task(
         Ok(client) => Arc::new(client),
         Err(e) => return Err(format!("创建 AI 客户端失败：{}", e)),
     };
-    let executor = RalphLoopExecutor::new(
-        ai_client.clone(),
-        task_manager.clone(),
-        tool_bridge.clone(),
-        Arc::new(crate::tools::ToolRegistry::new()),
-    );
+    // 使用新的 Builder 模式创建执行器
+    let executor = match RalphLoopExecutorBuilder::new()
+        .ai_client(ai_client.clone())
+        .task_manager(task_manager.clone())
+        .tool_bridge(tool_bridge.clone())
+        .tool_registry(Arc::new(crate::tools::ToolRegistry::new()))
+        .build() {
+        Ok(exec) => exec,
+        Err(e) => return Err(format!("创建执行器失败: {}", e)),
+    };
+    
     let task_id = task_manager.create_task(agent_id, message).await;
     match executor.execute(&task_id).await {
-        Ok(result) => Ok(result),
+        Ok(result) => Ok(TaskFinalResult {
+            task_id: task_id.clone(),
+            success: true,
+            result,
+            error: None,
+            iteration_count: 0, // TODO: 从执行器获取实际迭代次数
+        }),
         Err(e) => Err(e.to_string()),
     }
 }
@@ -99,14 +110,16 @@ pub async fn execute_ai_conversation(
         task_manager.create_task(target_session_id.clone(), message.clone()).await
     };
 
-    // 🔥 创建执行器（带 AppHandle 用于发送进度事件到前端）
-    let executor = RalphLoopExecutor::new(
-        ai_client,
-        task_manager.clone(),
-        tool_bridge,
-        Arc::new(crate::tools::ToolRegistry::new()),
-    )
-    .with_app_handle(app_handle.clone());
+    // 🔥 创建执行器（使用新的 Builder 模式）
+    let executor = match RalphLoopExecutorBuilder::new()
+        .ai_client(ai_client)
+        .task_manager(task_manager.clone())
+        .tool_bridge(tool_bridge)
+        .tool_registry(Arc::new(crate::tools::ToolRegistry::new()))
+        .build() {
+        Ok(exec) => exec,
+        Err(e) => return Err(format!("创建执行器失败: {}", e)),
+    };
 
     let use_stream = options.as_ref().and_then(|o| o.get("stream")).and_then(|s| s.as_bool()).unwrap_or(false);
 

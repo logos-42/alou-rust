@@ -5,14 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use serde_json::Value;
 use crate::agent::providers::ProviderRegistry;
-
-/// 工具 trait
-#[async_trait::async_trait]
-pub trait Tool: Send + Sync {
-    fn name(&self) -> &str;
-    fn description(&self) -> &str;
-    async fn execute(&self, args: Value) -> Result<Value, String>;
-}
+use crate::tools::trait_def::Tool;
 
 /// 工具总线
 pub struct ToolBus {
@@ -36,7 +29,7 @@ impl ToolBus {
 
     /// 创建并注册媒体工具
     pub fn register_media_tools(&self, provider_registry: Arc<ProviderRegistry>) {
-        use crate::agent_runtime::media_tools::{
+        use crate::tools::media_tools::{
             GenerateImageTool,
             GenerateAudioTool,
             GenerateVideoTool,
@@ -60,8 +53,9 @@ impl ToolBus {
         let tools = self.tools.read().await;
         let tool = tools.get(tool_name)
             .ok_or_else(|| format!("工具不存在：{}", tool_name))?;
-        
-        tool.execute(args).await
+
+        let context = crate::tools::trait_def::ToolContext::default();
+        tool.execute(args, &context).await
     }
     
     pub async fn list_tools(&self) -> Vec<ToolInfo> {
@@ -94,7 +88,7 @@ struct FilesystemTool;
 impl Tool for FilesystemTool {
     fn name(&self) -> &str { "filesystem" }
     fn description(&self) -> &str { "文件系统操作工具" }
-    async fn execute(&self, _args: Value) -> Result<Value, String> {
+    async fn execute(&self, _args: Value, _context: &crate::tools::trait_def::ToolContext) -> Result<Value, String> {
         Ok(Value::String("filesystem tool not implemented".to_string()))
     }
 }
@@ -104,7 +98,7 @@ struct BrowserTool;
 impl Tool for BrowserTool {
     fn name(&self) -> &str { "browser" }
     fn description(&self) -> &str { "浏览器自动化工具" }
-    async fn execute(&self, _args: Value) -> Result<Value, String> {
+    async fn execute(&self, _args: Value, _context: &crate::tools::trait_def::ToolContext) -> Result<Value, String> {
         Ok(Value::String("browser tool not implemented".to_string()))
     }
 }
@@ -114,7 +108,7 @@ struct SearchTool;
 impl Tool for SearchTool {
     fn name(&self) -> &str { "search" }
     fn description(&self) -> &str { "搜索工具" }
-    async fn execute(&self, _args: Value) -> Result<Value, String> {
+    async fn execute(&self, _args: Value, _context: &crate::tools::trait_def::ToolContext) -> Result<Value, String> {
         Ok(Value::String("search tool not implemented".to_string()))
     }
 }
@@ -124,7 +118,7 @@ struct ShellTool;
 impl Tool for ShellTool {
     fn name(&self) -> &str { "shell" }
     fn description(&self) -> &str { "Shell 命令执行工具" }
-    async fn execute(&self, _args: Value) -> Result<Value, String> {
+    async fn execute(&self, _args: Value, _context: &crate::tools::trait_def::ToolContext) -> Result<Value, String> {
         Ok(Value::String("shell tool not implemented".to_string()))
     }
 }

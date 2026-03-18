@@ -57,7 +57,7 @@ impl HybridGoalStorage {
     }
 
     /// 保存目标（写穿透模式）
-    pub async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 1. 先写 PostgreSQL（持久化）
         self.postgres.save(goal).await?;
 
@@ -70,7 +70,7 @@ impl HybridGoalStorage {
     }
 
     /// 加载目标（读穿透模式）
-    pub async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 1. 先读 Redis
         match self.redis.load(goal_id).await {
             Ok(Some(goal)) => {
@@ -103,20 +103,20 @@ impl HybridGoalStorage {
     }
 
     /// 加载所有目标
-    pub async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 优先从 PostgreSQL 加载完整数据
         self.postgres.load_all().await
     }
 
     /// 加载活跃目标（优先 Redis）
-    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         // 从 PostgreSQL 加载
         let goals = self.postgres.load_active().await?;
         Ok(goals)
     }
 
     /// 删除目标
-    pub async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 先删 PostgreSQL
         self.postgres.delete(goal_id).await?;
 
@@ -134,7 +134,7 @@ impl HybridGoalStorage {
         goal_id: &GoalId,
         progress: f32,
         note: Option<&str>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 1. 读取完整目标
         let mut goal = match self.load(goal_id).await? {
             Some(g) => g,
@@ -158,7 +158,7 @@ impl HybridGoalStorage {
     }
 
     /// 预热缓存（从 PostgreSQL 加载活跃目标到 Redis）
-    pub async fn warm_cache(&self) -> Result<usize, Box<dyn std::error::Error>> {
+    pub async fn warm_cache(&self) -> Result<usize, Box<dyn std::error::Error + Send + Sync>> {
         let active_goals = self.postgres.load_active().await?;
         let count = active_goals.len();
 
@@ -173,7 +173,26 @@ impl HybridGoalStorage {
     }
 
     /// 获取统计信息
-    pub async fn get_stats(&self) -> Result<super::goal_storage_postgres::GoalStats, Box<dyn std::error::Error>> {
+    pub async fn get_stats(&self) -> Result<super::goal_storage_postgres::GoalStats, Box<dyn std::error::Error + Send + Sync>> {
         self.postgres.get_stats().await
+    }
+}
+
+#[async_trait::async_trait]
+impl super::goal::GoalStorage for HybridGoalStorage {
+    async fn save(&self, goal: &super::goal::Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.save(goal).await
+    }
+
+    async fn load(&self, goal_id: &super::goal::GoalId) -> Result<Option<super::goal::Goal>, Box<dyn std::error::Error + Send + Sync>> {
+        self.load(goal_id).await
+    }
+
+    async fn load_all(&self) -> Result<Vec<super::goal::Goal>, Box<dyn std::error::Error + Send + Sync>> {
+        self.load_all().await
+    }
+
+    async fn delete(&self, goal_id: &super::goal::GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.delete(goal_id).await
     }
 }

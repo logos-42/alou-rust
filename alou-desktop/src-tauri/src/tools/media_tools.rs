@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 use serde_json::{Value, json};
-use crate::agent_runtime::tool_bus::Tool;
+use crate::tools::trait_def::{Tool, ToolContext};
 use crate::agent::providers::ProviderRegistry;
 
 /// 图片生成工具
@@ -31,7 +31,7 @@ impl Tool for GenerateImageTool {
         "根据文字描述生成图片，支持风景、人物、艺术创作等。可用的 Provider: google (Imagen), jimeng (即梦)"
     }
 
-    async fn execute(&self, args: Value) -> Result<Value, String> {
+    async fn execute(&self, args: Value, _context: &ToolContext) -> Result<Value, String> {
         use crate::agent::providers::media_provider::{MediaProvider, ImageOptions};
 
         let prompt = args.get("prompt")
@@ -116,7 +116,7 @@ impl Tool for GenerateAudioTool {
         "将文字转换为语音（TTS），支持多种音色和语言。可用的 Provider: minimax"
     }
 
-    async fn execute(&self, args: Value) -> Result<Value, String> {
+    async fn execute(&self, args: Value, _context: &ToolContext) -> Result<Value, String> {
         use crate::agent::providers::media_provider::{MediaProvider, AudioOptions};
 
         let text = args.get("text")
@@ -197,7 +197,7 @@ impl Tool for GenerateVideoTool {
         "根据文字描述生成视频，支持动画、实景等风格。可用的 Provider: minimax, jimeng (即梦)。注意：视频生成是异步任务，需要轮询状态"
     }
 
-    async fn execute(&self, args: Value) -> Result<Value, String> {
+    async fn execute(&self, args: Value, _context: &ToolContext) -> Result<Value, String> {
         use crate::agent::providers::media_provider::{MediaProvider, VideoOptions, TaskStatus};
 
         let prompt = args.get("prompt")
@@ -308,7 +308,7 @@ impl Tool for GetVideoStatusTool {
         "查询异步视频生成任务的状态。参数：task_id (任务 ID), provider (Provider 名称)"
     }
 
-    async fn execute(&self, args: Value) -> Result<Value, String> {
+    async fn execute(&self, args: Value, _context: &ToolContext) -> Result<Value, String> {
         use crate::agent::providers::media_provider::{MediaProvider, TaskStatus};
 
         let task_id = args.get("task_id")

@@ -482,10 +482,10 @@ pub struct GoalSummary {
 /// 目标存储 trait
 #[async_trait::async_trait]
 pub trait GoalStorage: Send + Sync {
-    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error>>;
-    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error>>;
-    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>>;
-    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>>;
+    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error + Send + Sync>>;
+    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>>;
+    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 }
 
 /// 内存存储（用于测试）
@@ -503,23 +503,23 @@ impl InMemoryGoalStorage {
 
 #[async_trait::async_trait]
 impl GoalStorage for InMemoryGoalStorage {
-    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error>> {
+    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut data = self.data.write().await;
         data.insert(goal.id.clone(), goal.clone());
         Ok(())
     }
 
-    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error>> {
+    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let data = self.data.read().await;
         Ok(data.get(goal_id).cloned())
     }
 
-    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let data = self.data.read().await;
         Ok(data.values().cloned().collect())
     }
 
-    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut data = self.data.write().await;
         data.remove(goal_id);
         Ok(())

@@ -132,39 +132,29 @@ pub async fn init_agent_runtime(
     let app_handle_for_media = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         use crate::media_api::start_media_api_server;
-        // Get the runtime state from the mod.rs (not commands.rs)
-        // We need to create a new instance since it's not managed by Tauri
-        match crate::agent_runtime::AgentRuntimeState::new(
-            Arc::new(crate::tools::ToolRegistry::new()),
-            Arc::new(crate::bridges::BridgeManager::new(
-                crate::bridges::BridgeConfig {
-                    tool_bridge: crate::bridges::ToolBridgeConfig::default(),
-                    context_bridge: crate::bridges::ContextBridgeConfig::default(),
-                    enabled: true,
-                    max_concurrent_calls: 10,
-                    timeout_seconds: 30,
-                    max_retries: 3,
-                    retry_delay_ms: 1000,
-                    debug_mode: false,
-                }
-            ))
-        ).await {
-            Ok(runtime_state) => {
-                match start_media_api_server(Arc::new(runtime_state)).await {
-                    Ok(port) => {
-                        println!("Media API server started on port {}", port);
-                        // Write port to config file for frontend to read
-                        let config_dir = dirs::config_dir()
-                            .unwrap_or_else(|| std::path::PathBuf::from("."))
-                            .join("alou");
-                        let _ = std::fs::create_dir_all(&config_dir);
-                        let port_file = config_dir.join("media_api_port");
-                        let _ = std::fs::write(port_file, port.to_string());
+        // 创建 ProviderRegistry 用于媒体 API
+        match crate::agent::media_config::MediaApiConfig::load() {
+            Ok(media_config) => {
+                match crate::agent::providers::ProviderRegistry::new(&media_config) {
+                    Ok(provider_registry) => {
+                        match start_media_api_server(Arc::new(provider_registry)).await {
+                            Ok(port) => {
+                                println!("Media API server started on port {}", port);
+                                // Write port to config file for frontend to read
+                                let config_dir = dirs::config_dir()
+                                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                                    .join("alou");
+                                let _ = std::fs::create_dir_all(&config_dir);
+                                let port_file = config_dir.join("media_api_port");
+                                let _ = std::fs::write(port_file, port.to_string());
+                            }
+                            Err(e) => eprintln!("Failed to start media API server: {}", e),
+                        }
                     }
-                    Err(e) => eprintln!("Failed to start media API server: {}", e),
+                    Err(e) => eprintln!("Failed to create ProviderRegistry: {}", e),
                 }
             }
-            Err(e) => eprintln!("Failed to create AgentRuntimeState for media API: {}", e),
+            Err(e) => eprintln!("Failed to load MediaApiConfig: {}", e),
         }
     });
 

@@ -23,7 +23,7 @@ pub struct RedisGoalStorage {
 
 impl RedisGoalStorage {
     /// 创建新的 Redis 存储
-    pub async fn new(redis_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(redis_url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let client = Client::open(redis_url)?;
         let conn = client.get_multiplexed_async_connection().await?;
 
@@ -65,7 +65,7 @@ impl RedisGoalStorage {
     }
 
     /// 按 Agent 加载目标
-    pub async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_by_agent(&self, agent_id: &str) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let index_key = self.make_index_key(agent_id);
         let mut conn = self.conn.write().await;
 
@@ -82,7 +82,7 @@ impl RedisGoalStorage {
     }
 
     /// 加载活跃目标
-    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    pub async fn load_active(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let active_key = self.make_active_key();
         let mut conn = self.conn.write().await;
 
@@ -107,7 +107,7 @@ impl RedisGoalStorage {
 
 #[async_trait]
 impl GoalStorage for RedisGoalStorage {
-    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error>> {
+    async fn save(&self, goal: &Goal) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let key = self.make_key(&goal.id);
         let value = serde_json::to_string(goal)?;
 
@@ -148,7 +148,7 @@ impl GoalStorage for RedisGoalStorage {
         Ok(())
     }
 
-    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error>> {
+    async fn load(&self, goal_id: &GoalId) -> Result<Option<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let key = self.make_key(goal_id);
         let mut conn = self.conn.write().await;
 
@@ -163,7 +163,7 @@ impl GoalStorage for RedisGoalStorage {
         }
     }
 
-    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error>> {
+    async fn load_all(&self) -> Result<Vec<Goal>, Box<dyn std::error::Error + Send + Sync>> {
         let pattern = format!("{}*", self.key_prefix);
         let mut conn = self.conn.write().await;
 
@@ -204,7 +204,7 @@ impl GoalStorage for RedisGoalStorage {
         Ok(goals)
     }
 
-    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error>> {
+    async fn delete(&self, goal_id: &GoalId) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let key = self.make_key(goal_id);
         
         // 先获取目标信息以清理索引（在获取锁之前）

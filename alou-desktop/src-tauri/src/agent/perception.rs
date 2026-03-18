@@ -232,7 +232,7 @@ impl PerceptionEngine {
     }
 
     /// 分析用户意图
-    async fn analyze_intent(&self, query: &str) -> Intent {
+    pub(crate) async fn analyze_intent(&self, query: &str) -> Intent {
         let query_lower = query.to_lowercase();
 
         // 问候意图检测
@@ -473,6 +473,21 @@ impl PerceptionEngine {
                 status: "active".to_string(),
             })
             .collect()
+    }
+
+    /// 获取记忆管理器
+    pub fn memory_manager(&self) -> Arc<MemoryManager> {
+        self.memory_manager.clone()
+    }
+
+    /// 获取任务管理器
+    pub fn task_manager(&self) -> Arc<TaskManager> {
+        self.task_manager.clone()
+    }
+
+    /// 获取目标追踪器
+    pub fn goal_tracker(&self) -> Option<Arc<GoalTracker>> {
+        self.goal_tracker.clone()
     }
 }
 

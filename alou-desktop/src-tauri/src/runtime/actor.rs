@@ -15,7 +15,7 @@ use crate::runtime::message::SessionMessage;
 use crate::runtime::handle::ActorHandle;
 use crate::bridges::BridgeManager;
 // Agent 模块
-use crate::agent::executor::RalphLoopExecutor;
+use crate::agent::executor::{RalphLoopExecutor, RalphLoopExecutorBuilder};
 use crate::agent::task::TaskManager;
 use crate::agent::ai_client::AiClient;
 use crate::tools::ToolRegistry;
@@ -48,12 +48,15 @@ impl SessionActor {
 
         // 创建任务管理器和执行器
         let task_manager = Arc::new(TaskManager::new());
-        let executor = Arc::new(RalphLoopExecutor::new(
-            ai_client,
-            task_manager.clone(),
-            bridge_manager.tool_bridge(),
-            tool_registry,
-        ));
+        let executor = Arc::new(
+            RalphLoopExecutorBuilder::new()
+                .ai_client(ai_client)
+                .task_manager(task_manager.clone())
+                .tool_bridge(bridge_manager.tool_bridge())
+                .tool_registry(tool_registry)
+                .build()
+                .expect("Failed to create RalphLoopExecutor")
+        );
 
         let actor = Self {
             session_id: session_id.clone(),
