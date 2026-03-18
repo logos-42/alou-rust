@@ -41,7 +41,183 @@ impl HeartbeatManager {
             stop_sender: Arc::new(Mutex::new(None)),
         }
     }
-    
+
+    /// 🔥 确保文档文件存在（首次运行时自动创建）
+    pub async fn ensure_documentation_files(&self) {
+        let config = self.config.lock().await;
+        let base_dir = dirs::home_dir()
+            .map(|h| h.join(".alou"))
+            .unwrap_or_else(|| PathBuf::from("./.alou"));
+        
+        let _ = fs::create_dir_all(&base_dir);
+        drop(config);
+
+        // 自动创建 HEARTBEAT.md 示例文件（如果不存在）
+        let heartbeat_file_path = base_dir.join("HEARTBEAT.md");
+        if !heartbeat_file_path.exists() {
+            let default_heartbeat_content = r#"# CONTINUOUS - 7x24 持续监控任务
+
+## 任务说明
+这是一个持续执行的任务，每次心跳都会执行以下内容。
+
+## 执行项目
+1. **系统健康检查**
+   - 检查内存使用
+   - 检查磁盘空间
+   - 检查进程状态
+
+2. **日志分析**
+   - 分析最近的错误日志
+   - 统计请求频率
+   - 检测异常模式
+
+3. **报告生成**
+   - 生成健康报告
+   - 记录到 MEMORY.md
+
+## 配置
+- 心跳间隔：每 10 分钟
+- 使用模型：写入
+- 模式：持续执行
+
+---
+[持续执行] 此任务会持续运行，每次心跳都会重新执行
+"#;
+            let _ = fs::write(&heartbeat_file_path, default_heartbeat_content);
+            println!("[Heartbeat] Created default HEARTBEAT.md at {:?}", heartbeat_file_path);
+        }
+
+        // 自动创建 HEARTBEAT_GUIDE.md 使用指南（如果不存在）
+        let guide_file_path = base_dir.join("HEARTBEAT_GUIDE.md");
+        if !guide_file_path.exists() {
+            let guide_content = r#"# 心跳驱动 - 7x24 持久执行指南
+
+## 🚀 快速开始
+
+### 1. 配置心跳间隔
+- 打开应用 → 设置 → 心跳管理
+- 设置间隔：推荐 10-30 分钟
+- 启用心跳
+
+### 2. 创建持续任务
+
+编辑 `~/.alou/HEARTBEAT.md` 文件：
+
+```markdown
+# CONTINUOUS - 持续监控任务
+
+## 任务说明
+这是一个持续执行的任务，每次心跳都会执行。
+
+## 执行内容
+1. 系统健康检查
+2. 日志分析
+3. 报告生成
+
+---
+[持续执行]
+```
+
+**关键**：包含 `# CONTINUOUS` 或 `[持续执行]` 标记
+
+## 📋 两种模式对比
+
+| 模式 | 文件标记 | 执行后 | 适用场景 |
+|------|---------|--------|---------|
+| **普通模式** | 无标记 | 清空文件 | 一次性任务 |
+| **持续模式** | `# CONTINUOUS` 或 `[持续执行]` | 保留内容 | 7x24 监控 |
+
+## ⚙️ 配置说明
+
+### 心跳间隔
+- **最小值**: 1 分钟
+- **最大值**: 120 分钟
+- **推荐**: 10-30 分钟
+
+### 模型选择
+- **便宜模型**: 用于常规心跳（如 `deepseek-chat`）
+- **昂贵模型**: 用于复杂任务（如 `claude-sonnet-4`）
+
+### 文件路径
+- 默认：`~/.alou/HEARTBEAT.md`
+- 可在配置中修改
+
+## 📝 示例任务
+
+### 示例 1: 系统监控
+```markdown
+# CONTINUOUS - 系统监控
+
+每小时检查：
+1. CPU 使用率
+2. 内存使用
+3. 磁盘空间
+4. 进程状态
+
+发现异常时记录到 MEMORY.md
+
+---
+[持续执行]
+```
+
+### 示例 2: 数据分析
+```markdown
+# CONTINUOUS - 日志分析
+
+分析最近的错误日志：
+1. 统计错误频率
+2. 识别错误模式
+3. 生成报告
+
+报告保存到 `~/.alou/reports/`
+
+---
+[持续执行]
+```
+
+### 示例 3: 一次性任务
+```markdown
+请执行以下任务：
+1. 备份重要文件
+2. 清理临时文件
+3. 更新系统状态
+
+（此任务执行后文件会被清空）
+```
+
+## 🔧 故障排除
+
+### 心跳不执行
+1. 检查是否启用：设置 → 心跳管理 → 启用
+2. 检查间隔设置：确保不是太长
+3. 查看日志：控制台搜索 `[Heartbeat]`
+
+### 任务不持续
+1. 确认文件包含 `# CONTINUOUS` 或 `[持续执行]`
+2. 检查文件是否被其他程序修改
+3. 查看心跳日志确认模式识别
+
+### 文件路径问题
+1. 使用绝对路径或 `~/` 开头
+2. 确保目录存在
+3. 检查文件权限
+
+## 💡 最佳实践
+
+1. **任务简洁**: 每次心跳执行时间不宜过长
+2. **错误处理**: 任务应该能容忍失败
+3. **日志记录**: 重要操作记录到 MEMORY.md
+4. **定期检查**: 查看心跳执行日志
+
+---
+
+**提示**: 可以在 HEARTBEAT.md 中写入复杂的 AI 指令，AI 会理解并执行。
+"#;
+            let _ = fs::write(&guide_file_path, guide_content);
+            println!("[Heartbeat] Created default HEARTBEAT_GUIDE.md at {:?}", guide_file_path);
+        }
+    }
+
     /// Start the heartbeat loop
     pub async fn start(&self) -> Result<(), String> {
         let mut state = self.state.lock().await;
@@ -266,6 +442,171 @@ impl HeartbeatManager {
 
         // Ensure directory exists
         let _ = fs::create_dir_all(&base_dir);
+
+        // 🔥 自动创建 HEARTBEAT.md 示例文件（如果不存在）
+        let heartbeat_file_path = base_dir.join("HEARTBEAT.md");
+        if !heartbeat_file_path.exists() {
+            let default_heartbeat_content = r#"# CONTINUOUS - 7x24 持续监控任务
+
+## 任务说明
+这是一个持续执行的任务，每次心跳都会执行以下内容。
+
+## 执行项目
+1. **系统健康检查**
+   - 检查内存使用
+   - 检查磁盘空间
+   - 检查进程状态
+
+2. **日志分析**
+   - 分析最近的错误日志
+   - 统计请求频率
+   - 检测异常模式
+
+3. **报告生成**
+   - 生成健康报告
+   - 记录到 MEMORY.md
+
+## 配置
+- 心跳间隔：每 10 分钟
+- 使用模型：deepseek-chat
+- 模式：持续执行
+
+---
+[持续执行] 此任务会持续运行，每次心跳都会重新执行
+"#;
+            let _ = fs::write(&heartbeat_file_path, default_heartbeat_content);
+            actions.push(format!("[{}] HEARTBEAT.md: created default continuous task", now));
+        }
+
+        // 🔥 自动创建 HEARTBEAT_GUIDE.md 使用指南（如果不存在）
+        let guide_file_path = base_dir.join("HEARTBEAT_GUIDE.md");
+        if !guide_file_path.exists() {
+            let guide_content = r#"# 心跳驱动 - 7x24 持久执行指南
+
+## 🚀 快速开始
+
+### 1. 配置心跳间隔
+- 打开应用 → 设置 → 心跳管理
+- 设置间隔：推荐 10-30 分钟
+- 启用心跳
+
+### 2. 创建持续任务
+
+编辑 `~/.alou/HEARTBEAT.md` 文件：
+
+```markdown
+# CONTINUOUS - 持续监控任务
+
+## 任务说明
+这是一个持续执行的任务，每次心跳都会执行。
+
+## 执行内容
+1. 系统健康检查
+2. 日志分析
+3. 报告生成
+
+---
+[持续执行]
+```
+
+**关键**：包含 `# CONTINUOUS` 或 `[持续执行]` 标记
+
+## 📋 两种模式对比
+
+| 模式 | 文件标记 | 执行后 | 适用场景 |
+|------|---------|--------|---------|
+| **普通模式** | 无标记 | 清空文件 | 一次性任务 |
+| **持续模式** | `# CONTINUOUS` 或 `[持续执行]` | 保留内容 | 7x24 监控 |
+
+## ⚙️ 配置说明
+
+### 心跳间隔
+- **最小值**: 1 分钟
+- **最大值**: 120 分钟
+- **推荐**: 10-30 分钟
+
+### 模型选择
+- **便宜模型**: 用于常规心跳（如 `deepseek-chat`）
+- **昂贵模型**: 用于复杂任务（如 `claude-sonnet-4`）
+
+### 文件路径
+- 默认：`~/.alou/HEARTBEAT.md`
+- 可在配置中修改
+
+## 📝 示例任务
+
+### 示例 1: 系统监控
+```markdown
+# CONTINUOUS - 系统监控
+
+每小时检查：
+1. CPU 使用率
+2. 内存使用
+3. 磁盘空间
+4. 进程状态
+
+发现异常时记录到 MEMORY.md
+
+---
+[持续执行]
+```
+
+### 示例 2: 数据分析
+```markdown
+# CONTINUOUS - 日志分析
+
+分析最近的错误日志：
+1. 统计错误频率
+2. 识别错误模式
+3. 生成报告
+
+报告保存到 `~/.alou/reports/`
+
+---
+[持续执行]
+```
+
+### 示例 3: 一次性任务
+```markdown
+请执行以下任务：
+1. 备份重要文件
+2. 清理临时文件
+3. 更新系统状态
+
+（此任务执行后文件会被清空）
+```
+
+## 🔧 故障排除
+
+### 心跳不执行
+1. 检查是否启用：设置 → 心跳管理 → 启用
+2. 检查间隔设置：确保不是太长
+3. 查看日志：控制台搜索 `[Heartbeat]`
+
+### 任务不持续
+1. 确认文件包含 `# CONTINUOUS` 或 `[持续执行]`
+2. 检查文件是否被其他程序修改
+3. 查看心跳日志确认模式识别
+
+### 文件路径问题
+1. 使用绝对路径或 `~/` 开头
+2. 确保目录存在
+3. 检查文件权限
+
+## 💡 最佳实践
+
+1. **任务简洁**: 每次心跳执行时间不宜过长
+2. **错误处理**: 任务应该能容忍失败
+3. **日志记录**: 重要操作记录到 MEMORY.md
+4. **定期检查**: 查看心跳执行日志
+
+---
+
+**提示**: 可以在 HEARTBEAT.md 中写入复杂的 AI 指令，AI 会理解并执行。
+"#;
+            let _ = fs::write(&guide_file_path, guide_content);
+            actions.push(format!("[{}] HEARTBEAT_GUIDE.md: created user guide", now));
+        }
 
         // Save SOUL.md
         match SoulManager::new(&base_dir).load() {

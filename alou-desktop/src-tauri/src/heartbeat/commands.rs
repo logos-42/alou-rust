@@ -153,7 +153,7 @@ pub async fn initialize_heartbeat(
     manager_state: State<'_, HeartbeatManagerState>,
 ) -> Result<serde_json::Value, String> {
     println!("[Heartbeat Command] Initializing heartbeat system...");
-    
+
     // Check if already initialized
     let manager = manager_state.inner().lock().await;
     if manager.is_some() {
@@ -162,13 +162,18 @@ pub async fn initialize_heartbeat(
             "message": "Heartbeat system already initialized"
         }));
     }
-    
+
     drop(manager);
-    
+
     // Create new manager
     let mut manager = manager_state.inner().lock().await;
-    *manager = Some(HeartbeatManager::new()?);
+    let mgr = HeartbeatManager::new()?;
     
+    // 🔥 自动创建文档文件（如果不存在）
+    mgr.ensure_documentation_files().await;
+    
+    *manager = Some(mgr);
+
     Ok(serde_json::json!({
         "success": true,
         "message": "Heartbeat system initialized successfully"
