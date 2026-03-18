@@ -199,11 +199,337 @@ impl AgentCreatorTool {
         })
     }
 
-    /// 保存智能体配置
+    /// 保存智能体配置并初始化文档
     async fn save_agent_config(&self, config: &AgentConfig) -> Result<(), String> {
-        // 使用 KV 存储保存智能体配置
-        // 实际实现应该调用 kv_commands
+        use std::fs;
+        use std::path::PathBuf;
+        
         println!("[AgentCreator] Saving agent config: {}", config.id);
+        
+        // 🔥 获取智能体文档目录
+        let agent_docs_dir = dirs::home_dir()
+            .map(|h| h.join(".alou").join(&config.id))
+            .ok_or_else(|| "Failed to get home directory".to_string())?;
+        
+        // 创建目录
+        fs::create_dir_all(&agent_docs_dir)
+            .map_err(|e| format!("Failed to create agent docs directory: {}", e))?;
+        
+        // 🔥 初始化 11 个文档
+        let now = chrono::Utc::now().to_rfc3339();
+        
+        // 1. SOUL.md
+        let soul_path = agent_docs_dir.join("SOUL.md");
+        if !soul_path.exists() {
+            let soul_content = format!(r#"# 核心身份
+
+**智能体 ID**: {}
+**名称**: {}
+
+## 角色定位
+{}
+
+## 核心价值观
+- 准确性：提供准确可靠的信息
+- 效率：快速完成任务
+- 安全性：注重操作安全
+- 学习性：从每次交互中学习和改进
+
+## 个性特点
+- 友好且专业
+- 注重细节
+- 善于沟通
+
+---
+最后更新：{}
+"#, config.id, config.display_name, config.persona, now);
+            fs::write(&soul_path, soul_content)
+                .map_err(|e| format!("Failed to write SOUL.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", soul_path);
+        }
+        
+        // 2. MEMORY.md
+        let memory_path = agent_docs_dir.join("MEMORY.md");
+        if !memory_path.exists() {
+            let memory_content = format!(r#"# 长期记忆
+
+**智能体 ID**: {}
+
+## 用户偏好
+（暂无记录）
+
+## 项目信息
+（暂无记录）
+
+## 学到的知识
+（暂无记录）
+
+## 重要对话
+（暂无记录）
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&memory_path, memory_content)
+                .map_err(|e| format!("Failed to write MEMORY.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", memory_path);
+        }
+        
+        // 3. IDENTITY.md
+        let identity_path = agent_docs_dir.join("IDENTITY.md");
+        if !identity_path.exists() {
+            let identity_content = format!(r#"# 身份定义
+
+**智能体 ID**: {}
+**名称**: {}
+
+## 角色
+{}
+
+## 专长领域
+（根据实际使用情况更新）
+
+## 工作方式
+- 理解用户需求
+- 选择合适工具
+- 执行任务
+- 反馈结果
+
+---
+最后更新：{}
+"#, config.id, config.display_name, config.persona, now);
+            fs::write(&identity_path, identity_content)
+                .map_err(|e| format!("Failed to write IDENTITY.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", identity_path);
+        }
+        
+        // 4. CAPABILITIES.md
+        let capabilities_path = agent_docs_dir.join("CAPABILITIES.md");
+        if !capabilities_path.exists() {
+            let capabilities_content = format!(r#"# 能力清单
+
+**智能体 ID**: {}
+
+## 核心能力
+- 文件操作：读取、写入、编辑、搜索文件
+- 终端命令：执行系统命令
+- 网络操作：搜索信息、获取网页内容
+- 任务规划：制定和管理任务计划
+- 代码理解：分析和修改代码
+
+## 工具使用
+- 熟练使用所有可用工具
+- 能够组合多个工具完成复杂任务
+- 理解工具的限制和最佳实践
+
+## 学习能力
+- 从用户反馈中学习
+- 记录成功的解决方案
+- 避免重复错误
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&capabilities_path, capabilities_content)
+                .map_err(|e| format!("Failed to write CAPABILITIES.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", capabilities_path);
+        }
+        
+        // 5. CONSTRAINTS.md
+        let constraints_path = agent_docs_dir.join("CONSTRAINTS.md");
+        if !constraints_path.exists() {
+            let constraints_content = format!(r#"# 约束和限制
+
+**智能体 ID**: {}
+
+## 操作限制
+- 不执行危险命令
+- 不访问敏感文件
+- 不进行未经授权的网络操作
+
+## 行为准则
+- 始终征求用户确认重要操作
+- 清晰解释操作步骤
+- 提供操作结果反馈
+
+## 安全原则
+- 保护用户数据安全
+- 遵守系统安全策略
+- 及时报告异常情况
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&constraints_path, constraints_content)
+                .map_err(|e| format!("Failed to write CONSTRAINTS.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", constraints_path);
+        }
+        
+        // 6. TOOLS.md
+        let tools_path = agent_docs_dir.join("TOOLS.md");
+        if !tools_path.exists() {
+            let tools_content = format!(r#"# 工具使用记录
+
+**智能体 ID**: {}
+
+## 常用工具
+（根据实际使用情况更新）
+
+## 工具组合
+（记录有效的工具组合方案）
+
+## 最佳实践
+（记录工具使用的最佳实践）
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&tools_path, tools_content)
+                .map_err(|e| format!("Failed to write TOOLS.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", tools_path);
+        }
+        
+        // 7. AGENTS.md
+        let agents_path = agent_docs_dir.join("AGENTS.md");
+        if !agents_path.exists() {
+            let agents_content = format!(r#"# 协作智能体
+
+**智能体 ID**: {}
+
+## 已知智能体
+（暂无记录）
+
+## 协作经验
+（暂无记录）
+
+## 协作模式
+（暂无记录）
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&agents_path, agents_content)
+                .map_err(|e| format!("Failed to write AGENTS.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", agents_path);
+        }
+        
+        // 8. IPFS.md
+        let ipfs_path = agent_docs_dir.join("IPFS.md");
+        if !ipfs_path.exists() {
+            let ipfs_content = format!(r#"# IPFS 对话历史索引
+
+**智能体 ID**: {}
+
+这里记录了存储在 IPFS 上的重要对话会话。
+
+## 最近会话
+（暂无记录）
+
+## 统计信息
+- 总会话数：0
+- 总消息数：0
+- 最早会话：暂无
+- 最近会话：暂无
+
+## 如何更新
+- 重要对话结束后，自动记录到本文件
+- 每条记录包含：CID、时间、主题、消息数
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&ipfs_path, ipfs_content)
+                .map_err(|e| format!("Failed to write IPFS.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", ipfs_path);
+        }
+        
+        // 9. USER.md
+        let user_path = agent_docs_dir.join("USER.md");
+        if !user_path.exists() {
+            let user_content = format!(r#"# 用户喜好与偏好
+
+**智能体 ID**: {}
+
+这里记录了用户的个人偏好、习惯和工作方式。
+
+## 用户偏好
+（暂无记录）
+
+## 沟通风格
+（暂无记录）
+
+## 技术栈偏好
+（暂无记录）
+
+## 如何更新
+- 用户分享偏好时自动记录
+- 使用 agent_document 工具的 update 操作更新
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&user_path, user_content)
+                .map_err(|e| format!("Failed to write USER.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", user_path);
+        }
+        
+        // 10. PROJECT.md
+        let project_path = agent_docs_dir.join("PROJECT.md");
+        if !project_path.exists() {
+            let project_content = format!(r#"# 项目与工作报告
+
+**智能体 ID**: {}
+
+这里记录了参与的项目、工作报告和重要成果。
+
+## 当前项目
+（暂无记录）
+
+## 已完成项目
+（暂无记录）
+
+## 工作报告
+（暂无记录）
+
+## 如何更新
+- 项目启动时创建记录
+- 定期更新工作报告
+- 项目完成后归档
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&project_path, project_content)
+                .map_err(|e| format!("Failed to write PROJECT.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", project_path);
+        }
+        
+        // 11. KEY.md
+        let key_path = agent_docs_dir.join("KEY.md");
+        if !key_path.exists() {
+            let key_content = format!(r#"# 关键密钥路径
+
+**智能体 ID**: {}
+
+这里记录了重要密钥和凭证的存储路径（不存储实际密钥）。
+
+## 密钥路径
+（暂无记录）
+
+## 如何更新
+- 记录密钥文件的存储路径
+- 不要存储实际密钥内容
+- 使用加密存储敏感信息
+
+---
+最后更新：{}
+"#, config.id, now);
+            fs::write(&key_path, key_content)
+                .map_err(|e| format!("Failed to write KEY.md: {}", e))?;
+            println!("[AgentCreator] 创建文档：{:?}", key_path);
+        }
+        
+        println!("[AgentCreator] ✅ 智能体 {} 文档初始化完成", config.id);
         Ok(())
     }
 
