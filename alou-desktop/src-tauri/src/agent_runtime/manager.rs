@@ -11,7 +11,8 @@ use crate::agent_runtime::{
     agent_registry::{AgentInfo, AgentConfig},
     message_bus::{Event, GroupMessage},
 };
-use crate::tools::{ToolRegistry, ToolFacade};
+use crate::tools::{ToolRegistry, ToolFacade, ToolConfig};
+use crate::tools::executor::ToolExecutionManager;
 
 /// AgentRuntime Manager
 pub struct AgentRuntimeManager {
@@ -23,10 +24,10 @@ impl AgentRuntimeManager {
     /// 创建新的 Manager
     pub async fn new(
         tool_registry: Arc<ToolRegistry>,
-        tool_bus: Arc<ToolBus>,
     ) -> Result<Self, String> {
         // 创建统一工具入口
-        let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), tool_bus));
+        let execution_manager = Arc::new(ToolExecutionManager::new(ToolConfig::default()));
+        let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), execution_manager));
 
         // 创建 AgentRuntime (passing required dependencies)
         let bridge_manager = Arc::new(crate::bridges::BridgeManager::new(

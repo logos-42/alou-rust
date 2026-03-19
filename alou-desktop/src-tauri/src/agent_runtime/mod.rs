@@ -47,7 +47,8 @@ use crate::agent::perception::{PerceptionEngine};
 use crate::agent::memory::MemoryManager;
 use crate::media_archive::MediaArchiveManager;
 use crate::agent::task::TaskManager;
-use crate::tools::{ToolRegistry, ToolFacade, ToolExecutionManager, ToolConfig};
+use crate::tools::{ToolRegistry, ToolFacade, ToolConfig};
+use crate::tools::executor::ToolExecutionManager;
 use crate::bridges::BridgeManager;
 
 /// Agent Runtime 状态

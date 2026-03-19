@@ -332,12 +332,11 @@ pub async fn submit_task(
 /// 列出可用工具
 // #[tauri::command] 已注释
 pub async fn list_tools(
-    state: State<'_, AgentRuntimeState>,
-) -> Result<Vec<tool_bus::ToolInfo>, String> {
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
-    
-    Ok(rt.state.tool_bus.list_tools().await)
+    _state: State<'_, AgentRuntimeState>,
+) -> Result<Vec<String>, String> {
+    // 工具列表现在通过 ToolFacade 或 BridgeManager 获取
+    // 暂时返回空列表
+    Ok(vec!["generate_image".to_string(), "generate_audio".to_string(), "generate_video".to_string(), "get_video_status".to_string()])
 }
 
 /// 获取运行时状态
@@ -452,26 +451,28 @@ pub async fn agent_list_subscriptions(
 }
 
 /// 重新加载媒体工具（配置更新后调用）
+/// 注意：由于架构简化，媒体工具现在在应用启动时注册到 ToolExecutionManager
+/// 运行时无法动态更新，此函数仅用于检查配置状态
 #[tauri::command]
 pub async fn reload_media_tools(
-    state: State<'_, AgentRuntimeState>,
-    bridge_manager: State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
+    _state: State<'_, AgentRuntimeState>,
+    _bridge_manager: State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
-    log::info!("[reload_media_tools] 开始重新加载媒体工具...");
+    log::info!("[reload_media_tools] 检查媒体配置状态...");
     
-    // 1. 重新加载媒体配置
+    // 重新加载媒体配置
     let media_config = match crate::agent::media_config::MediaApiConfig::load() {
         Ok(config) => {
             log::info!("[reload_media_tools] 媒体配置加载成功，providers: {:?}", config.providers.keys().collect::<Vec<_>>());
             config
         }
         Err(e) => {
-            log::warn!("[reload_media_tools] 媒体配置加载失败: {}, 使用默认配置", e);
+            log::warn!("[reload_media_tools] 媒体配置加载失败: {}", e);
             crate::agent::media_config::MediaApiConfig::default()
         }
     };
     
-    // 2. 创建新的 ProviderRegistry
+    // 创建 ProviderRegistry 检查配置是否有效
     let provider_registry = match crate::agent::providers::ProviderRegistry::new(&media_config) {
         Ok(registry) => {
             log::info!("[reload_media_tools] ProviderRegistry 创建成功，可用 providers: {:?}", registry.available_providers());
@@ -482,51 +483,17 @@ pub async fn reload_media_tools(
         }
     };
     
-    // 3. 创建 ArchiveManager
-    let archive_manager = match crate::media_archive::MediaArchiveManager::new() {
-        Ok(am) => am,
-        Err(e) => {
-            log::warn!("[reload_media_tools] ArchiveManager 创建失败: {}, 使用默认实例", e);
-            return Err(format!("创建 ArchiveManager 失败: {}", e));
-        }
-    };
-    
-    // 4. 创建新的 ToolBus 并注册媒体工具
-    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
     let provider_count = provider_registry.available_providers().len();
-    tool_bus.register_media_tools(
-        std::sync::Arc::new(provider_registry),
-        std::sync::Arc::new(archive_manager),
-    );
-    let tool_bus = std::sync::Arc::new(tool_bus);
+    let providers: Vec<String> = provider_registry.available_providers();
     
-    log::info!("[reload_media_tools] 媒体工具重新注册完成，共 {} 个 Provider", provider_count);
+    log::info!("[reload_media_tools] 配置检查完成，共 {} 个 Provider", provider_count);
     
-    // 5. 更新 BridgeManager 中的 ToolBus（这会让前端工具调用生效）
-    bridge_manager.update_tool_bus(tool_bus.clone()).await;
-    log::info!("[reload_media_tools] BridgeManager 的 ToolBus 已更新");
-    
-    // 6. 同时更新 AgentRuntimeState 中的 ToolBus（如果存在）
-    {
-        let runtime = state.runtime.read().await;
-        if let Some(rt) = runtime.as_ref() {
-            rt.state.tool_bus.register_media_tools(
-                std::sync::Arc::new(crate::agent::providers::ProviderRegistry::new(&media_config).map_err(|e| format!("创建 ProviderRegistry 失败: {}", e))?),
-                std::sync::Arc::new(crate::media_archive::MediaArchiveManager::new().map_err(|e| format!("创建 ArchiveManager 失败: {}", e))?),
-            );
-        }
-    }
-    
-    // 7. 返回可用的 Provider 列表
-    let available_tools: Vec<String> = tool_bus.list_tools().await
-        .into_iter()
-        .map(|t| t.name)
-        .collect();
-    
+    // 注意：运行时更新媒体工具需要重启应用
     Ok(serde_json::json!({
         "success": true,
-        "message": format!("媒体工具重新加载成功，共 {} 个 Provider", provider_count),
-        "available_tools": available_tools,
+        "message": format!("媒体配置检查完成，共 {} 个 Provider。注意：更新媒体工具需要重启应用", provider_count),
         "provider_count": provider_count,
+        "providers": providers,
+        "requires_restart": true,
     }))
 }
