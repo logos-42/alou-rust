@@ -10,6 +10,7 @@ import {
   getMentionSuggestions,
   parseMentions
 } from '@/utils/groupchat/mentionParser'
+import useClusterActionStore from '@/stores/clusterActionStore'
 import GroupIcon from '@/assets/群组.png'
 import RefreshIcon from '@/assets/刷新0.2.png'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -107,8 +108,12 @@ const GroupChatPanel = ({
 
   // 优先使用外部传入的数据，否则使用本地数据
   const activeGroup = externalActiveGroup || localActiveGroup
-  const messages = externalMessages.length > 0 ? externalMessages : localMessages
   const isLoading = externalIsLoading || localIsLoading
+  
+  // 关键修复：始终从 store 获取最新消息，确保消息显示
+  const groupId = activeGroup?.groupId || activeGroup?.action_id
+  const storeMessages = groupId ? useClusterActionStore(state => state.getGroupChatMessages(groupId)) : []
+  const messages = storeMessages && storeMessages.length > 0 ? storeMessages : (externalMessages.length > 0 ? externalMessages : localMessages)
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)
   const [isScrolledToBottom, setIsScrolledToBottom] = useState(true)
@@ -131,6 +136,27 @@ const GroupChatPanel = ({
   const actualAgents = useMemo(() => {
     return activeGroup?.agents || agents || []
   }, [activeGroup, agents])
+
+  // 订阅 store 变化，当消息更新时强制重新渲染
+  const [messageVersion, setMessageVersion] = useState(0)
+  useEffect(() => {
+    if (!activeGroup) return
+
+    const groupId = activeGroup.groupId || activeGroup.action_id
+    if (!groupId) return
+
+    // 定期检查 store 中的消息变化
+    const interval = setInterval(() => {
+      const { getGroupChatMessages } = useClusterActionStore.getState()
+      const storeMessages = getGroupChatMessages(groupId)
+      // 如果 store 中有消息且与当前消息数量不同，触发更新
+      if (storeMessages && storeMessages.length > 0) {
+        setMessageVersion(prev => prev + 1)
+      }
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [activeGroup?.groupId || activeGroup?.action_id])
 
   // 错误处理
   useEffect(() => {

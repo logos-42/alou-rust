@@ -615,6 +615,8 @@ fn main() {
         .manage(std::sync::Arc::new(tokio::sync::Mutex::new(initialize_task_queue_tool().unwrap())))
         .manage(initialize_heartbeat_manager())
         .manage(cron::initialize_cron().expect("Failed to initialize Cron scheduler"))
+        // 🔥 添加 AgentRuntimeState 管理（用于 init_agent_runtime 等命令）
+        .manage(agent_runtime::commands::AgentRuntimeState::new())
         // AgentRuntimeState 将在 init_agent_runtime 命令中创建
         .invoke_handler(tauri::generate_handler![
             // Agent Runtime commands
@@ -863,6 +865,50 @@ fn main() {
             // 初始化 DIAP 文件管理器（用于 DIAP 身份文件存储）
             crate::diap_file_manager::init_app_handle(app.handle().clone());
             log::info!("[main] DIAP file manager initialized");
+
+            // 🔥 初始化媒体工具到 BridgeManager（应用启动时）
+            log::info!("[main] 开始初始化媒体工具...");
+            let bridge_manager_state = app.state::<std::sync::Arc<BridgeManager>>();
+
+            // 加载媒体配置
+            match crate::agent::media_config::MediaApiConfig::load() {
+                Ok(media_config) => {
+                    match crate::agent::providers::ProviderRegistry::new(&media_config) {
+                        Ok(provider_registry) => {
+                            log::info!("[main] ProviderRegistry 创建成功，可用 providers: {:?}", provider_registry.available_providers());
+
+                            // 创建 ArchiveManager
+                            match crate::media_archive::MediaArchiveManager::new() {
+                                Ok(archive_manager) => {
+                                    // 创建 ToolBus 并注册媒体工具
+                                    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
+                                    tool_bus.register_media_tools(
+                                        std::sync::Arc::new(provider_registry),
+                                        std::sync::Arc::new(archive_manager),
+                                    );
+
+                                    // 更新 BridgeManager 的 ToolBus
+                                    let tool_bus = std::sync::Arc::new(tool_bus);
+                                    let bridge_manager = bridge_manager_state.inner().clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        bridge_manager.update_tool_bus(tool_bus).await;
+                                        log::info!("[main] ✅ 媒体工具初始化完成，已更新到 BridgeManager");
+                                    });
+                                }
+                                Err(e) => {
+                                    log::warn!("[main] 无法创建 MediaArchiveManager: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("[main] 无法创建 ProviderRegistry: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[main] 无法加载 MediaApiConfig: {}", e);
+                }
+            }
             
             // 自动加载所有已有身份到内存
             crate::diap_file_manager::load_all_identities_to_memory(app.handle());

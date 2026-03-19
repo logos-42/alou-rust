@@ -505,36 +505,52 @@
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
-/* 暗色模式 */
-.app-shell.dark-mode .group-chat-panel {
-  background: rgba(15, 23, 42, 0.95);
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2);
+/* 暗色模式 - 使用更高优先级的选择器 */
+.app-shell.dark-mode .group-chat-panel,
+[class*="dark"] .group-chat-panel,
+.dark-mode .group-chat-panel {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
-.app-shell.dark-mode .group-chat-panel.clicked {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  border-color: rgba(99, 102, 241, 0.3);
+.app-shell.dark-mode .group-chat-panel.clicked,
+[class*="dark"] .group-chat-panel.clicked,
+.dark-mode .group-chat-panel.clicked {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
 }
 
-.app-shell.dark-mode .group-chat-panel.input-target-active {
-  border-color: var(--primary-color, #6366f1);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), 0 12px 32px rgba(0, 0, 0, 0.3);
+.app-shell.dark-mode .group-chat-panel.input-target-active,
+[class*="dark"] .group-chat-panel.input-target-active,
+.dark-mode .group-chat-panel.input-target-active {
+  border-color: var(--primary-color, #6366f1) !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2), 0 12px 32px rgba(0, 0, 0, 0.3) !important;
 }
 
 .app-shell.dark-mode .group-chat-header,
 .app-shell.dark-mode .group-chat-agents,
-.app-shell.dark-mode .group-chat-agents-avatars {
-  background: rgba(30, 41, 59, 0.5);
-  border-color: rgba(255, 255, 255, 0.08);
+.app-shell.dark-mode .group-chat-agents-avatars,
+[class*="dark"] .group-chat-header,
+[class*="dark"] .group-chat-agents,
+[class*="dark"] .group-chat-agents-avatars,
+.dark-mode .group-chat-header,
+.dark-mode .group-chat-agents,
+.dark-mode .group-chat-agents-avatars {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-.app-shell.dark-mode .group-chat-content {
-  background: rgba(15, 23, 42, 0.4);
+.app-shell.dark-mode .group-chat-content,
+[class*="dark"] .group-chat-content,
+.dark-mode .group-chat-content {
+  background: rgba(15, 23, 42, 0.4) !important;
 }
 
-.app-shell.dark-mode .group-chat-messages {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(30, 41, 59, 0.2) 100%);
+.app-shell.dark-mode .group-chat-messages,
+[class*="dark"] .group-chat-messages,
+.dark-mode .group-chat-messages {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(30, 41, 59, 0.2) 100%) !important;
 }
 
 .app-shell.dark-mode .agent-item {

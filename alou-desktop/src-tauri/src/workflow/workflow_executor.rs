@@ -323,6 +323,21 @@ impl AsyncWorkflowExecutor {
 
         // 重试循环
         while retry_count <= max_retries {
+            // 在每次重试前检查是否被暂停/取消
+            if !self.check_and_wait_for_pause(execution_id).await {
+                println!("⏸️ [WORKFLOW] Step {} paused/cancelled before retry", step.id);
+                return StepResult {
+                    step_id: step.id.clone(),
+                    status: ExecutionStatus::Cancelled,
+                    result: None,
+                    error: Some("Execution paused or cancelled by user".to_string()),
+                    started_at: start_time,
+                    completed_at: Some(chrono::Utc::now().timestamp()),
+                    execution_time_ms: Some((chrono::Utc::now().timestamp() - start_time) as u64 * 1000),
+                    retry_count,
+                    max_retries,
+                };
+            }
             let _attempt_start = chrono::Utc::now().timestamp();
 
             match self.execute_step_logic(step, execution_id, api_key, agent_info).await {
@@ -341,6 +356,21 @@ impl AsyncWorkflowExecutor {
                     };
                 }
                 Err(error) => {
+                    // 检查是否是暂停/取消导致的错误
+                    if error.contains("paused") || error.contains("cancelled") {
+                        println!("⏸️ [WORKFLOW] Step {} interrupted by user pause/cancel", step.id);
+                        return StepResult {
+                            step_id: step.id.clone(),
+                            status: ExecutionStatus::Cancelled,
+                            result: None,
+                            error: Some(error),
+                            started_at: start_time,
+                            completed_at: Some(chrono::Utc::now().timestamp()),
+                            execution_time_ms: Some((chrono::Utc::now().timestamp() - start_time) as u64 * 1000),
+                            retry_count,
+                            max_retries,
+                        };
+                    }
                     last_error = Some(error.clone());
                     retry_count += 1;
 

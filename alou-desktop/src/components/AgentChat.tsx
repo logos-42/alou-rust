@@ -921,7 +921,7 @@ const AgentChat = () => {
                       onSwitchGroupChat={switchGroupChat}
                       onPanelClick={handleGroupChatPanelClick}
                       onSelectAgent={handleSelectAgentFromGroupChat}
-                      externalOnSendMessage={sendGroupChatMessage}
+                      externalOnSendMessage={sendGroupChatMessage}  // 使用 useGroupChatManager 中的 sendMessage
                       onResize={setSplitPosition}
                       inputTargetMode={inputTargetMode}
                     />

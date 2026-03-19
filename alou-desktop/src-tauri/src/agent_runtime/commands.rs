@@ -95,6 +95,7 @@ pub struct AgentInfoResponse {
 #[tauri::command]
 pub async fn init_agent_runtime(
     state: State<'_, AgentRuntimeState>,
+    bridge_manager_state: State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
     app_handle: AppHandle,
 ) -> Result<bool, String> {
     let mut runtime = state.runtime.write().await;
@@ -112,17 +113,17 @@ pub async fn init_agent_runtime(
         Ok(media_config) => {
             match crate::agent::providers::ProviderRegistry::new(&media_config) {
                 Ok(registry) => {
-                    log::info!("ProviderRegistry 创建成功");
+                    log::info!("[init_agent_runtime] ProviderRegistry 创建成功，可用 providers: {:?}", registry.available_providers());
                     Some(Arc::new(registry))
                 }
                 Err(e) => {
-                    log::warn!("Failed to create ProviderRegistry: {}, using None", e);
+                    log::warn!("[init_agent_runtime] Failed to create ProviderRegistry: {}, using None", e);
                     None
                 }
             }
         }
         Err(e) => {
-            log::warn!("Failed to load MediaApiConfig: {}, using None", e);
+            log::warn!("[init_agent_runtime] Failed to load MediaApiConfig: {}, using None", e);
             None
         }
     };
@@ -131,7 +132,7 @@ pub async fn init_agent_runtime(
     let archive_manager = match crate::media_archive::MediaArchiveManager::new() {
         Ok(am) => Some(Arc::new(am)),
         Err(e) => {
-            log::warn!("Failed to create MediaArchiveManager: {}, using None", e);
+            log::warn!("[init_agent_runtime] Failed to create MediaArchiveManager: {}, using None", e);
             None
         }
     };
@@ -139,23 +140,20 @@ pub async fn init_agent_runtime(
     // 创建 ToolBus 并注册媒体工具
     let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
     if let (Some(provider_reg), Some(archive_mgr)) = (&provider_registry, &archive_manager) {
+        log::info!("[init_agent_runtime] 注册媒体工具到 ToolBus...");
         tool_bus.register_media_tools(provider_reg.clone(), archive_mgr.clone());
+    } else {
+        log::warn!("[init_agent_runtime] 无法注册媒体工具：ProviderRegistry 或 ArchiveManager 缺失");
     }
     let tool_bus = Arc::new(tool_bus);
     
-    let bridge_manager = Arc::new(crate::bridges::BridgeManager::new_with_toolbus(
-        crate::bridges::BridgeConfig {
-            tool_bridge: crate::bridges::ToolBridgeConfig::default(),
-            context_bridge: crate::bridges::ContextBridgeConfig::default(),
-            enabled: true,
-            max_concurrent_calls: 10,
-            timeout_seconds: 30,
-            max_retries: 3,
-            retry_delay_ms: 1000,
-            debug_mode: false,
-        },
-        Some(tool_bus.clone())
-    ));
+    // 🔥 关键：更新 main.rs 中创建的 BridgeManager 的 ToolBus
+    log::info!("[init_agent_runtime] 更新 BridgeManager 的 ToolBus...");
+    bridge_manager_state.update_tool_bus(tool_bus.clone()).await;
+    log::info!("[init_agent_runtime] BridgeManager 的 ToolBus 已更新");
+
+    // 使用已存在的 BridgeManager（而不是创建新的）
+    let bridge_manager = bridge_manager_state.inner().clone();
 
     let rt = AgentRuntime::new(tool_registry, bridge_manager).await?;
     rt.start().await?;
@@ -164,7 +162,7 @@ pub async fn init_agent_runtime(
     state.set_app_handle(app_handle.clone());
 
     *runtime = Some(rt);
-    log::info!("Agent Runtime 初始化完成");
+    log::info!("[init_agent_runtime] Agent Runtime 初始化完成");
 
     // Start media API server after AgentRuntime is initialized
     let _app_handle_for_media = app_handle.clone();
