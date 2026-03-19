@@ -501,7 +501,7 @@ export const useAgentMessages = ({
       })
       
       // 写回
-      await agentDocumentService.updateDocument(agentId, 'ipfs', updatedContent)
+      await agentDocumentService.updateAgentDocument(agentId, 'ipfs', updatedContent)
       console.log('[useAgentMessages] IPFS.md 文档已更新')
     } catch (err) {
       console.warn('[useAgentMessages] 更新 IPFS.md 失败:', err)
