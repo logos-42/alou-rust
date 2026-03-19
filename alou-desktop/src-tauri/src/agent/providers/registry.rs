@@ -18,16 +18,27 @@ impl ProviderRegistry {
     pub fn new(config: &MediaApiConfig) -> Result<Self> {
         let mut media_providers = HashMap::new();
 
+        log::info!("[ProviderRegistry] 开始创建 Provider，配置中的 providers: {:?}", config.providers.keys().collect::<Vec<_>>());
+
         // 根据配置创建 Provider
         for (name, provider_config) in &config.providers {
             if !provider_config.enabled {
+                log::info!("[ProviderRegistry] Provider '{}' 未启用，跳过", name);
                 continue;
             }
 
-            if let Ok(provider) = Self::create_media_provider(name, provider_config) {
-                media_providers.insert(name.clone(), provider);
+            match Self::create_media_provider(name, provider_config) {
+                Ok(provider) => {
+                    log::info!("[ProviderRegistry] Provider '{}' 创建成功", name);
+                    media_providers.insert(name.clone(), provider);
+                }
+                Err(e) => {
+                    log::error!("[ProviderRegistry] Provider '{}' 创建失败: {}", name, e);
+                }
             }
         }
+
+        log::info!("[ProviderRegistry] 创建完成，可用 providers: {:?}", media_providers.keys().collect::<Vec<_>>());
 
         Ok(Self {
             media_providers,

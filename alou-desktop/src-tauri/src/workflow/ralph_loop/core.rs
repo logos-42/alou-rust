@@ -390,6 +390,11 @@ impl AsyncWorkflowExecutor {
         });
 
         for step in &workflow.steps {
+            // 检查暂停状态
+            if !self.check_and_wait_for_pause(execution_id).await {
+                println!("⏸️ [RALPH-ITERATION] Execution {} paused or cancelled, stopping", execution_id);
+                return Err("Execution paused or cancelled".to_string());
+            }
             // 执行步骤
             let step_result = self.execute_step_logic(step, execution_id, api_key, agent_info).await?;
 

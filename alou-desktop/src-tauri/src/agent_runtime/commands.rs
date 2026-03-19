@@ -466,3 +466,69 @@ pub async fn agent_list_subscriptions(
     // TODO: 实现查询逻辑
     Ok(vec![])
 }
+
+/// 重新加载媒体工具（配置更新后调用）
+#[tauri::command]
+pub async fn reload_media_tools(
+    state: State<'_, AgentRuntimeState>,
+) -> Result<serde_json::Value, String> {
+    log::info!("[reload_media_tools] 开始重新加载媒体工具...");
+    
+    let runtime = state.runtime.read().await;
+    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
+    
+    // 1. 重新加载媒体配置
+    let media_config = match crate::agent::media_config::MediaApiConfig::load() {
+        Ok(config) => {
+            log::info!("[reload_media_tools] 媒体配置加载成功，providers: {:?}", config.providers.keys().collect::<Vec<_>>());
+            config
+        }
+        Err(e) => {
+            log::warn!("[reload_media_tools] 媒体配置加载失败: {}, 使用默认配置", e);
+            crate::agent::media_config::MediaApiConfig::default()
+        }
+    };
+    
+    // 2. 创建新的 ProviderRegistry
+    let provider_registry = match crate::agent::providers::ProviderRegistry::new(&media_config) {
+        Ok(registry) => {
+            log::info!("[reload_media_tools] ProviderRegistry 创建成功，可用 providers: {:?}", registry.available_providers());
+            registry
+        }
+        Err(e) => {
+            return Err(format!("创建 ProviderRegistry 失败: {}", e));
+        }
+    };
+    
+    // 3. 创建 ArchiveManager
+    let archive_manager = match crate::media_archive::MediaArchiveManager::new() {
+        Ok(am) => am,
+        Err(e) => {
+            log::warn!("[reload_media_tools] ArchiveManager 创建失败: {}, 使用默认实例", e);
+            return Err(format!("创建 ArchiveManager 失败: {}", e));
+        }
+    };
+    
+    // 4. 重新注册媒体工具到 ToolBus
+    let provider_count = provider_registry.available_providers().len();
+    rt.state.tool_bus.register_media_tools(
+        std::sync::Arc::new(provider_registry),
+        std::sync::Arc::new(archive_manager),
+    );
+    
+    log::info!("[reload_media_tools] 媒体工具重新注册完成，共 {} 个 Provider", provider_count);
+    
+    // 5. 返回可用的 Provider 列表
+    let available_providers: Vec<String> = rt.state.tool_bus.list_tools().await
+        .into_iter()
+        .filter(|t| ["generate_image", "generate_video", "generate_audio", "get_video_status"].contains(&t.name.as_str()))
+        .map(|t| t.name)
+        .collect();
+    
+    Ok(serde_json::json!({
+        "success": true,
+        "message": format!("媒体工具重新加载成功，共 {} 个 Provider", provider_count),
+        "available_tools": available_providers,
+        "provider_count": provider_count,
+    }))
+}

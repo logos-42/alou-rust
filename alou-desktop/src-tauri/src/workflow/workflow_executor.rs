@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio::time::{sleep, Duration};
+use tokio::select;
 use uuid;
 
 /// 异步工作流执行器
@@ -202,6 +203,12 @@ impl AsyncWorkflowExecutor {
 
         // 执行步骤（简化版本：按顺序执行，实际应该支持并发）
         for step in &workflow.steps {
+            // 检查暂停状态
+            if !self.check_and_wait_for_pause(&execution_id).await {
+                println!("⏸️ Execution {} paused or cancelled, stopping", execution_id);
+                return Ok(());
+            }
+
             // 检查是否有未完成的依赖
             if !self.check_dependencies_completed(&execution_id, &step.depends_on).await {
                 // 等待依赖完成（简化实现）
@@ -438,6 +445,39 @@ impl AsyncWorkflowExecutor {
         let mut executions = self.active_executions.write().await;
         if let Some(execution) = executions.get_mut(execution_id) {
             execution.status = status.clone();
+        }
+    }
+
+    /// 检查执行是否被暂停，如果是则等待恢复
+    pub(crate) async fn check_and_wait_for_pause(&self, execution_id: &str) -> bool {
+        loop {
+            let executions = self.active_executions.read().await;
+            if let Some(execution) = executions.get(execution_id) {
+                match execution.status {
+                    ExecutionStatus::Paused => {
+                        println!("⏸️ [WORKFLOW] Execution {} is paused, waiting for resume...", execution_id);
+                        drop(executions);
+                        // 暂停时等待，定期检查是否恢复或取消
+                        sleep(Duration::from_millis(300)).await;
+                        // 继续循环检查状态
+                        continue;
+                    }
+                    ExecutionStatus::Cancelled => {
+                        println!("❌ [WORKFLOW] Execution {} cancelled", execution_id);
+                        return false;
+                    }
+                    ExecutionStatus::Running => {
+                        // 正常运行状态
+                        return true;
+                    }
+                    _ => {
+                        // 其他状态（Pending、Completed 等）也返回 false
+                        return false;
+                    }
+                }
+            }
+            drop(executions);
+            return true;
         }
     }
 

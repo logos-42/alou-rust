@@ -76,7 +76,7 @@ export type ActionStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Can
  */
 export interface AgentInfo {
   /** 智能体唯一标识 */
-  id: string
+  id?: string
   /** 智能体显示名称 */
   name: string
   /** 智能体头像URL */
@@ -696,7 +696,7 @@ export function isUnifiedGroup(value: unknown): value is UnifiedGroup {
     'id' in value &&
     'name' in value &&
     'mode' in value &&
-    Object.values(GroupChatMode).includes((value as UnifiedGroup).mode)
+    Object.values(GroupChatMode).includes((value as UnifiedGroup).mode as GroupChatMode)
   )
 }
 

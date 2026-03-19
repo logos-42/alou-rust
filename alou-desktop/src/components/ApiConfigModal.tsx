@@ -510,6 +510,14 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         // 保存更新后的配置
         await invoke('update_media_config', { providers: mediaConfig.providers })
         
+        // 🔥 重新加载媒体工具
+        try {
+          const reloadResult = await invoke('reload_media_tools');
+          console.log('[ApiConfigModal] 删除配置后重新加载媒体工具:', reloadResult);
+        } catch (reloadErr) {
+          console.warn('[ApiConfigModal] 媒体工具重新加载失败:', reloadErr);
+        }
+        
         // 更新本地状态
         setApiConfigs(prev => prev.filter(c => c.id !== id))
       } else {
@@ -565,6 +573,10 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
           : PROVIDERS.find(p => p.category === 'text')?.value || 'deepseek'
         const provider = PROVIDERS.find(p => p.value === firstProvider)
         setEditingId('new')
+        // 根据删除的配置类型计算剩余配置数量
+        const remainingConfigs = configToDelete.isMedia 
+          ? apiConfigs.filter(c => c.id !== id && c.isMedia)
+          : apiConfigs.filter(c => c.id !== id && !c.isMedia)
         setCurrentConfig({
           id: `new_${Date.now()}`,
           provider: firstProvider,
@@ -572,7 +584,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
           base_url: '',
           model: DEFAULT_MODELS[firstProvider],
           enabled: true,
-          is_active: newConfigs.length === 0,
+          is_active: remainingConfigs.length === 0,
           capabilities: provider?.capabilities || [],
         })
       }
@@ -658,7 +670,16 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         try {
           await invoke('update_media_config', { providers });
           console.log('[ApiConfigModal] 媒体配置保存成功');
-          setSuccess('媒体配置已保存');
+          
+          // 🔥 重新加载媒体工具，使配置立即生效
+          try {
+            const reloadResult = await invoke('reload_media_tools');
+            console.log('[ApiConfigModal] 媒体工具重新加载结果:', reloadResult);
+          } catch (reloadErr) {
+            console.warn('[ApiConfigModal] 媒体工具重新加载失败，需要重启应用:', reloadErr);
+          }
+          
+          setSuccess('媒体配置已保存并生效');
         } catch (err) {
           console.error('[ApiConfigModal] 媒体配置保存失败:', err);
           throw err;

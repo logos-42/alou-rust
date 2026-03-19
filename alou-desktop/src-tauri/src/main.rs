@@ -633,6 +633,7 @@ fn main() {
             agent_runtime::commands::agent_subscribe_group,
             agent_runtime::commands::agent_unsubscribe_group,
             agent_runtime::commands::agent_list_subscriptions,
+            agent_runtime::commands::reload_media_tools,
             
             download_kubo_binary,
             start_ipfs_node,
