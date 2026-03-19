@@ -26,6 +26,8 @@ interface ImportMeta {
 declare global {
   interface Window {
     __lastLoadChannelsError?: number
+    __lastHealthCheckError?: number
+    __lastCreateSessionError?: number
     // Tauri APIs
     __TAURI__?: Record<string, unknown>
     __TAURI_IPC__?: Record<string, unknown>

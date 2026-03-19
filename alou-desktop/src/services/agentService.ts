@@ -855,6 +855,30 @@ class AgentService {
       };
     }
   }
+
+  /**
+   * 健康检查 - 检查后端服务是否可用
+   */
+  async healthCheck(): Promise<{ status: string }> {
+    try {
+      const response = await apiClient.get('/health');
+      return { status: 'ok' };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * 创建会话
+   */
+  async createSession(walletAddress?: string): Promise<{ session_id: string }> {
+    try {
+      const response = await apiClient.post('/session', { wallet_address: walletAddress });
+      return response.data || { session_id: `local_${Date.now()}` };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 // 创建单例实例
