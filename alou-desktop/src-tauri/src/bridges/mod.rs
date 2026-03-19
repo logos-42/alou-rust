@@ -93,6 +93,11 @@ impl BridgeManager {
         self.context_bridge.clone()
     }
 
+    /// 更新 ToolBus（用于配置更新后重新加载）
+    pub async fn update_tool_bus(&self, tool_bus: Arc<crate::agent_runtime::tool_bus::ToolBus>) {
+        self.tool_bridge.update_tool_bus(tool_bus).await;
+    }
+
     /// 获取配置
     pub fn get_config(&self) -> &BridgeConfig {
         &self.config

@@ -330,8 +330,10 @@ export class WorkflowService {
    * @returns 暂停结果
    */
   async pauseExecution(executionId: string): Promise<ExecutionControlResult> {
+    console.log('[WorkflowService] pauseExecution called with:', executionId)
     try {
-      const result = await invoke<{
+      console.log('[WorkflowService] Calling pause_execution Tauri command');
+        const result = await invoke<{
         execution_id: string
         status: string
         message: string

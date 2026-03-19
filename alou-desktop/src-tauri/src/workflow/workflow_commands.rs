@@ -33,7 +33,9 @@ pub async fn pause_execution(
     execution_id: String,
     executor: tauri::State<'_, AsyncWorkflowExecutor>,
 ) -> Result<serde_json::Value, String> {
-    executor.pause_execution(&execution_id).await?;
+    println!("🔔 [TAURI] pause_execution command received with id: {}", execution_id);
+        executor.pause_execution(&execution_id).await?;
+        println!("✅ [TAURI] pause_execution command completed");
     Ok(serde_json::json!({
         "execution_id": execution_id,
         "status": "paused"

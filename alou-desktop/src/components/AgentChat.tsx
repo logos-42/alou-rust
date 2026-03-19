@@ -713,7 +713,7 @@ const AgentChat = () => {
     openConversationPanel,
   })
 
-  const { inputTargetMode, handleGroupChatPanelClick } = remoteControl
+  const { inputTargetMode, handleGroupChatPanelClick, sendMessage: sendFromRemoteControl } = remoteControl
 
 
   // ==================== Bootstrap Effect ====================
@@ -1014,7 +1014,14 @@ const AgentChat = () => {
         style={consoleDockStyle}
         showOpenButton={!showConversationPanel && messages.length > 0}
         onSend={(text) => {
-          sendMessage(text)  // 传递输入文本
+          // 根据输入目标模式选择发送方式
+          if (showGroupChat && inputTargetMode === 'groupChat') {
+            // 发送到群聊 - 使用 remoteControl 的 sendMessage
+            sendFromRemoteControl(text)
+          } else {
+            // 发送到智能体 - 使用原有的 sendMessage
+            sendMessage(text)
+          }
         }}
         onCancel={() => {
           // 终止当前频道/会话的所有执行

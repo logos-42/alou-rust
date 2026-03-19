@@ -230,18 +230,18 @@ export const useWorkflow = ({
     }
   }, [sessionId, apiKey, agentInfo, onWorkflowMessage, loadWorkflows])
 
-  // 恢复工作流
-  const resumeWorkflow = useCallback(async (workflowId: string) => {
+  // 恢复工作流执行
+  const resumeWorkflow = useCallback(async (executionId: string) => {
     const effectiveApiKey = apiKey || (typeof window !== 'undefined' ? localStorage.getItem('claude_api_key') : null)
     if (!sessionId || !effectiveApiKey) return
 
     try {
-      const response = await workflowService.resumeWorkflow(workflowId, effectiveApiKey, agentInfo)
+      const response = await workflowService.resumeExecution(executionId)
 
       if (response.success) {
         onWorkflowMessage?.({
           type: 'workflow_resumed',
-          workflowId,
+          workflowId: executionId,
           result: response.result
         })
 
@@ -250,7 +250,7 @@ export const useWorkflow = ({
       } else {
         onWorkflowMessage?.({
           type: 'resume_error',
-          workflowId,
+          workflowId: executionId,
           error: response.error
         })
       }
@@ -259,7 +259,7 @@ export const useWorkflow = ({
       console.error('[useWorkflow] 恢复工作流异常:', error)
       onWorkflowMessage?.({
         type: 'resume_error',
-        workflowId,
+        workflowId: executionId,
         error
       })
     }
@@ -303,17 +303,21 @@ export const useWorkflow = ({
     }
   }, [sessionId, selectedWorkflow, onWorkflowMessage, loadWorkflows])
 
-  // 暂停工作流
-  const pauseWorkflow = useCallback(async (workflowId: string) => {
+  // 暂停工作流执行
+  const pauseWorkflow = useCallback(async (executionId: string) => {
     if (!sessionId) return
 
+    console.log('[useWorkflow] pauseWorkflow called with executionId:', executionId)
+    
     try {
-      const response = await workflowService.pauseWorkflow(workflowId)
+      const response = await workflowService.pauseExecution(executionId)
 
+      console.log('[useWorkflow] pauseExecution response:', response)
+      
       if (response.success) {
         onWorkflowMessage?.({
           type: 'workflow_paused',
-          workflowId
+          workflowId: executionId
         })
 
         // 重新获取工作流状态
@@ -321,7 +325,7 @@ export const useWorkflow = ({
       } else {
         onWorkflowMessage?.({
           type: 'pause_error',
-          workflowId,
+          workflowId: executionId,
           error: response.error
         })
       }
@@ -330,7 +334,7 @@ export const useWorkflow = ({
       console.error('[useWorkflow] 暂停工作流异常:', error)
       onWorkflowMessage?.({
         type: 'pause_error',
-        workflowId,
+        workflowId: executionId,
         error
       })
     }

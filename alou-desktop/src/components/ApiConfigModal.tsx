@@ -510,7 +510,7 @@ function ApiConfigModal({ isOpen, onClose, isDarkMode }) {
         // 保存更新后的配置
         await invoke('update_media_config', { providers: mediaConfig.providers })
         
-        // 🔥 重新加载媒体工具
+        //  重新加载媒体工具
         try {
           const reloadResult = await invoke('reload_media_tools');
           console.log('[ApiConfigModal] 删除配置后重新加载媒体工具:', reloadResult);

@@ -382,6 +382,8 @@ impl AsyncWorkflowExecutor {
     ) -> Result<serde_json::Value, String> {
         // 使用真实的工具桥接执行工具
         let tool_bridge = self.bridge_manager.tool_bridge();
+        let executor = self.clone();
+        let execution_id_clone = execution_id.to_string();
 
         let request = crate::bridges::ToolCallRequest {
             session_id: format!("workflow_{}", execution_id),
@@ -396,20 +398,49 @@ impl AsyncWorkflowExecutor {
             permissions: vec![],
         };
 
-        match tool_bridge.handle_request(request).await {
-            Ok(response) => {
-                if response.success {
-                    Ok(serde_json::json!({
-                        "step_id": step.id,
-                        "tool": step.tool,
-                        "result": response.result.map(|r| r.data).unwrap_or_else(|| serde_json::json!({"status": "success"})),
-                        "message": format!("Step '{}' completed successfully", step.name)
-                    }))
-                } else {
-                    Err(response.error.unwrap_or_else(|| format!("Step '{}' execution failed", step.name)))
+        // 使用 tokio::select! 同时监听工具执行和暂停/取消事件
+        select! {
+            // 工具执行任务
+            result = tool_bridge.handle_request(request) => {
+                match result {
+                    Ok(response) => {
+                        if response.success {
+                            Ok(serde_json::json!({
+                                "step_id": step.id,
+                                "tool": step.tool,
+                                "result": response.result.map(|r| r.data).unwrap_or_else(|| serde_json::json!({"status": "success"})),
+                                "message": format!("Step '{}' completed successfully", step.name)
+                            }))
+                        } else {
+                            Err(response.error.unwrap_or_else(|| format!("Step '{}' execution failed", step.name)))
+                        }
+                    }
+                    Err(e) => Err(format!("Tool execution error: {}", e))
                 }
             }
-            Err(e) => Err(format!("Tool execution error: {}", e))
+            // 暂停/取消检查任务
+            _ = async {
+                loop {
+                    sleep(Duration::from_millis(200)).await;
+                    {
+                        let executions = executor.active_executions.read().await;
+                        if let Some(exec) = executions.get(&execution_id_clone) {
+                            if exec.status == ExecutionStatus::Cancelled {
+                                return true; // 取消
+                            }
+                            if exec.status == ExecutionStatus::Paused {
+                                // 暂停时返回错误，中断工具执行
+                                println!("⏸️ [WORKFLOW] Execution paused during step: {}", step.id);
+                                return true; // 暂停
+                            }
+                        }
+                    }
+                }
+            } => {
+                // 被暂停或取消
+                println!("⏹️ [WORKFLOW] Step execution interrupted for: {}", step.id);
+                Err("Execution paused or cancelled by user".to_string())
+            }
         }
     }
 
@@ -545,10 +576,23 @@ impl AsyncWorkflowExecutor {
 
     /// 暂停执行
     pub async fn pause_execution(&self, execution_id: &str) -> Result<(), String> {
+        println!("⏸️ [WORKFLOW] pause_execution called with id: {}", execution_id);
+        
+        // 检查执行是否存在
+        {
+            let executions = self.active_executions.read().await;
+            if let Some(exec) = executions.get(execution_id) {
+                println!("📋 [WORKFLOW] Current status: {:?}, changing to Paused", exec.status);
+            } else {
+                return Err(format!("Execution '{}' not found", execution_id));
+            }
+        }
+        
         self.update_execution_status(execution_id, ExecutionStatus::Paused).await;
         let _ = self.event_sender.send(ExecutionEvent::Paused {
             execution_id: execution_id.to_string(),
         });
+        println!("✅ [WORKFLOW] Execution {} paused successfully", execution_id);
         Ok(())
     }
 

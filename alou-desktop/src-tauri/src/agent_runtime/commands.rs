@@ -471,11 +471,9 @@ pub async fn agent_list_subscriptions(
 #[tauri::command]
 pub async fn reload_media_tools(
     state: State<'_, AgentRuntimeState>,
+    bridge_manager: State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
 ) -> Result<serde_json::Value, String> {
     log::info!("[reload_media_tools] 开始重新加载媒体工具...");
-    
-    let runtime = state.runtime.read().await;
-    let rt = runtime.as_ref().ok_or("Agent Runtime 未初始化")?;
     
     // 1. 重新加载媒体配置
     let media_config = match crate::agent::media_config::MediaApiConfig::load() {
@@ -509,26 +507,42 @@ pub async fn reload_media_tools(
         }
     };
     
-    // 4. 重新注册媒体工具到 ToolBus
+    // 4. 创建新的 ToolBus 并注册媒体工具
+    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
     let provider_count = provider_registry.available_providers().len();
-    rt.state.tool_bus.register_media_tools(
+    tool_bus.register_media_tools(
         std::sync::Arc::new(provider_registry),
         std::sync::Arc::new(archive_manager),
     );
+    let tool_bus = std::sync::Arc::new(tool_bus);
     
     log::info!("[reload_media_tools] 媒体工具重新注册完成，共 {} 个 Provider", provider_count);
     
-    // 5. 返回可用的 Provider 列表
-    let available_providers: Vec<String> = rt.state.tool_bus.list_tools().await
+    // 5. 更新 BridgeManager 中的 ToolBus（这会让前端工具调用生效）
+    bridge_manager.update_tool_bus(tool_bus.clone()).await;
+    log::info!("[reload_media_tools] BridgeManager 的 ToolBus 已更新");
+    
+    // 6. 同时更新 AgentRuntimeState 中的 ToolBus（如果存在）
+    {
+        let runtime = state.runtime.read().await;
+        if let Some(rt) = runtime.as_ref() {
+            rt.state.tool_bus.register_media_tools(
+                std::sync::Arc::new(crate::agent::providers::ProviderRegistry::new(&media_config).map_err(|e| format!("创建 ProviderRegistry 失败: {}", e))?),
+                std::sync::Arc::new(crate::media_archive::MediaArchiveManager::new().map_err(|e| format!("创建 ArchiveManager 失败: {}", e))?),
+            );
+        }
+    }
+    
+    // 7. 返回可用的 Provider 列表
+    let available_tools: Vec<String> = tool_bus.list_tools().await
         .into_iter()
-        .filter(|t| ["generate_image", "generate_video", "generate_audio", "get_video_status"].contains(&t.name.as_str()))
         .map(|t| t.name)
         .collect();
     
     Ok(serde_json::json!({
         "success": true,
         "message": format!("媒体工具重新加载成功，共 {} 个 Provider", provider_count),
-        "available_tools": available_providers,
+        "available_tools": available_tools,
         "provider_count": provider_count,
     }))
 }

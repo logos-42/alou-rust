@@ -300,9 +300,11 @@ export const useGroupChatRemoteControl = ({
   }, [])
 
   // 发送消息（整合了遥控功能的逻辑）
-  const sendMessage = useCallback(async () => {
-    const text = currentMessage.trim()
-    if (!text) {
+  const sendMessage = useCallback(async (text?: string) => {
+    // 如果传入了 text 参数，使用它；否则从 currentMessage 获取
+    const messageText = text !== undefined ? text : currentMessage
+    const trimmed = messageText?.trim()
+    if (!trimmed) {
       return
     }
 
@@ -313,30 +315,28 @@ export const useGroupChatRemoteControl = ({
       activeChannelId,
       selectedAgent: selectedAgent?.id,
       inputTargetMode,
-      text: text.slice(0, 30)
+      text: trimmed.slice(0, 30)
     })
 
     // 零状态处理：没有活跃频道或智能体时
     if (!activeChannelId || !selectedAgent) {
       console.log('[useGroupChatRemoteControl] 零状态处理:', { activeChannelId, selectedAgent, showGroupChat, activeActionId })
-      
+
       // 关键修复：如果群聊面板打开且有活跃群聊，直接发送到群聊
       // 不再依赖 inputTargetMode，确保群聊消息能正确发送
       if (showGroupChat && activeActionId) {
-        setCurrentMessage('')
         try {
-          await sendMessageToGroupChat(text, activeActionId)
+          await sendMessageToGroupChat(trimmed, activeActionId)
           console.log('[useGroupChatRemoteControl] 零状态下消息已发送到群聊')
         } catch (sendError) {
           console.error('[useGroupChatRemoteControl] 零状态下发送消息失败:', sendError)
         }
         return
       }
-      
+
       // 尝试处理零状态消息
-      const handled = await handleZeroStateMessage(text)
+      const handled = await handleZeroStateMessage(trimmed)
       if (handled) {
-        setCurrentMessage('')
         return
       }
       // 如果没有成功处理，仍然允许发送（可能会有其他逻辑处理）
@@ -357,17 +357,15 @@ export const useGroupChatRemoteControl = ({
         setSessionReady(true)
       }
 
-      setCurrentMessage('')
       // 发送消息后不自动打开对话面板，只显示查看按钮
-      await sendMessageToAgent(activeChannelId, text, selectedAgent)
+      await sendMessageToAgent(activeChannelId, trimmed, selectedAgent)
       return
     }
 
     // 群聊面板打开时，启用遥控功能
     if (inputTargetMode === 'groupChat') {
       // 发送到群聊
-      setCurrentMessage('')
-      await sendMessageToGroupChat(text, activeActionId)
+      await sendMessageToGroupChat(trimmed, activeActionId)
     } else {
       // 发送到智能体主对话（遥控模式）
       if (!isSessionReady) {
@@ -375,9 +373,8 @@ export const useGroupChatRemoteControl = ({
         setSessionReady(true)
       }
 
-      setCurrentMessage('')
       // 发送消息后不自动打开对话面板，只显示查看按钮
-      await sendMessageToAgent(activeChannelId, text, selectedAgent)
+      await sendMessageToAgent(activeChannelId, trimmed, selectedAgent)
     }
   }, [
     handleZeroStateMessage,
@@ -392,7 +389,6 @@ export const useGroupChatRemoteControl = ({
     selectedAgent,
     sendMessageToAgent,
     sendMessageToGroupChat,
-    setCurrentMessage,
     setSessionReady,
     showGroupChat,
   ])

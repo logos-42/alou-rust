@@ -41,6 +41,8 @@ impl ToolBus {
             GetVideoStatusTool,
         };
 
+        log::info!("[ToolBus] 开始注册媒体工具，可用 providers: {:?}", provider_registry.available_providers());
+
         self.register_tool("generate_image", Box::new(GenerateImageTool::new(
             provider_registry.clone(),
             archive_manager.clone(),
@@ -58,7 +60,7 @@ impl ToolBus {
             archive_manager.clone(),
         )));
 
-        log::info!("媒体工具已注册（直接调用 Provider）");
+        log::info!("[ToolBus] 媒体工具注册完成，共注册 4 个工具");
     }
     
     pub fn register_tool(&self, name: &str, tool: Box<dyn Tool>) {

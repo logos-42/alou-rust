@@ -134,9 +134,19 @@ export const useGroupChatAutonomousAgent = (
       return false
     }
 
+    // ✅ 关键修复：如果只有一个智能体，始终响应（除非是系统消息）
+    if (allAgents.length === 1) {
+      // 系统消息不响应
+      if (message.type === 'system') {
+        return false
+      }
+      // 单个智能体时，始终响应所有用户消息
+      return true
+    }
+
     // 自主响应模式：智能体根据消息内容判断是否响应
     const content = message.content.toLowerCase()
-    
+
     // 1. 检查是否被直接 @
     if (content.includes('@' + agent.name)) {
       return true
@@ -154,7 +164,7 @@ export const useGroupChatAutonomousAgent = (
       agent.name,
       ...(agent.role_description ? [agent.role_description] : [])
     ]
-    const mentionsAgent = agentKeywords.some(keyword => 
+    const mentionsAgent = agentKeywords.some(keyword =>
       keyword && content.includes(keyword.toLowerCase())
     )
 

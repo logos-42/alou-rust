@@ -523,7 +523,8 @@
 }
 
 .app-shell.dark-mode .group-chat-header,
-.app-shell.dark-mode .group-chat-agents {
+.app-shell.dark-mode .group-chat-agents,
+.app-shell.dark-mode .group-chat-agents-avatars {
   background: rgba(30, 41, 59, 0.5);
   border-color: rgba(255, 255, 255, 0.08);
 }
@@ -554,6 +555,21 @@
 .app-shell.dark-mode .refresh-btn-fixed:hover {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15);
+}
+
+.app-shell.dark-mode .group-title,
+.app-shell.dark-mode .message-sender {
+  color: var(--text-primary-dark, #f7fafc);
+}
+
+.app-shell.dark-mode .group-subtitle,
+.app-shell.dark-mode .agents-avatars-label,
+.app-shell.dark-mode .empty-text {
+  color: var(--text-secondary-dark, #a0aec0);
+}
+
+.app-shell.dark-mode .empty-hint {
+  color: var(--text-muted-dark, #718096);
 }
 
 /* 消息输入框 */

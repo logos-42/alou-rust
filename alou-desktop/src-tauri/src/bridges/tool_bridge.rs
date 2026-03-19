@@ -18,6 +18,7 @@ use crate::agent_runtime::tool_bus::ToolBus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 /// 工具桥接
 #[derive(Clone)]
@@ -25,7 +26,7 @@ pub struct ToolBridge {
     registry: ToolRegistry,
     execution_manager: ToolExecutionManager,
     request_count: Arc<AtomicU64>,
-    tool_bus: Option<Arc<ToolBus>>,
+    tool_bus: Arc<RwLock<Option<Arc<ToolBus>>>>,
 }
 
 impl ToolBridge {
@@ -40,7 +41,7 @@ impl ToolBridge {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
-            tool_bus: tool_bus.clone(),
+            tool_bus: Arc::new(RwLock::new(tool_bus)),
         };
 
         // 在同步上下文中注册工具
@@ -65,13 +66,20 @@ impl ToolBridge {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
-            tool_bus: tool_bus.clone(),
+            tool_bus: Arc::new(RwLock::new(tool_bus)),
         };
 
         // 注册所有工具
         bridge.register_all_tools().await?;
 
         Ok(bridge)
+    }
+
+    /// 更新 ToolBus（用于配置更新后重新加载）
+    pub async fn update_tool_bus(&self, tool_bus: Arc<ToolBus>) {
+        let mut tb = self.tool_bus.write().await;
+        *tb = Some(tool_bus);
+        log::info!("[ToolBridge] ToolBus 已更新");
     }
 
     /// 处理工具调用请求
@@ -91,24 +99,29 @@ impl ToolBridge {
         };
 
         // 1. 先尝试 ToolBus（媒体工具等）
-        if let Some(tool_bus) = &self.tool_bus {
-            match tool_bus.execute(&request.tool_id, request.args.clone()).await {
-                Ok(result) => {
-                    return Ok(ToolCallResponse {
-                        success: true,
-                        result: Some(ToolResult {
+        {
+            let tool_bus = self.tool_bus.read().await;
+            if let Some(tb) = tool_bus.as_ref() {
+                match tb.execute(&request.tool_id, request.args.clone()).await {
+                    Ok(result) => {
+                        return Ok(ToolCallResponse {
                             success: true,
-                            data: result,
+                            result: Some(ToolResult {
+                                success: true,
+                                data: result,
+                                error: None,
+                                execution_time_ms: 0,
+                                output: None,
+                                warnings: vec![],
+                                context: None,
+                            }),
                             error: None,
-                            execution_time_ms: 0,
-                            output: None,
-                            warnings: vec![],
-                            context: None,
-                        }),
-                        error: None,
-                    });
+                        });
+                    }
+                    Err(e) => {
+                        log::debug!("[ToolBridge] ToolBus 执行失败，尝试 fallback: {}", e);
+                    }
                 }
-                Err(_) => {}
             }
         }
 
