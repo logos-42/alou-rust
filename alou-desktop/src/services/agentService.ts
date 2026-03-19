@@ -156,6 +156,15 @@ class AgentService {
       // 获取 AI 配置
       const aiConfig = getAIConfig();
       
+      // 🔥 获取系统提示（使用统一的 promptService）
+      const systemPrompt = await getSystemPromptForChat(agentInfo, {
+        ...options,
+        message,
+        timestamp: Date.now(),
+      });
+      
+      console.log('[AgentService] 本地执行，系统提示长度:', systemPrompt.length);
+      
       const payload = {
         agentConfig: {
           name: agentInfo.name,
@@ -171,7 +180,9 @@ class AgentService {
         options: {
           stream: options.stream || false,
           timeout: options.timeout || 30000
-        }
+        },
+        // 🔥 传递系统提示到后端
+        systemPrompt,
       };
       
       const result: any = await invoke('execute_ai_conversation', payload);

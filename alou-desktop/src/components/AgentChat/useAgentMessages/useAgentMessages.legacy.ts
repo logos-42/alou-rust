@@ -760,6 +760,8 @@ export const useAgentMessages = ({
         options: { stream: false },
         agentId: agentInfo?.id || targetAgentId,  // 传递智能体 ID
         sessionId: agentSessionId,  // ← 修复：传递每个 agent 独立的 session，而不是全局 sessionId
+        // 🔥 传递系统提示到后端
+        systemPrompt,
       })
 
       console.log('[useAgentMessages] Tauri AI 响应:', tauri_result)

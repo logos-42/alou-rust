@@ -185,6 +185,8 @@ export function useAgentExecution({
         options: { stream: false },
         agentId: agentInfo?.id || targetAgentId,
         sessionId,
+        // 🔥 传递系统提示到后端（优先使用单独的参数）
+        systemPrompt,
       })
 
       // 处理响应

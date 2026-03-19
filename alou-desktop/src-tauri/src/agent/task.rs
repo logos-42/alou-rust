@@ -64,6 +64,9 @@ pub struct Task {
     #[serde(skip, default = "Instant::now")]
     pub updated_at: Instant,
     pub metadata: TaskMetadata,
+    /// 🔥 前端传入的系统提示（优先使用）
+    #[serde(skip)]
+    pub system_prompt: Option<String>,
 }
 
 impl Default for Task {
@@ -79,6 +82,7 @@ impl Default for Task {
             created_at: Instant::now(),
             updated_at: Instant::now(),
             metadata: TaskMetadata::default(),
+            system_prompt: None,
         }
     }
 }
@@ -190,6 +194,16 @@ impl TaskManager {
 
     /// 创建任务（完整消息数组，支持 system/user/assistant 角色）
     pub async fn create_task_with_messages(&self, agent_id: String, messages: Vec<AiMessage>) -> String {
+        self.create_task_with_messages_and_prompt(agent_id, messages, None).await
+    }
+
+    /// 🔥 创建任务（完整消息数组 + 系统提示）
+    pub async fn create_task_with_messages_and_prompt(
+        &self, 
+        agent_id: String, 
+        messages: Vec<AiMessage>,
+        system_prompt: Option<String>,
+    ) -> String {
         let task_id = uuid::Uuid::new_v4().to_string();
         let task = Task {
             id: task_id.clone(),
@@ -208,6 +222,7 @@ impl TaskManager {
                 max_iterations: 20, // 合理的最大迭代次数
                 ralph_loop_enabled: true,
             },
+            system_prompt,
         };
 
         let mut tasks = self.tasks.write().await;

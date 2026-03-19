@@ -62,6 +62,8 @@ pub async fn execute_ai_conversation(
     options: Option<serde_json::Value>,
     agent_id: Option<String>,
     session_id: Option<String>,
+    // 🔥 前端传入的系统提示（优先使用）
+    system_prompt: Option<String>,
     bridge_manager: tauri::State<'_, std::sync::Arc<crate::bridges::BridgeManager>>,
     _session_router: tauri::State<'_, std::sync::Arc<SessionRouter>>,
 ) -> std::result::Result<serde_json::Value, String> {
@@ -105,8 +107,9 @@ pub async fn execute_ai_conversation(
             })
             .collect();
 
-        log::info!("[Command] 使用完整消息历史创建任务，消息数：{}", ai_messages.len());
-        task_manager.create_task_with_messages(target_session_id.clone(), ai_messages).await
+        log::info!("[Command] 使用完整消息历史创建任务，消息数：{}，system_prompt: {}", ai_messages.len(), system_prompt.as_ref().map(|_| "有").unwrap_or("无"));
+        // 🔥 传递 system_prompt 到任务
+        task_manager.create_task_with_messages_and_prompt(target_session_id.clone(), ai_messages, system_prompt).await
     } else {
         log::info!("[Command] 使用单条消息创建任务");
         task_manager.create_task(target_session_id.clone(), message.clone()).await

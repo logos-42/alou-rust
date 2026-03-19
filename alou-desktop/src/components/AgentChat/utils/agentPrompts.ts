@@ -1098,12 +1098,17 @@ ${memoryPath}
 - 🔒 Bash工具：避免执行未知命令，敏感操作需确认
 - 📁 文件操作：重要文件操作前建议备份
 - 🌐 网络操作：验证URL安全性，使用HTTPS连接
+`;
 
-=== SOUL ===
-${documentContents.soul}
-
-=== MEMORY ===
+    // 🔥 根据 injectAll 参数决定注入范围
+    if (injectAll) {
+      // 初次激活：注入所有 11 个文档
+      prompt += `
+=== 你的长期记忆 ===
 ${documentContents.memory}
+
+=== IPFS 对话历史 ===
+${documentContents.ipfs}
 
 === 用户喜好 ===
 ${documentContents.user}
@@ -1111,7 +1116,47 @@ ${documentContents.user}
 === 项目与工作报告 ===
 ${documentContents.project}
 
-现在，请根据用户需求选择合适的工具来完成任务。`;
+=== 关键密钥路径 ===
+${documentContents.key}
+
+=== 核心身份 ===
+${documentContents.soul}
+
+=== 身份定义 ===
+${documentContents.identity}
+
+=== 能力清单 ===
+${documentContents.capabilities}
+
+=== 约束限制 ===
+${documentContents.constraints}
+
+=== 工具记录 ===
+${documentContents.tools}
+
+=== 协作智能体 ===
+${documentContents.agents}
+`;
+      console.log('[getSystemPromptForAgent] Agent 模式初次激活：注入所有 11 个文档，长度:', prompt.length);
+    } else {
+      // 后续对话：只注入 4 个核心文档
+      prompt += `
+=== 核心身份 ===
+${documentContents.soul}
+
+=== 你的长期记忆 ===
+${documentContents.memory}
+
+=== 用户喜好 ===
+${documentContents.user}
+
+=== 项目与工作报告 ===
+${documentContents.project}
+`;
+      console.log('[getSystemPromptForAgent] Agent 模式后续对话：注入 4 个核心文档，长度:', prompt.length);
+    }
+
+    prompt += `\n现在，请根据用户需求选择合适的工具来完成任务。`;
 
     // 添加钱包上下文
     if (walletAddress) {

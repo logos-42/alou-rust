@@ -82,7 +82,9 @@ export function createAgentCommunicationService({
   async function executeConversation(
     apiConfig: APIConfig,
     messages: Array<{ role: string; content: string }>,
-    agentId: string
+    agentId: string,
+    // 🔥 新增：系统提示参数
+    systemPrompt?: string
   ): Promise<AgentExecutionResult> {
     const controller = new AbortController()
     abortControllers.set(agentId, controller)
@@ -101,6 +103,8 @@ export function createAgentCommunicationService({
         options: { stream: false },
         agentId,
         sessionId,
+        // 🔥 传递系统提示到后端
+        systemPrompt,
       })
 
       if (result?.success) {

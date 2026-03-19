@@ -14,16 +14,27 @@ use crate::agent::executor::types::{
     EnvironmentState, Thought, Action, Reflection, InformationAssessment, TaskProgress,
 };
 use crate::agent::perception::Intent;
+use crate::tools::facade::ToolFacade;
 
 /// 推理层
 pub struct ReasoningLayer {
     ai_client: Arc<AiClient>,
+    /// 🔥 统一工具访问入口（包含 ToolRegistry + ToolBus）
+    tool_facade: Option<Arc<ToolFacade>>,
 }
 
 impl ReasoningLayer {
     /// 创建推理层实例
     pub fn new(ai_client: Arc<AiClient>) -> Self {
-        Self { ai_client }
+        Self { ai_client, tool_facade: None }
+    }
+
+    /// 🔥 创建带 ToolFacade 的推理层实例
+    pub fn new_with_tool_facade(ai_client: Arc<AiClient>, tool_facade: Arc<ToolFacade>) -> Self {
+        Self { 
+            ai_client, 
+            tool_facade: Some(tool_facade),
+        }
     }
 
     /// 推理（完整流程）
@@ -33,8 +44,14 @@ impl ReasoningLayer {
         intent: Intent,
         tool_registry: Arc<crate::tools::ToolRegistry>,
     ) -> Result<Thought, crate::agent::executor::types::ExecutorError> {
-        // 1. 根据意图和上下文构建增强提示词
-        let system_prompt = self.build_reasoning_prompt(state, intent, tool_registry.clone()).await;
+        // 🔥 1. 优先使用前端传入的系统提示，否则构建增强提示词
+        let system_prompt = if let Some(ref custom_prompt) = state.system_prompt {
+            log::info!("[ReasoningLayer] 使用前端传入的系统提示，长度: {}", custom_prompt.len());
+            custom_prompt.clone()
+        } else {
+            log::info!("[ReasoningLayer] 使用后端构建的系统提示");
+            self.build_reasoning_prompt(state, intent, tool_registry.clone()).await
+        };
 
         // 2. 准备消息 - system prompt 作为第一条消息
         let mut messages = vec![AiMessage {
@@ -120,11 +137,10 @@ impl ReasoningLayer {
    - 如果信息不足，选择 ask_user 或 manage_goal
 
 2. **任务进度评估**（必须）
-   - 评估当前完成进度 (0.0-1.0)
+   - 评估当前完成进度 (0.0-1.0)，不显示
    - 列出已完成和待处理的步骤
 
 3. **决策置信度**（必须）
-   - 给出 0.0-1.0 的置信度分数
    - 低于 0.6 时建议 gather_more 或 ask_user
 
 4. **选择行动**
@@ -144,9 +160,21 @@ impl ReasoningLayer {
         _tool_names: &[String],
         tool_registry: Arc<crate::tools::ToolRegistry>,
     ) -> Vec<AiTool> {
-        let mut tools = Vec::new();
+        // 🔥 优先使用 ToolFacade（统一入口，包含 ToolRegistry + ToolBus）
+        if let Some(ref facade) = self.tool_facade {
+            let all_tools = facade.list_tools().await;
+            return all_tools.into_iter().map(|tool| {
+                let parameters = Self::get_tool_parameters(&tool.name);
+                AiTool {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters,
+                }
+            }).collect();
+        }
 
-        // 从 ToolRegistry 获取工具
+        // Fallback: 从 ToolRegistry 获取工具
+        let mut tools = Vec::new();
         let registry_tools = tool_registry.list_all().await;
         for tool in registry_tools {
             tools.push(AiTool {
@@ -156,7 +184,6 @@ impl ReasoningLayer {
             });
         }
 
-       
         // 如果 registry 为空，使用默认工具列表
         if tools.is_empty() {
             tools = Self::get_default_tools();
@@ -618,37 +645,6 @@ impl ReasoningLayer {
                     "provider": { "type": "string", "enum": ["minimax", "jimeng"], "description": "视频生成 Provider" }
                 },
                 "required": ["task_id", "provider"]
-            }),
-            // 🔥 媒体工具参数定义
-            "generate_image" => serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "prompt": { "type": "string", "description": "图片描述" },
-                    "width": { "type": "integer", "description": "图片宽度", "default": 1024 },
-                    "height": { "type": "integer", "description": "图片高度", "default": 1024 },
-                    "provider": { "type": "string", "description": "Provider 名称", "default": "google" }
-                },
-                "required": ["prompt"]
-            }),
-            "generate_audio" => serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "text": { "type": "string", "description": "要转换的文本" },
-                    "voice": { "type": "string", "description": "音色 ID", "default": "default" },
-                    "language": { "type": "string", "description": "语言代码", "default": "zh-CN" },
-                    "provider": { "type": "string", "description": "Provider 名称", "default": "minimax" }
-                },
-                "required": ["text"]
-            }),
-            "generate_video" => serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "prompt": { "type": "string", "description": "视频描述" },
-                    "duration": { "type": "integer", "description": "视频时长（秒）", "default": 5 },
-                    "resolution": { "type": "string", "description": "分辨率", "default": "720p" },
-                    "provider": { "type": "string", "description": "Provider 名称", "default": "kling" }
-                },
-                "required": ["prompt"]
             }),
             _ => serde_json::json!({
                 "type": "object",

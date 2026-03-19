@@ -71,6 +71,8 @@ impl PerceptionLayer {
             available_tools,
             retrieved_context,
             context_documents: crate::agent::executor::types::ContextDocuments::default(),
+            // 🔥 传递前端传入的系统提示
+            system_prompt: task.system_prompt.clone(),
         })
     }
 
@@ -109,6 +111,8 @@ impl PerceptionLayer {
             available_tools,
             retrieved_context: RetrievedContext::default(),
             context_documents: crate::agent::executor::types::ContextDocuments::default(),
+            // 🔥 传递前端传入的系统提示
+            system_prompt: task.system_prompt.clone(),
         })
     }
 

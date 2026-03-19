@@ -30,6 +30,9 @@ pub struct EnvironmentState {
     /// 🔥 文档缓存（SOUL.md, TASKS.md, MEMORY.md）
     #[serde(skip)]
     pub context_documents: ContextDocuments,
+    /// 🔥 前端传入的系统提示（优先使用）
+    #[serde(skip)]
+    pub system_prompt: Option<String>,
 }
 
 /// 推理结果（Reason 层输出 - LLM 单次调用）

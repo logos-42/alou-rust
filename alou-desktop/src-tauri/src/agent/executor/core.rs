@@ -14,6 +14,7 @@ use crate::agent::perception::PerceptionEngine;
 use crate::agent::goal::GoalTracker;
 use crate::bridges::ToolBridge;
 use crate::tools::ToolRegistry;
+use crate::tools::facade::ToolFacade;
 use crate::agent::executor::types::{
     ExecutorError, ExecutionResult, Action,
 };
@@ -29,6 +30,8 @@ pub struct ExecutorCore {
     task_manager: Arc<TaskManager>,
     tool_bridge: Arc<ToolBridge>,
     tool_registry: Arc<ToolRegistry>,
+    /// 🔥 统一工具访问入口（包含 ToolRegistry + ToolBus）
+    tool_facade: Option<Arc<ToolFacade>>,
     perception_engine: Option<Arc<PerceptionEngine>>,
     goal_tracker: Option<Arc<GoalTracker>>,
     app_handle: Option<tauri::AppHandle>,
@@ -48,11 +51,18 @@ impl ExecutorCore {
             task_manager,
             tool_bridge,
             tool_registry,
+            tool_facade: None,
             perception_engine: None,
             goal_tracker: None,
             app_handle: None,
             agent_id: None,
         }
+    }
+
+    /// 🔥 设置 ToolFacade（统一工具入口）
+    pub fn with_tool_facade(mut self, facade: Arc<ToolFacade>) -> Self {
+        self.tool_facade = Some(facade);
+        self
     }
 
     /// 设置感知引擎
@@ -111,6 +121,11 @@ impl ExecutorCore {
     pub fn agent_id(&self) -> Option<String> {
         self.agent_id.clone()
     }
+
+    /// 🔥 获取 ToolFacade（统一工具入口）
+    pub fn tool_facade(&self) -> Option<Arc<ToolFacade>> {
+        self.tool_facade.clone()
+    }
 }
 
 /// Ralph Loop 执行器
@@ -150,10 +165,17 @@ impl RalphLoopExecutor {
             ActionLayer::new(tool_bridge, tool_registry)
         };
 
+        // 🔥 创建 ReasoningLayer：优先使用 ToolFacade
+        let reasoning_layer = if let Some(ref tool_facade) = core.tool_facade() {
+            ReasoningLayer::new_with_tool_facade(ai_client.clone(), tool_facade.clone())
+        } else {
+            ReasoningLayer::new(ai_client.clone())
+        };
+
         Self {
             core,
             perception_layer: PerceptionLayer::new(),
-            reasoning_layer: ReasoningLayer::new(ai_client),
+            reasoning_layer,
             action_layer,
             integration_layer: IntegrationLayer::new(),
         }
@@ -186,10 +208,17 @@ impl RalphLoopExecutor {
             ActionLayer::new(tool_bridge, tool_registry)
         };
 
+        // 🔥 创建 ReasoningLayer：优先使用 ToolFacade
+        let reasoning_layer = if let Some(ref tool_facade) = core.tool_facade() {
+            ReasoningLayer::new_with_tool_facade(ai_client.clone(), tool_facade.clone())
+        } else {
+            ReasoningLayer::new(ai_client.clone())
+        };
+
         Self {
             core,
             perception_layer: PerceptionLayer::new(),
-            reasoning_layer: ReasoningLayer::new(ai_client),
+            reasoning_layer,
             action_layer,
             integration_layer: IntegrationLayer::new(),
         }
@@ -519,6 +548,8 @@ pub struct RalphLoopExecutorBuilder {
     task_manager: Option<Arc<TaskManager>>,
     tool_bridge: Option<Arc<ToolBridge>>,
     tool_registry: Option<Arc<ToolRegistry>>,
+    /// 🔥 统一工具访问入口
+    tool_facade: Option<Arc<ToolFacade>>,
     perception_engine: Option<Arc<PerceptionEngine>>,
     goal_tracker: Option<Arc<GoalTracker>>,
     app_handle: Option<tauri::AppHandle>,
@@ -532,6 +563,7 @@ impl RalphLoopExecutorBuilder {
             task_manager: None,
             tool_bridge: None,
             tool_registry: None,
+            tool_facade: None,
             perception_engine: None,
             goal_tracker: None,
             app_handle: None,
@@ -556,6 +588,12 @@ impl RalphLoopExecutorBuilder {
 
     pub fn tool_registry(mut self, registry: Arc<ToolRegistry>) -> Self {
         self.tool_registry = Some(registry);
+        self
+    }
+
+    /// 🔥 设置 ToolFacade（统一工具入口）
+    pub fn tool_facade(mut self, facade: Arc<ToolFacade>) -> Self {
+        self.tool_facade = Some(facade);
         self
     }
 
@@ -586,6 +624,11 @@ impl RalphLoopExecutorBuilder {
         let tool_registry = self.tool_registry.ok_or("ToolRegistry 未设置")?;
 
         let mut core = ExecutorCore::new(ai_client, task_manager, tool_bridge, tool_registry);
+
+        // 🔥 设置 ToolFacade
+        if let Some(facade) = self.tool_facade {
+            core = core.with_tool_facade(facade);
+        }
 
         if let Some(engine) = self.perception_engine {
             core = core.with_perception_engine(engine);
