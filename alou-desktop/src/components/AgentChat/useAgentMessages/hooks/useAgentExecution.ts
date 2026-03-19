@@ -8,6 +8,16 @@ import { useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { Message, AgentInfo } from '../types'
 
+interface ChannelAgent {
+  id: string
+  name: string
+  did?: string
+  ipns?: string
+  cid?: string
+  role_description?: string
+  avatar?: string
+}
+
 interface UseAgentExecutionConfig {
   sessionId: string
   appendMessage: (message: Message, channelId?: string) => void
@@ -25,7 +35,8 @@ interface UseAgentExecutionConfig {
     mode: string,
     walletAddress: string | null,
     chain: string | null,
-    injectAll: boolean
+    injectAll: boolean,
+    channelAgents?: ChannelAgent[]
   ) => Promise<string>
   getMessageHistory: (agentId: string, messagesByChannel: unknown) => unknown[]
   systemPromptCache: Record<string, string>
@@ -35,6 +46,7 @@ interface UseAgentExecutionConfig {
   walletAddress: string | null
   activeChain: string | null
   maxTokens?: number
+  channelAgents?: ChannelAgent[]  // Channel 中的其他智能体列表
 }
 
 interface UseAgentExecutionReturn {
@@ -64,6 +76,7 @@ export function useAgentExecution({
   walletAddress,
   activeChain,
   maxTokens = 4000,
+  channelAgents,  // Channel 中的其他智能体列表
 }: UseAgentExecutionConfig): UseAgentExecutionReturn {
   const abortControllersByAgent = useRef<Record<string, AbortController>>({})
 
@@ -128,7 +141,8 @@ export function useAgentExecution({
           currentMode,
           walletAddress,
           activeChain,
-          false
+          false,
+          channelAgents
         )
         if (systemPrompt) {
           setSystemPromptCache(prev => ({ ...prev, [cacheKey]: systemPrompt }))

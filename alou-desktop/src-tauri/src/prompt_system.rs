@@ -100,7 +100,7 @@ impl HierarchicalPromptSystem {
                 summary: String::new(),
                 key_facts: Vec::new(),
                 decision_log: Vec::new(),
-                max_context_size: 5000, // 字符数限制
+                max_context_size: 200_000, // 字符数限制 (200k)
                 summary_threshold: 1000, // 摘要阈值
             },
         }

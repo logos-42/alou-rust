@@ -190,14 +190,25 @@ DIAP 身份 Id:did;cid;ipns
 - 🛡️ 不要将密钥硬编码在代码或对话中
 `
 };
+export interface ChannelAgent {
+  id: string
+  name: string
+  did?: string
+  ipns?: string
+  cid?: string
+  role_description?: string
+  avatar?: string
+}
+
 export const getSystemPromptForAgent = async (
   agentInfo: { name?: string; role_description?: string; id?: string } | null,
   mode: 'agent' | 'alou' | 'group_chat',
   walletAddress: string | null,
   chain: string | null,
-  injectAll: boolean = false  // 是否注入所有文档（初次激活用），默认 false（只注入记忆）
+  injectAll: boolean = false,  // 是否注入所有文档（初次激活用），默认 false（只注入记忆）
+  channelAgents?: ChannelAgent[]  // Channel 中的其他智能体列表
 ): Promise<string> => {
-  console.log('[getSystemPromptForAgent] 参数:', { mode, hasAgentInfo: !!agentInfo, walletAddress, chain });
+  console.log('[getSystemPromptForAgent] 参数:', { mode, hasAgentInfo: !!agentInfo, walletAddress, chain, channelAgentsCount: channelAgents?.length });
 
   // 动态获取文档路径（跨平台兼容）
   const agentId = agentInfo?.id || 'unknown';
@@ -225,14 +236,14 @@ export const getSystemPromptForAgent = async (
   
   try {
     // 动态获取实际的应用数据目录
-    const { resolve, BaseDirectory } = await import('@tauri-apps/api/path');
-    
-    const appDataPath = await resolve(BaseDirectory.AppData);
-    
-    memoryPath = `${appDataPath}/agent-documents/${agentId}`;
-    soulPath = `${appDataPath}/agent-documents/${agentId}`;
-    identityPath = `${appDataPath}/agent-documents/${agentId}`;
-    
+    const { appDataDir } = await import('@tauri-apps/api/path');
+
+    const appDataPath = await appDataDir();
+
+    memoryPath = `${appDataPath}agent-documents/${agentId}`;
+    soulPath = `${appDataPath}agent-documents/${agentId}`;
+    identityPath = `${appDataPath}agent-documents/${agentId}`;
+
     console.log('[getSystemPromptForAgent] 动态获取路径成功:', { appDataPath, agentId });
   } catch (err) {
     // 如果 Tauri API 不可用，根据操作系统使用默认路径
@@ -1158,6 +1169,36 @@ ${documentContents.project}
 
     prompt += `\n现在，请根据用户需求选择合适的工具来完成任务。`;
 
+    // 🔥 注入 Channel 中的其他智能体信息
+    if (channelAgents && channelAgents.length > 0) {
+      const otherAgents = channelAgents.filter(a => a.id !== agentInfo?.id);
+      if (otherAgents.length > 0) {
+        prompt += `
+
+## 🤝 协作伙伴智能体
+
+你的 Channel 中有以下智能体伙伴，你可以与他们协作：
+
+${otherAgents.map((agent, index) => `### ${index + 1}. ${agent.name}
+- **ID**: ${agent.id}
+${agent.role_description ? `- **角色**: ${agent.role_description}` : ''}
+${agent.did ? `- **DID**: ${agent.did}` : ''}
+${agent.ipns ? `- **IPNS**: ${agent.ipns}` : ''}
+`).join('\n')}
+
+### 💬 如何与协作伙伴交互
+
+1. **了解伙伴**：你可以使用 \`agent_document\` 工具读取其他智能体的公开文档（需要他们的 ID）
+2. **点对点对话**：当需要专门技能时，可以提及或邀请特定智能体参与讨论
+3. **协作记录**：协作完成后，在 AGENTS.md 中记录协作经验
+4. **任务分配**：根据各智能体的专长，合理分配子任务
+
+**注意**：协作时请尊重其他智能体的专长领域，保持开放和谦逊的态度。
+`;
+        console.log('[getSystemPromptForAgent] 注入 Channel 智能体列表:', otherAgents.length, '个');
+      }
+    }
+
     // 添加钱包上下文
     if (walletAddress) {
       prompt += `\n\n当前钱包地址：${walletAddress}`;
@@ -1207,6 +1248,34 @@ ${documentContents.project}
 - 用户："请制定计划" → 使用 plan 工具
 
 现在，请根据用户需求选择合适的工具来完成任务。`;
+
+  // 🔥 注入 Channel 中的其他智能体信息（基础模式）
+  if (channelAgents && channelAgents.length > 0) {
+    const otherAgents = channelAgents.filter(a => a.id !== agentInfo?.id);
+    if (otherAgents.length > 0) {
+      prompt += `
+
+## 🤝 协作伙伴智能体
+
+你的 Channel 中有以下智能体伙伴，你可以与他们协作：
+
+${otherAgents.map((agent, index) => `### ${index + 1}. ${agent.name}
+- **ID**: ${agent.id}
+${agent.role_description ? `- **角色**: ${agent.role_description}` : ''}
+${agent.did ? `- **DID**: ${agent.did}` : ''}
+${agent.ipns ? `- **IPNS**: ${agent.ipns}` : ''}
+`).join('\n')}
+
+### 💬 如何与协作伙伴交互
+
+1. **了解伙伴**：你可以使用 \`agent_document\` 工具读取其他智能体的公开文档
+2. **点对点对话**：当需要专门技能时，可以提及或邀请特定智能体参与讨论
+3. **协作记录**：协作完成后，记录协作经验
+4. **任务分配**：根据各智能体的专长，合理分配子任务
+`;
+      console.log('[getSystemPromptForAgent] 基础模式注入 Channel 智能体列表:', otherAgents.length, '个');
+    }
+  }
 
   // 添加钱包上下文
   if (walletAddress) {

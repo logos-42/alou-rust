@@ -108,6 +108,16 @@ export interface GroupChatMessage {
 }
 
 // Hook参数类型
+export interface ChannelAgent {
+  id: string
+  name: string
+  did?: string
+  ipns?: string
+  cid?: string
+  role_description?: string
+  avatar?: string
+}
+
 export interface UseAgentMessagesProps {
   sessionId: string
   setSessionId: (id: string) => void
@@ -126,6 +136,7 @@ export interface UseAgentMessagesProps {
   onRateLimitExceeded?: (data: { remainingRequests: number; resetTime: string | null }) => void
   onCreateAgent?: () => Promise<void>
   onAutoCreateAgent?: (agentInfo: AgentInfo) => Promise<boolean>
+  channelAgents?: ChannelAgent[]  // Channel 中的其他智能体列表
 }
 
 // 智能体类型
@@ -184,6 +195,7 @@ export const useAgentMessages = ({
   onRateLimitExceeded,
   onCreateAgent,
   onAutoCreateAgent,
+  channelAgents,  // Channel 中的其他智能体列表
 }: UseAgentMessagesProps) => {
   // 按频道存储消息：Map<channelId, Message[]>
   const [messagesByChannel, setMessagesByChannel] = useState<Record<string, Message[]>>({})
@@ -228,7 +240,7 @@ export const useAgentMessages = ({
         // 首次激活时生成完整提示词（包含所有7个文档）
         if (!cachedFullPrompt) {
           console.log('[useAgentMessages] 预加载系统提示词（初次激活，注入所有文档）...')
-          const fullPrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, true)  // injectAll=true
+          const fullPrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, true, channelAgents)  // injectAll=true
           
           if (fullPrompt) {
             setSystemPromptCache(prev => ({
@@ -242,7 +254,7 @@ export const useAgentMessages = ({
         // 同时预加载精简版本（只包含 MEMORY.md）
         if (!cachedLitePrompt) {
           console.log('[useAgentMessages] 预加载系统提示词（lite，只注入记忆）...')
-          const litePrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, false)  // injectAll=false
+          const litePrompt = await getSystemPromptForAgent(selectedAgent, currentMode, walletAddress, activeChain ?? null, false, channelAgents)  // injectAll=false
           
           if (litePrompt) {
             setSystemPromptCache(prev => ({
@@ -450,7 +462,7 @@ export const useAgentMessages = ({
       console.log('[useAgentMessages] 更新 IPFS.md 文档:', agentId)
       
       // 读取当前 IPFS.md
-      const currentDoc = await agentDocumentService.getDocument(agentId, 'ipfs').catch(() => null)
+      const currentDoc = await agentDocumentService.getAgentDocument(agentId, 'ipfs').catch(() => null)
       
       const now = new Date(sessionInfo.timestamp)
       const dateStr = now.toLocaleString('zh-CN')
@@ -649,7 +661,7 @@ export const useAgentMessages = ({
       // 如果缓存不存在或为空，动态生成并更新缓存（只注入记忆）
       if (!systemPrompt || systemPrompt.length === 0) {
         console.log('[useAgentMessages] 缓存未命中，动态生成系统提示词（只注入记忆）')
-        systemPrompt = await getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null, false)  // injectAll=false
+        systemPrompt = await getSystemPromptForAgent(agentInfo, currentMode, walletAddress, activeChain ?? null, false, channelAgents)  // injectAll=false
         
         if (systemPrompt) {
           setSystemPromptCache(prev => ({

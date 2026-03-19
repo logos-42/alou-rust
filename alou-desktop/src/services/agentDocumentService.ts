@@ -24,6 +24,10 @@ export interface AgentDocuments {
   constraints?: string;
   tools?: string;
   agents?: string;
+  ipfs?: string;
+  user?: string;
+  project?: string;
+  key?: string;
 }
 
 // 为了兼容性，导出Document类型
@@ -40,7 +44,11 @@ export enum DocumentTypes {
   CAPABILITIES = 'capabilities',
   CONSTRAINTS = 'constraints',
   TOOLS = 'tools',
-  AGENTS = 'agents'
+  AGENTS = 'agents',
+  IPFS = 'ipfs',
+  USER = 'user',
+  PROJECT = 'project',
+  KEY = 'key'
 }
 
 class AgentDocumentService {
@@ -192,7 +200,7 @@ class AgentDocumentService {
    * 读取agent的所有文档
    */
   async getAgentDocuments(agentId: string): Promise<AgentDocuments> {
-    const documentTypes = ['memory', 'soul', 'identity', 'capabilities', 'constraints', 'tools', 'agents'];
+    const documentTypes = ['memory', 'soul', 'identity', 'capabilities', 'constraints', 'tools', 'agents', 'ipfs', 'user', 'project', 'key'];
     const documents: AgentDocuments = {};
 
     for (const type of documentTypes) {
@@ -233,7 +241,7 @@ class AgentDocumentService {
    * 初始化agent的文档（如果不存在）
    */
   async initializeAgentDocuments(agentId: string, agentInfo?: any): Promise<void> {
-    const documentTypes = ['memory', 'soul', 'identity', 'capabilities', 'constraints', 'tools', 'agents'];
+    const documentTypes = ['memory', 'soul', 'identity', 'capabilities', 'constraints', 'tools', 'agents', 'ipfs', 'user', 'project', 'key'];
 
     for (const type of documentTypes) {
       const filePath = this.getDocumentPath(agentId, type);
@@ -382,6 +390,68 @@ ${agentInfo?.role_description || '专业的AI助手'}
 
 ## 协作模式
 （暂无记录）
+
+---
+最后更新: ${new Date().toISOString()}`,
+
+      ipfs: `# IPFS 对话历史索引
+
+这里记录了存储在 IPFS 上的重要对话会话。
+
+## 最近会话
+（暂无记录）
+
+## 统计信息
+- 总会话数：0
+- 总消息数：0
+
+---
+最后更新: ${new Date().toISOString()}`,
+
+      user: `# 用户喜好与偏好
+
+这里记录了用户的个人偏好、习惯和工作方式。
+
+## 用户偏好
+（暂无记录）
+
+## 沟通风格
+（暂无记录）
+
+## 技术栈偏好
+（暂无记录）
+
+---
+最后更新: ${new Date().toISOString()}`,
+
+      project: `# 项目与工作报告
+
+这里记录了参与的项目、工作报告和重要成果。
+
+## 当前项目
+（暂无记录）
+
+## 已完成项目
+（暂无记录）
+
+## 工作报告
+（暂无记录）
+
+---
+最后更新: ${new Date().toISOString()}`,
+
+      key: `# 关键密钥路径
+
+这里记录了重要密钥和凭证的存储路径（不存储实际密钥）。
+
+## 钱包密钥
+（暂无记录）
+
+## API 密钥
+（暂无记录）
+
+## 安全提醒
+- ⚠️ 本文件只记录路径，不存储实际密钥
 
 ---
 最后更新: ${new Date().toISOString()}`

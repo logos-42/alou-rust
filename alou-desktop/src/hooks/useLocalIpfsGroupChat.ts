@@ -19,6 +19,7 @@ export interface GroupConfig {
   isPublic?: boolean
   maxMembers?: number
   metadata?: Record<string, any>
+  agents?: any[]
 }
 
 /**

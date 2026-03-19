@@ -137,6 +137,21 @@ export class LocalGroupMessage {
 }
 
 /**
+ * 智能体信息接口
+ */
+export interface AgentInfo {
+  id?: string
+  name?: string
+  did?: string
+  ipns?: string
+  cid?: string
+  avatar?: string
+  agent_id?: string
+  agent_name?: string
+  mode?: string
+}
+
+/**
  * 本地群聊配置
  */
 export interface LocalGroupConfig {
@@ -148,6 +163,7 @@ export interface LocalGroupConfig {
   creator: string
   createdAt: number
   metadata?: Record<string, any>
+  agents?: AgentInfo[]
 }
 
 /**
@@ -162,6 +178,7 @@ export class LocalGroup {
   creator: string
   createdAt: number
   metadata: Record<string, any>
+  agents: AgentInfo[]
 
   constructor({
     groupId,
@@ -171,7 +188,8 @@ export class LocalGroup {
     members = [],
     creator,
     createdAt,
-    metadata = {}
+    metadata = {},
+    agents = []
   }: LocalGroupConfig) {
     this.groupId = groupId
     this.groupName = groupName
@@ -181,6 +199,7 @@ export class LocalGroup {
     this.creator = creator
     this.createdAt = createdAt
     this.metadata = metadata
+    this.agents = agents
   }
 
   toJSON(): LocalGroupConfig {
@@ -192,7 +211,8 @@ export class LocalGroup {
       members: this.members,
       creator: this.creator,
       createdAt: this.createdAt,
-      metadata: this.metadata
+      metadata: this.metadata,
+      agents: this.agents
     }
   }
 
@@ -211,6 +231,7 @@ export interface CreateGroupConfig {
   isPublic?: boolean
   maxMembers?: number
   metadata?: Record<string, any>
+  agents?: AgentInfo[]
 }
 
 /**
@@ -506,7 +527,8 @@ class LocalIpfsGroupChatService {
         maxMembers: config.maxMembers || 50,
         memoryMode: forceMemoryMode || !this.ipfsAvailable, // 标记是否为内存模式
         ...config.metadata
-      }
+      },
+      agents: config.agents || []
     })
 
     try {

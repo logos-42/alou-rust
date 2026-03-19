@@ -52,6 +52,18 @@ pub struct AgentConfig {
     pub custom_prompt: Option<String>,
 }
 
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            mention_only: false,
+            auto_reply: true,
+            reply_delay_ms: 500,
+            max_context_messages: 200_000, // 200k 上下文
+            custom_prompt: None,
+        }
+    }
+}
+
 /// Agent 注册表
 pub struct AgentRegistry {
     agents: RwLock<HashMap<String, AgentInfo>>,

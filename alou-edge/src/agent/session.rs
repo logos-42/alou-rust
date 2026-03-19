@@ -6,8 +6,8 @@ use serde_json::Value;
 use uuid::Uuid;
 
 const SESSION_TTL_SECONDS: u64 = 24 * 60 * 60; // 24 hours
-const MAX_MESSAGES_PER_SESSION: usize = 50;
-const MAX_CONTEXT_EVENTS_PER_SESSION: usize = 50;
+const MAX_MESSAGES_PER_SESSION: usize = 200_000;
+const MAX_CONTEXT_EVENTS_PER_SESSION: usize = 200_000;
 
 /// Message in a conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]

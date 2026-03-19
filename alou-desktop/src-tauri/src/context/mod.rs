@@ -40,8 +40,8 @@ pub struct ContextConfig {
 impl Default for ContextConfig {
     fn default() -> Self {
         Self {
-            max_context_length: 8000,
-            compression_threshold: 6000,
+            max_context_length: 200_000, // 200k 上下文
+            compression_threshold: 180_000,
             keep_important_ratio: 0.7,
             smart_compression: true,
             memory_enabled: true,

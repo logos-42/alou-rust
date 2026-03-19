@@ -20,7 +20,7 @@ const DEFAULT_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_LOG_LIMIT = 20
-const DEFAULT_CONTEXT_LIMIT = 50
+const DEFAULT_CONTEXT_LIMIT = 200_000
 
 /**
  * 交互日志条目接口

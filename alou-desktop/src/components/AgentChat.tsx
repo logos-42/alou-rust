@@ -422,6 +422,19 @@ const AgentChat = () => {
   } = autoAgentCreator
 
   // ==================== 6. Message State Hook ====================
+  // 将 channels 转换为 channelAgents 格式，用于智能体上下文
+  const channelAgents = useMemo(() => {
+    return channels.map(ch => ({
+      id: ch.id,
+      name: ch.name || ch.meta?.display_name || ch.meta?.name || 'Unknown',
+      did: ch.meta?.did,
+      ipns: ch.meta?.ipns,
+      cid: ch.meta?.cid,
+      role_description: ch.meta?.role_description,
+      avatar: ch.avatar || ch.meta?.avatar,
+    }))
+  }, [channels])
+
   const messageState = useAgentMessages({
     sessionId,
     setSessionId,
@@ -440,6 +453,7 @@ const AgentChat = () => {
     onRateLimitExceeded: openRateLimitModal,
     onCreateAgent: createChannel,
     onAutoCreateAgent: handleAutoCreateAgent,
+    channelAgents,  // 传递 Channel 中的智能体列表
   })
 
   const {

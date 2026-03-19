@@ -147,7 +147,7 @@ impl Default for ResourceQuota {
             max_concurrent_tasks: 10,
             max_llm_calls_per_minute: 60,
             max_tool_calls_per_minute: 100,
-            max_context_length: 100000,
+            max_context_length: 200_000, // 200k 上下文
             max_task_duration_secs: 300, // 5 分钟
         }
     }
