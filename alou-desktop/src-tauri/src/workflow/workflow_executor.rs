@@ -43,15 +43,10 @@ pub struct AsyncWorkflowExecutor {
 impl AsyncWorkflowExecutor {
     /// 创建新的异步工作流执行器
     pub fn new() -> Result<Self, String> {
-        Self::new_with_toolbus(None)
-    }
-
-    /// 创建新的异步工作流执行器（带 ToolBus）
-    pub fn new_with_toolbus(tool_bus: Option<Arc<crate::agent_runtime::tool_bus::ToolBus>>) -> Result<Self, String> {
         let (tx, rx) = mpsc::unbounded_channel();
         let storage = Arc::new(WorkflowStorage::new(StorageConfig::default())?);
         let monitor = Arc::new(WorkflowMonitor::default());
-        let bridge_manager = Arc::new(crate::bridges::create_default_bridge_manager_with_toolbus(tool_bus));
+        let bridge_manager = Arc::new(crate::bridges::create_default_bridge_manager());
 
         Ok(Self {
             active_executions: Arc::new(RwLock::new(HashMap::new())),

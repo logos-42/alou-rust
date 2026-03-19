@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
+use crate::agent::providers::ProviderRegistry;
+use crate::media_archive::MediaArchiveManager;
 
 /// 桥接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,15 +63,30 @@ pub struct BridgeManager {
 impl BridgeManager {
     /// 创建新的桥接管理器
     pub fn new(config: BridgeConfig) -> Self {
-        Self::new_with_toolbus(config, None)
-    }
-
-    /// 创建新的桥接管理器（带 ToolBus）
-    pub fn new_with_toolbus(config: BridgeConfig, tool_bus: Option<Arc<crate::agent_runtime::tool_bus::ToolBus>>) -> Self {
         let semaphore = Arc::new(Semaphore::new(config.max_concurrent_calls));
 
         Self {
-            tool_bridge: Arc::new(ToolBridge::new_sync_with_toolbus(config.tool_bridge.clone(), tool_bus)),
+            tool_bridge: Arc::new(ToolBridge::new_sync(config.tool_bridge.clone())),
+            context_bridge: Arc::new(ContextBridge::new(config.context_bridge.clone())),
+            config: Arc::new(config),
+            semaphore,
+        }
+    }
+
+    /// 创建带媒体工具的桥接管理器
+    pub fn new_with_media_tools(
+        config: BridgeConfig,
+        provider_registry: Arc<ProviderRegistry>,
+        archive_manager: Arc<MediaArchiveManager>,
+    ) -> Self {
+        let semaphore = Arc::new(Semaphore::new(config.max_concurrent_calls));
+
+        Self {
+            tool_bridge: Arc::new(ToolBridge::new_with_media_tools(
+                config.tool_bridge.clone(),
+                provider_registry,
+                archive_manager,
+            )),
             context_bridge: Arc::new(ContextBridge::new(config.context_bridge.clone())),
             config: Arc::new(config),
             semaphore,
@@ -91,11 +108,6 @@ impl BridgeManager {
     /// 获取上下文桥接
     pub fn context_bridge(&self) -> Arc<ContextBridge> {
         self.context_bridge.clone()
-    }
-
-    /// 更新 ToolBus（用于配置更新后重新加载）
-    pub async fn update_tool_bus(&self, tool_bus: Arc<crate::agent_runtime::tool_bus::ToolBus>) {
-        self.tool_bridge.update_tool_bus(tool_bus).await;
     }
 
     /// 获取配置
@@ -152,12 +164,7 @@ pub struct ComponentHealthStatus {
 
 /// 创建默认桥接管理器
 pub fn create_default_bridge_manager() -> BridgeManager {
-    create_default_bridge_manager_with_toolbus(None)
-}
-
-/// 创建默认桥接管理器（带 ToolBus）
-pub fn create_default_bridge_manager_with_toolbus(tool_bus: Option<Arc<crate::agent_runtime::tool_bus::ToolBus>>) -> BridgeManager {
-    BridgeManager::new_with_toolbus(BridgeConfig {
+    BridgeManager::new(BridgeConfig {
         tool_bridge: ToolBridgeConfig::default(),
         context_bridge: ContextBridgeConfig::default(),
         enabled: true,
@@ -166,7 +173,28 @@ pub fn create_default_bridge_manager_with_toolbus(tool_bus: Option<Arc<crate::ag
         max_retries: 3,
         retry_delay_ms: 1000,
         debug_mode: false,
-    }, tool_bus)
+    })
+}
+
+/// 创建带媒体工具的桥接管理器
+pub fn create_bridge_manager_with_media_tools(
+    provider_registry: Arc<ProviderRegistry>,
+    archive_manager: Arc<MediaArchiveManager>,
+) -> BridgeManager {
+    BridgeManager::new_with_media_tools(
+        BridgeConfig {
+            tool_bridge: ToolBridgeConfig::default(),
+            context_bridge: ContextBridgeConfig::default(),
+            enabled: true,
+            max_concurrent_calls: 10,
+            timeout_seconds: 30,
+            max_retries: 3,
+            retry_delay_ms: 1000,
+            debug_mode: false,
+        },
+        provider_registry,
+        archive_manager,
+    )
 }
 
 /// 桥接事件类型

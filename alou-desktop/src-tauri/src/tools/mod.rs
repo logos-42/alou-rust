@@ -6,9 +6,8 @@ use std::sync::Arc;
 
 pub mod executor;
 pub mod registry;
-pub mod facade;  // 统一工具入口（新增）
-pub mod trait_def;  // 统一 Tool trait（新增）
-pub mod media_tools;  // 媒体工具（从 agent_runtime 迁移）
+pub mod facade;  // 统一工具入口
+pub mod media_tools;  // 媒体工具
 pub mod bash;
 pub mod filesystem;
 pub mod search;
@@ -49,7 +48,7 @@ pub mod meta_tool;                // 元行动工具（记忆、目标管理）
 pub use executor::{ToolExecutor, ToolResult, ToolError};
 // ToolCategory is defined in this module, not registry
 pub use registry::ToolRegistry;
-pub use facade::{ToolFacade, ToolInfo};  // 新增统一入口
+pub use facade::{ToolFacade, ToolInfo};
 pub use filesystem::FileSystemTool;
 pub use search::SearchTool;
 pub use bash::BashTool;

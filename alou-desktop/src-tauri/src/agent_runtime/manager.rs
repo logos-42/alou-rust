@@ -10,7 +10,6 @@ use crate::agent_runtime::{
     AgentRuntimeState,
     agent_registry::{AgentInfo, AgentConfig},
     message_bus::{Event, GroupMessage},
-    tool_bus::ToolBus,
 };
 use crate::tools::{ToolRegistry, ToolFacade};
 

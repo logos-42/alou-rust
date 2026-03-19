@@ -13,12 +13,13 @@ use crate::tools::{
     spec_tool::SpecTool, agent_wallet::AgentWalletTool, wallet_manager::WalletManagerTool,
     query_blockchain::QueryBlockchainTool, build_transaction::BuildTransactionTool,
     broadcast_transaction::BroadcastTransactionTool,
+    media_tools::{GenerateImageTool, GenerateAudioTool, GenerateVideoTool, GetVideoStatusTool},
 };
-use crate::agent_runtime::tool_bus::ToolBus;
+use crate::agent::providers::ProviderRegistry;
+use crate::media_archive::MediaArchiveManager;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
 
 /// 工具桥接
 #[derive(Clone)]
@@ -26,22 +27,15 @@ pub struct ToolBridge {
     registry: ToolRegistry,
     execution_manager: ToolExecutionManager,
     request_count: Arc<AtomicU64>,
-    tool_bus: Arc<RwLock<Option<Arc<ToolBus>>>>,
 }
 
 impl ToolBridge {
     /// 创建新的工具桥接（同步版本，用于 Tauri setup）
     pub fn new_sync(config: ToolBridgeConfig) -> Self {
-        Self::new_sync_with_toolbus(config, None)
-    }
-
-    /// 创建新的工具桥接（带 ToolBus）
-    pub fn new_sync_with_toolbus(config: ToolBridgeConfig, tool_bus: Option<Arc<ToolBus>>) -> Self {
         let mut bridge = Self {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
-            tool_bus: Arc::new(RwLock::new(tool_bus)),
         };
 
         // 在同步上下文中注册工具
@@ -55,18 +49,37 @@ impl ToolBridge {
         bridge
     }
 
-    /// 创建新的工具桥接
-    pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error>> {
-        Self::new_with_toolbus(config, None).await
-    }
-
-    /// 创建新的工具桥接（带 ToolBus）
-    pub async fn new_with_toolbus(config: ToolBridgeConfig, tool_bus: Option<Arc<ToolBus>>) -> Result<Self, Box<dyn std::error::Error>> {
+    /// 创建带媒体工具的工具桥接
+    pub fn new_with_media_tools(
+        config: ToolBridgeConfig,
+        provider_registry: Arc<ProviderRegistry>,
+        archive_manager: Arc<MediaArchiveManager>,
+    ) -> Self {
         let mut bridge = Self {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
             request_count: Arc::new(AtomicU64::new(0)),
-            tool_bus: Arc::new(RwLock::new(tool_bus)),
+        };
+
+        // 在同步上下文中注册工具
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(async {
+            if let Err(e) = bridge.register_all_tools().await {
+                eprintln!("Failed to register tools: {}", e);
+            }
+            // 注册媒体工具
+            bridge.register_media_tools(provider_registry, archive_manager);
+        });
+
+        bridge
+    }
+
+    /// 创建新的工具桥接
+    pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut bridge = Self {
+            registry: ToolRegistry::new(),
+            execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
+            request_count: Arc::new(AtomicU64::new(0)),
         };
 
         // 注册所有工具
@@ -75,11 +88,25 @@ impl ToolBridge {
         Ok(bridge)
     }
 
-    /// 更新 ToolBus（用于配置更新后重新加载）
-    pub async fn update_tool_bus(&self, tool_bus: Arc<ToolBus>) {
-        let mut tb = self.tool_bus.write().await;
-        *tb = Some(tool_bus);
-        log::info!("[ToolBridge] ToolBus 已更新");
+    /// 注册媒体工具
+    pub fn register_media_tools(
+        &mut self,
+        provider_registry: Arc<ProviderRegistry>,
+        archive_manager: Arc<MediaArchiveManager>,
+    ) {
+        log::info!("[ToolBridge] 注册媒体工具...");
+
+        let image_tool = Arc::new(GenerateImageTool::new(provider_registry.clone(), archive_manager.clone()));
+        let audio_tool = Arc::new(GenerateAudioTool::new(provider_registry.clone(), archive_manager.clone()));
+        let video_tool = Arc::new(GenerateVideoTool::new(provider_registry.clone(), archive_manager.clone()));
+        let status_tool = Arc::new(GetVideoStatusTool::new(provider_registry, archive_manager));
+
+        self.execution_manager.register_executor("generate_image".to_string(), image_tool);
+        self.execution_manager.register_executor("generate_audio".to_string(), audio_tool);
+        self.execution_manager.register_executor("generate_video".to_string(), video_tool);
+        self.execution_manager.register_executor("get_video_status".to_string(), status_tool);
+
+        log::info!("[ToolBridge] ✅ 媒体工具注册完成 (4 个工具)");
     }
 
     /// 处理工具调用请求
@@ -98,34 +125,7 @@ impl ToolBridge {
             timestamp: chrono::Utc::now().timestamp(),
         };
 
-        // 1. 先尝试 ToolBus（媒体工具等）
-        {
-            let tool_bus = self.tool_bus.read().await;
-            if let Some(tb) = tool_bus.as_ref() {
-                match tb.execute(&request.tool_id, request.args.clone()).await {
-                    Ok(result) => {
-                        return Ok(ToolCallResponse {
-                            success: true,
-                            result: Some(ToolResult {
-                                success: true,
-                                data: result,
-                                error: None,
-                                execution_time_ms: 0,
-                                output: None,
-                                warnings: vec![],
-                                context: None,
-                            }),
-                            error: None,
-                        });
-                    }
-                    Err(e) => {
-                        log::debug!("[ToolBridge] ToolBus 执行失败，尝试 fallback: {}", e);
-                    }
-                }
-            }
-        }
-
-        // 2. Fallback 到 ToolRegistry
+        // 直接使用 ToolExecutionManager 执行
         match self.execution_manager.execute_tool(&request.tool_id, request.args, context).await {
             Ok(result) => Ok(ToolCallResponse {
                 success: true,
@@ -242,8 +242,6 @@ impl ToolBridge {
         // 注册交易广播工具
         let broadcast_transaction_tool = Arc::new(BroadcastTransactionTool::new());
         self.register_tool(broadcast_transaction_tool).await?;
-
-        // 注意：媒体工具通过 ToolBus 注册，不在这里注册
 
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())

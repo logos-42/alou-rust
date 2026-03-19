@@ -137,22 +137,8 @@ pub async fn init_agent_runtime(
         }
     };
     
-    // 创建 ToolBus 并注册媒体工具
-    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
-    if let (Some(provider_reg), Some(archive_mgr)) = (&provider_registry, &archive_manager) {
-        log::info!("[init_agent_runtime] 注册媒体工具到 ToolBus...");
-        tool_bus.register_media_tools(provider_reg.clone(), archive_mgr.clone());
-    } else {
-        log::warn!("[init_agent_runtime] 无法注册媒体工具：ProviderRegistry 或 ArchiveManager 缺失");
-    }
-    let tool_bus = Arc::new(tool_bus);
-    
-    // 🔥 关键：更新 main.rs 中创建的 BridgeManager 的 ToolBus
-    log::info!("[init_agent_runtime] 更新 BridgeManager 的 ToolBus...");
-    bridge_manager_state.update_tool_bus(tool_bus.clone()).await;
-    log::info!("[init_agent_runtime] BridgeManager 的 ToolBus 已更新");
-
-    // 使用已存在的 BridgeManager（而不是创建新的）
+    // 媒体工具现在通过 ToolExecutionManager 注册，不再需要 ToolBus
+    // 直接使用已存在的 BridgeManager
     let bridge_manager = bridge_manager_state.inner().clone();
 
     let rt = AgentRuntime::new(tool_registry, bridge_manager).await?;

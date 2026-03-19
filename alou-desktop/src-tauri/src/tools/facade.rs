@@ -1,22 +1,34 @@
 //! 统一工具访问入口（外观模式）
 //!
-//! 将 ToolRegistry 和 ToolBus 统一到一个接口
+//! 提供统一的工具执行接口
 
 use std::sync::Arc;
 use serde_json::Value;
 use crate::tools::registry::ToolRegistry;
-use crate::agent_runtime::tool_bus::ToolBus;
+use crate::tools::executor::ToolExecutionManager;
+use crate::tools::{ExecutionContext, ToolResult, ToolError};
 
 /// 统一工具访问入口
 pub struct ToolFacade {
     registry: Arc<ToolRegistry>,
-    toolbus: Arc<ToolBus>,
+    execution_manager: Arc<ToolExecutionManager>,
 }
 
 impl ToolFacade {
     /// 创建新的统一入口
-    pub fn new(registry: Arc<ToolRegistry>, toolbus: Arc<ToolBus>) -> Self {
-        Self { registry, toolbus }
+    pub fn new(registry: Arc<ToolRegistry>, execution_manager: Arc<ToolExecutionManager>) -> Self {
+        Self { registry, execution_manager }
+    }
+
+    /// 从 BridgeManager 创建
+    pub fn from_bridge_manager(bridge_manager: &crate::bridges::BridgeManager) -> Self {
+        // 获取 ToolBridge 的内部组件
+        // 注意：这里需要 BridgeManager 暴露相关方法
+        // 暂时使用空实现
+        Self {
+            registry: Arc::new(ToolRegistry::new()),
+            execution_manager: Arc::new(ToolExecutionManager::new(crate::tools::ToolConfig::default())),
+        }
     }
 
     /// 执行工具（统一接口）
@@ -24,56 +36,31 @@ impl ToolFacade {
         &self,
         name: &str,
         args: Value,
-        context: crate::tools::ExecutionContext,
+        context: ExecutionContext,
     ) -> Result<Value, String> {
-        // 1. 先尝试 ToolBus（媒体工具，数量少，快速失败）
-        match self.toolbus.execute(name, args.clone()).await {
+        // 使用 ToolExecutionManager 执行
+        match self.execution_manager.execute_tool(name, args, context).await {
             Ok(result) => {
-                log::debug!("ToolFacade: 工具 '{}' 由 ToolBus 执行", name);
-                return Ok(result);
-            }
-            Err(_) => {}
-        }
-
-        // 2. Fallback 到 ToolRegistry（核心工具）
-        match self.registry.get_tool(name).await {
-            Some(tool) => {
-                log::debug!("ToolFacade: 工具 '{}' 由 ToolRegistry 执行", name);
-                match tool.execute(args, &context).await {
-                    Ok(result) => {
-                        return Ok(serde_json::to_value(result).unwrap_or(Value::Null));
-                    }
-                    Err(e) => {
-                        return Err(format!("工具执行失败：{}", e));
-                    }
+                if result.success {
+                    Ok(result.data)
+                } else {
+                    Err(result.error.unwrap_or_else(|| "执行失败".to_string()))
                 }
             }
-            None => {}
+            Err(e) => Err(format!("{:?}", e))
         }
-
-        // 3. 工具不存在
-        Err(format!("工具不存在：{}", name))
     }
 
     /// 列出所有可用工具
     pub async fn list_tools(&self) -> Vec<ToolInfo> {
         let mut tools = Vec::new();
 
-        // 添加 ToolRegistry 的工具
-        for meta in self.registry.list_all().await {
+        // 添加 ToolExecutionManager 的工具
+        for meta in self.execution_manager.list_tools() {
             tools.push(ToolInfo {
-                name: meta.id,
-                description: meta.description,
-                source: "registry".to_string(),
-            });
-        }
-
-        // 添加 ToolBus 的工具
-        for meta in self.toolbus.list_tools().await {
-            tools.push(ToolInfo {
-                name: meta.name,
-                description: meta.description,
-                source: "toolbus".to_string(),
+                name: meta.id.clone(),
+                description: meta.description.clone(),
+                source: "execution_manager".to_string(),
             });
         }
 
@@ -82,13 +69,12 @@ impl ToolFacade {
 
     /// 获取工具详情
     pub async fn get_tool_info(&self, name: &str) -> Option<ToolInfo> {
-        // 先查 ToolBus
-        let tools = self.toolbus.list_tools().await;
-        if let Some(tool) = tools.iter().find(|t| t.name == name) {
+        if let Some(_executor) = self.execution_manager.get_executor(name) {
+            let meta = self.execution_manager.get_executor(name)?.metadata();
             return Some(ToolInfo {
-                name: tool.name.clone(),
-                description: tool.description.clone(),
-                source: "toolbus".to_string(),
+                name: meta.id.clone(),
+                description: meta.description.clone(),
+                source: "execution_manager".to_string(),
             });
         }
 
@@ -104,6 +90,11 @@ impl ToolFacade {
 
         None
     }
+
+    /// 检查工具是否存在
+    pub fn has_tool(&self, name: &str) -> bool {
+        self.execution_manager.has_tool(name)
+    }
 }
 
 /// 工具信息（统一格式）
@@ -111,5 +102,5 @@ impl ToolFacade {
 pub struct ToolInfo {
     pub name: String,
     pub description: String,
-    pub source: String,  // "registry" 或 "toolbus"
+    pub source: String,
 }

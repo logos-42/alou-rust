@@ -245,6 +245,12 @@ export const useWorkflow = ({
           result: response.result
         })
 
+        // 获取 execution 对应的 workflowId 并重新启动轮询
+        const execution = activeExecutions[executionId]
+        if (execution?.workflow_id) {
+          startExecutionPolling(executionId, execution.workflow_id)
+        }
+
         // 重新获取工作流状态
         await loadWorkflows()
       } else {
@@ -263,7 +269,7 @@ export const useWorkflow = ({
         error
       })
     }
-  }, [sessionId, apiKey, agentInfo, onWorkflowMessage, loadWorkflows])
+  }, [sessionId, apiKey, agentInfo, onWorkflowMessage, loadWorkflows, activeExecutions, startExecutionPolling])
 
   // 删除工作流
   const deleteWorkflow = useCallback(async (workflowId: string) => {
@@ -308,17 +314,20 @@ export const useWorkflow = ({
     if (!sessionId) return
 
     console.log('[useWorkflow] pauseWorkflow called with executionId:', executionId)
-    
+
     try {
       const response = await workflowService.pauseExecution(executionId)
 
       console.log('[useWorkflow] pauseExecution response:', response)
-      
+
       if (response.success) {
         onWorkflowMessage?.({
           type: 'workflow_paused',
           workflowId: executionId
         })
+
+        // 停止轮询
+        stopExecutionPolling(executionId)
 
         // 重新获取工作流状态
         await loadWorkflows()
@@ -338,7 +347,7 @@ export const useWorkflow = ({
         error
       })
     }
-  }, [sessionId, onWorkflowMessage, loadWorkflows])
+  }, [sessionId, onWorkflowMessage, loadWorkflows, stopExecutionPolling])
 
   // 清除轮询
   const clearPolling = useCallback(() => {

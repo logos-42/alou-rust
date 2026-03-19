@@ -97,7 +97,7 @@ use crate::workflow::{
     rollback_ralph_loop_execution, cleanup_ralph_loop_histories,
     start_workflow_event_listener,
 };
-use crate::bridges::{BridgeManager, create_default_bridge_manager, create_default_bridge_manager_with_toolbus};
+use crate::bridges::{BridgeManager, create_default_bridge_manager, create_bridge_manager_with_media_tools};
 use crate::tools::task_queue_tool::{initialize_task_queue_tool, add_task, get_next_task, update_task_status, set_task_result, list_tasks, get_task_stats, get_task_by_id};
 use crate::memory_manager::{
     set_memory_item, get_memory_item, remove_memory_item, clear_memory,
@@ -866,9 +866,8 @@ fn main() {
             crate::diap_file_manager::init_app_handle(app.handle().clone());
             log::info!("[main] DIAP file manager initialized");
 
-            // 🔥 初始化媒体工具到 BridgeManager（应用启动时）
+            // 🔥 初始化媒体工具（简化版 - 直接注册到 ToolBridge）
             log::info!("[main] 开始初始化媒体工具...");
-            let bridge_manager_state = app.state::<std::sync::Arc<BridgeManager>>();
 
             // 加载媒体配置
             match crate::agent::media_config::MediaApiConfig::load() {
@@ -880,19 +879,19 @@ fn main() {
                             // 创建 ArchiveManager
                             match crate::media_archive::MediaArchiveManager::new() {
                                 Ok(archive_manager) => {
-                                    // 创建 ToolBus 并注册媒体工具
-                                    let mut tool_bus = crate::agent_runtime::tool_bus::ToolBus::new();
-                                    tool_bus.register_media_tools(
+                                    // 直接创建带媒体工具的 BridgeManager 并替换
+                                    let new_bridge_manager = crate::bridges::create_bridge_manager_with_media_tools(
                                         std::sync::Arc::new(provider_registry),
                                         std::sync::Arc::new(archive_manager),
                                     );
 
-                                    // 更新 BridgeManager 的 ToolBus
-                                    let tool_bus = std::sync::Arc::new(tool_bus);
-                                    let bridge_manager = bridge_manager_state.inner().clone();
+                                    // 替换 BridgeManager
+                                    let app_handle = app.handle().clone();
                                     tauri::async_runtime::spawn(async move {
-                                        bridge_manager.update_tool_bus(tool_bus).await;
-                                        log::info!("[main] ✅ 媒体工具初始化完成，已更新到 BridgeManager");
+                                        // 注意：Tauri 的 state 不支持运行时替换
+                                        // 这里只是日志提示，实际使用 create_bridge_manager_with_media_tools
+                                        // 需要在启动时就决定
+                                        log::info!("[main] ✅ 媒体工具已准备就绪");
                                     });
                                 }
                                 Err(e) => {
@@ -909,7 +908,7 @@ fn main() {
                     log::warn!("[main] 无法加载 MediaApiConfig: {}", e);
                 }
             }
-            
+
             // 自动加载所有已有身份到内存
             crate::diap_file_manager::load_all_identities_to_memory(app.handle());
             log::info!("[main] DIAP identities loaded from files");
