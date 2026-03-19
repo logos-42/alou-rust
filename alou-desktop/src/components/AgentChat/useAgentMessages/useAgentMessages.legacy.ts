@@ -1357,7 +1357,7 @@ ${errorMessage}
 
     const setupAgentCreatedListener = async () => {
       try {
-        const fn = await listen<{ name: string; role_description?: string; id?: string }>('agent:created', async (event) => {
+        const fn = await listen<{ name: string; role_description?: string; id?: string; autoActivate?: boolean }>('agent:created', async (event) => {
           const payload = event.payload
           console.log('[useAgentMessages] ========== 收到 agent:created 事件 ==========')
           console.log('[useAgentMessages] payload:', payload)
