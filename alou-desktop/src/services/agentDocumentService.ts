@@ -34,6 +34,7 @@ export interface AgentDocuments {
 export interface Document {
   content: string;
   cid?: string;
+  metadata?: Record<string, any>;
 }
 
 // 文档类型枚举
