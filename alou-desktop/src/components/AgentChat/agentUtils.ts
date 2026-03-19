@@ -1,5 +1,11 @@
 import { getToolCategoriesByMode as getToolCategoriesFromAgentTools, getToolsByCategories as getToolsByCategoriesFromAgentTools } from './utils/agentTools'
 
+// 从共享类型导入 Channel 类型，保持类型一致性
+import type { Channel } from '@/shared/types/services'
+
+// 导出 Channel 类型供其他模块使用
+export type { Channel }
+
 // AgentInfo 类型定义
 interface AgentInfo {
   id?: string;
@@ -118,19 +124,6 @@ export interface Agent {
   mode?: string;
   role_description?: string;
   sessionId?: string | undefined;
-}
-
-// 频道类型
-export interface Channel {
-  id: string;
-  name: string;
-  status: string;
-  statusLabel: string;
-  icon: string;
-  avatar: string;
-  color: string;
-  updatedAt: number;
-  meta: Agent;
 }
 
 // 扩展Agent类型以包含hasLogged属性

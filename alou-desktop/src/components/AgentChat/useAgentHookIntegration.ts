@@ -73,11 +73,12 @@ export function useAgentHookIntegration({
 
         console.log('[AgentHook] 指令注入结果:', result)
 
-        if (result.success) {
+        const typedResult = result as InstructionResult
+        if (typedResult.success) {
           await refreshStatus()
-          return result as InstructionResult
+          return typedResult
         } else {
-          throw new Error(result.message || '指令注入失败')
+          throw new Error(typedResult.message || '指令注入失败')
         }
       } catch (error) {
         console.error('[AgentHook] 指令注入失败:', error)

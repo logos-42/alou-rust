@@ -12,6 +12,13 @@ import { useAgentHookIntegration } from './useAgentHookIntegration'
   })
 */
 
+// 🔧 辅助函数：生成唯一 ID，避免时间戳冲突
+const generateUniqueId = (prefix: string): string => {
+  const baseTime = Date.now()
+  const randomSuffix = Math.random().toString(36).slice(2, 6)
+  return `${prefix}_${baseTime}_${randomSuffix}`
+}
+
 // 然后修改 sendMessage 函数如下:
 
 const sendMessage = useCallback(async () => {
@@ -28,11 +35,15 @@ const sendMessage = useCallback(async () => {
     console.log('[sendMessage] Agent 执行中，注入新指令:', text)
     
     try {
-      // 判断优先级
+      // 判断优先级 - 使用正则匹配，支持中英文
       let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium'
-      if (text.includes('停止') || text.includes('取消') || text.includes('!') || text.includes('！')) {
+      
+      const criticalPatterns = /(?:停止|取消|abort|stop|cancel|[!！]{2,})/i
+      const highPatterns = /(?:请|尽快|urgent|asap|紧急)/i
+      
+      if (criticalPatterns.test(text)) {
         priority = 'critical'
-      } else if (text.includes('请') || text.includes('尽快')) {
+      } else if (highPatterns.test(text)) {
         priority = 'high'
       }
 
@@ -41,7 +52,7 @@ const sendMessage = useCallback(async () => {
 
       // 显示用户消息（作为指令）
       appendMessage({
-        id: `user_instruction_${Date.now()}`,
+        id: generateUniqueId('user_instruction'),
         type: 'user',
         content: text,
         timestamp: Date.now(),
@@ -56,7 +67,7 @@ const sendMessage = useCallback(async () => {
       // 显示系统确认消息
       const priorityText = priority === 'critical' ? '🚨 紧急' : priority === 'high' ? '⚡ 高优先级' : '✅'
       appendMessage({
-        id: `system_ack_${Date.now()}`,
+        id: generateUniqueId('system_ack'),
         type: 'system',
         content: `${priorityText} 指令已发送给正在执行的 Agent: "${text}"`,
         timestamp: Date.now(),
@@ -66,7 +77,7 @@ const sendMessage = useCallback(async () => {
       // 如果是指令是"停止"或"取消"，显示额外提示
       if (priority === 'critical') {
         appendMessage({
-          id: `system_stop_${Date.now()}`,
+          id: generateUniqueId('system_stop'),
           type: 'system',
           content: '⏹️ Agent 将立即停止当前执行...',
           timestamp: Date.now(),
@@ -76,7 +87,7 @@ const sendMessage = useCallback(async () => {
     } catch (error) {
       console.error('[sendMessage] 注入指令失败:', error)
       appendMessage({
-        id: `system_err_${Date.now()}`,
+        id: generateUniqueId('system_err'),
         type: 'error',
         content: `❌ 指令发送失败：${(error as Error).message}`,
         timestamp: Date.now(),
@@ -94,7 +105,7 @@ const sendMessage = useCallback(async () => {
 
     // 显示用户消息
     appendMessage({
-      id: `user_${Date.now()}`,
+      id: generateUniqueId('user'),
       type: 'user',
       content: text,
       timestamp: Date.now(),
@@ -104,7 +115,7 @@ const sendMessage = useCallback(async () => {
     // 如果有自动创建回调，用 AI 解析描述 → 自动创建
     if (wrappedAutoCreateAgent) {
       appendMessage({
-        id: `system_thinking_${Date.now()}`,
+        id: generateUniqueId('system_thinking'),
         type: 'system',
         content: '🤔 正在理解你的需求，准备创建智能体...',
         timestamp: Date.now(),
@@ -115,18 +126,29 @@ const sendMessage = useCallback(async () => {
         const agentInfo = await parseAgentCreationCommandWithAIDirect(text)
         console.log('[sendMessage] 解析的智能体信息:', agentInfo)
 
+        // 🔧 类型安全：验证必要字段
+        if (!agentInfo.name) {
+          throw new Error('智能体名称不能为空')
+        }
+        
+        const validAgentInfo: AgentInfo = {
+          name: agentInfo.name,
+          role_description: agentInfo.role_description || agentInfo.name,
+          ...agentInfo,
+        }
+
         appendMessage({
-          id: `system_creating_${Date.now()}`,
+          id: generateUniqueId('system_creating'),
           type: 'system',
           content: `🔄 正在创建智能体 **"${agentInfo.name}"**...`,
           timestamp: Date.now(),
           source: 'system',
         })
 
-        await wrappedAutoCreateAgent(agentInfo as unknown as AgentInfo)
+        await wrappedAutoCreateAgent(validAgentInfo)
 
         appendMessage({
-          id: `system_done_${Date.now()}`,
+          id: generateUniqueId('system_done'),
           type: 'assistant',
           content: `✅ 智能体 **"${agentInfo.name}"** 已创建！点击左侧频道开始对话。`,
           timestamp: Date.now(),
@@ -134,7 +156,7 @@ const sendMessage = useCallback(async () => {
         })
       } catch (err) {
         appendMessage({
-          id: `system_err_${Date.now()}`,
+          id: generateUniqueId('system_err'),
           type: 'assistant',
           content: `❌ 创建失败：${(err as Error).message || '未知错误'}`,
           timestamp: Date.now(),
@@ -143,7 +165,7 @@ const sendMessage = useCallback(async () => {
       }
     } else if (onCreateAgent) {
       appendMessage({
-        id: `system_modal_${Date.now()}`,
+        id: generateUniqueId('system_modal'),
         type: 'assistant',
         content: '📝 即将打开创建表单...',
         timestamp: Date.now(),
@@ -156,7 +178,7 @@ const sendMessage = useCallback(async () => {
       }
     } else {
       appendMessage({
-        id: `system_hint_${Date.now()}`,
+        id: generateUniqueId('system_hint'),
         type: 'assistant',
         content: '👈 点击左侧 **"+"** 按钮创建你的第一个智能体，或者试试输入：\n\n> `创建一个擅长写代码的助手`',
         timestamp: Date.now(),
@@ -169,7 +191,20 @@ const sendMessage = useCallback(async () => {
 
   // ── 正常流程：发送到选中的智能体 ──
   setCurrentMessage('')
-  await sendMessageToAgent(activeChannelId, text, selectedAgent)
+  
+  // 🔧 添加错误处理
+  try {
+    await sendMessageToAgent(activeChannelId, text, selectedAgent)
+  } catch (error) {
+    console.error('[sendMessage] 发送消息失败:', error)
+    appendMessage({
+      id: generateUniqueId('system_err'),
+      type: 'error',
+      content: `❌ 消息发送失败：${(error as Error).message || '未知错误'}`,
+      timestamp: Date.now(),
+      source: 'system',
+    })
+  }
 }, [
   activeChannelId,
   currentMessage,

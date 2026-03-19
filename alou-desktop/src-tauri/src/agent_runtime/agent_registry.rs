@@ -43,7 +43,7 @@ pub struct AgentInfo {
 }
 
 /// Agent 配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
     pub mention_only: bool,
     pub auto_reply: bool,

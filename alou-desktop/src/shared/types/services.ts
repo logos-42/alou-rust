@@ -359,7 +359,7 @@ export interface Channel {
   avatar: string;
   color: string;
   updatedAt: number;
-  meta: AgentInfo & { mode?: string };
+  meta: AgentInfo & { mode?: string; [key: string]: any };  // 扩展 meta 类型以支持额外字段
 }
 
 export interface Message {
