@@ -879,6 +879,18 @@ class AgentService {
       throw error;
     }
   }
+
+  /**
+   * 删除会话
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/session/${sessionId}`);
+    } catch (error) {
+      // 本地模式下静默处理错误
+      console.warn('[AgentService] 删除会话失败 (可能后端不可用):', error);
+    }
+  }
 }
 
 // 创建单例实例

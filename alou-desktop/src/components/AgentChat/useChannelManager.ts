@@ -84,8 +84,8 @@ interface UseChannelManagerProps {
   channelError: string | null;
   setChannelError: React.Dispatch<React.SetStateAction<string | null>>;
   recordInteraction: (action: string, data?: any) => void;
-  openConversationPanel: (channelId: string) => void;
-  loadMessagesFromIpfs: (channelId: string) => Promise<void>;
+  openConversationPanel: () => void;
+  loadMessagesFromIpfs: (channelId: string, messagesCid: string) => Promise<void>;
   preferredChain: string;
 }
 
@@ -1321,7 +1321,7 @@ export const useChannelManager = ({
     
     // 4. 调用后端 API 删除 session（异步，不阻塞 UI）
     if (agentSessionId) {
-      (agentService as any).deleteSession(agentSessionId)
+      agentService.deleteSession(agentSessionId)
         .then(() => {
           console.log('[useChannelManager] 已删除后端 session:', agentSessionId)
         })
