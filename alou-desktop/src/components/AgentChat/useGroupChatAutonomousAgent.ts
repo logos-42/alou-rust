@@ -73,6 +73,7 @@ export const useGroupChatAutonomousAgent = (
   const groupAgentsRef = useRef<Map<string, AgentConfig[]>>(new Map())
   const activeGroupsRef = useRef<string[]>([])
   const messageQueueRef = useRef<Map<string, string[]>>(new Map())
+  const processingMessages = useRef<Map<string, boolean>>(new Map())
 
   /**
    * 获取群聊中的所有智能体
@@ -217,7 +218,7 @@ export const useGroupChatAutonomousAgent = (
     // }
 
     try {
-      processingMessages.set(taskKey, true)
+      processingMessages.current.set(taskKey, true)
       agentTasksRef.current.set(taskKey, Promise.resolve())
 
       console.log('[useGroupChatAutonomousAgent] 触发智能体响应:', {
@@ -283,10 +284,10 @@ export const useGroupChatAutonomousAgent = (
     } catch (error) {
       console.error('[useGroupChatAutonomousAgent] 触发智能体响应失败:', error)
     } finally {
-      processingMessages.set(taskKey, false)
+      processingMessages.current.set(taskKey, false)
       agentTasksRef.current.delete(taskKey)
     }
-  }, [getGroupAgents, shouldAgentRespond]) // 移除 maxConcurrentTasks 和 processingMessages 依赖
+  }, [getGroupAgents, shouldAgentRespond])
 
   /**
    * 广播消息到群聊
