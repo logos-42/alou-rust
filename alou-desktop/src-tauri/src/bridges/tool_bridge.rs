@@ -67,8 +67,8 @@ impl ToolBridge {
             if let Err(e) = bridge.register_all_tools().await {
                 eprintln!("Failed to register tools: {}", e);
             }
-            // 注册媒体工具
-            bridge.register_media_tools(provider_registry, archive_manager);
+            // 注册媒体工具（异步版本）
+            bridge.register_media_tools_async(provider_registry, archive_manager).await;
         });
 
         bridge
@@ -88,8 +88,8 @@ impl ToolBridge {
         Ok(bridge)
     }
 
-    /// 注册媒体工具
-    pub fn register_media_tools(
+    /// 注册媒体工具（异步版本）
+    pub async fn register_media_tools_async(
         &mut self,
         provider_registry: Arc<ProviderRegistry>,
         archive_manager: Arc<MediaArchiveManager>,
@@ -101,33 +101,45 @@ impl ToolBridge {
         let video_tool = Arc::new(GenerateVideoTool::new(provider_registry.clone(), archive_manager.clone()));
         let status_tool = Arc::new(GetVideoStatusTool::new(provider_registry, archive_manager));
 
-        // 使用当前 runtime 的 handle 来执行异步注册
-        if let Ok(handle) = tokio::runtime::Handle::try_current() {
-            // 注册到 ToolRegistry（用于工具列表）和 ToolExecutionManager（用于执行）
-            handle.block_on(async {
-                if let Err(e) = self.register_tool(image_tool.clone()).await {
-                    log::warn!("[ToolBridge] 注册 generate_image 到 ToolRegistry 失败: {}", e);
-                }
-                if let Err(e) = self.register_tool(audio_tool.clone()).await {
-                    log::warn!("[ToolBridge] 注册 generate_audio 到 ToolRegistry 失败: {}", e);
-                }
-                if let Err(e) = self.register_tool(video_tool.clone()).await {
-                    log::warn!("[ToolBridge] 注册 generate_video 到 ToolRegistry 失败: {}", e);
-                }
-                if let Err(e) = self.register_tool(status_tool.clone()).await {
-                    log::warn!("[ToolBridge] 注册 get_video_status 到 ToolRegistry 失败: {}", e);
-                }
-            });
-        } else {
-            // 如果没有当前 runtime，只注册到 execution_manager
-            self.execution_manager.register_executor("generate_image".to_string(), image_tool);
-            self.execution_manager.register_executor("generate_audio".to_string(), audio_tool);
-            self.execution_manager.register_executor("generate_video".to_string(), video_tool);
-            self.execution_manager.register_executor("get_video_status".to_string(), status_tool);
-            log::warn!("[ToolBridge] 没有可用的 tokio runtime，媒体工具仅注册到 ExecutionManager");
+        // 注册到 ToolRegistry（用于工具列表）和 ToolExecutionManager（用于执行）
+        if let Err(e) = self.register_tool(image_tool.clone()).await {
+            log::warn!("[ToolBridge] 注册 generate_image 到 ToolRegistry 失败: {}", e);
+        }
+        if let Err(e) = self.register_tool(audio_tool.clone()).await {
+            log::warn!("[ToolBridge] 注册 generate_audio 到 ToolRegistry 失败: {}", e);
+        }
+        if let Err(e) = self.register_tool(video_tool.clone()).await {
+            log::warn!("[ToolBridge] 注册 generate_video 到 ToolRegistry 失败: {}", e);
+        }
+        if let Err(e) = self.register_tool(status_tool.clone()).await {
+            log::warn!("[ToolBridge] 注册 get_video_status 到 ToolRegistry 失败: {}", e);
         }
 
         log::info!("[ToolBridge] ✅ 媒体工具注册完成 (4 个工具)");
+    }
+
+    /// 注册媒体工具（同步版本 - 仅用于同步上下文）
+    pub fn register_media_tools(
+        &mut self,
+        provider_registry: Arc<ProviderRegistry>,
+        archive_manager: Arc<MediaArchiveManager>,
+    ) {
+        log::info!("[ToolBridge] 注册媒体工具（同步模式）...");
+
+        let image_tool = Arc::new(GenerateImageTool::new(provider_registry.clone(), archive_manager.clone()));
+        let audio_tool = Arc::new(GenerateAudioTool::new(provider_registry.clone(), archive_manager.clone()));
+        let video_tool = Arc::new(GenerateVideoTool::new(provider_registry.clone(), archive_manager.clone()));
+        let status_tool = Arc::new(GetVideoStatusTool::new(provider_registry, archive_manager));
+
+        // 同步上下文下只注册到 execution_manager
+        // ToolRegistry 的注册需要异步，由调用者确保在正确的上下文中调用
+        self.execution_manager.register_executor("generate_image".to_string(), image_tool.clone());
+        self.execution_manager.register_executor("generate_audio".to_string(), audio_tool.clone());
+        self.execution_manager.register_executor("generate_video".to_string(), video_tool.clone());
+        self.execution_manager.register_executor("get_video_status".to_string(), status_tool.clone());
+        
+        log::info!("[ToolBridge] ✅ 媒体工具已注册到 ExecutionManager");
+        log::info!("[ToolBridge] ⚠️  注意：ToolRegistry 注册需要在异步上下文中调用 register_media_tools_async");
     }
 
     /// 处理工具调用请求
