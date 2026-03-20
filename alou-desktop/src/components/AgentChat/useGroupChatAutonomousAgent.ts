@@ -159,6 +159,22 @@ export const useGroupChatAutonomousAgent = (
       return false
     }
     
+    const content = message.content.toLowerCase()
+    
+    // 🔥 关键修复：对于特定请求，第一个智能体始终响应
+    const selfIntroPatterns = ['介绍自己', '介绍一下', '你是谁', 'who are you', '自我介绍', '介绍下']
+    const isSelfIntroRequest = selfIntroPatterns.some(pattern => content.includes(pattern))
+    
+    if (isSelfIntroRequest) {
+      // 第一个智能体始终响应
+      if (agent.id === allAgents[0]?.id) {
+        console.log('[shouldAgentRespond] 自我介绍请求，第一个智能体响应')
+        return true
+      }
+      console.log('[shouldAgentRespond] 自我介绍请求，非第一个智能体跳过')
+      return false
+    }
+
     // 如果配置为仅在被 @ 时响应
     if (mentionOnly) {
       // 检查消息是否包含 @ 提及
