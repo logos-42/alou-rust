@@ -101,10 +101,31 @@ impl ToolBridge {
         let video_tool = Arc::new(GenerateVideoTool::new(provider_registry.clone(), archive_manager.clone()));
         let status_tool = Arc::new(GetVideoStatusTool::new(provider_registry, archive_manager));
 
-        self.execution_manager.register_executor("generate_image".to_string(), image_tool);
-        self.execution_manager.register_executor("generate_audio".to_string(), audio_tool);
-        self.execution_manager.register_executor("generate_video".to_string(), video_tool);
-        self.execution_manager.register_executor("get_video_status".to_string(), status_tool);
+        // 使用当前 runtime 的 handle 来执行异步注册
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            // 注册到 ToolRegistry（用于工具列表）和 ToolExecutionManager（用于执行）
+            handle.block_on(async {
+                if let Err(e) = self.register_tool(image_tool.clone()).await {
+                    log::warn!("[ToolBridge] 注册 generate_image 到 ToolRegistry 失败: {}", e);
+                }
+                if let Err(e) = self.register_tool(audio_tool.clone()).await {
+                    log::warn!("[ToolBridge] 注册 generate_audio 到 ToolRegistry 失败: {}", e);
+                }
+                if let Err(e) = self.register_tool(video_tool.clone()).await {
+                    log::warn!("[ToolBridge] 注册 generate_video 到 ToolRegistry 失败: {}", e);
+                }
+                if let Err(e) = self.register_tool(status_tool.clone()).await {
+                    log::warn!("[ToolBridge] 注册 get_video_status 到 ToolRegistry 失败: {}", e);
+                }
+            });
+        } else {
+            // 如果没有当前 runtime，只注册到 execution_manager
+            self.execution_manager.register_executor("generate_image".to_string(), image_tool);
+            self.execution_manager.register_executor("generate_audio".to_string(), audio_tool);
+            self.execution_manager.register_executor("generate_video".to_string(), video_tool);
+            self.execution_manager.register_executor("get_video_status".to_string(), status_tool);
+            log::warn!("[ToolBridge] 没有可用的 tokio runtime，媒体工具仅注册到 ExecutionManager");
+        }
 
         log::info!("[ToolBridge] ✅ 媒体工具注册完成 (4 个工具)");
     }
