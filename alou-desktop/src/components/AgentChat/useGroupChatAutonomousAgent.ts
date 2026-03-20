@@ -154,6 +154,11 @@ export const useGroupChatAutonomousAgent = (
     message: GroupChatMessage,
     allAgents: AgentConfig[]
   ): boolean => {
+    // 系统消息不响应
+    if (message.type === 'system') {
+      return false
+    }
+    
     // 如果配置为仅在被 @ 时响应
     if (mentionOnly) {
       // 检查消息是否包含 @ 提及
@@ -165,30 +170,47 @@ export const useGroupChatAutonomousAgent = (
 
     // ✅ 关键修复：如果只有一个智能体，始终响应（除非是系统消息）
     if (allAgents.length === 1) {
-      // 系统消息不响应
-      if (message.type === 'system') {
-        return false
-      }
-      // 单个智能体时，始终响应所有用户消息
       return true
     }
 
-    // 自主响应模式：智能体根据消息内容判断是否响应
+    // 🔥 群聊模式：多个智能体时，使用轮询或随机响应
+    // 每个智能体有 50% 的概率响应，确保消息能得到回复
     const content = message.content.toLowerCase()
-
-    // 1. 检查是否被直接 @
+    
+    // 1. 检查是否被直接 @ - 必须响应
     if (content.includes('@' + agent.name)) {
+      console.log('[shouldAgentRespond] 智能体被@，响应')
       return true
     }
 
-    // 2. 检查是否是问题或请求
+    // 2. 检查是否是问题或请求 - 高概率响应
     const questionPatterns = [
       '?', '？', '吗', '什么', '怎么', '为什么', '是否', '能否', '可以',
       'help', 'what', 'how', 'why', 'can', 'could', 'please'
     ]
     const isQuestion = questionPatterns.some(pattern => content.includes(pattern))
+    
+    if (isQuestion) {
+      // 问题消息，70% 概率响应
+      if (Math.random() < 0.7) {
+        console.log('[shouldAgentRespond] 智能体响应问题')
+        return true
+      }
+    }
 
-    // 3. 检查是否提及智能体相关关键词
+    // 3. 检查是否是问候语或简单消息 - 低概率响应，避免多个智能体同时回复
+    const greetingPatterns = ['你好', 'hello', 'hi', '嗨', '早', '好', '在吗', '喂', 'test', '测试']
+    const isGreeting = greetingPatterns.some(pattern => content.includes(pattern))
+    
+    if (isGreeting) {
+      // 问候语，30% 概率响应
+      if (Math.random() < 0.3) {
+        console.log('[shouldAgentRespond] 智能体响应问候')
+        return true
+      }
+    }
+
+    // 4. 检查是否提及智能体相关关键词
     const agentKeywords = [
       agent.name,
       ...(agent.role_description ? [agent.role_description] : [])
@@ -197,20 +219,17 @@ export const useGroupChatAutonomousAgent = (
       keyword && content.includes(keyword.toLowerCase())
     )
 
-    // 4. 如果是问题且提及智能体，应该响应
-    if (isQuestion && mentionsAgent) {
-      return true
+    if (mentionsAgent) {
+      // 提及智能体，60% 概率响应
+      if (Math.random() < 0.6) {
+        console.log('[shouldAgentRespond] 智能体响应提及')
+        return true
+      }
     }
 
-    // 5. 如果是直接的问题，智能体可以主动响应
-    if (isQuestion && Math.random() > 0.5) {
-      return true
-    }
-
-    // 6. 如果消息是任务分配或协作请求
-    const taskPatterns = ['任务', 'task', '分配', 'assign', '请', '帮忙', 'help']
-    const isTaskRequest = taskPatterns.some(pattern => content.includes(pattern))
-    if (isTaskRequest && mentionsAgent) {
+    // 5. 其他消息，20% 概率随机响应（保持对话活跃）
+    if (Math.random() < 0.2) {
+      console.log('[shouldAgentRespond] 智能体随机响应')
       return true
     }
 
