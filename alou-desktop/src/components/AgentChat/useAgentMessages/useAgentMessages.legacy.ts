@@ -935,12 +935,12 @@ ${errorMessage}
   useEffect(() => {
     // 消息队列处理器 - 由 sessionMessageQueue 调用
     const handler = async (message: QueueMessage) => {
-      console.log('[sessionMessageQueue handler] 处理消息，agentId:', message.agentId, 'sessionId:', message.sessionId)
-      
+      console.log('[sessionMessageQueue handler] 处理消息，agentId:', message.agentId, 'sessionId:', message.sessionId, 'isGroupChat:', message.isGroupChat)
+
       try {
         // 显示 loading 状态
         setAgentLoading(message.agentId, true)
-        
+
         // 调用 sendMessageToAgent 处理消息（使用已有的同步版本）
         if (sendMessageToAgentRef.current) {
           await sendMessageToAgentRef.current(
@@ -974,15 +974,23 @@ ${errorMessage}
 
     // 为当前 session 设置处理器
     if (sessionId) {
-      console.log('[useAgentMessages] 初始化 sessionMessageQueue handler，sessionId:', sessionId)
+      console.log('[useAgentMessages] 初始化主 session handler，sessionId:', sessionId)
       setSessionHandler(sessionId, handler)
     }
+
+    // 🔥 为所有 agent 的 session 设置处理器（群聊消息需要）
+    Object.entries(sessionsByAgent).forEach(([agentId, agentSessionId]) => {
+      if (agentSessionId && agentSessionId !== sessionId) {
+        console.log('[useAgentMessages] 为 agent session 设置 handler，agentId:', agentId, 'sessionId:', agentSessionId)
+        setSessionHandler(agentSessionId, handler)
+      }
+    })
 
     return () => {
       // 清理 handler（可选）
       console.log('[useAgentMessages] 清理 sessionMessageQueue handler')
     }
-  }, [sessionId, appendMessage, setAgentLoading])
+  }, [sessionId, sessionsByAgent, appendMessage, setAgentLoading])
 
   // 向后兼容的 sendMessage（发送到当前活动智能体）
   // 修改：接收 text 参数而不是依赖内部 currentMessage 状态

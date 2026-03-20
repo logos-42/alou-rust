@@ -61,6 +61,9 @@ pub use spec_tool::SpecTool;
 pub use tool_parts::executor::DynamicToolExecutor;
 pub use meta_tool::MetaActionTools;  // 导出元行动工具
 
+// 导出媒体工具
+pub use media_tools::{GenerateImageTool, GenerateAudioTool, GenerateVideoTool, GetVideoStatusTool};
+
 // 导出通知工具类型 - 暂时注释，等待模块创建
 // pub use notification::{NotificationTool, NotificationLevel, NotificationType};
 
