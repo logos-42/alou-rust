@@ -262,7 +262,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
   }, [diapGroupChat.groups, activeGroupId, getActiveAction, getActions, activeChannelId])
 
   // 获取当前活跃群聊的消息（优先从 DIAP 群聊查找，然后从本地 store 查找）
-  const [messageVersion, setMessageVersion] = useState(0)
+  const [lastMessageCount, setLastMessageCount] = useState(0)
   
   const activeGroupMessages = useMemo(() => {
     if (!activeGroupId) {
@@ -270,34 +270,28 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       return []
     }
 
-    console.log('[useGroupChatManager] activeGroupMessages: 获取消息，activeGroupId=', activeGroupId, 'version=', messageVersion)
-
     // 先从 DIAP 群聊获取消息（仅当当前活跃群聊匹配）
     if (diapGroupChat.activeGroup?.groupId === activeGroupId) {
-      console.log('[useGroupChatManager] activeGroupMessages: 从 DIAP 获取，消息数量=', diapGroupChat.messages.length)
       return diapGroupChat.messages
     }
 
     // 从本地 store 获取消息
     const messages = getGroupChatMessages(activeGroupId)
-    console.log('[useGroupChatManager] activeGroupMessages: 从本地 store 获取，消息数量=', messages?.length || 0)
     return messages || []
-  }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId, messageVersion])
+  }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId, lastMessageCount])
   
-  // 监听 store 中的消息变化，强制更新
+  // 监听 store 中的消息变化，只在消息数量变化时强制更新
   useEffect(() => {
     if (!activeGroupId) return
     
-    const interval = setInterval(() => {
-      const messages = getGroupChatMessages(activeGroupId)
-      const count = messages?.length || 0
-      if (count > 0) {
-        setMessageVersion(prev => prev + 1)
-      }
-    }, 500)
+    const messages = getGroupChatMessages(activeGroupId)
+    const count = messages?.length || 0
     
-    return () => clearInterval(interval)
-  }, [activeGroupId, getGroupChatMessages])
+    if (count !== lastMessageCount) {
+      console.log('[useGroupChatManager] 检测到消息数量变化:', lastMessageCount, '->', count)
+      setLastMessageCount(count)
+    }
+  }, [activeGroupId, lastMessageCount])
 
   // 获取当前频道的群聊列表（合并 DIAP 群聊和本地群聊）
   const groupChatList = useMemo(() => {
