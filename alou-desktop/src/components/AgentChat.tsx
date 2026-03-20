@@ -213,6 +213,8 @@ const AgentChat = () => {
     canOpenGroupChat,
   } = groupChatManager
 
+  // 稳定 agents 数组，避免不必要的重新渲染
+  const groupChatPanelAgents = useMemo(() => activeGroup?.agents || [], [activeGroup?.agents])
 
   // ==================== 2. Connection State Hook ====================
   const connectionState = useAgentConnection({
@@ -908,12 +910,10 @@ const AgentChat = () => {
                       actionId={activeActionId || activeGroup?.groupId}
                       externalActiveGroup={activeGroup}
                       externalMessages={activeGroupMessages}
-                      agents={activeGroup?.agents || []}
+                      agents={groupChatPanelAgents}
                       status={actionStatus}
                       onClose={closeGroupChatCompletely}
-                      onRefresh={() => {
-                        // 刷新群聊消息的逻辑已在 useGroupChat 中处理
-                      }}
+                      onRefresh={undefined}
                       onAgentClick={handleAgentClickFromGroupChat}
                       externalIsLoading={actionStatus === 'Running'}
                       groupChatList={groupChatList}
@@ -921,7 +921,7 @@ const AgentChat = () => {
                       onSwitchGroupChat={switchGroupChat}
                       onPanelClick={handleGroupChatPanelClick}
                       onSelectAgent={handleSelectAgentFromGroupChat}
-                      externalOnSendMessage={sendGroupChatMessage}  // 使用 useGroupChatManager 中的 sendMessage
+                      externalOnSendMessage={sendGroupChatMessage}
                       onResize={setSplitPosition}
                       inputTargetMode={inputTargetMode}
                     />
