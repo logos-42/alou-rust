@@ -69,7 +69,6 @@ const GroupChatPanel = ({
   onClose,
   onAgentClick,
   onPanelClick,
-  inputTargetMode,
   // 兼容性参数（保持与原有接口的兼容）
   externalActiveGroup,
   externalMessages = [],
