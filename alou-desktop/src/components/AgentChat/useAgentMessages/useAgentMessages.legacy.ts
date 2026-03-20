@@ -780,11 +780,10 @@ export const useAgentMessages = ({
 
       if (tauri_result?.success) {
         // 提取响应内容
-        // TaskFinalResult.result 是 AI 最终回复的字符串
         const result = tauri_result.result
         const content =
-          result?.result ||        // TaskFinalResult.result (主字段)
-          result?.final_answer ||  // 兼容旧格式
+          result?.result ||
+          result?.final_answer ||
           result?.content ||
           result?.summary ||
           '✅ 任务已完成'
@@ -796,7 +795,6 @@ export const useAgentMessages = ({
           timestamp: tauri_result.timestamp ? tauri_result.timestamp * 1000 : Date.now(),
           source: 'local',
           agentId: targetAgentId,
-          // 🔥 关键修复：继承群聊 metadata，这样同步逻辑才能检测到
           metadata: isGroupChat ? {
             isGroupChatMessage: true,
             groupId: groupId,
@@ -805,13 +803,51 @@ export const useAgentMessages = ({
           } : undefined
         }
         appendMessage(assistantMessage, targetAgentId)
-        
-        // ✅ 关键修复：对话结束后立即保存消息到 IPFS，保存上下文
+
+        // 🔥 关键修改：群聊消息直接保存到 groupChatMessages，不需要同步逻辑
+        if (isGroupChat && groupId) {
+          try {
+            const { addGroupChatMessage } = clusterActionStore.getState()
+            const { getActions } = clusterActionStore.getState()
+            
+            // 获取智能体信息
+            const allActions = Object.values(clusterActionStore.getState().actionsByChannel || {}).flat()
+            let agentInfo = null
+            for (const action of allActions) {
+              const agent = action.agents?.find((a: any) => a.id === targetAgentId)
+              if (agent) {
+                agentInfo = agent
+                break
+              }
+            }
+
+            const groupReplyMessage = {
+              id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              type: 'agent' as const,
+              from: targetAgentId,
+              fromName: agentInfo?.name || targetAgentId || '智能体',
+              avatar: agentInfo?.avatar,
+              content: String(content),
+              timestamp: assistantMessage.timestamp,
+              metadata: {
+                agentId: targetAgentId,
+                replyTo: options?.originalMessage,
+                isReply: true
+              }
+            }
+
+            addGroupChatMessage(groupId, groupReplyMessage)
+            console.log('[useAgentMessages] 群聊 AI 回复已直接保存到 groupChatMessages:', groupId)
+          } catch (error) {
+            console.warn('[useAgentMessages] 保存群聊 AI 回复失败:', error)
+          }
+        }
+
+        // ✅ 保存消息到 IPFS
         if (selectedAgent?.id && activeChannelId) {
           saveMessagesToIpfs(activeChannelId, selectedAgent.id, false).then((cid) => {
             if (cid) {
               console.log('[useAgentMessages] 消息已保存到 IPFS，CID:', cid)
-              // 更新 agent 的 messages_cid
               updateAgent(selectedAgent.id, { messages_cid: cid })
             }
           }).catch(err => {
