@@ -230,24 +230,6 @@ export const useGroupChatAutonomousAgent = (
   ): Promise<void> => {
     const taskKey = `${groupId}_${agentId}_${message.id}`
 
-    // ✅ 移除正在处理检查 - 允许同一消息被多个 agent 同时处理
-    // if (processingMessages.get(taskKey)) {
-    //   console.log('[useGroupChatAutonomousAgent] 消息正在处理中，跳过:', taskKey)
-    //   return
-    // }
-
-    // ✅ 移除并发限制 - 允许所有 agent 同时响应
-    // const activeTasks = Array.from(agentTasksRef.current.values())
-    //   .filter(task => task !== undefined).length
-    // if (activeTasks >= maxConcurrentTasks) {
-    //   console.log('[useGroupChatAutonomousAgent] 达到最大并发任务数，消息已加入队列')
-    //   if (!messageQueueRef.current.has(groupId)) {
-    //     messageQueueRef.current.set(groupId, [])
-    //   }
-    //   messageQueueRef.current.get(groupId)!.push(message)
-    //   return
-    // }
-
     try {
       processingMessages.current.set(taskKey, true)
       agentTasksRef.current.set(taskKey, Promise.resolve())
@@ -273,43 +255,8 @@ export const useGroupChatAutonomousAgent = (
         return
       }
 
-      // 立即触发智能体响应（无延迟）
-      console.log('[useGroupChatAutonomousAgent] 立即触发智能体响应:', agentId)
-      const systemPrompt = `你是一个群聊智能体，正在参与群聊 "${groupId}"。
-
-你的角色：${agent.role_description || '助手'}
-你的名字：${agent.name}
-
-群聊规则：
-1. 只在被@或消息与你相关时响应
-2. 保持回复简洁明了
-3. 与其他智能体协作完成任务
-4. 如果消息是任务分配，确认接收并执行
-
-当前消息来自：${message.fromName}
-消息内容：${message.content}
-
-请根据上下文给出合适的回复。`
-
-      // 触发智能体处理消息的事件
-      window.dispatchEvent(new CustomEvent('agent-group-message', {
-        detail: {
-          agentId,
-          message: {
-            ...message,
-            type: 'group_chat_message',
-            isMentioned: message.content.includes('@' + agent.name),
-            mentionedAgentIds: [agentId],
-            metadata: {
-              ...message.metadata,
-              systemPrompt,
-              groupId,
-              isGroupChat: true
-            }
-          }
-        }
-      }))
-
+      // 🔥 关键修改：直接调用 useAgentMessages 的 sendMessageToAgent 处理群聊消息
+      // 这样 AI 回复会保存到 agent 的独立 channel，然后由群聊同步逻辑处理
       console.log('[useGroupChatAutonomousAgent] 智能体响应已触发:', agentId)
 
     } catch (error) {
