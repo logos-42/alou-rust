@@ -386,6 +386,41 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         }
       })
 
+      // 🔥 关键：保存到 clusterActionStore，这样 sendMessage 时能找到智能体
+      const actionId = `diap_group_${group.groupId}`
+      const action = {
+        action_id: actionId,
+        description: group.description || `${group.groupName} (${channelAgents.length}个智能体)`,
+        status: 'Active',
+        created_at: new Date().toISOString(),
+        agents: [
+          {
+            id: localIdentity?.did || 'user',
+            did: localIdentity?.did,
+            name: localIdentity?.name || '用户',
+            mode: 'user'
+          },
+          ...channelAgents.map(agent => ({
+            id: agent.did || agent.id,
+            did: agent.did,
+            name: agent.name || '智能体',
+            mode: agent.mode || 'agent'
+          }))
+        ],
+        metadata: {
+          type: 'diap_group_chat',
+          diap_group_id: group.groupId,
+          channel: { id: channelId },
+          channelName: channel.name,
+          local: false
+        }
+      }
+      
+      // 保存到 store
+      addAction(action)
+      setActiveAction(actionId, channelId)
+      console.log('[useGroupChatManager] DIAP 群聊已保存到 store:', actionId)
+
       // 设置为活跃群聊
       setActiveGroupId(group.groupId as string)
       await diapGroupChat.switchToGroup(group.groupId)
