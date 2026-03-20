@@ -1317,9 +1317,9 @@ ${errorMessage}
 
         try {
           const { addGroupChatMessage, getActions } = clusterActionStore.getState()
-          
+
           // 获取智能体信息
-          const allActions = Object.values(get().actionsByChannel || {}).flat()
+          const allActions = Object.values(clusterActionStore.getState().actionsByChannel || {}).flat()
           let agentInfo = null
           for (const action of allActions) {
             const agent = action.agents?.find((a: any) => a.id === agentId)
@@ -1347,7 +1347,7 @@ ${errorMessage}
 
           addGroupChatMessage(groupId, groupReplyMessage)
           console.log('[useAgentMessages] 群聊消息已同步:', groupId)
-          
+
           // 标记为已同步
           lastMessage.metadata[syncKey] = true
         } catch (error) {
