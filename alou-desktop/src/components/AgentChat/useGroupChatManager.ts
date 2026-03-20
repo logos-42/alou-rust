@@ -334,25 +334,34 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       }
     }
 
-    // 如果没有频道，创建一个默认频道 ID
+    // 如果没有频道，使用当前 activeChannelId
     let channelId = activeChannelId
     if (!channelId) {
       channelId = `channel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
       console.log('[useGroupChatManager] 自动创建默认频道:', channelId)
     }
 
-    // 如果没有传入 agents，从当前 channel 获取所有智能体
+    // 如果没有传入 agents，从所有 channel 获取智能体
     let channelAgents = agents
     if (!channelAgents || channelAgents.length === 0) {
-      // 从 store 获取当前频道的智能体
+      // 从 store 获取所有智能体（不限制频道）
       const { getActions } = useClusterActionStore.getState()
-      const actions = getActions(channelId) || []
-      channelAgents = actions
-        .filter(action => action.agents && action.agents.length > 0)
-        .flatMap(action => action.agents)
-        .filter(agent => agent.mode === 'agent')
+      const allActions = getActions("") || []
       
-      console.log('[useGroupChatManager] 从 channel 获取智能体:', channelAgents.length, '个')
+      // 收集所有智能体
+      const allAgentsSet = new Map()
+      allActions.forEach(action => {
+        if (action.agents && Array.isArray(action.agents)) {
+          action.agents.forEach(agent => {
+            if (agent.mode === 'agent' && agent.id) {
+              allAgentsSet.set(agent.id, agent)
+            }
+          })
+        }
+      })
+      
+      channelAgents = Array.from(allAgentsSet.values())
+      console.log('[useGroupChatManager] 从所有 channel 获取智能体:', channelAgents.length, '个', channelAgents.map(a => a.name))
     }
 
     try {
