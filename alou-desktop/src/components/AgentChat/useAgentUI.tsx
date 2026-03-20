@@ -5,12 +5,19 @@ import { ACTION_LABELS } from '@/hooks/useAgentChat'
 /**
  * Hook for managing UI state and interactions
  */
-export const useAgentUI = ({
-  sessionId,
-  viewportWidth: initialViewportWidth = 1440,
-  isLeftSidebarCollapsed,
-  isSidebarCollapsed,
-}) => {
+export const useAgentUI = (options: {
+  sessionId?: string | null;
+  viewportWidth?: number;
+  isLeftSidebarCollapsed?: boolean;
+  isSidebarCollapsed?: boolean;
+} = {}) => {
+  const {
+    sessionId,
+    viewportWidth: initialViewportWidth = 1440,
+    isLeftSidebarCollapsed,
+    isSidebarCollapsed,
+  } = options;
+
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isSidebarCollapsedLocal, setSidebarCollapsed] = useState(true)
   const [isLeftSidebarCollapsedLocal, setLeftSidebarCollapsed] = useState(false)
@@ -30,7 +37,7 @@ export const useAgentUI = ({
   const effectiveSidebarCollapsed = isSidebarCollapsed ?? isSidebarCollapsedLocal
   const effectiveLeftSidebarCollapsed = isLeftSidebarCollapsed ?? isLeftSidebarCollapsedLocal
 
-  const recordInteraction = useCallback((action, detail, label) => {
+  const recordInteraction = useCallback((action, detail, label = undefined) => {
     const timestamp = Date.now()
     const entry = {
       id: `log_${timestamp}_${Math.random().toString(36).slice(2, 6)}`,

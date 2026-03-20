@@ -27,9 +27,7 @@ interface PubSubMessage {
   }
 }
 
-interface ActionStatus {
-  status: string
-}
+import type { ActionStatus } from '@/stores/clusterActionStore'
 
 interface UseGroupChatOptions {
   actionId: string | null
@@ -224,7 +222,7 @@ export const useGroupChat = ({ actionId, enabled = true }: UseGroupChatOptions):
       if (isLocalGroupChat(actionId)) {
         const action = getActiveAction(actionId)
         if (action) {
-          updateActionStatus(actionId, action.status || 'Active')
+          updateActionStatus(actionId, (action.status || 'Active') as ActionStatus)
         }
         return () => {} // 返回空的清理函数
       }

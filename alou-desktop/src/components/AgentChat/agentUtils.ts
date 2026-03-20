@@ -1,20 +1,10 @@
 import { getToolCategoriesByMode as getToolCategoriesFromAgentTools, getToolsByCategories as getToolsByCategoriesFromAgentTools } from './utils/agentTools'
 
-// 从共享类型导入 Channel 类型，保持类型一致性
-import type { Channel } from '@/shared/types/services'
+// 从共享类型导入 Channel 和 AgentInfo 类型，保持类型一致性
+import type { Channel, AgentInfo } from '@/shared/types/services'
 
 // 导出 Channel 类型供其他模块使用
 export type { Channel }
-
-// AgentInfo 类型定义
-interface AgentInfo {
-  id?: string;
-  name?: string;
-  display_name?: string;
-  did?: string;
-  cid?: string;
-  ipns?: string;
-}
 
 // ToolCategory 类型定义
 interface ToolCategory {
@@ -113,15 +103,28 @@ export interface Agent {
   };
   meta?: Agent;
   did_document?: {
+    '@context'?: string[];
+    id?: string;
+    verificationMethod?: Array<{
+      id: string;
+      type: string;
+      controller: string;
+      publicKeyBase58?: string;
+      publicKeyJwk?: any;
+    }>;
+    authentication?: string[];
+    assertionMethod?: string[];
+    keyAgreement?: string[];
+    capabilityInvocation?: string[];
     service?: Array<{
-      serviceEndpoint?: {
-        avatar_cid?: string;
-      };
+      id?: string;
+      type?: string;
+      serviceEndpoint?: string | { [key: string]: any };
     }>;
   };
   status?: string;
   agent_type?: string;
-  mode?: string;
+  mode?: 'agent' | 'alou';
   role_description?: string;
   sessionId?: string | undefined;
 }
@@ -207,7 +210,7 @@ export const resolveAgentAvatar = (agent: Agent | null | undefined): string => {
     const services = agent.did_document.service
     for (const svc of services) {
       const endpoint = svc.serviceEndpoint
-      if (endpoint?.avatar_cid) {
+      if (typeof endpoint === 'object' && endpoint?.avatar_cid) {
         const url = buildIpfsUrl(endpoint.avatar_cid)
         if (url !== fallbackAvatar) return url
       }
@@ -320,7 +323,7 @@ export const buildChannelFromAgent = (agent: Agent | null): Channel | null => {
     avatar,
     color: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
     updatedAt: Math.floor(Date.now() / 1000),
-    meta: metaWithMode,
+    meta: metaWithMode as AgentInfo & { mode?: string; [key: string]: any },
   }
 }
 

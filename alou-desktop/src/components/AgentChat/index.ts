@@ -1,11 +1,11 @@
 // Export all custom hooks
 // @ts-expect-error - JSX files without type definitions
-export { useAgentConnection } from './useAgentConnection.jsx';
+export { useAgentConnection } from './useAgentConnection.tsx';
 export { useAgentWallet } from './useAgentWallet';
 export { useAgentMessages } from './useAgentMessages';
 export { useAgentDrag } from './useAgentDrag';
 // @ts-expect-error - JSX files without type definitions
-export { useAgentUI } from './useAgentUI.jsx';
+export { useAgentUI } from './useAgentUI.tsx';
 export { useChannelManager } from './useChannelManager';
 export { useAgentPersistence } from './useAgentPersistence';
 export { useAgentHookIntegration } from './useAgentHookIntegration';

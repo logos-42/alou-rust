@@ -112,6 +112,8 @@ export const useWorkflow = ({
   const { t } = useI18n()
   const [workflows, setWorkflows] = useState<Workflow[]>([])
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null)
+  const stopExecutionPollingRef = useRef<((executionId: string) => void) | null>(null)
+  const startExecutionPollingRef = useRef<((executionId: string, workflowId: string) => void) | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [executingWorkflowId, setExecutingWorkflowId] = useState<string | null>(null)
   const [executionProgress, setExecutionProgress] = useState<Record<string, ExecutionProgress>>({})
@@ -248,7 +250,7 @@ export const useWorkflow = ({
         // 获取 execution 对应的 workflowId 并重新启动轮询
         const execution = activeExecutions[executionId]
         if (execution?.workflow_id) {
-          startExecutionPolling(executionId, execution.workflow_id)
+          startExecutionPollingRef.current?.(executionId, execution.workflow_id)
         }
 
         // 重新获取工作流状态
@@ -269,7 +271,7 @@ export const useWorkflow = ({
         error
       })
     }
-  }, [sessionId, apiKey, agentInfo, onWorkflowMessage, loadWorkflows, activeExecutions, startExecutionPolling])
+  }, [sessionId, apiKey, agentInfo, onWorkflowMessage, loadWorkflows, activeExecutions])
 
   // 删除工作流
   const deleteWorkflow = useCallback(async (workflowId: string) => {
@@ -327,7 +329,7 @@ export const useWorkflow = ({
         })
 
         // 停止轮询
-        stopExecutionPolling(executionId)
+        stopExecutionPollingRef.current?.(executionId)
 
         // 重新获取工作流状态
         await loadWorkflows()
@@ -347,7 +349,7 @@ export const useWorkflow = ({
         error
       })
     }
-  }, [sessionId, onWorkflowMessage, loadWorkflows, stopExecutionPolling])
+  }, [sessionId, onWorkflowMessage, loadWorkflows])
 
   // 清除轮询
   const clearPolling = useCallback(() => {
@@ -420,6 +422,9 @@ export const useWorkflow = ({
     }
   }, [executionPolling])
 
+  // Assign stopExecutionPolling to ref for use in other callbacks
+  stopExecutionPollingRef.current = stopExecutionPolling
+
   // 取消工作流执行
   const cancelWorkflow = useCallback(async (executionId: string) => {
     if (!sessionId) return
@@ -434,7 +439,7 @@ export const useWorkflow = ({
         })
 
         // 停止轮询
-        stopExecutionPolling(executionId)
+        stopExecutionPollingRef.current?.(executionId)
 
         // 清除执行进度
         setExecutionProgress(prev => {
@@ -502,7 +507,7 @@ export const useWorkflow = ({
 
           // 检查是否完成
           if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
-            stopExecutionPolling(executionId)
+            stopExecutionPollingRef.current?.(executionId)
 
             if (execution.status === 'completed') {
               onWorkflowMessage?.(`✅ 工作流执行完成!`)
@@ -517,7 +522,7 @@ export const useWorkflow = ({
         }
       } catch (error) {
         console.error('[useWorkflow] 轮询执行状态异常:', error)
-        stopExecutionPolling(executionId)
+        stopExecutionPollingRef.current?.(executionId)
       }
     }
 
@@ -532,6 +537,9 @@ export const useWorkflow = ({
       [executionId]: intervalId as unknown as NodeJS.Timeout
     }))
   }, [executionPolling, onWorkflowMessage, stopExecutionPolling])
+
+  // Assign startExecutionPolling to ref for use in other callbacks
+  startExecutionPollingRef.current = startExecutionPolling
 
   // 修改执行工作流函数，支持异步执行
   const executeWorkflow = useCallback(async (workflowId: string) => {

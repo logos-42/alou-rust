@@ -38,6 +38,7 @@ export const useAgentModals = ({ recordInteraction }: UseAgentModalsParams): Use
   const createChannel = useCallback(() => {
     setCreateAgentModalOpen(true)
     recordInteraction('open_create_agent_modal')
+    return Promise.resolve(true)
   }, [recordInteraction])
   
   // 导入频道/智能体

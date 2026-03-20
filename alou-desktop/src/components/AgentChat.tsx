@@ -26,8 +26,8 @@ import TranslationIcon from '@/assets/icon_翻译.png'
 import GroupIcon from '@/assets/群组.png'
 
 // Hooks
-import { useAgentUI } from './AgentChat/useAgentUI.jsx'
-import { useAgentConnection } from './AgentChat/useAgentConnection.jsx'
+import { useAgentUI } from './AgentChat/useAgentUI'
+import { useAgentConnection } from './AgentChat/useAgentConnection'
 import { useAgentDrag } from './AgentChat/useAgentDrag'
 import { useAgentMessages } from './AgentChat/useAgentMessages'
 import { useAgentWallet } from './AgentChat/useAgentWallet'
@@ -266,7 +266,7 @@ const AgentChat = () => {
     appendMessage: null, // 会通过 handleToolCalls 传递
     scrollToBottom: null, // 会通过 handleToolCalls 传递
     setTransactions: undefined,
-        })
+  })
 
   const {
     walletSnapshot,
@@ -1049,7 +1049,7 @@ const AgentChat = () => {
             console.log('[AgentChat] 已终止频道所有执行:', activeChannelId)
           }
         }}
-        onNewLine={() => setCurrentMessage((prev) => `${prev}\n`)}
+        onNewLine={() => { /* 输入框由 AgentConsoleDock 内部管理 */ }}
         onOpenConversation={openConversationPanel}
         inputTargetMode={showGroupChat ? inputTargetMode : null}
         showGroupChat={showGroupChat}
