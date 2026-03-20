@@ -218,7 +218,7 @@ export const useGroupChatAutonomousAgent = (
     // 4. 其他情况不响应
     console.log('[shouldAgentRespond] 智能体不响应')
     return false
-  }
+  }, [mentionOnly])
 
   /**
    * 触发智能体响应（无并发限制）
