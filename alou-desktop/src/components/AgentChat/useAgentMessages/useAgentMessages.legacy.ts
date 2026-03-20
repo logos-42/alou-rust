@@ -796,6 +796,13 @@ export const useAgentMessages = ({
           timestamp: tauri_result.timestamp ? tauri_result.timestamp * 1000 : Date.now(),
           source: 'local',
           agentId: targetAgentId,
+          // 🔥 关键修复：继承群聊 metadata，这样同步逻辑才能检测到
+          metadata: isGroupChat ? {
+            isGroupChatMessage: true,
+            groupId: groupId,
+            originalMessage: options?.originalMessage,
+            agentId: targetAgentId
+          } : undefined
         }
         appendMessage(assistantMessage, targetAgentId)
         
