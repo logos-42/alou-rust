@@ -89,12 +89,30 @@ export const useGroupChatAutonomousAgent = (
     // 从 store 获取
     try {
       const { getActions } = useClusterActionStore.getState()
-      const actions = getActions("") || []
+      
+      // 🔥 关键修复：获取所有频道的 actions，而不是只获取空字符串 channelId
+      // 先获取所有已知的 channelId
+      const state = useClusterActionStore.getState()
+      const channelIds = Object.keys(state.actionsByChannel || {})
+      
+      // 收集所有 actions
+      let allActions: any[] = []
+      channelIds.forEach(channelId => {
+        const actions = getActions(channelId) || []
+        if (actions.length > 0) {
+          allActions = [...allActions, ...actions]
+        }
+      })
+      
+      // 如果还是没有 actions，尝试直接获取所有 action
+      if (allActions.length === 0) {
+        allActions = Object.values(state.actionsByChannel || {}).flat()
+      }
 
-      console.log('[useGroupChatAutonomousAgent] 从 store 获取智能体，groupId:', groupId, 'actions 数量:', actions.length)
+      console.log('[useGroupChatAutonomousAgent] 从 store 获取智能体，groupId:', groupId, 'channelIds:', channelIds, 'actions 数量:', allActions.length)
 
       // 查找匹配的群聊 - 支持多种 ID 格式
-      const groupAction = actions.find(action => {
+      const groupAction = allActions.find(action => {
         const match = action.action_id === groupId ||
           action.metadata?.diap_group_id === groupId ||
           action.metadata?.local_group_id === groupId
