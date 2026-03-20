@@ -82,6 +82,7 @@ export const useGroupChatAutonomousAgent = (
     // 从缓存获取
     const cached = groupAgentsRef.current.get(groupId)
     if (cached) {
+      console.log('[useGroupChatAutonomousAgent] 从缓存获取智能体:', groupId, cached.length, '个')
       return cached
     }
 
@@ -89,14 +90,20 @@ export const useGroupChatAutonomousAgent = (
     try {
       const { getActions } = useClusterActionStore.getState()
       const actions = getActions("") || []
-      
-      // 查找匹配的群聊
-      const groupAction = actions.find(action => 
-        action.action_id === groupId || 
-        action.metadata?.diap_group_id === groupId
-      )
+
+      console.log('[useGroupChatAutonomousAgent] 从 store 获取智能体，groupId:', groupId, 'actions 数量:', actions.length)
+
+      // 查找匹配的群聊 - 支持多种 ID 格式
+      const groupAction = actions.find(action => {
+        const match = action.action_id === groupId ||
+          action.metadata?.diap_group_id === groupId ||
+          action.metadata?.local_group_id === groupId
+        console.log('[useGroupChatAutonomousAgent] 检查 action:', action.action_id, '匹配:', match)
+        return match
+      })
 
       if (groupAction && groupAction.agents) {
+        console.log('[useGroupChatAutonomousAgent] 找到群聊 action，agents 数量:', groupAction.agents.length)
         const agents: AgentConfig[] = groupAction.agents
           .filter(agent => agent.mode === 'agent')
           .map(agent => ({
@@ -108,8 +115,11 @@ export const useGroupChatAutonomousAgent = (
             mode: 'agent'
           }))
 
+        console.log('[useGroupChatAutonomousAgent] 过滤后的智能体数量:', agents.length, agents.map(a => a.id))
         groupAgentsRef.current.set(groupId, agents)
         return agents
+      } else {
+        console.warn('[useGroupChatAutonomousAgent] 未找到群聊 action 或 agents:', groupId)
       }
     } catch (error) {
       console.error('[useGroupChatAutonomousAgent] 获取群聊智能体失败:', error)
