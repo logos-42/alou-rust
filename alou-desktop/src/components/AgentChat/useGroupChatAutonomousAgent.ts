@@ -226,7 +226,8 @@ export const useGroupChatAutonomousAgent = (
   const triggerAgentResponse = useCallback(async (
     groupId: string,
     message: GroupChatMessage,
-    agentId: string
+    agentId: string,
+    onAgentRespond?: (agentId: string, response: string) => void
   ): Promise<void> => {
     const taskKey = `${groupId}_${agentId}_${message.id}`
 
@@ -255,8 +256,14 @@ export const useGroupChatAutonomousAgent = (
         return
       }
 
-      // 🔥 关键修改：直接调用 useAgentMessages 的 sendMessageToAgent 处理群聊消息
-      // 这样 AI 回复会保存到 agent 的独立 channel，然后由群聊同步逻辑处理
+      // 🔥 关键修改：调用回调函数处理智能体响应
+      // 回调函数会调用 useAgentMessages.sendMessageToAgent 处理消息
+      // AI 回复会保存到 agent 的独立 channel
+      if (onAgentRespond) {
+        console.log('[useGroupChatAutonomousAgent] 调用回调处理智能体响应:', agentId)
+        onAgentRespond(agentId, message.content)
+      }
+
       console.log('[useGroupChatAutonomousAgent] 智能体响应已触发:', agentId)
 
     } catch (error) {
