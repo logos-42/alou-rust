@@ -258,10 +258,29 @@ export const useGroupChatAutonomousAgent = (
 
       // 🔥 关键修改：调用回调函数处理智能体响应
       // 回调函数会调用 useAgentMessages.sendMessageToAgent 处理消息
-      // AI 回复会保存到 agent 的独立 channel
+      // AI 回复会保存到 groupChatMessages
       if (onAgentRespond) {
         console.log('[useGroupChatAutonomousAgent] 调用回调处理智能体响应:', agentId)
         onAgentRespond(agentId, message.content)
+      } else {
+        // 如果没有回调，发送事件通知（兼容旧逻辑）
+        console.log('[useGroupChatAutonomousAgent] 发送事件通知智能体:', agentId)
+        window.dispatchEvent(new CustomEvent('agent-group-message', {
+          detail: {
+            agentId,
+            message: {
+              ...message,
+              type: 'group_chat_message',
+              isMentioned: message.content.includes('@' + agent.name),
+              mentionedAgentIds: [agentId],
+              metadata: {
+                ...message.metadata,
+                groupId,
+                isGroupChat: true
+              }
+            }
+          }
+        }))
       }
 
       console.log('[useGroupChatAutonomousAgent] 智能体响应已触发:', agentId)
