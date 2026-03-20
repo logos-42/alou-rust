@@ -82,7 +82,9 @@ const GroupChatPanel = ({
   onSelectAgent,
   externalOnSendMessage,
   onStop,
-  inputTargetMode = 'agent'  // 默认值
+  inputTargetMode = 'agent',  // 默认值
+  // 新增：使用 useGroupChatManager 的 createGroupChat 来支持智能体添加
+  createGroupChat
 }) => {
   const { t } = useI18n()
   
@@ -352,7 +354,7 @@ const GroupChatPanel = ({
     }
   }, [messageInput, cursorPosition])
 
-  // 处理创建群聊
+  // 处理创建群聊 - 使用 useGroupChatManager 的 createGroupChat 来添加智能体
   const handleCreateGroup = useCallback(async () => {
     if (!newGroupName.trim()) {
       setSendError('请输入群聊名称')
@@ -360,7 +362,21 @@ const GroupChatPanel = ({
     }
 
     try {
-      if (createGroup) {
+      // 优先使用 useGroupChatManager 的 createGroupChat（会添加智能体）
+      if (createGroupChat) {
+        const newGroup = await createGroupChat(newGroupName.trim(), [])
+        
+        // 创建成功后，切换到新群聊
+        if (newGroup && switchToGroup) {
+          console.log('[GroupChatPanel] 群聊创建成功，切换到新群聊:', newGroup.groupId)
+          await switchToGroup(newGroup.groupId)
+        }
+        
+        setNewGroupName('')
+        setShowCreateModal(false)
+        console.log('[GroupChatPanel] 群聊创建成功:', newGroupName)
+      } else if (createGroup) {
+        // 降级使用 useLocalIpfsGroupChat 的 createGroup（不添加智能体）
         const newGroup = await createGroup({
           groupName: newGroupName.trim(),
           description: '新创建的群聊',
@@ -383,7 +399,7 @@ const GroupChatPanel = ({
       console.error('[GroupChatPanel] 创建群聊失败:', error)
       setSendError(error.message || '创建群聊失败，请重试')
     }
-  }, [newGroupName, createGroup, switchToGroup])
+  }, [newGroupName, createGroup, createGroupChat, switchToGroup])
 
   // 处理加入群聊
   const handleJoinGroup = useCallback(async () => {

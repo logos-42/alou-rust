@@ -211,6 +211,7 @@ const AgentChat = () => {
     switchGroupChat,
     _hasActiveAction,
     canOpenGroupChat,
+    createGroupChat,
   } = groupChatManager
 
   // 稳定 agents 数组，避免不必要的重新渲染
@@ -924,6 +925,7 @@ const AgentChat = () => {
                       externalOnSendMessage={sendGroupChatMessage}
                       onResize={setSplitPosition}
                       inputTargetMode={inputTargetMode}
+                      createGroupChat={createGroupChat}
                     />
                   }
                   defaultPosition={splitPosition}

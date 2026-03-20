@@ -845,7 +845,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     diapGroupChat,
 
     // 操作方法
-    createGroupChat,
+    createGroupChat,  // 🔥 传递 createGroupChat 以便 GroupChatPanel 使用
     sendMessage,
     switchGroupChat,
     openGroupChat,
