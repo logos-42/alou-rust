@@ -158,13 +158,13 @@ export const useGroupChatAutonomousAgent = (
     if (message.type === 'system') {
       return false
     }
-    
+
     const content = message.content.toLowerCase()
-    
+
     // 🔥 关键修复：对于特定请求，第一个智能体始终响应
     const selfIntroPatterns = ['介绍自己', '介绍一下', '你是谁', 'who are you', '自我介绍', '介绍下']
     const isSelfIntroRequest = selfIntroPatterns.some(pattern => content.includes(pattern))
-    
+
     if (isSelfIntroRequest) {
       // 第一个智能体始终响应
       if (agent.id === allAgents[0]?.id) {
@@ -177,53 +177,48 @@ export const useGroupChatAutonomousAgent = (
 
     // 如果配置为仅在被 @ 时响应
     if (mentionOnly) {
-      // 检查消息是否包含 @ 提及
       if (message.content.includes('@')) {
         return isAgentMentioned(agent.id, message.content, allAgents)
       }
       return false
     }
 
-    // ✅ 关键修复：如果只有一个智能体，始终响应（除非是系统消息）
+    // 如果只有一个智能体，始终响应
     if (allAgents.length === 1) {
+      console.log('[shouldAgentRespond] 只有一个智能体，始终响应')
       return true
     }
 
-    // 🔥 群聊模式：多个智能体时，使用轮询或随机响应
-    // 🔥 群聊模式：多个智能体时，按顺序响应（避免同时响应）
+    // 🔥 群聊模式：多个智能体时，按顺序响应
     const agentIndex = allAgents.findIndex(a => a.id === agent.id)
     
     // 检查消息类型
-    const isQuestion = ["?", "？", "吗", "什么", "怎么", "为什么"].some(p => content.includes(p))
-    const isGreeting = ["你好", "hello", "hi", "嗨", "早", "好"].some(p => content.includes(p))
-    const isCommand = ["请", "帮忙", "help", "可以", "能否"].some(p => content.includes(p))
+    const isQuestion = ['?', '?', '吗', '什么', '怎么', '为什么'].some(p => content.includes(p))
+    const isGreeting = ['你好', 'hello', 'hi', '嗨', '早', '好'].some(p => content.includes(p))
+    const isCommand = ['请', '帮忙', 'help', '可以', '能否'].some(p => content.includes(p))
     
     // 1. 如果是问题、问候或请求，第一个智能体响应
     if ((isQuestion || isGreeting || isCommand) && agentIndex === 0) {
-      console.log("[shouldAgentRespond] 第一个智能体响应用户消息")
+      console.log('[shouldAgentRespond] 第一个智能体响应用户消息')
       return true
     }
     
-    // 2. 如果第一个智能体不响应，第二个智能体响应（避免冷场）
+    // 2. 如果第一个智能体不响应，第二个智能体响应
     if (agentIndex === 1 && !isQuestion && !isGreeting && !isCommand) {
-      console.log("[shouldAgentRespond] 第二个智能体响应普通消息")
+      console.log('[shouldAgentRespond] 第二个智能体响应普通消息')
       return true
     }
     
     // 3. 被@时必须响应
-    if (content.includes("@" + agent.name)) {
-      console.log("[shouldAgentRespond] 智能体被@，必须响应")
+    if (content.includes('@' + agent.name)) {
+      console.log('[shouldAgentRespond] 智能体被@，必须响应')
       return true
     }
     
-    // 4. 其他情况不响应（避免多个智能体同时说话）
-    console.log("[shouldAgentRespond] 智能体不响应")
-    return false      console.log('[shouldAgentRespond] 智能体随机响应')
-      return true
-    }
-
+    // 4. 其他情况不响应
+    console.log('[shouldAgentRespond] 智能体不响应')
     return false
-  }, [mentionOnly])
+  }
 
   /**
    * 触发智能体响应（无并发限制）
