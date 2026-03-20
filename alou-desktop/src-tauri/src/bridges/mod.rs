@@ -162,8 +162,47 @@ pub struct ComponentHealthStatus {
     pub error_details: Option<String>,
 }
 
-/// 创建默认桥接管理器
+/// 创建默认桥接管理器（自动尝试加载媒体工具）
 pub fn create_default_bridge_manager() -> BridgeManager {
+    // 尝试加载媒体配置并创建带媒体工具的 BridgeManager
+    match crate::agent::media_config::MediaApiConfig::load() {
+        Ok(media_config) => {
+            match crate::agent::providers::ProviderRegistry::new(&media_config) {
+                Ok(provider_registry) => {
+                    match crate::media_archive::MediaArchiveManager::new() {
+                        Ok(archive_manager) => {
+                            log::info!("[create_default_bridge_manager] 媒体配置加载成功，创建带媒体工具的 BridgeManager");
+                            return BridgeManager::new_with_media_tools(
+                                BridgeConfig {
+                                    tool_bridge: ToolBridgeConfig::default(),
+                                    context_bridge: ContextBridgeConfig::default(),
+                                    enabled: true,
+                                    max_concurrent_calls: 10,
+                                    timeout_seconds: 30,
+                                    max_retries: 3,
+                                    retry_delay_ms: 1000,
+                                    debug_mode: false,
+                                },
+                                std::sync::Arc::new(provider_registry),
+                                std::sync::Arc::new(archive_manager),
+                            );
+                        }
+                        Err(e) => {
+                            log::warn!("[create_default_bridge_manager] 无法创建 MediaArchiveManager: {}, 使用默认配置", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("[create_default_bridge_manager] 无法创建 ProviderRegistry: {}, 使用默认配置", e);
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("[create_default_bridge_manager] 无法加载 MediaApiConfig: {}, 使用默认配置", e);
+        }
+    }
+
+    // 回退到默认配置（不带媒体工具）
     BridgeManager::new(BridgeConfig {
         tool_bridge: ToolBridgeConfig::default(),
         context_bridge: ContextBridgeConfig::default(),

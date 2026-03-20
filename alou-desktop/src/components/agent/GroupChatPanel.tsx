@@ -82,7 +82,8 @@ const GroupChatPanel = ({
   onSwitchGroupChat,
   onSelectAgent,
   externalOnSendMessage,
-  onStop
+  onStop,
+  inputTargetMode = 'agent'  // 默认值
 }) => {
   const { t } = useI18n()
   
@@ -111,7 +112,12 @@ const GroupChatPanel = ({
 
   // 使用外部传入的消息或本地消息
   const messages = useMemo(() => {
-    return externalMessages.length > 0 ? externalMessages : localMessages
+    // 优先使用外部传入的消息
+    if (externalMessages && externalMessages.length > 0) {
+      return externalMessages
+    }
+    // 降级使用本地消息
+    return localMessages
   }, [externalMessages, localMessages])
   const messagesEndRef = useRef(null)
   const containerRef = useRef(null)

@@ -280,7 +280,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     const messages = getGroupChatMessages(activeGroupId)
     console.log('[useGroupChatManager] activeGroupMessages: 从本地 store 获取，消息数量=', messages?.length || 0)
     return messages || []
-  }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId, getGroupChatMessages])
+  }, [diapGroupChat.activeGroup?.groupId, diapGroupChat.messages, activeGroupId])
 
   // 获取当前频道的群聊列表（合并 DIAP 群聊和本地群聊）
   const groupChatList = useMemo(() => {
@@ -313,7 +313,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
     return [...diapGroups, ...localGroups]
   }, [activeChannelId, diapGroupChat.groups, getActions, isGroupInActiveChannel])
 
-  // 创建群聊
+  // 创建群聊 - 默认添加当前 channel 的所有智能体
   const createGroupChat = useCallback(async (groupName: string, agents: any[] = []) => {
     if (!localIdentity) {
       // 创建一个默认身份
@@ -330,8 +330,22 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       console.log('[useGroupChatManager] 自动创建默认频道:', channelId)
     }
 
+    // 如果没有传入 agents，从当前 channel 获取所有智能体
+    let channelAgents = agents
+    if (!channelAgents || channelAgents.length === 0) {
+      // 从 store 获取当前频道的智能体
+      const { getActions } = useClusterActionStore.getState()
+      const actions = getActions(channelId) || []
+      channelAgents = actions
+        .filter(action => action.agents && action.agents.length > 0)
+        .flatMap(action => action.agents)
+        .filter(agent => agent.mode === 'agent')
+      
+      console.log('[useGroupChatManager] 从 channel 获取智能体:', channelAgents.length, '个')
+    }
+
     try {
-      console.log('[useGroupChatManager] 创建群聊:', groupName, '频道:', channelId)
+      console.log('[useGroupChatManager] 创建群聊:', groupName, '频道:', channelId, '智能体:', channelAgents.length)
 
       // 获取频道信息
       const channel = {
@@ -343,7 +357,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
       const group = await diapGroupChat.createGroupWithAgents({
         groupName,
         description: `${channel.name} 的群聊`,
-        agents: agents,
+        agents: channelAgents,
         channel: channel,
         metadata: {
           channelId: channelId,
@@ -377,7 +391,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         const actionId = `local_group_${localGroupId}`
         const action = {
           action_id: actionId,
-          description: `${groupName} (${agents.length}个智能体)`,
+          description: `${groupName} (${channelAgents.length}个智能体)`,
           status: 'Active',
           created_at: new Date().toISOString(),
           agents: [
@@ -387,7 +401,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
               name: localIdentity?.name || '用户',
               mode: 'user'
             },
-            ...agents.map(agent => ({
+            ...channelAgents.map(agent => ({
               id: agent.did || agent.id,
               did: agent.did,
               name: agent.name || '智能体',
@@ -418,7 +432,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
         throw new Error('无法创建群聊，请确保应用已正常初始化')
       }
     }
-  }, [localIdentity, activeChannelId, diapGroupChat, openConversationPanelRef, setActiveAction, addAction])
+  }, [localIdentity, activeChannelId, diapGroupChat, openConversationPanelRef, setActiveAction, addAction, getActions])
 
   // 发送消息 - 健壮的群聊消息发送逻辑
   const sendMessage = useCallback(async (groupId: string, content: string, options?: {
@@ -478,7 +492,7 @@ export const useGroupChatManager = ({ openConversationPanel, activeChannelId, lo
           // 1. 保存到本地 store
           const { addGroupChatMessage } = useClusterActionStore.getState()
           addGroupChatMessage(groupId, userMessage)
-          console.log('[useGroupChatManager] 本地群聊消息已添加到 store:', groupId)
+          console.log('[useGroupChatManager] 本地群聊消息已添加到 store:', groupId, userMessage.id)
           sendSuccess = true
         } catch (error) {
           console.error('[useGroupChatManager] 保存到本地 store 失败:', error)
