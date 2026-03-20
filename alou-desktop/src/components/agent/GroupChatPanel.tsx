@@ -361,11 +361,18 @@ const GroupChatPanel = ({
 
     try {
       if (createGroup) {
-        await createGroup({
+        const newGroup = await createGroup({
           groupName: newGroupName.trim(),
           description: '新创建的群聊',
           isPublic: true
         })
+        
+        // 创建成功后，切换到新群聊
+        if (newGroup && switchToGroup) {
+          console.log('[GroupChatPanel] 群聊创建成功，切换到新群聊:', newGroup.groupId)
+          await switchToGroup(newGroup.groupId)
+        }
+        
         setNewGroupName('')
         setShowCreateModal(false)
         console.log('[GroupChatPanel] 群聊创建成功:', newGroupName)
@@ -376,7 +383,7 @@ const GroupChatPanel = ({
       console.error('[GroupChatPanel] 创建群聊失败:', error)
       setSendError(error.message || '创建群聊失败，请重试')
     }
-  }, [newGroupName, createGroup])
+  }, [newGroupName, createGroup, switchToGroup])
 
   // 处理加入群聊
   const handleJoinGroup = useCallback(async () => {
