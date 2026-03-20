@@ -1280,42 +1280,62 @@ ${errorMessage}
 
   // 监听智能体消息变化，如果是群聊消息的回复，则同步到群聊
   useEffect(() => {
-    if (!selectedAgent || !messages.length) return
+    if (!messages.length) return
 
     const lastMessage = messages[messages.length - 1]
-    
-    if (lastMessage && 
-        lastMessage.type === 'assistant' && 
-        lastMessage.metadata?.isGroupChatMessage) {
+
+    // 🔥 关键修复：检查消息是否来自群聊智能体响应
+    if (lastMessage &&
+        lastMessage.type === 'assistant' &&
+        (lastMessage.metadata?.isGroupChatMessage || lastMessage.metadata?.groupId)) {
+
+      const groupId = lastMessage.metadata?.groupId as string
+      const agentId = lastMessage.agentId || selectedAgent?.id
       
-      const groupId = lastMessage.metadata.groupId as string
-      if (groupId) {
-        console.log('[useAgentMessages] 智能体回复群聊消息，同步到群聊:', groupId, lastMessage)
-        
+      if (groupId && agentId) {
+        console.log('[useAgentMessages] 检测到群聊智能体回复，同步到群聊:', {
+          groupId,
+          agentId,
+          content: lastMessage.content.slice(0, 50)
+        })
+
         try {
-          const { addGroupChatMessage } = clusterActionStore.getState()
+          const { addGroupChatMessage, getActions } = clusterActionStore.getState()
+          
+          // 获取智能体信息
+          const allActions = Object.values(get().actionsByChannel || {}).flat()
+          let agentInfo = null
+          for (const action of allActions) {
+            const agent = action.agents?.find((a: any) => a.id === agentId)
+            if (agent) {
+              agentInfo = agent
+              break
+            }
+          }
+
           const groupReplyMessage = {
             id: `agent_reply_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
             type: 'agent' as const,
-            from: selectedAgent.id,
-            fromName: selectedAgent.display_name || selectedAgent.name || '智能体',
-            avatar: selectedAgent.avatar,
+            from: agentId,
+            fromName: agentInfo?.name || lastMessage.agentId || '智能体',
+            avatar: agentInfo?.avatar,
             content: lastMessage.content,
             timestamp: lastMessage.timestamp,
             metadata: {
-              agentId: selectedAgent.id,
-              replyTo: lastMessage.metadata.originalMessage,
+              agentId: agentId,
+              replyTo: lastMessage.metadata?.originalMessage,
               isReply: true
             }
           }
-          
+
           addGroupChatMessage(groupId, groupReplyMessage)
+          console.log('[useAgentMessages] 群聊消息已同步:', groupId)
         } catch (error) {
           console.warn('[useAgentMessages] 同步智能体回复到群聊失败:', error)
         }
       }
     }
-  }, [messages, selectedAgent])
+  }, [messages])
 
   // 用 ref 持有最新的 onAutoCreateAgent 回调，避免 useEffect([]) 的陈旧闭包
   // 同时防止回调变化时重新注册 Tauri listener（会导致重复监听）
