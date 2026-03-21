@@ -469,13 +469,14 @@ export const getToolsByCategories = (categories: string[]) => {
 
       get_video_status: {
         name: "get_video_status",
-        description: "查询视频生成任务的状态。",
+        description: "查询异步视频生成任务的状态。当 generate_video 返回 status: 'processing' 时，使用此工具轮询任务进度。",
         parameters: {
           type: "object",
           properties: {
-            task_id: { type: "string", description: "视频任务 ID" }
+            task_id: { type: "string", description: "视频生成任务 ID (从 generate_video 返回结果中获取)" },
+            provider: { type: "string", description: "Provider 名称 (需与 generate_video 调用时使用的 provider 一致)", default: "minimax" }
           },
-          required: ["task_id"]
+          required: ["task_id", "provider"]
         }
       }
     };

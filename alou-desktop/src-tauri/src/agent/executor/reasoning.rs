@@ -671,8 +671,8 @@ impl ReasoningLayer {
         desc.push_str("\n\n### 媒体工具\n");
         desc.push_str("\n- generate_image: 根据文字描述生成图片，支持风景、人物、艺术创作等");
         desc.push_str("\n- generate_audio: 文本转语音，支持多语言、多音色");
-        desc.push_str("\n- generate_video: 根据文字描述生成视频，支持风景、动画、特效等");
-        desc.push_str("\n- get_video_status: 查询视频生成任务的状态");
+        desc.push_str("\n- generate_video: 根据文字描述生成视频，支持风景、动画、特效等。⚠️ 重要：这是异步任务，调用后会立即返回 task_id 和 status: processing，必须使用 get_video_status 轮询查询结果，不要重复调用 generate_video");
+        desc.push_str("\n- get_video_status: 查询视频生成任务的状态。当 generate_video 返回 processing 状态时，使用此工具传入 task_id 和 provider 轮询，直到 status 变为 completed 或 failed");
 
         desc
     }

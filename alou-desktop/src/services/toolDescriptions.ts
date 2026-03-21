@@ -184,6 +184,72 @@ export const TOOL_DESCRIPTIONS = {
         description: "技能名称"
       }
     }
+  },
+
+  // 媒体生成工具
+  generate_image: {
+    name: "图片生成工具",
+    description: "根据文字描述生成图片，支持风景、人物、艺术创作等",
+    categories: ["media", "image", "ai"],
+    usage: [
+      "根据文本提示生成图片",
+      "支持自定义图片尺寸",
+      "可选择不同的Provider（google/jimeng）"
+    ],
+    parameters: {
+      prompt: { type: "string", description: "图片描述" },
+      width: { type: "number", description: "图片宽度", default: 1024 },
+      height: { type: "number", description: "图片高度", default: 1024 },
+      provider: { type: "string", description: "Provider名称", default: "google" }
+    }
+  },
+
+  generate_audio: {
+    name: "语音合成工具",
+    description: "将文字转换为语音（TTS），支持多种音色和语言",
+    categories: ["media", "audio", "tts"],
+    usage: [
+      "将文本转换为语音",
+      "支持多语言、多音色",
+      "可选择不同的Provider"
+    ],
+    parameters: {
+      text: { type: "string", description: "要转换的文本" },
+      voice_id: { type: "string", description: "音色ID" },
+      provider: { type: "string", description: "Provider名称", default: "minimax" }
+    }
+  },
+
+  generate_video: {
+    name: "视频生成工具",
+    description: "根据文字描述生成视频。⚠️ 重要：这是异步任务，调用后会立即返回task_id和status:processing，必须使用get_video_status轮询查询结果，切勿重复调用generate_video",
+    categories: ["media", "video", "ai"],
+    usage: [
+      "根据文本提示生成视频",
+      "⚠️ 异步任务：调用后立即返回task_id，需要轮询",
+      "使用get_video_status查询任务状态直到完成",
+      "支持minimax和jimeng Provider"
+    ],
+    parameters: {
+      prompt: { type: "string", description: "视频描述" },
+      duration: { type: "number", description: "视频时长（秒）", default: 5 },
+      provider: { type: "string", description: "Provider名称（minimax/jimeng）", default: "minimax" }
+    }
+  },
+
+  get_video_status: {
+    name: "视频状态查询工具",
+    description: "查询异步视频生成任务的状态。当generate_video返回processing状态时，使用此工具传入task_id和provider轮询，直到status变为completed或failed",
+    categories: ["media", "video", "status"],
+    usage: [
+      "查询视频生成任务的当前状态",
+      "轮询使用：定期调用直到任务完成",
+      "必须提供generate_video返回的task_id和相同的provider"
+    ],
+    parameters: {
+      task_id: { type: "string", description: "视频生成任务ID（从generate_video返回结果中获取）" },
+      provider: { type: "string", description: "Provider名称（必须与generate_video调用时一致）", default: "minimax" }
+    }
   }
 };
 

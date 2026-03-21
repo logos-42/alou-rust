@@ -294,12 +294,21 @@ impl ActionLayer {
 
                 // 🔥 发送工具调用完成事件到前端
                 if let Some(app_handle) = executor_core.app_handle() {
+                    // 构建 preview：优先使用 output，否则使用 data 的序列化
+                    let preview_str = result.as_ref().map(|r| {
+                        if let Some(ref output) = r.output {
+                            output.clone()
+                        } else {
+                            serde_json::to_string(&r.data).unwrap_or_default()
+                        }
+                    }).unwrap_or_default();
+
                     let done_payload = serde_json::json!({
                         "task_id": id,
                         "tool_name": tool,
                         "type": "tool_done",
                         "success": success,
-                        "preview": result.as_ref().and_then(|r| r.output.as_ref()).map(|s| s.as_str()).unwrap_or(""),
+                        "preview": preview_str,
                         "error": error,
                     });
                     if let Err(e) = app_handle.emit("agent:progress", &done_payload) {
@@ -318,11 +327,24 @@ impl ActionLayer {
                     let _ = app_handle.emit("tool:log", &tool_log_end);
                 }
 
+                // 🔥 修复：优先使用 output，如果没有则使用 data 的序列化结果
+                let output_value = result.as_ref().and_then(|r| {
+                    if let Some(ref output_str) = r.output {
+                        // 如果 output 字段有值，使用它
+                        Some(Value::String(output_str.clone()))
+                    } else if !r.data.is_null() {
+                        // 否则使用 data 字段的 JSON 序列化
+                        Some(r.data.clone())
+                    } else {
+                        None
+                    }
+                });
+
                 Ok(ActionResult {
                     action_id: id.to_string(),
                     tool_name: tool.to_string(),
                     success,
-                    output: result.and_then(|r| Some(Value::String(r.output.unwrap_or_default()))),
+                    output: output_value,
                     error,
                 })
             }
