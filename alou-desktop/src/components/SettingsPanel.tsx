@@ -41,6 +41,11 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
     qq: '🐧',
   }
 
+  // 心跳相关状态
+  const [showHeartbeatPanel, setShowHeartbeatPanel] = useState(false)
+  const [heartbeatState, setHeartbeatState] = useState<HeartbeatState | null>(null)
+  const [heartbeatConfig, setHeartbeatConfig] = useState<HeartbeatConfig | null>(null)
+
   // 加载 Gateway 配置
   const loadGatewayConfig = useCallback(async () => {
     try {
@@ -525,6 +530,21 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
             )}
           </div>
 
+          {/* 心跳设置 */}
+          <div className="settings-section">
+            <div className="settings-section-title">心跳设置</div>
+            <div className="settings-option">
+              <span className="option-label">配置系统心跳机制，保持 7x24 小时无值守运行</span>
+              <button
+                type="button"
+                className="btn-select-image"
+                onClick={() => setShowHeartbeatPanel(true)}
+              >
+                配置心跳
+              </button>
+            </div>
+          </div>
+
           {/* 背景设置 */}
           <div className="settings-section">
             <div className="settings-section-title">{t('common.settings.background.title')}</div>
@@ -562,13 +582,15 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
               </div>
             )}
           </div>
-
-          {/* 心跳管理 */}
-          <div className="settings-section">
-            <div className="settings-section-title">心跳管理</div>
-            <HeartbeatPanel isDarkMode={isDarkMode} />
-          </div>
         </div>
+
+        {/* 心跳管理对话框 */}
+        {showHeartbeatPanel && (
+          <HeartbeatPanel
+            isDarkMode={isDarkMode}
+            onClose={() => setShowHeartbeatPanel(false)}
+          />
+        )}
       </div>
     </div>
   )

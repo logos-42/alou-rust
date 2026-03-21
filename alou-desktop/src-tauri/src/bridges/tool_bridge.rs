@@ -75,7 +75,7 @@ impl ToolBridge {
     }
 
     /// 创建新的工具桥接
-    pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(config: ToolBridgeConfig) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let mut bridge = Self {
             registry: ToolRegistry::new(),
             execution_manager: ToolExecutionManager::new(config.tool_config.clone()),
@@ -143,7 +143,7 @@ impl ToolBridge {
     }
 
     /// 处理工具调用请求
-    pub async fn handle_request(&self, request: ToolCallRequest) -> Result<ToolCallResponse, Box<dyn std::error::Error>> {
+    pub async fn handle_request(&self, request: ToolCallRequest) -> Result<ToolCallResponse, Box<dyn std::error::Error + Send + Sync>> {
         // 无锁原子操作增加计数器
         self.request_count.fetch_add(1, Ordering::Relaxed);
 
@@ -174,12 +174,12 @@ impl ToolBridge {
     }
 
     /// 获取请求计数
-    pub async fn get_request_count(&self) -> Result<u64, Box<dyn std::error::Error>> {
+    pub async fn get_request_count(&self) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         Ok(self.request_count.load(Ordering::Relaxed))
     }
 
     /// 注册所有工具
-    async fn register_all_tools(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn register_all_tools(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         // 注册文件系统工具
         let fs_tool = Arc::new(FileSystemTool::new());
         self.register_tool(fs_tool).await?;
@@ -281,11 +281,11 @@ impl ToolBridge {
     }
 
     /// 注册工具
-    async fn register_tool(&mut self, tool: Arc<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn register_tool(&mut self, tool: Arc<dyn super::super::tools::ToolExecutor>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let tool_id = tool.metadata().id.clone();
 
         // 注册到 ToolRegistry
-        self.registry.register(tool.clone()).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+        self.registry.register(tool.clone()).await.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
         // 注册到 ToolExecutionManager
         self.execution_manager.register_executor(tool_id.clone(), tool);
@@ -334,9 +334,9 @@ impl ToolBridge {
     }
 
     /// 取消工具执行
-    pub async fn cancel_execution(&self, execution_id: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn cancel_execution(&self, execution_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.execution_manager.cancel_execution(execution_id).await
-            .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
     }
 
     /// 获取执行历史

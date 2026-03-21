@@ -10,15 +10,24 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { heartbeatService } from '@/services/heartbeatService';
+import useAgentStore from '@/stores/agentStore';
 import type {
   HeartbeatConfig,
   HeartbeatState,
-  HealthStatus,
-  CheckResult,
-  Issue,
 } from '@shared/types/heartbeat';
 import './HeartbeatPanel.css';
+
+const HEARTBEAT_MODELS = [
+  { label: 'DeepSeek Chat', value: 'deepseek-chat' },
+  { label: 'DeepSeek R1', value: 'deepseek-reasoner' },
+  { label: 'GLM-5', value: 'glm-5' },
+  { label: 'Kimi K2.5', value: 'kimi-k2.5' },
+  { label: 'Gemini 3.1', value: 'gemini-3.1-pro' },
+  { label: 'Claude Sonnet', value: 'claude-sonnet-4-6-20260218' },
+  { label: 'Claude Opus', value: 'claude-opus-4-6-20260218' },
+];
 
 /**
  * 格式化时间戳为本地时间字符串
@@ -84,13 +93,13 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
   // 状态管理
   const [heartbeatState, setHeartbeatState] = useState<HeartbeatState | null>(null);
   const [heartbeatConfig, setHeartbeatConfig] = useState<HeartbeatConfig | null>(null);
-  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
+  const [systemHealth, setSystemHealth] = useState<{ status: string; mode: string; timestamp: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [showHealthPanel, setShowHealthPanel] = useState(false);
   const [configForm, setConfigForm] = useState<Partial<HeartbeatConfig>>({});
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [agentDocsPath, setAgentDocsPath] = useState<string | null>(null);
 
   /**
    * 加载心跳状态
@@ -123,17 +132,37 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
   }, []);
 
   /**
-   * 加载健康状态
-   * Load health status
+   * 加载系统健康状态
+   * Load system health status
    */
-  const loadHealthStatus = useCallback(async () => {
+  const loadSystemHealth = useCallback(async () => {
     try {
-      const response = await heartbeatService.getHealthStatus();
-      if (response.success && response.data) {
-        setHealthStatus(response.data);
+      const result = await invoke<{ status: string; mode: string; timestamp: number }>('health_check');
+      setSystemHealth(result);
+    } catch (err: any) {
+      console.error('加载系统健康状态失败:', err);
+    }
+  }, []);
+
+  /**
+   * 获取当前 agent 文档路径并更新心跳文件路径
+   */
+  const loadAgentDocsPath = useCallback(async () => {
+    try {
+      const state = useAgentStore.getState();
+      const agents = state.agents;
+      if (agents && agents.length > 0) {
+        const agentId = agents[0].id;
+        const path = await invoke<string>('get_agent_documents_path', { agentId });
+        setAgentDocsPath(path);
+        // 同时更新配置表单中的心跳文件路径
+        setConfigForm(prev => ({
+          ...prev,
+          heartbeat_file_path: `${path}/HEARTBEAT.md`,
+        }));
       }
     } catch (err: any) {
-      console.error('加载健康状态失败:', err);
+      console.warn('获取 agent 文档路径失败:', err);
     }
   }, []);
 
@@ -144,7 +173,7 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([loadState(), loadConfig()]);
+      await Promise.all([loadState(), loadConfig(), loadSystemHealth(), loadAgentDocsPath()]);
       setLoading(false);
     };
 
@@ -153,7 +182,7 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
     // 定时刷新状态（每 5 秒）
     const intervalId = setInterval(loadState, 5000);
     return () => clearInterval(intervalId);
-  }, [loadState, loadConfig]);
+  }, [loadState, loadConfig, loadSystemHealth, loadAgentDocsPath]);
 
   /**
    * 显示消息提示
@@ -224,7 +253,12 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
    */
   const handleOpenConfig = () => {
     if (heartbeatConfig) {
-      setConfigForm({ ...heartbeatConfig });
+      const form = { ...heartbeatConfig };
+      // 覆盖心跳文件路径为 agent 文档目录
+      if (agentDocsPath) {
+        form.heartbeat_file_path = `${agentDocsPath}/HEARTBEAT.md`;
+      }
+      setConfigForm(form);
       setShowConfigDialog(true);
     }
   };
@@ -238,13 +272,6 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
     setError(null);
 
     try {
-      // 验证间隔范围
-      if (configForm.interval_minutes) {
-        if (configForm.interval_minutes < 30 || configForm.interval_minutes > 120) {
-          throw new Error('心跳间隔必须在 30-120 分钟之间');
-        }
-      }
-
       const response = await heartbeatService.updateConfig(configForm);
       if (response.success) {
         await loadConfig();
@@ -263,58 +290,16 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
   };
 
   /**
-   * 处理打开健康面板
-   * Handle open health panel
-   */
-  const handleOpenHealthPanel = async () => {
-    setLoading(true);
-    try {
-      await loadHealthStatus();
-      setShowHealthPanel(true);
-    } catch (err: any) {
-      showMessage('error', '加载健康状态失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
    * 处理运行健康检查
    * Handle run health check
    */
   const handleRunHealthCheck = async () => {
     setLoading(true);
     try {
-      const response = await heartbeatService.runHealthCheck();
-      if (response.success && response.data) {
-        setHealthStatus(response.data);
-        showMessage('success', '健康检查完成');
-      } else {
-        showMessage('error', response.error || '健康检查失败');
-      }
+      await loadSystemHealth();
+      showMessage('success', '健康检查完成');
     } catch (err: any) {
       showMessage('error', '健康检查失败');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * 处理执行自愈
-   * Handle execute self-heal
-   */
-  const handleSelfHeal = async () => {
-    setLoading(true);
-    try {
-      const response = await heartbeatService.executeSelfHeal();
-      if (response.success) {
-        await loadHealthStatus();
-        showMessage('success', response.message || '自愈完成');
-      } else {
-        showMessage('error', response.error || '自愈失败');
-      }
-    } catch (err: any) {
-      showMessage('error', '自愈失败');
     } finally {
       setLoading(false);
     }
@@ -340,6 +325,17 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
         <div className={`heartbeat-message ${message.type}`}>
           {message.text}
         </div>
+      )}
+
+      {/* 关闭按钮 */}
+      {onClose && (
+        <button
+          className="heartbeat-close-btn"
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          ×
+        </button>
       )}
 
       {/* 状态显示区域 */}
@@ -378,12 +374,19 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
             </span>
           </div>
 
-          {/* 总心跳次数 */}
+          {/* 系统健康状态 */}
           <div className="heartbeat-status-item">
-            <span className="heartbeat-status-label">总心跳次数</span>
-            <span className="heartbeat-status-value">
-              {heartbeatState?.total_beats || 0}
-            </span>
+            <span className="heartbeat-status-label">系统健康</span>
+            <div className="heartbeat-status-value">
+              <span
+                className={`heartbeat-status-indicator ${
+                  systemHealth?.status === 'healthy' ? 'running' : 'stopped'
+                }`}
+              />
+              <span className="heartbeat-status-text">
+                {systemHealth?.status === 'healthy' ? '正常' : (systemHealth?.status || '检测中...')}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -419,7 +422,7 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
 
           <button
             className="heartbeat-btn heartbeat-btn-secondary"
-            onClick={handleOpenHealthPanel}
+            onClick={handleRunHealthCheck}
             disabled={loading}
           >
             健康检查
@@ -460,24 +463,39 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                 </label>
               </div>
 
-              {/* 心跳间隔 */}
+              {/* 心跳间隔 - 滑动选择 */}
               <div className="heartbeat-form-group">
                 <label className="heartbeat-form-label">
-                  心跳间隔（分钟）
+                  心跳间隔：<strong>{configForm.interval_minutes || 10} 分钟</strong>
                 </label>
-                <input
-                  type="number"
-                  className="heartbeat-form-input"
-                  min={1}
-                  max={120}
-                  value={configForm.interval_minutes || 10}
-                  onChange={(e) =>
-                    handleConfigChange(
-                      'interval_minutes',
-                      parseInt(e.target.value, 10) || 10
-                    )
-                  }
-                />
+                <div className="heartbeat-slider-row">
+                  <input
+                    type="range"
+                    className="heartbeat-slider"
+                    min={1}
+                    max={120}
+                    step={1}
+                    value={configForm.interval_minutes || 10}
+                    onChange={(e) =>
+                      handleConfigChange(
+                        'interval_minutes',
+                        parseInt(e.target.value, 10)
+                      )
+                    }
+                  />
+                </div>
+                <div className="heartbeat-slider-presets">
+                  {[5, 10, 15, 30, 60, 90, 120].map((val) => (
+                    <button
+                      key={val}
+                      type="button"
+                      className={`heartbeat-preset-btn ${(configForm.interval_minutes || 10) === val ? 'active' : ''}`}
+                      onClick={() => handleConfigChange('interval_minutes', val)}
+                    >
+                      {val}min
+                    </button>
+                  ))}
+                </div>
                 <span className="heartbeat-form-hint">范围：1-120 分钟（推荐 10-30 分钟）</span>
               </div>
 
@@ -498,48 +516,28 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
 
               {/* 模型选择 */}
               <div className="heartbeat-form-group">
-                <label className="heartbeat-form-label">便宜模型</label>
-                <input
-                  type="text"
-                  className="heartbeat-form-input"
-                  value={configForm.cheap_model || ''}
-                  onChange={(e) =>
-                    handleConfigChange('cheap_model', e.target.value)
-                  }
-                  placeholder="用于常规心跳（如：deepseek-chat）"
-                />
-              </div>
-
-              <div className="heartbeat-form-group">
-                <label className="heartbeat-form-label">昂贵模型</label>
-                <input
-                  type="text"
-                  className="heartbeat-form-input"
-                  value={configForm.expensive_model || ''}
-                  onChange={(e) =>
-                    handleConfigChange('expensive_model', e.target.value)
-                  }
-                  placeholder="用于重要操作（如：claude-sonnet-4）"
-                />
+                <label className="heartbeat-form-label">模型</label>
+                <div className="heartbeat-model-presets">
+                  {HEARTBEAT_MODELS.map((m) => (
+                    <button
+                      key={m.value}
+                      type="button"
+                      className={`heartbeat-preset-btn heartbeat-model-btn ${configForm.model === m.value ? 'active' : ''}`}
+                      onClick={() => handleConfigChange('model', m.value)}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* 文件路径显示 */}
               <div className="heartbeat-form-group">
                 <label className="heartbeat-form-label">心跳文件路径</label>
                 <div className="heartbeat-form-path">
-                  {configForm.heartbeat_file_path || '未设置'}
+                  {configForm.heartbeat_file_path || agentDocsPath ? `${agentDocsPath}/HEARTBEAT.md` : '未设置'}
                 </div>
-                <button
-                  type="button"
-                  className="heartbeat-btn heartbeat-btn-secondary"
-                  style={{ marginTop: '8px' }}
-                  onClick={() => {
-                    navigator.clipboard.writeText(configForm.heartbeat_file_path || '');
-                    showMessage('success', '路径已复制到剪贴板');
-                  }}
-                >
-                  复制路径
-                </button>
+                <span className="heartbeat-form-hint">文件位于当前智能体的文档目录下</span>
               </div>
             </div>
 
@@ -556,108 +554,6 @@ const HeartbeatPanel: React.FC<HeartbeatPanelProps> = ({
                 disabled={loading}
               >
                 保存
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 健康状态面板 */}
-      {showHealthPanel && healthStatus && (
-        <div className="heartbeat-dialog-overlay" onClick={() => setShowHealthPanel(false)}>
-          <div className="heartbeat-dialog heartbeat-dialog-health" onClick={(e) => e.stopPropagation()}>
-            <div className="heartbeat-dialog-header">
-              <h3>健康状态</h3>
-              <button
-                className="heartbeat-dialog-close"
-                onClick={() => setShowHealthPanel(false)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="heartbeat-dialog-content">
-              {/* 整体健康状态 */}
-              <div className={`heartbeat-health-overall ${getHealthStatusClass(healthStatus.overall)}`}>
-                <span className="heartbeat-health-label">整体状态</span>
-                <span className="heartbeat-health-value">{healthStatus.overall}</span>
-              </div>
-
-              {/* 检查结果列表 */}
-              <div className="heartbeat-health-section">
-                <h4>检查项</h4>
-                <div className="heartbeat-checks-list">
-                  {healthStatus.checks.map((check: CheckResult, index: number) => (
-                    <div
-                      key={index}
-                      className={`heartbeat-check-item ${
-                        check.passed ? 'check-passed' : 'check-failed'
-                      }`}
-                    >
-                      <span className="heartbeat-check-icon">
-                        {check.passed ? '✓' : '✗'}
-                      </span>
-                      <div className="heartbeat-check-content">
-                        <span className="heartbeat-check-name">{check.name}</span>
-                        {check.details && (
-                          <span className="heartbeat-check-details">{check.details}</span>
-                        )}
-                        {check.recommendation && (
-                          <span className="heartbeat-check-recommendation">
-                            建议：{check.recommendation}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 问题列表 */}
-              {healthStatus.issues.length > 0 && (
-                <div className="heartbeat-health-section">
-                  <h4>发现的问题</h4>
-                  <div className="heartbeat-issues-list">
-                    {healthStatus.issues.map((issue: Issue, index: number) => (
-                      <div
-                        key={index}
-                        className={`heartbeat-issue-item ${getIssueSeverityClass(
-                          issue.severity
-                        )}`}
-                      >
-                        <span className="heartbeat-issue-code">{issue.code}</span>
-                        <div className="heartbeat-issue-content">
-                          <span className="heartbeat-issue-description">
-                            {issue.description}
-                          </span>
-                          {issue.fix && (
-                            <span className="heartbeat-issue-fix">修复：{issue.fix}</span>
-                          )}
-                        </div>
-                        <span className="heartbeat-issue-severity">
-                          {issue.severity}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="heartbeat-dialog-footer">
-              <button
-                className="heartbeat-btn heartbeat-btn-secondary"
-                onClick={handleRunHealthCheck}
-                disabled={loading}
-              >
-                重新检查
-              </button>
-              <button
-                className="heartbeat-btn heartbeat-btn-primary"
-                onClick={handleSelfHeal}
-                disabled={loading || healthStatus.issues.length === 0}
-              >
-                执行自愈
               </button>
             </div>
           </div>

@@ -334,7 +334,7 @@ impl ActionLayer {
                 // 🔥 如果是异步视频任务，启动自动轮询
                 if is_async_video_task {
                     if let (Some(scheduler), Some(task_id), Some(provider)) = 
-                        (self.async_scheduler.clone(), video_task_id, video_provider) {
+                        (self.async_scheduler.clone(), video_task_id.clone(), video_provider) {
                         log::info!("[ActionLayer] 启动异步任务轮询: task_id={}, provider={}", task_id, provider);
                         
                         // 获取 initial payload（请求参数）
@@ -342,13 +342,13 @@ impl ActionLayer {
                         
                         // 启动轮询
                         scheduler.start_polling(
-                            task_id.clone(),
+                            task_id,
                             "generate_video".to_string(),
                             provider,
                             initial_payload,
                         ).await;
                         
-                        log::info!("[ActionLayer] 异步任务轮询已启动: {}", task_id);
+                        log::info!("[ActionLayer] 异步任务轮询已启动");
                     }
                 }
 

@@ -21,7 +21,20 @@ import type {
  * Heartbeat Service Class
  */
 class HeartbeatService {
-  private readonly COMMAND_PREFIX = 'heartbeat_';
+  /**
+   * 命令名映射：前端方法名 -> Tauri 后端注册的命令名
+   */
+  private readonly COMMANDS = {
+    start: 'start_heartbeat',
+    stop: 'stop_heartbeat',
+    trigger_now: 'trigger_heartbeat_now',
+    get_state: 'get_heartbeat_state',
+    get_config: 'get_heartbeat_config',
+    update_config: 'update_heartbeat_config',
+    health_check: 'health_check',
+    get_health_status: 'health_check',
+    self_heal: 'health_check',
+  } as const;
 
   /**
    * 启动心跳
@@ -30,7 +43,7 @@ class HeartbeatService {
    */
   async startHeartbeat(): Promise<HeartbeatResponse<HeartbeatState>> {
     try {
-      const result = await invoke<HeartbeatState>(`${this.COMMAND_PREFIX}start`);
+      const result = await invoke<HeartbeatState>(this.COMMANDS.start);
       return {
         success: true,
         message: '心跳已启动',
@@ -53,7 +66,7 @@ class HeartbeatService {
    */
   async stopHeartbeat(): Promise<HeartbeatResponse<HeartbeatState>> {
     try {
-      const result = await invoke<HeartbeatState>(`${this.COMMAND_PREFIX}stop`);
+      const result = await invoke<HeartbeatState>(this.COMMANDS.stop);
       return {
         success: true,
         message: '心跳已停止',
@@ -76,7 +89,7 @@ class HeartbeatService {
    */
   async triggerHeartbeatNow(): Promise<HeartbeatResponse<HeartbeatState>> {
     try {
-      const result = await invoke<HeartbeatState>(`${this.COMMAND_PREFIX}trigger_now`);
+      const result = await invoke<HeartbeatState>(this.COMMANDS.trigger_now);
       return {
         success: true,
         message: '心跳已触发',
@@ -99,7 +112,7 @@ class HeartbeatService {
    */
   async getState(): Promise<HeartbeatResponse<HeartbeatState>> {
     try {
-      const result = await invoke<HeartbeatState>(`${this.COMMAND_PREFIX}get_state`);
+      const result = await invoke<HeartbeatState>(this.COMMANDS.get_state);
       return {
         success: true,
         data: result,
@@ -121,7 +134,7 @@ class HeartbeatService {
    */
   async getConfig(): Promise<HeartbeatResponse<HeartbeatConfig>> {
     try {
-      const result = await invoke<HeartbeatConfig>(`${this.COMMAND_PREFIX}get_config`);
+      const result = await invoke<HeartbeatConfig>(this.COMMANDS.get_config);
       return {
         success: true,
         data: result,
@@ -146,8 +159,8 @@ class HeartbeatService {
     config: Partial<HeartbeatConfig>
   ): Promise<HeartbeatResponse<HeartbeatConfig>> {
     try {
-      const result = await invoke<HeartbeatConfig>(`${this.COMMAND_PREFIX}update_config`, {
-        config,
+      const result = await invoke<HeartbeatConfig>(this.COMMANDS.update_config, {
+        request: config,
       });
       return {
         success: true,
@@ -171,7 +184,7 @@ class HeartbeatService {
    */
   async runHealthCheck(): Promise<HeartbeatResponse<HealthStatus>> {
     try {
-      const result = await invoke<HealthStatus>(`${this.COMMAND_PREFIX}health_check`);
+      const result = await invoke<HealthStatus>(this.COMMANDS.health_check);
       return {
         success: true,
         data: result,
@@ -193,7 +206,7 @@ class HeartbeatService {
    */
   async getHealthStatus(): Promise<HeartbeatResponse<HealthStatus>> {
     try {
-      const result = await invoke<HealthStatus>(`${this.COMMAND_PREFIX}get_health_status`);
+      const result = await invoke<HealthStatus>(this.COMMANDS.get_health_status);
       return {
         success: true,
         data: result,
@@ -216,7 +229,7 @@ class HeartbeatService {
   async executeSelfHeal(): Promise<HeartbeatResponse<{ healed_issues: string[] }>> {
     try {
       const result = await invoke<{ healed_issues: string[] }>(
-        `${this.COMMAND_PREFIX}self_heal`
+        this.COMMANDS.self_heal
       );
       return {
         success: true,
