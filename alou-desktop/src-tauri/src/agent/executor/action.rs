@@ -13,6 +13,7 @@ use tauri::{Emitter, Manager};
 
 use crate::agent::executor::types::{Thought, Action, ActionResult};
 use crate::agent::executor::core::ExecutorCore;
+use crate::agent::executor::async_scheduler::AsyncTaskScheduler;
 use crate::bridges::{ToolBridge, ToolCallRequest, ToolCallResponse};
 use crate::tools::ToolRegistry;
 use crate::tools::meta_tool::MetaActionTools;
@@ -24,6 +25,7 @@ pub struct ActionLayer {
     tool_bridge: Arc<ToolBridge>,
     tool_registry: Arc<ToolRegistry>,
     meta_tools: Option<Arc<MetaActionTools>>,
+    async_scheduler: Option<Arc<AsyncTaskScheduler>>,
 }
 
 impl ActionLayer {
@@ -36,6 +38,7 @@ impl ActionLayer {
             tool_bridge,
             tool_registry,
             meta_tools: None,
+            async_scheduler: None,
         }
     }
 
@@ -51,7 +54,14 @@ impl ActionLayer {
             tool_bridge,
             tool_registry,
             meta_tools: Some(meta_tools),
+            async_scheduler: None,
         }
+    }
+
+    /// 设置异步任务调度器
+    pub fn with_async_scheduler(mut self, scheduler: Arc<AsyncTaskScheduler>) -> Self {
+        self.async_scheduler = Some(scheduler);
+        self
     }
 
     /// 执行 Thought 中的所有行动
@@ -292,6 +302,56 @@ impl ActionLayer {
                     }
                 }
 
+                // 🔥 检查是否是 generate_video 异步任务
+                let mut is_async_video_task = false;
+                let mut video_task_id: Option<String> = None;
+                let mut video_provider: Option<String> = None;
+                
+                log::info!("[ActionLayer] 🔍 检查异步任务: tool={}, success={}", tool, success);
+                
+                if success && tool == "generate_video" {
+                    if let Some(ref r) = result {
+                        log::info!("[ActionLayer] 🔍 generate_video 结果: data={}", serde_json::to_string(&r.data).unwrap_or_default());
+                        
+                        // 检查返回的状态是否为 processing
+                        let status = r.data.get("status").and_then(|s| s.as_str());
+                        log::info!("[ActionLayer] 🔍 状态检查: status={:?}", status);
+                        
+                        if status == Some("processing") {
+                            video_task_id = r.data.get("task_id").and_then(|t| t.as_str()).map(|s| s.to_string());
+                            video_provider = r.data.get("provider").and_then(|p| p.as_str()).map(|s| s.to_string());
+                            
+                            log::info!("[ActionLayer] 🔍 task_id={:?}, provider={:?}", video_task_id, video_provider);
+                            
+                            if video_task_id.is_some() && video_provider.is_some() {
+                                is_async_video_task = true;
+                                log::info!("[ActionLayer] ✅ 检测到异步视频任务");
+                            }
+                        }
+                    }
+                }
+
+                // 🔥 如果是异步视频任务，启动自动轮询
+                if is_async_video_task {
+                    if let (Some(scheduler), Some(task_id), Some(provider)) = 
+                        (self.async_scheduler.clone(), video_task_id, video_provider) {
+                        log::info!("[ActionLayer] 启动异步任务轮询: task_id={}, provider={}", task_id, provider);
+                        
+                        // 获取 initial payload（请求参数）
+                        let initial_payload = args.clone();
+                        
+                        // 启动轮询
+                        scheduler.start_polling(
+                            task_id.clone(),
+                            "generate_video".to_string(),
+                            provider,
+                            initial_payload,
+                        ).await;
+                        
+                        log::info!("[ActionLayer] 异步任务轮询已启动: {}", task_id);
+                    }
+                }
+
                 // 🔥 发送工具调用完成事件到前端
                 if let Some(app_handle) = executor_core.app_handle() {
                     // 构建 preview：优先使用 output，否则使用 data 的序列化
@@ -310,6 +370,8 @@ impl ActionLayer {
                         "success": success,
                         "preview": preview_str,
                         "error": error,
+                        "is_async_task": is_async_video_task,
+                        "async_task_id": video_task_id,
                     });
                     if let Err(e) = app_handle.emit("agent:progress", &done_payload) {
                         log::warn!("[ActionLayer] 发送 tool_done 事件失败：{}", e);

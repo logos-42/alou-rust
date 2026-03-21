@@ -4,6 +4,7 @@ import { useI18n } from '@/hooks/useI18n'
 import { invoke } from '@tauri-apps/api/core'
 import CloseIcon from '@/assets/关闭0.3.png'
 import { blurImage } from '@/utils/imageBlur'
+import HeartbeatPanel from './Heartbeat/HeartbeatPanel'
 import './SettingsPanel.css'
 
 const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange, isSidebarCollapsed = false, activeChannelId = null, onOpenApiConfig }) => {
@@ -560,6 +561,12 @@ const SettingsPanel = ({ isDarkMode, onToggleTheme, onClose, onBackgroundChange,
                 <img src={backgroundImage} alt={t('common.settings.background.preview')} />
               </div>
             )}
+          </div>
+
+          {/* 心跳管理 */}
+          <div className="settings-section">
+            <div className="settings-section-title">心跳管理</div>
+            <HeartbeatPanel isDarkMode={isDarkMode} />
           </div>
         </div>
       </div>

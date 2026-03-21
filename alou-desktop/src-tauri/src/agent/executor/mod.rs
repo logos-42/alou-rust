@@ -29,6 +29,7 @@ pub mod reasoning;
 pub mod action;
 pub mod integration;
 pub mod core;
+pub mod async_scheduler;
 
 // 重新导出主要类型
 pub use types::{
