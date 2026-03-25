@@ -160,11 +160,27 @@ impl ToolBridge {
 
         // 直接使用 ToolExecutionManager 执行
         match self.execution_manager.execute_tool(&request.tool_id, request.args, context).await {
-            Ok(result) => Ok(ToolCallResponse {
-                success: true,
-                result: Some(result),
-                error: None,
-            }),
+            Ok(result) => {
+                // 🔥 修复：检查 ToolResult.success，而非外层 Result
+                // execute_with_context 会把工具执行错误转为 ToolResult { success: false, data: Null }
+                // 而不是返回 Err，所以这里必须检查内部 success 字段
+                if result.success {
+                    Ok(ToolCallResponse {
+                        success: true,
+                        result: Some(result),
+                        error: None,
+                    })
+                } else {
+                    let error_msg = result.error.clone()
+                        .unwrap_or_else(|| format!("工具执行失败，data={}", result.data));
+                    log::warn!("[ToolBridge] 工具 {} 执行失败: {}", request.tool_id, error_msg);
+                    Ok(ToolCallResponse {
+                        success: false,
+                        result: Some(result),
+                        error: Some(error_msg),
+                    })
+                }
+            }
             Err(e) => Ok(ToolCallResponse {
                 success: false,
                 result: None,

@@ -97,12 +97,18 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
     try {
       setIsLoading(true)
 
-      // 创建新钱包
-      const walletData = await desktopWalletService.createNewWallet()
+      // 使用 Agent 创建钱包（Web3 工具）
+      const walletData = await desktopWalletService.agentCreateWallet()
+
+      if (!walletData.success || !walletData.address) {
+        throw new Error(walletData.error || '创建钱包失败')
+      }
 
       // 生成验证消息并签名
       const message = desktopWalletService.generateVerificationMessage(walletData.address)
-      const signature = await walletData.wallet.signMessage(message)
+      
+      // 使用本地钱包签名（因为刚创建的钱包已经在 desktopWalletService 中）
+      const signature = await desktopWalletService.signMessage(message)
 
       // 验证签名
       const isValid = await desktopWalletService.verifySignature(
@@ -120,7 +126,13 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
       await desktopWalletService.saveWalletConnection(walletData.address, 'local')
 
       // 将钱包数据传递给父组件（用于显示助记词和私钥）
-      onCreateNew(walletData)
+      onCreateNew({
+        address: walletData.address,
+        chainId: chainId || '0x1',
+        walletType: 'local',
+        mnemonic: walletData.mnemonic,
+        privateKey: walletData.privateKey,
+      })
     } catch (error) {
       console.error('Create wallet error:', error)
       onError(error.message || '创建钱包失败')
@@ -134,9 +146,9 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
       <div className="form-header">
         <h3>导入本地钱包</h3>
         <p className="form-subtitle">
-          {hasDefaultKey 
-            ? `已保存默认钱包：${maskedKey}` 
-            : '输入您的私钥或助记词以连接钱包'}
+          {hasDefaultKey
+            ? `已保存默认钱包：${maskedKey}`
+            : '输入您的私钥或助记词以连接钱包，或创建新的 Agent 钱包'}
         </p>
       </div>
 
@@ -249,10 +261,10 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
           className="create-btn"
           disabled={isLoading}
         >
-          创建新钱包
+          🤖 Agent 创建钱包
         </button>
         <p className="create-warning">
-          ⚠️ 创建新钱包后，请务必保存好您的助记词和私钥，丢失后将无法恢复！
+          ⚠️ Agent 将使用 Web3 工具自动创建钱包，请保存好您的助记词和私钥，丢失后将无法恢复！
         </p>
       </div>
     </div>

@@ -7,6 +7,7 @@ export const login = {
     // ==================== 页面标题 ====================
     'login.title': '连接钱包',
     'login.subtitle.desktop': '使用手机钱包扫码连接，或在浏览器中使用钱包插件（桌面版）',
+    'login.subtitle.desktop.new': '使用 Agent 创建钱包或导入私钥（桌面版）',
     'login.subtitle.browser': '选择您的加密钱包以安全登录（浏览器版）',
 
     // ==================== 钱包选项 ====================
@@ -24,6 +25,7 @@ export const login = {
     'login.mode.phoneScan': '手机扫码',
     'login.mode.localWallet': '本地钱包',
     'login.mode.selectHint': '💡 请选择连接方式：WalletConnect（手机扫码）或本地钱包',
+    'login.mode.selectHint.new': '💡 请选择连接方式：本地钱包（推荐）或手机扫码',
 
     // ==================== 状态提示 ====================
     'login.status.metamaskDetected': '✅ 已检测到 MetaMask，点击上方按钮即可连接',
@@ -106,6 +108,7 @@ export const login = {
     // ==================== Page Title ====================
     'login.title': 'Connect Wallet',
     'login.subtitle.desktop': 'Scan QR code with mobile wallet, or use wallet plugin in browser (Desktop)',
+    'login.subtitle.desktop.new': 'Create wallet with Agent or import private key (Desktop)',
     'login.subtitle.browser': 'Select your crypto wallet to login securely (Browser)',
 
     // ==================== Wallet Options ====================
@@ -123,6 +126,7 @@ export const login = {
     'login.mode.phoneScan': 'Phone Scan',
     'login.mode.localWallet': 'Local Wallet',
     'login.mode.selectHint': '💡 Please select connection method: WalletConnect (phone scan) or Local Wallet',
+    'login.mode.selectHint.new': '💡 Please select connection method: Local Wallet (Recommended) or Phone Scan',
 
     // ==================== Status Messages ====================
     'login.status.metamaskDetected': '✅ MetaMask detected, click the button above to connect',

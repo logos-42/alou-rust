@@ -48,6 +48,55 @@ impl GenerateImageTool {
             },
         }
     }
+
+    /// 智能匹配 Provider 名称
+    /// 支持模型名到 Provider 名的映射，以及模糊匹配
+    fn resolve_provider_name(raw: &str, registry: &ProviderRegistry) -> String {
+        // 1. 精确匹配：直接就是 Provider 名（如 "seedance"、"minimax"）
+        if registry.get_media_provider(raw).is_some() {
+            return raw.to_string();
+        }
+
+        // 2. 模型名 -> Provider 名映射
+        let model_to_provider: &[(&str, &str)] = &[
+            // seedance 系列模型
+            ("seedance-1.0-pro", "seedance"),
+            ("seedance-1.0-pro-fast", "seedance"),
+            ("seedance-1.0-lite", "seedance"),
+            ("doubao-seedance-1.0-pro", "seedance"),
+            ("doubao-seedance-1.0-pro-fast", "seedance"),
+            ("doubao-seedance-1.0-lite", "seedance"),
+            // seedream 系列（图片，但也可能被误传入）
+            ("seedream", "seedream"),
+            ("doubao-seedream", "seedream"),
+            // jimeng 系列
+            ("jimeng", "jimeng"),
+            // minimax 系列
+            ("video-01", "minimax"),
+            ("minimax-video", "minimax"),
+        ];
+
+        if let Some((_, provider)) = model_to_provider.iter().find(|(model, _)| {
+            model.eq_ignore_ascii_case(raw)
+        }) {
+            return provider.to_string();
+        }
+
+        // 3. 前缀匹配：如 "seedance" 匹配 "seedance-1.0-pro"
+        if let Some(provider) = model_to_provider.iter()
+            .find(|(model, _)| {
+                raw.len() >= model.len() && raw[..model.len()].eq_ignore_ascii_case(*model)
+                    || model.len() >= raw.len() && model[..raw.len()].eq_ignore_ascii_case(raw)
+            })
+            .map(|(_, provider)| *provider)
+        {
+            return provider.to_string();
+        }
+
+        // 4. 回退：使用原始名称，让后续 get_media_provider 报错
+        log::warn!("[GenerateVideoTool] 无法匹配 Provider: '{}'，将尝试直接查找", raw);
+        raw.to_string()
+    }
 }
 
 #[async_trait]
@@ -184,6 +233,55 @@ impl GenerateAudioTool {
                 tags: vec!["media".to_string(), "audio".to_string(), "tts".to_string()],
             },
         }
+    }
+
+    /// 智能匹配 Provider 名称
+    /// 支持模型名到 Provider 名的映射，以及模糊匹配
+    fn resolve_provider_name(raw: &str, registry: &ProviderRegistry) -> String {
+        // 1. 精确匹配：直接就是 Provider 名（如 "seedance"、"minimax"）
+        if registry.get_media_provider(raw).is_some() {
+            return raw.to_string();
+        }
+
+        // 2. 模型名 -> Provider 名映射
+        let model_to_provider: &[(&str, &str)] = &[
+            // seedance 系列模型
+            ("seedance-1.0-pro", "seedance"),
+            ("seedance-1.0-pro-fast", "seedance"),
+            ("seedance-1.0-lite", "seedance"),
+            ("doubao-seedance-1.0-pro", "seedance"),
+            ("doubao-seedance-1.0-pro-fast", "seedance"),
+            ("doubao-seedance-1.0-lite", "seedance"),
+            // seedream 系列（图片，但也可能被误传入）
+            ("seedream", "seedream"),
+            ("doubao-seedream", "seedream"),
+            // jimeng 系列
+            ("jimeng", "jimeng"),
+            // minimax 系列
+            ("video-01", "minimax"),
+            ("minimax-video", "minimax"),
+        ];
+
+        if let Some((_, provider)) = model_to_provider.iter().find(|(model, _)| {
+            model.eq_ignore_ascii_case(raw)
+        }) {
+            return provider.to_string();
+        }
+
+        // 3. 前缀匹配：如 "seedance" 匹配 "seedance-1.0-pro"
+        if let Some(provider) = model_to_provider.iter()
+            .find(|(model, _)| {
+                raw.len() >= model.len() && raw[..model.len()].eq_ignore_ascii_case(*model)
+                    || model.len() >= raw.len() && model[..raw.len()].eq_ignore_ascii_case(raw)
+            })
+            .map(|(_, provider)| *provider)
+        {
+            return provider.to_string();
+        }
+
+        // 4. 回退：使用原始名称，让后续 get_media_provider 报错
+        log::warn!("[GenerateVideoTool] 无法匹配 Provider: '{}'，将尝试直接查找", raw);
+        raw.to_string()
     }
 }
 
@@ -323,6 +421,55 @@ impl GenerateVideoTool {
             },
         }
     }
+
+    /// 智能匹配 Provider 名称
+    /// 支持模型名到 Provider 名的映射，以及模糊匹配
+    fn resolve_provider_name(raw: &str, registry: &ProviderRegistry) -> String {
+        // 1. 精确匹配：直接就是 Provider 名（如 "seedance"、"minimax"）
+        if registry.get_media_provider(raw).is_some() {
+            return raw.to_string();
+        }
+
+        // 2. 模型名 -> Provider 名映射
+        let model_to_provider: &[(&str, &str)] = &[
+            // seedance 系列模型
+            ("seedance-1.0-pro", "seedance"),
+            ("seedance-1.0-pro-fast", "seedance"),
+            ("seedance-1.0-lite", "seedance"),
+            ("doubao-seedance-1.0-pro", "seedance"),
+            ("doubao-seedance-1.0-pro-fast", "seedance"),
+            ("doubao-seedance-1.0-lite", "seedance"),
+            // seedream 系列（图片，但也可能被误传入）
+            ("seedream", "seedream"),
+            ("doubao-seedream", "seedream"),
+            // jimeng 系列
+            ("jimeng", "jimeng"),
+            // minimax 系列
+            ("video-01", "minimax"),
+            ("minimax-video", "minimax"),
+        ];
+
+        if let Some((_, provider)) = model_to_provider.iter().find(|(model, _)| {
+            model.eq_ignore_ascii_case(raw)
+        }) {
+            return provider.to_string();
+        }
+
+        // 3. 前缀匹配：如 "seedance" 匹配 "seedance-1.0-pro"
+        if let Some(provider) = model_to_provider.iter()
+            .find(|(model, _)| {
+                raw.len() >= model.len() && raw[..model.len()].eq_ignore_ascii_case(*model)
+                    || model.len() >= raw.len() && model[..raw.len()].eq_ignore_ascii_case(raw)
+            })
+            .map(|(_, provider)| *provider)
+        {
+            return provider.to_string();
+        }
+
+        // 4. 回退：使用原始名称，让后续 get_media_provider 报错
+        log::warn!("[GenerateVideoTool] 无法匹配 Provider: '{}'，将尝试直接查找", raw);
+        raw.to_string()
+    }
 }
 
 #[async_trait]
@@ -341,14 +488,18 @@ impl ToolExecutor for GenerateVideoTool {
             .and_then(|v| v.as_u64())
             .unwrap_or(5);
 
-        let provider_name = args.get("provider")
+        let raw_provider = args.get("provider")
             .and_then(|v| v.as_str())
             .unwrap_or("minimax");
 
+        // 🔥 智能匹配 Provider 名称：支持模型名到 Provider 名的映射
+        // Agent 可能传入模型名（如 "seedance-1.0-pro"）而非 Provider 名（如 "seedance"）
+        let provider_name = Self::resolve_provider_name(raw_provider, &self.provider_registry);
+
         let provider = self.provider_registry
-            .get_media_provider(provider_name)
+            .get_media_provider(&provider_name)
             .ok_or_else(|| ToolError::ExecutionFailed(
-                format!("媒体 Provider '{}' 不存在或未启用", provider_name)
+                format!("媒体 Provider '{}' (原始输入: '{}') 不存在或未启用", provider_name, raw_provider)
             ))?;
 
         let options = VideoOptions {
@@ -491,6 +642,55 @@ impl GetVideoStatusTool {
             },
         }
     }
+
+    /// 智能匹配 Provider 名称
+    /// 支持模型名到 Provider 名的映射，以及模糊匹配
+    fn resolve_provider_name(raw: &str, registry: &ProviderRegistry) -> String {
+        // 1. 精确匹配：直接就是 Provider 名（如 "seedance"、"minimax"）
+        if registry.get_media_provider(raw).is_some() {
+            return raw.to_string();
+        }
+
+        // 2. 模型名 -> Provider 名映射
+        let model_to_provider: &[(&str, &str)] = &[
+            // seedance 系列模型
+            ("seedance-1.0-pro", "seedance"),
+            ("seedance-1.0-pro-fast", "seedance"),
+            ("seedance-1.0-lite", "seedance"),
+            ("doubao-seedance-1.0-pro", "seedance"),
+            ("doubao-seedance-1.0-pro-fast", "seedance"),
+            ("doubao-seedance-1.0-lite", "seedance"),
+            // seedream 系列（图片，但也可能被误传入）
+            ("seedream", "seedream"),
+            ("doubao-seedream", "seedream"),
+            // jimeng 系列
+            ("jimeng", "jimeng"),
+            // minimax 系列
+            ("video-01", "minimax"),
+            ("minimax-video", "minimax"),
+        ];
+
+        if let Some((_, provider)) = model_to_provider.iter().find(|(model, _)| {
+            model.eq_ignore_ascii_case(raw)
+        }) {
+            return provider.to_string();
+        }
+
+        // 3. 前缀匹配：如 "seedance" 匹配 "seedance-1.0-pro"
+        if let Some(provider) = model_to_provider.iter()
+            .find(|(model, _)| {
+                raw.len() >= model.len() && raw[..model.len()].eq_ignore_ascii_case(*model)
+                    || model.len() >= raw.len() && model[..raw.len()].eq_ignore_ascii_case(raw)
+            })
+            .map(|(_, provider)| *provider)
+        {
+            return provider.to_string();
+        }
+
+        // 4. 回退：使用原始名称，让后续 get_media_provider 报错
+        log::warn!("[GenerateVideoTool] 无法匹配 Provider: '{}'，将尝试直接查找", raw);
+        raw.to_string()
+    }
 }
 
 #[async_trait]
@@ -505,14 +705,17 @@ impl ToolExecutor for GetVideoStatusTool {
             .ok_or_else(|| ToolError::InvalidArguments("缺少必要参数：task_id (任务 ID)".to_string()))?
             .to_string();
 
-        let provider_name = args.get("provider")
+        let raw_provider = args.get("provider")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidArguments("缺少必要参数：provider (Provider 名称)".to_string()))?;
 
+        // 🔥 智能匹配 Provider 名称
+        let provider_name = Self::resolve_provider_name(raw_provider, &self.provider_registry);
+
         let provider = self.provider_registry
-            .get_media_provider(provider_name)
+            .get_media_provider(&provider_name)
             .ok_or_else(|| ToolError::ExecutionFailed(
-                format!("媒体 Provider '{}' 不存在或未启用", provider_name)
+                format!("媒体 Provider '{}' (原始输入: '{}') 不存在或未启用", provider_name, raw_provider)
             ))?;
 
         match provider.get_task_status(&task_id).await {

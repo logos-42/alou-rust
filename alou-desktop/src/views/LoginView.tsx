@@ -129,10 +129,10 @@ const LoginView = () => {
     
     return isDesktopDefault
   })
-  // 桌面版默认显示 WalletConnect 二维码，浏览器版为 null
+  // 桌面版默认显示本地钱包表单，浏览器版为 null
   const [connectionMode, setConnectionMode] = useState(() => {
     // 根据 isDesktop 的初始值设置
-    return isDesktop ? 'walletconnect' : null
+    return isDesktop ? 'local' : null
   })
   const [newWalletData, setNewWalletData] = useState(null) // 用于存储新创建的钱包数据
 
@@ -168,12 +168,12 @@ const LoginView = () => {
       setIsDesktop((prevDesktop) => {
         // 只有在检测结果发生变化时才更新
         if (desktop !== prevDesktop) {
-          // 如果是桌面环境，确保默认连接模式为 WalletConnect
+          // 如果是桌面环境，确保默认连接模式为本地钱包
           if (desktop) {
             setConnectionMode((prevMode) => {
-              if (prevMode !== 'walletconnect' && prevMode !== 'local') {
-                console.log('[LoginView] Setting connection mode to walletconnect')
-                return 'walletconnect'
+              if (prevMode !== 'local' && prevMode !== 'walletconnect') {
+                console.log('[LoginView] Setting connection mode to local')
+                return 'local'
               }
               return prevMode
             })
@@ -407,8 +407,8 @@ const LoginView = () => {
 
         <h1 className="title">{t('login.title')}</h1>
         <p className="subtitle">
-          {isDesktop 
-            ? t('login.subtitle.desktop')
+          {isDesktop
+            ? t('login.subtitle.desktop.new')
             : t('login.subtitle.browser')}
         </p>
 
@@ -443,21 +443,21 @@ const LoginView = () => {
                   <button
                     type="button"
                     className={`mode-btn active`}
-                    onClick={() => setConnectionMode('walletconnect')}
-                  >
-                    {t('login.mode.phoneScan')}
-                  </button>
-                  <button
-                    type="button"
-                    className="mode-btn"
                     onClick={() => setConnectionMode('local')}
                   >
                     {t('login.mode.localWallet')}
                   </button>
+                  <button
+                    type="button"
+                    className="mode-btn"
+                    onClick={() => setConnectionMode('walletconnect')}
+                  >
+                    {t('login.mode.phoneScan')}
+                  </button>
                 </div>
 
                 <div className="desktop-notice">
-                  <p>{t('login.mode.selectHint')}</p>
+                  <p>{t('login.mode.selectHint.new')}</p>
                 </div>
               </>
             )}
@@ -466,17 +466,17 @@ const LoginView = () => {
             <div className="desktop-mode-switcher">
               <button
                 type="button"
-                className={`mode-btn ${connectionMode === 'walletconnect' ? 'active' : ''}`}
-                onClick={() => setConnectionMode('walletconnect')}
-              >
-                {t('login.mode.phoneScan')}
-              </button>
-              <button
-                type="button"
                 className={`mode-btn ${connectionMode === 'local' ? 'active' : ''}`}
                 onClick={() => setConnectionMode('local')}
               >
                 {t('login.mode.localWallet')}
+              </button>
+              <button
+                type="button"
+                className={`mode-btn ${connectionMode === 'walletconnect' ? 'active' : ''}`}
+                onClick={() => setConnectionMode('walletconnect')}
+              >
+                {t('login.mode.phoneScan')}
               </button>
             </div>
           </>

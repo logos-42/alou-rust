@@ -456,7 +456,7 @@ async fn execute_get_video_status(
             let task_status = task.status.clone();
             let task_result_for_archive = task.result.clone();
             
-            let mut result = match task.status {
+            let result = match task.status {
                 TaskStatus::Completed => {
                     if let Some(output) = task.result {
                         serde_json::json!({

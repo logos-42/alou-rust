@@ -249,6 +249,61 @@ class DesktopWalletService {
   }
 
   /**
+   * Agent 创建钱包（使用 Web3 工具）
+   */
+  async agentCreateWallet(options: {
+    name?: string;
+    chain?: string;
+  } = {}): Promise<{
+    success: boolean;
+    address?: string;
+    mnemonic?: string;
+    privateKey?: string;
+    error?: string;
+  }> {
+    try {
+      console.warn('[DesktopWalletService] Agent 创建钱包');
+
+      // 使用 ethers 生成随机助记词和钱包
+      const mnemonic = ethers.Mnemonic.entropyToPhrase(ethers.randomBytes(16));
+      const wallet = ethers.HDNodeWallet.fromPhrase(mnemonic);
+      const address = await wallet.getAddress();
+      const privateKey = wallet.privateKey;
+
+      // 保存钱包数据
+      const walletData: LocalWalletData = {
+        address,
+        privateKey,
+        mnemonic,
+        name: options.name || `Agent 钱包 ${address.slice(0, 6)}...${address.slice(-4)}`,
+        chainId: options.chain || '0x1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await this.saveLocalWallet(walletData);
+
+      this.localWallet = wallet as unknown as ethers.Wallet;
+      this.provider = this.createLocalProvider(this.localWallet);
+      this.walletType = 'local';
+
+      console.warn('[DesktopWalletService] Agent 钱包创建成功:', address);
+      return {
+        success: true,
+        address,
+        mnemonic,
+        privateKey,
+      };
+    } catch (error) {
+      console.error('[DesktopWalletService] Agent 创建钱包失败:', error);
+      return {
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  /**
    * 获取当前钱包信息
    */
   async getWalletInfo(): Promise<WalletInfo | null> {
