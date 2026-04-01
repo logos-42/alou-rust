@@ -4,10 +4,12 @@ use aes_gcm::{
 };
 use bip39::Mnemonic;
 use bs58;
-use ed25519_dalek::{SigningKey, VerifyingKey};
+use ed25519_dalek::{SigningKey as Ed25519SigningKey, VerifyingKey as Ed25519VerifyingKey};
 use hex;
 use k256::ecdsa::{Signature as K256Signature, VerifyingKey as K256VerifyingKey};
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 use sha2::{Digest, Sha256, Sha512};
+use sha3::Keccak256;
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
