@@ -61,6 +61,35 @@ export const login = {
     'login.terms.and': '和',
     'login.terms.privacyPolicy': '隐私政策',
 
+    // ==================== 登录类别 ====================
+    'login.category.crypto': '加密钱包',
+    'login.category.bankCard': '银行卡登录',
+
+    // ==================== 银行卡登录 ====================
+    'login.bankCard.title': '银行卡 / 数字人民币登录',
+    'login.bankCard.subtitle': '使用银行卡或数字人民币钱包验证身份并登录',
+    'login.bankCard.method.bankCard': '银行卡',
+    'login.bankCard.method.digitalRmb': '数字人民币',
+    'login.bankCard.cardNumber': '银行卡号',
+    'login.bankCard.cardNumber.placeholder': '请输入您的银行卡号',
+    'login.bankCard.digitalRmbWallet': '数字人民币钱包地址',
+    'login.bankCard.digitalRmbWallet.placeholder': '请输入您的数字人民币钱包地址',
+    'login.bankCard.phoneNumber': '预留手机号',
+    'login.bankCard.phoneNumber.placeholder': '请输入银行预留手机号',
+    'login.bankCard.smsCode': '短信验证码',
+    'login.bankCard.smsCode.placeholder': '请输入 6 位验证码',
+    'login.bankCard.sendSms': '发送验证码',
+    'login.bankCard.login': '验证并登录',
+    'login.bankCard.loggingIn': '验证中...',
+    'login.bankCard.cancel': '取消',
+    'login.bankCard.securityNotice': '您的银行卡信息仅用于身份验证，不会被存储或泄露',
+    'login.bankCard.error.cardRequired': '请输入银行卡号',
+    'login.bankCard.error.phoneRequired': '请输入预留手机号',
+    'login.bankCard.error.smsRequired': '请输入短信验证码',
+    'login.bankCard.error.smsFailed': '发送验证码失败，请稍后重试',
+    'login.bankCard.error.verifyFailed': '验证失败，请检查信息是否正确',
+    'login.bankCard.error.loginFailed': '登录失败，请稍后重试',
+
     // ==================== 本地钱包表单 ====================
     'login.localWallet.title': '本地钱包',
     'login.localWallet.importPrivateKey': '导入私钥',
@@ -161,6 +190,35 @@ export const login = {
     'login.terms.termsOfService': 'Terms of Service',
     'login.terms.and': 'and',
     'login.terms.privacyPolicy': 'Privacy Policy',
+
+    // ==================== Login Category ====================
+    'login.category.crypto': 'Crypto Wallet',
+    'login.category.bankCard': 'Bank Card',
+
+    // ==================== Bank Card Login ====================
+    'login.bankCard.title': 'Bank Card / Digital RMB Login',
+    'login.bankCard.subtitle': 'Verify identity with bank card or Digital RMB wallet to login',
+    'login.bankCard.method.bankCard': 'Bank Card',
+    'login.bankCard.method.digitalRmb': 'Digital RMB',
+    'login.bankCard.cardNumber': 'Bank Card Number',
+    'login.bankCard.cardNumber.placeholder': 'Enter your bank card number',
+    'login.bankCard.digitalRmbWallet': 'Digital RMB Wallet Address',
+    'login.bankCard.digitalRmbWallet.placeholder': 'Enter your Digital RMB wallet address',
+    'login.bankCard.phoneNumber': 'Reserved Phone Number',
+    'login.bankCard.phoneNumber.placeholder': 'Enter your bank-reserved phone number',
+    'login.bankCard.smsCode': 'SMS Verification Code',
+    'login.bankCard.smsCode.placeholder': 'Enter 6-digit code',
+    'login.bankCard.sendSms': 'Send Code',
+    'login.bankCard.login': 'Verify & Login',
+    'login.bankCard.loggingIn': 'Verifying...',
+    'login.bankCard.cancel': 'Cancel',
+    'login.bankCard.securityNotice': 'Your bank card info is only used for identity verification and will not be stored or leaked',
+    'login.bankCard.error.cardRequired': 'Please enter bank card number',
+    'login.bankCard.error.phoneRequired': 'Please enter reserved phone number',
+    'login.bankCard.error.smsRequired': 'Please enter SMS verification code',
+    'login.bankCard.error.smsFailed': 'Failed to send verification code, please try again later',
+    'login.bankCard.error.verifyFailed': 'Verification failed, please check your information',
+    'login.bankCard.error.loginFailed': 'Login failed, please try again later',
 
     // ==================== Local Wallet Form ====================
     'login.localWallet.title': 'Local Wallet',

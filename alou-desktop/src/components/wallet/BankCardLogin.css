@@ -1,0 +1,229 @@
+.bank-card-login {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.bank-card-login .form-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.bank-card-login .form-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.bank-card-login .form-subtitle {
+  margin: 0;
+  color: #aaaaaa;
+  font-size: 0.9rem;
+}
+
+.method-selector {
+  display: flex;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.25rem;
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.method-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #aaaaaa;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.method-btn:hover:not(.active) {
+  color: #ffffff;
+}
+
+.method-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
+}
+
+.bank-card-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.bank-card-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.bank-card-input:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.bank-card-input:disabled {
+  background: rgba(255, 255, 255, 0.03);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.bank-card-input::placeholder {
+  color: #666666;
+}
+
+.sms-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.sms-input {
+  flex: 1;
+}
+
+.sms-send-btn {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  min-width: 100px;
+}
+
+.sms-send-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sms-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.cancel-btn,
+.submit-btn {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.submit-btn {
+  background: #ffffff;
+  color: #000000;
+}
+
+.submit-btn:hover:not(:disabled) {
+  background: #cccccc;
+  transform: translateY(-1px);
+}
+
+.submit-btn:disabled,
+.cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.security-notice {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  color: #81c784;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+
+.security-notice svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .bank-card-login {
+    padding: 1rem;
+  }
+
+  .sms-input-wrapper {
+    flex-direction: column;
+  }
+
+  .sms-send-btn {
+    width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+}

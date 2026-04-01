@@ -1,12 +1,13 @@
 /**
  * Secure storage utility for default private key
- * Uses Tauri secure storage in desktop app, localStorage fallback for browser
+ * Uses Tauri secure storage in desktop app, AES-256-GCM for browser
  */
 
 import { invoke } from '@tauri-apps/api/core'
 
 const DEFAULT_KEY_STORAGE_KEY = 'alou_default_wallet_key'
 const DEFAULT_KEY_ADDRESS_KEY = 'alou_default_wallet_address'
+const ENCRYPTION_SALT_KEY = 'alou_encryption_salt'
 
 /**
  * Check if running in Tauri desktop environment
@@ -23,21 +24,127 @@ function isTauri(): boolean {
 }
 
 /**
+ * Derive AES-GCM key from browser fingerprint
+ * Uses Web Crypto API PBKDF2 for key derivation
+ */
+async function getBrowserEncryptionKey(): Promise<CryptoKey> {
+  // Generate or retrieve salt
+  let salt = localStorage.getItem(ENCRYPTION_SALT_KEY)
+  if (!salt) {
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16))
+    salt = btoa(String.fromCharCode(...saltBytes))
+    localStorage.setItem(ENCRYPTION_SALT_KEY, salt)
+  }
+
+  // Create machine-specific key material from navigator properties
+  const keyMaterial = [
+    navigator.userAgent,
+    navigator.language,
+    navigator.platform,
+    screen.width,
+    screen.height,
+    new Date().getTimezoneOffset(),
+    'alou-browser-encryption-v1',
+  ].join('|')
+
+  const encoder = new TextEncoder()
+  const keyData = encoder.encode(keyMaterial)
+  const saltData = Uint8Array.from(atob(salt), (c) => c.charCodeAt(0))
+
+  // Import key material
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  )
+
+  // Derive AES-GCM key using PBKDF2
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: saltData,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+}
+
+/**
+ * Encrypt data using AES-256-GCM (browser)
+ * Returns base64 encoded string with IV prepended
+ */
+async function browserEncrypt(plaintext: string): Promise<string> {
+  const key = await getBrowserEncryptionKey()
+  const encoder = new TextEncoder()
+  const data = encoder.encode(plaintext)
+
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    data
+  )
+
+  // Combine IV + ciphertext and encode as base64
+  const result = new Uint8Array(iv.length + encrypted.byteLength)
+  result.set(iv)
+  result.set(new Uint8Array(encrypted), iv.length)
+
+  return btoa(String.fromCharCode(...result))
+}
+
+/**
+ * Decrypt data using AES-256-GCM (browser)
+ * Expects base64 encoded string with IV prepended
+ */
+async function browserDecrypt(ciphertext: string): Promise<string | null> {
+  try {
+    const key = await getBrowserEncryptionKey()
+
+    // Decode base64
+    const data = Uint8Array.from(atob(ciphertext), (c) => c.charCodeAt(0))
+
+    if (data.length < 13) {
+      return null
+    }
+
+    const iv = data.slice(0, 12)
+    const encrypted = data.slice(12)
+
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encrypted
+    )
+
+    const decoder = new TextDecoder()
+    return decoder.decode(decrypted)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Save default private key securely
- * In Tauri: uses secure storage
- * In browser: uses localStorage (development only)
+ * In Tauri: uses secure storage with AES-256-GCM
+ * In browser: uses AES-256-GCM via Web Crypto API
  */
 export async function saveDefaultPrivateKey(privateKey: string): Promise<void> {
   try {
     if (isTauri()) {
-      // Use Tauri secure storage
       await invoke('save_secure_storage', {
         key: DEFAULT_KEY_STORAGE_KEY,
         value: privateKey,
       })
     } else {
-      // Browser fallback (development only)
-      localStorage.setItem(DEFAULT_KEY_STORAGE_KEY, privateKey)
+      const encrypted = await browserEncrypt(privateKey)
+      localStorage.setItem(DEFAULT_KEY_STORAGE_KEY, encrypted)
     }
     console.log('[SecureStorage] Default private key saved securely')
   } catch (error) {
@@ -53,14 +160,20 @@ export async function saveDefaultPrivateKey(privateKey: string): Promise<void> {
 export async function getDefaultPrivateKey(): Promise<string | null> {
   try {
     if (isTauri()) {
-      // Use Tauri secure storage
       const result = await invoke('get_secure_storage', {
         key: DEFAULT_KEY_STORAGE_KEY,
       })
       return result as string | null
     } else {
-      // Browser fallback
       const stored = localStorage.getItem(DEFAULT_KEY_STORAGE_KEY)
+      if (!stored) return null
+
+      // Try AES-GCM decryption first
+      const decrypted = await browserDecrypt(stored)
+      if (decrypted) return decrypted
+
+      // Backward compatibility: return plain text if decryption fails
+      // (for data stored before encryption was implemented)
       return stored
     }
   } catch (error) {
@@ -80,7 +193,8 @@ export async function saveDefaultWalletAddress(address: string): Promise<void> {
         value: address,
       })
     } else {
-      localStorage.setItem(DEFAULT_KEY_ADDRESS_KEY, address)
+      const encrypted = await browserEncrypt(address)
+      localStorage.setItem(DEFAULT_KEY_ADDRESS_KEY, encrypted)
     }
   } catch (error) {
     console.error('[SecureStorage] Failed to save wallet address:', error)
@@ -98,7 +212,13 @@ export async function getDefaultWalletAddress(): Promise<string | null> {
       })
       return result as string | null
     } else {
-      return localStorage.getItem(DEFAULT_KEY_ADDRESS_KEY)
+      const stored = localStorage.getItem(DEFAULT_KEY_ADDRESS_KEY)
+      if (!stored) return null
+
+      const decrypted = await browserDecrypt(stored)
+      if (decrypted) return decrypted
+
+      return stored
     }
   } catch (error) {
     console.error('[SecureStorage] Failed to get wallet address:', error)
@@ -141,6 +261,7 @@ export async function clearDefaultPrivateKey(): Promise<void> {
     } else {
       localStorage.removeItem(DEFAULT_KEY_STORAGE_KEY)
       localStorage.removeItem(DEFAULT_KEY_ADDRESS_KEY)
+      localStorage.removeItem(ENCRYPTION_SALT_KEY)
     }
     console.log('[SecureStorage] Default private key cleared')
   } catch (error) {
@@ -156,16 +277,15 @@ export function maskPrivateKey(privateKey: string): string {
   if (!privateKey || privateKey.length < 10) {
     return '***'
   }
-  
-  // Remove 0x prefix if present for masking
+
   const keyWithoutPrefix = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey
-  
+
   if (keyWithoutPrefix.length < 10) {
     return '***'
   }
-  
+
   const prefix = keyWithoutPrefix.slice(0, 6)
   const suffix = keyWithoutPrefix.slice(-4)
-  
+
   return `0x${prefix}...${suffix}`
 }

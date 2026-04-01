@@ -5,6 +5,7 @@ import { walletService } from '@/services/walletService'
 import { desktopWalletService } from '@/services/desktopWalletService'
 import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
+import BankCardLogin from '@/components/wallet/BankCardLogin'
 import { useI18n } from '@/hooks/useI18n'
 import CloseIcon from '@/assets/关闭0.3.png'
 import WalletIcon from '@/assets/钱包0.3.png'
@@ -131,10 +132,10 @@ const LoginView = () => {
   })
   // 桌面版默认显示本地钱包表单，浏览器版为 null
   const [connectionMode, setConnectionMode] = useState(() => {
-    // 根据 isDesktop 的初始值设置
     return isDesktop ? 'local' : null
   })
-  const [newWalletData, setNewWalletData] = useState(null) // 用于存储新创建的钱包数据
+  const [newWalletData, setNewWalletData] = useState(null)
+  const [loginCategory, setLoginCategory] = useState('crypto') // 'crypto' or 'bankCard'
 
   useEffect(() => {
     // 延迟检测，确保 Tauri API 已经加载
@@ -423,62 +424,78 @@ const LoginView = () => {
         {/* DEBUG: isDesktop={String(isDesktop)}, connectionMode={connectionMode} */}
         {isDesktop ? (
           <>
-            {connectionMode === 'walletconnect' ? (
-              <WalletConnectQR
-                onConnected={handleWalletConnected}
-                onError={handleWalletError}
-                onCancel={handleConnectionCancel}
-              />
-            ) : connectionMode === 'local' ? (
-              <LocalWalletForm
-                onConnected={handleWalletConnected}
-                onError={handleWalletError}
-                onCancel={handleConnectionCancel}
-                onCreateNew={handleNewWalletCreated}
-              />
-            ) : (
-              // 桌面版默认回退：显示切换器（理论上不应该走到这里，因为初始化时已经设置了 connectionMode）
+            {/* 登录类别切换：加密钱包 / 银行卡 */}
+            <div className="login-category-switcher">
+              <button
+                type="button"
+                className={`category-btn ${loginCategory === 'crypto' ? 'active' : ''}`}
+                onClick={() => setLoginCategory('crypto')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                {t('login.category.crypto')}
+              </button>
+              <button
+                type="button"
+                className={`category-btn ${loginCategory === 'bankCard' ? 'active' : ''}`}
+                onClick={() => setLoginCategory('bankCard')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="5" width="20" height="14" rx="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+                {t('login.category.bankCard')}
+              </button>
+            </div>
+
+            {loginCategory === 'crypto' ? (
               <>
+                {connectionMode === 'walletconnect' ? (
+                  <WalletConnectQR
+                    onConnected={handleWalletConnected}
+                    onError={handleWalletError}
+                    onCancel={handleConnectionCancel}
+                  />
+                ) : connectionMode === 'local' ? (
+                  <LocalWalletForm
+                    onConnected={handleWalletConnected}
+                    onError={handleWalletError}
+                    onCancel={handleConnectionCancel}
+                    onCreateNew={handleNewWalletCreated}
+                  />
+                ) : (
+                  <div className="desktop-notice">
+                    <p>{t('login.mode.selectHint.new')}</p>
+                  </div>
+                )}
+
+                {/* 加密钱包模式切换器 */}
                 <div className="desktop-mode-switcher">
                   <button
                     type="button"
-                    className={`mode-btn active`}
+                    className={`mode-btn ${connectionMode === 'local' ? 'active' : ''}`}
                     onClick={() => setConnectionMode('local')}
                   >
                     {t('login.mode.localWallet')}
                   </button>
                   <button
                     type="button"
-                    className="mode-btn"
+                    className={`mode-btn ${connectionMode === 'walletconnect' ? 'active' : ''}`}
                     onClick={() => setConnectionMode('walletconnect')}
                   >
                     {t('login.mode.phoneScan')}
                   </button>
                 </div>
-
-                <div className="desktop-notice">
-                  <p>{t('login.mode.selectHint.new')}</p>
-                </div>
               </>
+            ) : (
+              <BankCardLogin
+                onConnected={handleWalletConnected}
+                onError={handleWalletError}
+                onCancel={handleConnectionCancel}
+              />
             )}
-
-            {/* 桌面版模式切换器：在所有模式下显示，方便切换 */}
-            <div className="desktop-mode-switcher">
-              <button
-                type="button"
-                className={`mode-btn ${connectionMode === 'local' ? 'active' : ''}`}
-                onClick={() => setConnectionMode('local')}
-              >
-                {t('login.mode.localWallet')}
-              </button>
-              <button
-                type="button"
-                className={`mode-btn ${connectionMode === 'walletconnect' ? 'active' : ''}`}
-                onClick={() => setConnectionMode('walletconnect')}
-              >
-                {t('login.mode.phoneScan')}
-              </button>
-            </div>
           </>
         ) : (
           /* 浏览器版：显示钱包选项列表 */

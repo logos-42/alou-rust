@@ -1,8 +1,14 @@
+use aes_gcm::{
+    aead::{Aead, AeadCore, KeyInit, OsRng},
+    Aes256Gcm, Nonce,
+};
 use hex;
 use k256::ecdsa::{Signature as K256Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
+use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -135,8 +141,71 @@ fn get_secure_storage_file_path(app_handle: &AppHandle, key: &str) -> Result<Pat
     Ok(storage_dir.join(format!("{}.dat", sanitized_key)))
 }
 
+/// Get the encryption key for secure storage (AES-256-GCM)
+fn get_storage_encryption_key() -> aes_gcm::Key<Aes256Gcm> {
+    let mut hasher = DefaultHasher::new();
+
+    if let Ok(hostname) = env::var("COMPUTERNAME") {
+        hostname.hash(&mut hasher);
+    } else if let Ok(hostname) = env::var("HOSTNAME") {
+        hostname.hash(&mut hasher);
+    }
+
+    if let Ok(username) = env::var("USERNAME") {
+        username.hash(&mut hasher);
+    } else if let Ok(username) = env::var("USER") {
+        username.hash(&mut hasher);
+    }
+
+    "alou-wallet-storage-encryption-v1".hash(&mut hasher);
+
+    let hash = hasher.finish();
+
+    let mut sha_hasher = Sha256::new();
+    sha_hasher.update(&hash.to_be_bytes());
+    let sha_result = sha_hasher.finalize();
+
+    let mut key_bytes = [0u8; 32];
+    key_bytes.copy_from_slice(&sha_result[..32]);
+
+    *aes_gcm::Key::<Aes256Gcm>::from_slice(&key_bytes)
+}
+
+/// Encrypt data using AES-256-GCM
+fn encrypt_storage_value(plaintext: &[u8]) -> Result<Vec<u8>, String> {
+    let key = get_storage_encryption_key();
+    let cipher = Aes256Gcm::new(&key);
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
+    let ciphertext = cipher
+        .encrypt(&nonce, plaintext)
+        .map_err(|e| format!("Encryption failed: {}", e))?;
+
+    let mut result = nonce.to_vec();
+    result.extend(ciphertext);
+
+    Ok(result)
+}
+
+/// Decrypt data using AES-256-GCM
+fn decrypt_storage_value(ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+    if ciphertext.len() < 12 {
+        return Err("Encrypted data too short".to_string());
+    }
+
+    let key = get_storage_encryption_key();
+    let cipher = Aes256Gcm::new(&key);
+
+    let (nonce, data) = ciphertext.split_at(12);
+    let nonce = Nonce::from_slice(nonce);
+
+    cipher
+        .decrypt(nonce, data)
+        .map_err(|e| format!("Decryption failed: {}", e))
+}
+
 /// Save data to secure storage
-/// Uses encrypted file storage with application-specific location
+/// Uses AES-256-GCM authenticated encryption
 #[tauri::command]
 pub async fn save_secure_storage(
     app_handle: AppHandle,
@@ -144,18 +213,12 @@ pub async fn save_secure_storage(
     value: String,
 ) -> Result<(), String> {
     let file_path = get_secure_storage_file_path(&app_handle, &key)?;
-    
-    // Simple obfuscation (XOR with a fixed byte for basic protection)
-    // In production, consider using a proper encryption library
-    let bytes = value.as_bytes();
-    let mut obfuscated = Vec::with_capacity(bytes.len());
-    for &byte in bytes {
-        obfuscated.push(byte ^ 0x5A); // Simple XOR obfuscation
-    }
-    
-    fs::write(&file_path, &obfuscated)
+
+    let encrypted = encrypt_storage_value(value.as_bytes())?;
+
+    fs::write(&file_path, &encrypted)
         .map_err(|e| format!("Failed to write secure storage: {}", e))?;
-    
+
     // Set restrictive file permissions (Unix only)
     #[cfg(unix)]
     {
@@ -164,7 +227,7 @@ pub async fn save_secure_storage(
             let _ = fs::set_permissions(&file_path, PermissionsExt::from_mode(0o600));
         }
     }
-    
+
     Ok(())
 }
 
@@ -176,23 +239,35 @@ pub async fn get_secure_storage(
     key: String,
 ) -> Result<Option<String>, String> {
     let file_path = get_secure_storage_file_path(&app_handle, &key)?;
-    
+
     if !file_path.exists() {
         return Ok(None);
     }
-    
-    let obfuscated = fs::read(&file_path)
+
+    let encrypted = fs::read(&file_path)
         .map_err(|e| format!("Failed to read secure storage: {}", e))?;
-    
-    // De-obfuscate (XOR with the same fixed byte)
-    let mut bytes = Vec::with_capacity(obfuscated.len());
-    for &byte in &obfuscated {
-        bytes.push(byte ^ 0x5A);
-    }
-    
-    let value = String::from_utf8(bytes)
+
+    // Try AES-256-GCM decryption first
+    let plaintext = match decrypt_storage_value(&encrypted) {
+        Ok(pt) => pt,
+        Err(_) => {
+            // Backward compatibility: try legacy XOR de-obfuscation
+            // for data encrypted with the old XOR 0x5A method
+            let mut bytes = Vec::with_capacity(encrypted.len());
+            for &byte in &encrypted {
+                bytes.push(byte ^ 0x5A);
+            }
+            // Validate it's valid UTF-8
+            match String::from_utf8(bytes.clone()) {
+                Ok(_) => bytes,
+                Err(_) => return Err("Failed to decrypt or decode secure storage data".to_string()),
+            }
+        }
+    };
+
+    let value = String::from_utf8(plaintext)
         .map_err(|_| "Failed to decode secure storage data".to_string())?;
-    
+
     Ok(Some(value))
 }
 
