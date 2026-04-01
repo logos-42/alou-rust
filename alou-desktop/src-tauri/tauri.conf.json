@@ -47,7 +47,8 @@
     "externalBin": [],
     "macOS": {
       "signingIdentity": "-",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist",
       "minimumSystemVersion": "10.13"
     },
     "windows": {
