@@ -62,6 +62,7 @@ sha2 = "0.10"
 k256 = { version = "0.13", features = ["ecdsa"] }
 ed25519-dalek = "2"
 bs58 = { version = "0.5", features = ["std"] }
+bip39 = "2"
 regex = "1"
 glob = "0.3"
 walkdir = "2"

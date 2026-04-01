@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '@/stores/authStore'
 import { walletService } from '@/services/walletService'
-import { desktopWalletService } from '@/services/desktopWalletService'
 import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
 import BankCardLogin from '@/components/wallet/BankCardLogin'
 import { useI18n } from '@/hooks/useI18n'
+import { useTheme } from '@/hooks/useTheme'
 import CloseIcon from '@/assets/关闭0.3.png'
 import WalletIcon from '@/assets/钱包0.3.png'
 import './LoginView.css'
@@ -89,6 +89,7 @@ const getWalletButtons = (isDesktop, t) => {
 
 const LoginView = () => {
   const { t } = useI18n()
+  const { isDarkMode, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const loginWithWeb3Wallet = useAuthStore((state) => state.loginWithWeb3Wallet)
   const [isLoading, setIsLoading] = useState(false)
@@ -396,10 +397,35 @@ const LoginView = () => {
   )
 
   return (
-    <div className="login-container">
+    <div className={`login-container ${isDarkMode ? 'dark-mode' : 'light-mode'}`}>
       <div className="login-box">
         <button type="button" onClick={goBack} className="close-btn" title={t('common.back')}>
           <img src={CloseIcon} alt="关闭" />
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="theme-toggle-btn"
+          title={isDarkMode ? t('common.theme.day') : t('common.theme.night')}
+        >
+          {isDarkMode ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          ) : (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          )}
         </button>
 
         <div className="logo">

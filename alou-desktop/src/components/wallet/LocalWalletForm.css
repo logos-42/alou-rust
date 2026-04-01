@@ -17,13 +17,15 @@
   margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
+  transition: color 0.3s ease;
 }
 
 .form-subtitle {
   margin: 0;
-  color: #aaaaaa;
+  color: var(--login-text-secondary, #888888);
   font-size: 0.9rem;
+  transition: color 0.3s ease;
 }
 
 .wallet-form {
@@ -37,10 +39,11 @@
 .input-type-selector {
   display: flex;
   gap: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-input-border, rgba(255, 255, 255, 0.1));
   border-radius: 6px;
   padding: 0.25rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .type-btn {
@@ -49,20 +52,20 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #aaaaaa;
+  color: var(--login-text-secondary, #888888);
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .type-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  box-shadow: 0 1px 3px rgba(255, 255, 255, 0.05);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.08));
+  color: var(--login-text-primary, #e8e8e8);
+  box-shadow: var(--login-active-shadow, 0 1px 3px rgba(0, 0, 0, 0.2));
 }
 
 .type-btn:hover:not(.active) {
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
 }
 
 .form-group {
@@ -74,29 +77,30 @@
 .form-group label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
+  transition: color 0.3s ease;
 }
 
 .wallet-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-input-border, rgba(255, 255, 255, 0.1));
   border-radius: 6px;
   font-size: 0.9rem;
   font-family: monospace;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: var(--login-input-bg, rgba(255, 255, 255, 0.04));
+  color: var(--login-text-primary, #e8e8e8);
   resize: vertical;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, background 0.3s ease, color 0.3s ease;
 }
 
 .wallet-input:focus {
   outline: none;
-  border-color: #ffffff;
+  border-color: var(--login-input-focus-border, rgba(255, 255, 255, 0.4));
 }
 
 .wallet-input:disabled {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -119,22 +123,22 @@
 }
 
 .cancel-btn {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.05));
+  color: var(--login-text-primary, #e8e8e8);
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.2));
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.1));
 }
 
 .submit-btn {
-  background: #ffffff;
-  color: #000000;
+  background: var(--login-submit-bg, #e8e8e8);
+  color: var(--login-submit-text, #0a0a0a);
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #cccccc;
+  background: var(--login-submit-hover-bg, #cccccc);
   transform: translateY(-1px);
 }
 
@@ -162,22 +166,23 @@
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--login-divider, rgba(255, 255, 255, 0.06));
 }
 
 .divider span {
   padding: 0 1rem;
-  color: #aaaaaa;
+  color: var(--login-text-secondary, #888888);
   font-size: 0.9rem;
+  transition: color 0.3s ease;
 }
 
 .create-btn {
   width: 100%;
   padding: 0.75rem 1.5rem;
-  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border: 2px dashed var(--login-btn-border, rgba(255, 255, 255, 0.2));
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  background: var(--login-input-bg, rgba(255, 255, 255, 0.05));
+  color: var(--login-text-primary, #e8e8e8);
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
@@ -185,9 +190,9 @@
 }
 
 .create-btn:hover:not(:disabled) {
-  border-color: #ffffff;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--login-btn-hover-border, rgba(255, 255, 255, 0.4));
+  color: var(--login-text-primary, #e8e8e8);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.1));
 }
 
 .create-btn:disabled {
@@ -198,16 +203,16 @@
 .create-warning {
   margin: 0;
   padding: 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: var(--login-warning-bg, rgba(255, 193, 7, 0.08));
+  border: 1px solid var(--login-warning-border, rgba(255, 193, 7, 0.25));
   border-radius: 6px;
-  color: #ffd54f;
+  color: var(--login-warning-text, #ffd54f);
   font-size: 0.85rem;
   line-height: 1.5;
   text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Password input wrapper for toggle visibility */
 .password-input-wrapper {
   position: relative;
   display: flex;
@@ -227,8 +232,8 @@
   height: 32px;
   border: none;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.1));
+  color: var(--login-text-primary, #e8e8e8);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -237,30 +242,30 @@
 }
 
 .toggle-visibility-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--login-btn-hover-bg, rgba(255, 255, 255, 0.2));
 }
 
 .toggle-visibility-btn:active {
   transform: scale(0.95);
 }
 
-/* Security notice text */
 .security-notice-text {
   margin: 0.5rem 0 0 0;
   padding: 0.5rem 0.75rem;
-  background: rgba(76, 175, 80, 0.1);
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: var(--login-notice-bg, rgba(76, 175, 80, 0.06));
+  border: 1px solid var(--login-notice-border, rgba(76, 175, 80, 0.2));
   border-radius: 4px;
-  color: #81c784;
+  color: var(--login-notice-text, #81c784);
   font-size: 0.85rem;
   line-height: 1.4;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Clear default section */
 .clear-default-section {
   margin-top: 1rem;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--login-divider, rgba(255, 255, 255, 0.06));
+  transition: border-color 0.3s ease;
 }
 
 .clear-default-btn {
@@ -268,7 +273,7 @@
   padding: 0.5rem 1rem;
   border: 1px solid rgba(244, 67, 54, 0.3);
   border-radius: 4px;
-  background: rgba(244, 67, 54, 0.1);
+  background: rgba(244, 67, 54, 0.08);
   color: #ef5350;
   font-size: 0.85rem;
   font-weight: 500;
@@ -277,7 +282,7 @@
 }
 
 .clear-default-btn:hover {
-  background: rgba(244, 67, 54, 0.2);
+  background: rgba(244, 67, 54, 0.15);
   border-color: rgba(244, 67, 54, 0.5);
 }
 
@@ -285,3 +290,145 @@
   transform: scale(0.98);
 }
 
+/* ==================== Wallet List ==================== */
+.wallet-list-section {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 1.5rem;
+}
+
+.wallet-list-toggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
+  color: var(--login-text-primary, #e8e8e8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wallet-list-toggle:hover {
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.06));
+}
+
+.wallet-list {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.wallet-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  background: var(--login-input-bg, rgba(255, 255, 255, 0.03));
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.wallet-list-item:hover {
+  border-color: var(--login-btn-hover-border, rgba(255, 255, 255, 0.15));
+  background: var(--login-btn-hover-bg, rgba(255, 255, 255, 0.05));
+}
+
+.wallet-item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.wallet-chain-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.wallet-chain-badge.ethereum {
+  background: rgba(98, 126, 234, 0.15);
+  color: #627eea;
+}
+
+.wallet-chain-badge.solana {
+  background: rgba(0, 255, 163, 0.1);
+  color: #00ffa3;
+}
+
+.wallet-item-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--login-text-primary, #e8e8e8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wallet-item-address {
+  font-size: 0.75rem;
+  color: var(--login-text-muted, #666666);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.wallet-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.wallet-item-login-btn {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--login-submit-bg, #e8e8e8);
+  color: var(--login-submit-text, #0a0a0a);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.wallet-item-login-btn:hover:not(:disabled) {
+  background: var(--login-submit-hover-bg, #cccccc);
+}
+
+.wallet-item-login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wallet-item-remove-btn {
+  padding: 0.35rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--login-text-muted, #666666);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wallet-item-remove-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
+  color: #ef5350;
+}

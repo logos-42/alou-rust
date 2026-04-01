@@ -17,25 +17,28 @@
   margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
+  transition: color 0.3s ease;
 }
 
 .bank-card-login .form-subtitle {
   margin: 0;
-  color: #aaaaaa;
+  color: var(--login-text-secondary, #888888);
   font-size: 0.9rem;
+  transition: color 0.3s ease;
 }
 
 .method-selector {
   display: flex;
   gap: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-switcher-border, rgba(255, 255, 255, 0.08));
   border-radius: 8px;
   padding: 0.25rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
   margin-bottom: 1.5rem;
   width: 100%;
   max-width: 420px;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .method-btn {
@@ -44,7 +47,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #aaaaaa;
+  color: var(--login-text-secondary, #888888);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -56,13 +59,13 @@
 }
 
 .method-btn:hover:not(.active) {
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
 }
 
 .method-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.08));
+  color: var(--login-text-primary, #e8e8e8);
+  box-shadow: var(--login-active-shadow, 0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .bank-card-form {
@@ -82,34 +85,35 @@
 .form-group label {
   font-size: 0.9rem;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--login-text-primary, #e8e8e8);
+  transition: color 0.3s ease;
 }
 
 .bank-card-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-input-border, rgba(255, 255, 255, 0.1));
   border-radius: 6px;
   font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-  transition: border-color 0.2s;
+  background: var(--login-input-bg, rgba(255, 255, 255, 0.04));
+  color: var(--login-text-primary, #e8e8e8);
+  transition: border-color 0.2s, background 0.3s ease, color 0.3s ease;
   box-sizing: border-box;
 }
 
 .bank-card-input:focus {
   outline: none;
-  border-color: #ffffff;
+  border-color: var(--login-input-focus-border, rgba(255, 255, 255, 0.4));
 }
 
 .bank-card-input:disabled {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
   cursor: not-allowed;
   opacity: 0.5;
 }
 
 .bank-card-input::placeholder {
-  color: #666666;
+  color: var(--login-text-muted, #666666);
 }
 
 .sms-input-wrapper {
@@ -124,10 +128,10 @@
 
 .sms-send-btn {
   padding: 0.75rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.2));
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.1));
+  color: var(--login-text-primary, #e8e8e8);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -137,8 +141,8 @@
 }
 
 .sms-send-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--login-btn-hover-bg, rgba(255, 255, 255, 0.2));
+  border-color: var(--login-btn-hover-border, rgba(255, 255, 255, 0.3));
 }
 
 .sms-send-btn:disabled {
@@ -165,22 +169,22 @@
 }
 
 .cancel-btn {
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.05));
+  color: var(--login-text-primary, #e8e8e8);
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.2));
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.1));
 }
 
 .submit-btn {
-  background: #ffffff;
-  color: #000000;
+  background: var(--login-submit-bg, #e8e8e8);
+  color: var(--login-submit-text, #0a0a0a);
 }
 
 .submit-btn:hover:not(:disabled) {
-  background: #cccccc;
+  background: var(--login-submit-hover-bg, #cccccc);
   transform: translateY(-1px);
 }
 
@@ -193,10 +197,10 @@
 .security-notice {
   margin-top: 1.5rem;
   padding: 0.75rem 1rem;
-  background: rgba(76, 175, 80, 0.1);
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: var(--login-notice-bg, rgba(76, 175, 80, 0.06));
+  border: 1px solid var(--login-notice-border, rgba(76, 175, 80, 0.2));
   border-radius: 6px;
-  color: #81c784;
+  color: var(--login-notice-text, #81c784);
   font-size: 0.85rem;
   line-height: 1.4;
   display: flex;
@@ -204,10 +208,177 @@
   gap: 0.5rem;
   width: 100%;
   max-width: 420px;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .security-notice svg {
   flex-shrink: 0;
+}
+
+/* ==================== Saved Cards ==================== */
+.saved-cards-section {
+  width: 100%;
+  max-width: 420px;
+  margin-bottom: 1.5rem;
+}
+
+.saved-cards-toggle {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  background: var(--login-switcher-bg, rgba(255, 255, 255, 0.03));
+  color: var(--login-text-primary, #e8e8e8);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.saved-cards-toggle:hover {
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.06));
+}
+
+.saved-cards-list {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.25rem;
+}
+
+.saved-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--login-btn-border, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  background: var(--login-input-bg, rgba(255, 255, 255, 0.03));
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.saved-card-item:hover {
+  border-color: var(--login-btn-hover-border, rgba(255, 255, 255, 0.15));
+  background: var(--login-btn-hover-bg, rgba(255, 255, 255, 0.05));
+}
+
+.saved-card-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.card-type-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.card-type-badge.bankCard {
+  background: rgba(98, 126, 234, 0.15);
+  color: #627eea;
+}
+
+.card-type-badge.digitalRmb {
+  background: rgba(220, 38, 38, 0.12);
+  color: #ef4444;
+}
+
+.saved-card-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--login-text-primary, #e8e8e8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-card-number {
+  font-size: 0.75rem;
+  color: var(--login-text-muted, #666666);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.saved-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.saved-card-login-btn {
+  padding: 0.35rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  background: var(--login-submit-bg, #e8e8e8);
+  color: var(--login-submit-text, #0a0a0a);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.saved-card-login-btn:hover:not(:disabled) {
+  background: var(--login-submit-hover-bg, #cccccc);
+}
+
+.saved-card-login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saved-card-remove-btn {
+  padding: 0.35rem;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--login-text-muted, #666666);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saved-card-remove-btn:hover {
+  background: rgba(244, 67, 54, 0.1);
+  color: #ef5350;
+}
+
+.add-new-card-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px dashed var(--login-btn-border, rgba(255, 255, 255, 0.15));
+  border-radius: 8px;
+  background: transparent;
+  color: var(--login-text-secondary, #888888);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.add-new-card-btn:hover {
+  border-color: var(--login-btn-hover-border, rgba(255, 255, 255, 0.3));
+  color: var(--login-text-primary, #e8e8e8);
+  background: var(--login-active-bg, rgba(255, 255, 255, 0.04));
 }
 
 @media (max-width: 600px) {

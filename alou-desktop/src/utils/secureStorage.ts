@@ -7,7 +7,9 @@ import { invoke } from '@tauri-apps/api/core'
 
 const DEFAULT_KEY_STORAGE_KEY = 'alou_default_wallet_key'
 const DEFAULT_KEY_ADDRESS_KEY = 'alou_default_wallet_address'
+const DEFAULT_MNEMONIC_KEY = 'alou_default_wallet_mnemonic'
 const ENCRYPTION_SALT_KEY = 'alou_encryption_salt'
+const WALLET_LIST_KEY = 'alou_wallet_list'
 
 /**
  * Check if running in Tauri desktop environment
@@ -288,4 +290,142 @@ export function maskPrivateKey(privateKey: string): string {
   const suffix = keyWithoutPrefix.slice(-4)
 
   return `0x${prefix}...${suffix}`
+}
+
+/**
+ * Save mnemonic phrase securely (encrypted)
+ */
+export async function saveMnemonic(mnemonic: string): Promise<void> {
+  try {
+    if (isTauri()) {
+      await invoke('save_secure_storage', {
+        key: DEFAULT_MNEMONIC_KEY,
+        value: mnemonic,
+      })
+    } else {
+      const encrypted = await browserEncrypt(mnemonic)
+      localStorage.setItem(DEFAULT_MNEMONIC_KEY, encrypted)
+    }
+  } catch (error) {
+    console.error('[SecureStorage] Failed to save mnemonic:', error)
+    throw error
+  }
+}
+
+/**
+ * Get stored mnemonic phrase
+ */
+export async function getMnemonic(): Promise<string | null> {
+  try {
+    if (isTauri()) {
+      const result = await invoke('get_secure_storage', {
+        key: DEFAULT_MNEMONIC_KEY,
+      })
+      return result as string | null
+    } else {
+      const stored = localStorage.getItem(DEFAULT_MNEMONIC_KEY)
+      if (!stored) return null
+
+      const decrypted = await browserDecrypt(stored)
+      if (decrypted) return decrypted
+
+      return stored
+    }
+  } catch (error) {
+    console.error('[SecureStorage] Failed to get mnemonic:', error)
+    return null
+  }
+}
+
+/**
+ * Clear stored mnemonic
+ */
+export async function clearMnemonic(): Promise<void> {
+  try {
+    if (isTauri()) {
+      await invoke('delete_secure_storage', {
+        key: DEFAULT_MNEMONIC_KEY,
+      })
+    } else {
+      localStorage.removeItem(DEFAULT_MNEMONIC_KEY)
+    }
+  } catch (error) {
+    console.error('[SecureStorage] Failed to clear mnemonic:', error)
+  }
+}
+
+export interface StoredWallet {
+  id: string
+  name: string
+  chain: 'ethereum' | 'solana'
+  address: string
+  createdAt: string
+}
+
+/**
+ * Save wallet list (metadata only, not keys)
+ */
+export async function saveWalletList(wallets: StoredWallet[]): Promise<void> {
+  try {
+    const data = JSON.stringify(wallets)
+    if (isTauri()) {
+      await invoke('save_secure_storage', {
+        key: WALLET_LIST_KEY,
+        value: data,
+      })
+    } else {
+      const encrypted = await browserEncrypt(data)
+      localStorage.setItem(WALLET_LIST_KEY, encrypted)
+    }
+  } catch (error) {
+    console.error('[SecureStorage] Failed to save wallet list:', error)
+  }
+}
+
+/**
+ * Get stored wallet list
+ */
+export async function getWalletList(): Promise<StoredWallet[]> {
+  try {
+    let data: string | null
+    if (isTauri()) {
+      const result = await invoke('get_secure_storage', {
+        key: WALLET_LIST_KEY,
+      })
+      data = result as string | null
+    } else {
+      const stored = localStorage.getItem(WALLET_LIST_KEY)
+      if (!stored) return []
+      const decrypted = await browserDecrypt(stored)
+      data = decrypted || stored
+    }
+
+    if (!data) return []
+    return JSON.parse(data)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Add wallet to the list
+ */
+export async function addWalletToList(wallet: StoredWallet): Promise<void> {
+  const list = await getWalletList()
+  const exists = list.find((w) => w.address === wallet.address)
+  if (exists) {
+    Object.assign(exists, wallet)
+  } else {
+    list.push(wallet)
+  }
+  await saveWalletList(list)
+}
+
+/**
+ * Remove wallet from the list
+ */
+export async function removeWalletFromList(address: string): Promise<void> {
+  const list = await getWalletList()
+  const filtered = list.filter((w) => w.address !== address)
+  await saveWalletList(filtered)
 }

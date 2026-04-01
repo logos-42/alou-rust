@@ -1,30 +1,134 @@
+/* ==================== Dark Mode (Default) ==================== */
+.login-container {
+  --login-bg: #0a0a0a;
+  --login-card-bg: #141414;
+  --login-card-border: rgba(255, 255, 255, 0.08);
+  --login-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  --login-text-primary: #e8e8e8;
+  --login-text-secondary: #888888;
+  --login-text-muted: #666666;
+  --login-btn-bg: #1e1e1e;
+  --login-btn-hover-bg: #282828;
+  --login-btn-border: rgba(255, 255, 255, 0.08);
+  --login-btn-hover-border: rgba(255, 255, 255, 0.2);
+  --login-input-bg: rgba(255, 255, 255, 0.04);
+  --login-input-border: rgba(255, 255, 255, 0.1);
+  --login-input-focus-border: rgba(255, 255, 255, 0.4);
+  --login-divider: rgba(255, 255, 255, 0.06);
+  --login-switcher-bg: rgba(255, 255, 255, 0.03);
+  --login-switcher-border: rgba(255, 255, 255, 0.08);
+  --login-active-bg: rgba(255, 255, 255, 0.08);
+  --login-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --login-error-bg: rgba(220, 38, 38, 0.12);
+  --login-error-border: rgba(220, 38, 38, 0.25);
+  --login-error-text: #ff6b6b;
+  --login-success-bg: rgba(82, 196, 26, 0.1);
+  --login-success-border: rgba(82, 196, 26, 0.25);
+  --login-success-text: #52c41a;
+  --login-warning-bg: rgba(255, 193, 7, 0.08);
+  --login-warning-border: rgba(255, 193, 7, 0.25);
+  --login-warning-text: #ffd54f;
+  --login-notice-bg: rgba(255, 255, 255, 0.04);
+  --login-notice-border: rgba(255, 255, 255, 0.08);
+  --login-notice-text: #81c784;
+  --login-close-btn-bg: #141414;
+  --login-close-btn-border: rgba(255, 255, 255, 0.3);
+  --login-submit-bg: #e8e8e8;
+  --login-submit-text: #0a0a0a;
+  --login-submit-hover-bg: #cccccc;
+  --login-link-color: #e8e8e8;
+  --login-link-hover-color: #cccccc;
+  --login-spinner-border: rgba(255, 255, 255, 0.08);
+  --login-spinner-top: #e8e8e8;
+  --login-arrow-color: #666666;
+  --login-icon-filter: brightness(0) invert(0.9);
+  --login-logo-filter: none;
+  --login-theme-btn-bg: rgba(255, 255, 255, 0.06);
+  --login-theme-btn-hover-bg: rgba(255, 255, 255, 0.12);
+  --login-theme-btn-color: #888888;
+}
+
+/* ==================== Light Mode ==================== */
+.login-container.light-mode {
+  --login-bg: #f5f5f5;
+  --login-card-bg: #ffffff;
+  --login-card-border: rgba(0, 0, 0, 0.08);
+  --login-card-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+  --login-text-primary: #1a1a1a;
+  --login-text-secondary: #666666;
+  --login-text-muted: #999999;
+  --login-btn-bg: #f8f8f8;
+  --login-btn-hover-bg: #f0f0f0;
+  --login-btn-border: rgba(0, 0, 0, 0.08);
+  --login-btn-hover-border: rgba(0, 0, 0, 0.15);
+  --login-input-bg: rgba(0, 0, 0, 0.02);
+  --login-input-border: rgba(0, 0, 0, 0.1);
+  --login-input-focus-border: rgba(0, 0, 0, 0.3);
+  --login-divider: rgba(0, 0, 0, 0.06);
+  --login-switcher-bg: rgba(0, 0, 0, 0.02);
+  --login-switcher-border: rgba(0, 0, 0, 0.08);
+  --login-active-bg: rgba(0, 0, 0, 0.06);
+  --login-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  --login-error-bg: rgba(220, 38, 38, 0.08);
+  --login-error-border: rgba(220, 38, 38, 0.2);
+  --login-error-text: #d32f2f;
+  --login-success-bg: rgba(46, 125, 50, 0.08);
+  --login-success-border: rgba(46, 125, 50, 0.2);
+  --login-success-text: #2e7d32;
+  --login-warning-bg: rgba(255, 152, 0, 0.08);
+  --login-warning-border: rgba(255, 152, 0, 0.2);
+  --login-warning-text: #e65100;
+  --login-notice-bg: rgba(46, 125, 50, 0.06);
+  --login-notice-border: rgba(46, 125, 50, 0.15);
+  --login-notice-text: #2e7d32;
+  --login-close-btn-bg: #ffffff;
+  --login-close-btn-border: rgba(0, 0, 0, 0.15);
+  --login-submit-bg: #1a1a1a;
+  --login-submit-text: #ffffff;
+  --login-submit-hover-bg: #333333;
+  --login-link-color: #1a1a1a;
+  --login-link-hover-color: #555555;
+  --login-spinner-border: rgba(0, 0, 0, 0.08);
+  --login-spinner-top: #1a1a1a;
+  --login-arrow-color: #999999;
+  --login-icon-filter: none;
+  --login-logo-filter: none;
+  --login-theme-btn-bg: rgba(0, 0, 0, 0.04);
+  --login-theme-btn-hover-bg: rgba(0, 0, 0, 0.08);
+  --login-theme-btn-color: #666666;
+}
+
+/* ==================== Base Layout ==================== */
 .login-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000; /* 纯黑色背景 */
+  background: var(--login-bg);
   padding: 20px;
+  transition: background 0.3s ease;
 }
 
 .login-box {
-  background: #111111; /* 深黑色 */
+  background: var(--login-card-bg);
   border-radius: 24px;
   padding: 48px 40px;
-  box-shadow: 0 20px 60px rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--login-card-shadow);
+  border: 1px solid var(--login-card-border);
   max-width: 1000px;
   width: 100%;
   position: relative;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* ==================== Close Button ==================== */
 .close-btn {
   position: absolute;
   top: 20px;
   right: 20px;
-  background: #111111;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  color: #e0e0e0;
+  background: var(--login-close-btn-bg);
+  border: 2px solid var(--login-close-btn-border);
+  color: var(--login-text-primary);
   cursor: pointer;
   padding: 12px;
   border-radius: 50%;
@@ -34,8 +138,8 @@
   justify-content: center;
   width: 52px;
   height: 52px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 
-              inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   z-index: 10;
 }
 
@@ -43,8 +147,8 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
-  filter: brightness(0) invert(1);
-  opacity: 0.8;
+  filter: var(--login-icon-filter);
+  opacity: 0.7;
 }
 
 .close-btn:hover img {
@@ -52,14 +156,43 @@
 }
 
 .close-btn:hover {
-  background: #1a1a1a;
-  border-color: rgba(255, 255, 255, 0.6);
-  color: #ffffff;
+  background: var(--login-btn-hover-bg);
+  border-color: var(--login-btn-hover-border);
   transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
+/* ==================== Theme Toggle Button ==================== */
+.theme-toggle-btn {
+  position: absolute;
+  top: 20px;
+  right: 84px;
+  background: var(--login-theme-btn-bg);
+  border: 1px solid var(--login-btn-border);
+  color: var(--login-theme-btn-color);
+  cursor: pointer;
+  padding: 12px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  z-index: 10;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--login-theme-btn-hover-bg);
+  color: var(--login-text-primary);
+  transform: scale(1.1);
+}
+
+.theme-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ==================== Logo & Title ==================== */
 .logo {
   text-align: center;
   margin-bottom: 24px;
@@ -71,37 +204,36 @@
   display: inline-block;
   animation: float 3s ease-in-out infinite;
   object-fit: contain;
+  filter: var(--login-logo-filter);
 }
 
 @keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
 .title {
   font-size: 28px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--login-text-primary);
   margin-bottom: 8px;
   text-align: center;
+  transition: color 0.3s ease;
 }
 
 .subtitle {
   font-size: 16px;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   margin-bottom: 32px;
   text-align: center;
+  transition: color 0.3s ease;
 }
 
+/* ==================== Error Message ==================== */
 .error-message {
-  background-color: rgba(220, 38, 38, 0.15);
-  border: 1px solid rgba(220, 38, 38, 0.3);
-  color: #ff6b6b;
+  background-color: var(--login-error-bg);
+  border: 1px solid var(--login-error-border);
+  color: var(--login-error-text);
   padding: 14px 16px;
   border-radius: 12px;
   margin-bottom: 24px;
@@ -110,19 +242,13 @@
   align-items: center;
   gap: 8px;
   animation: shake 0.5s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 @keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  25% {
-    transform: translateX(-10px);
-  }
-  75% {
-    transform: translateX(10px);
-  }
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
 }
 
 .error-icon {
@@ -130,6 +256,7 @@
   flex-shrink: 0;
 }
 
+/* ==================== Wallet Options ==================== */
 .wallet-options {
   display: flex;
   flex-direction: column;
@@ -138,8 +265,8 @@
 }
 
 .wallet-btn {
-  background: #1a1a1a;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: var(--login-btn-bg);
+  border: 2px solid var(--login-btn-border);
   border-radius: 16px;
   padding: 20px 24px;
   display: flex;
@@ -151,10 +278,10 @@
 }
 
 .wallet-btn:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: #222222;
+  border-color: var(--login-btn-hover-border);
+  background: var(--login-btn-hover-bg);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
 .wallet-btn:disabled {
@@ -163,8 +290,8 @@
 }
 
 .wallet-btn.loading {
-  border-color: rgba(255, 255, 255, 0.3);
-  background: #222222;
+  border-color: var(--login-btn-hover-border);
+  background: var(--login-btn-hover-bg);
 }
 
 .wallet-icon {
@@ -185,7 +312,7 @@
 }
 
 .wallet-icon-walletconnect {
-  background: #1a1a1a;
+  background: var(--login-btn-bg);
 }
 
 .wallet-info {
@@ -196,13 +323,15 @@
 .wallet-name {
   font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--login-text-primary);
   margin-bottom: 4px;
+  transition: color 0.3s ease;
 }
 
 .wallet-desc {
   font-size: 13px;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
+  transition: color 0.3s ease;
 }
 
 .wallet-arrow {
@@ -212,32 +341,33 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #888888;
+  color: var(--login-arrow-color);
+  transition: color 0.3s ease;
 }
 
 .spinner {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #ffffff;
+  border: 2px solid var(--login-spinner-border);
+  border-top-color: var(--login-spinner-top);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
+/* ==================== Security Notice ==================== */
 .security-notice {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--login-notice-bg);
+  border: 1px solid var(--login-notice-border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .notice-icon {
@@ -252,15 +382,16 @@
 .notice-content h3 {
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--login-text-primary);
   margin: 0 0 8px 0;
+  transition: color 0.3s ease;
 }
 
 .notice-content ul {
   margin: 0;
   padding-left: 20px;
   font-size: 13px;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   line-height: 1.6;
 }
 
@@ -268,22 +399,24 @@
   margin-bottom: 4px;
 }
 
+/* ==================== Help Section ==================== */
 .help-section {
   text-align: center;
   margin-bottom: 24px;
   padding: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg);
   border-radius: 12px;
+  transition: background 0.3s ease;
 }
 
 .help-text {
   font-size: 14px;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   margin: 0 0 8px 0;
 }
 
 .help-link {
-  color: #ffffff;
+  color: var(--login-link-color);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -291,20 +424,22 @@
 }
 
 .help-link:hover {
-  color: #cccccc;
+  color: var(--login-link-hover-color);
   text-decoration: underline;
 }
 
+/* ==================== Terms ==================== */
 .terms {
   font-size: 12px;
-  color: #888888;
+  color: var(--login-text-muted);
   line-height: 1.5;
   text-align: center;
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .terms a {
-  color: #ffffff;
+  color: var(--login-link-color);
   text-decoration: none;
 }
 
@@ -312,15 +447,17 @@
   text-decoration: underline;
 }
 
+/* ==================== Desktop Notice ==================== */
 .desktop-notice {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--login-notice-bg);
+  border: 1px solid var(--login-notice-border);
   border-radius: 8px;
   font-size: 0.85rem;
-  color: #ffffff;
+  color: var(--login-text-primary);
   text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .desktop-notice p {
@@ -328,27 +465,29 @@
   line-height: 1.5;
 }
 
+/* ==================== Browser Notice ==================== */
 .browser-notice {
   margin-top: 1rem;
   padding: 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: var(--login-warning-bg);
+  border: 1px solid var(--login-warning-border);
   border-radius: 8px;
   text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .browser-notice p {
   margin: 0 0 0.75rem 0;
   font-size: 0.9rem;
-  color: #ffd54f;
+  color: var(--login-warning-text);
   line-height: 1.5;
 }
 
 .install-link {
   display: inline-block;
   padding: 0.5rem 1rem;
-  background: #ffffff;
-  color: #000000;
+  background: var(--login-submit-bg);
+  color: var(--login-submit-text);
   text-decoration: none;
   border-radius: 6px;
   font-size: 0.9rem;
@@ -357,34 +496,38 @@
 }
 
 .install-link:hover {
-  background: #cccccc;
+  background: var(--login-submit-hover-bg);
   transform: translateY(-1px);
 }
 
+/* ==================== Browser Success ==================== */
 .browser-success {
   margin-top: 1rem;
   padding: 0.75rem 1rem;
-  background: rgba(82, 196, 26, 0.1);
-  border: 1px solid rgba(82, 196, 26, 0.3);
+  background: var(--login-success-bg);
+  border: 1px solid var(--login-success-border);
   border-radius: 8px;
   text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .browser-success p {
   margin: 0;
   font-size: 0.9rem;
-  color: #52c41a;
+  color: var(--login-success-text);
   line-height: 1.5;
 }
 
+/* ==================== Login Category Switcher ==================== */
 .login-category-switcher {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-switcher-border);
   border-radius: 10px;
   padding: 0.3rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .category-btn {
@@ -393,7 +536,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -405,27 +548,29 @@
 }
 
 .category-btn:hover:not(.active) {
-  color: #ffffff;
+  color: var(--login-text-primary);
 }
 
 .category-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.08);
+  background: var(--login-active-bg);
+  color: var(--login-text-primary);
+  box-shadow: var(--login-active-shadow);
 }
 
 .category-btn svg {
   flex-shrink: 0;
 }
 
+/* ==================== Desktop Mode Switcher ==================== */
 .desktop-mode-switcher {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--login-switcher-border);
   border-radius: 8px;
   padding: 0.25rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--login-switcher-bg);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .mode-btn {
@@ -434,7 +579,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
@@ -442,21 +587,23 @@
 }
 
 .mode-btn:hover {
-  color: #ffffff;
+  color: var(--login-text-primary);
 }
 
 .mode-btn.active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  box-shadow: 0 2px 4px rgba(255, 255, 255, 0.05);
+  background: var(--login-active-bg);
+  color: var(--login-text-primary);
+  box-shadow: var(--login-active-shadow);
 }
 
+/* ==================== Browser Option ==================== */
 .desktop-browser-option {
   margin-top: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--login-notice-bg);
+  border: 1px solid var(--login-notice-border);
   border-radius: 8px;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .browser-option-content {
@@ -479,14 +626,14 @@
   margin: 0 0 0.25rem 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--login-text-primary);
   line-height: 1.4;
 }
 
 .browser-option-desc {
   margin: 0;
   font-size: 0.85rem;
-  color: #aaaaaa;
+  color: var(--login-text-secondary);
   line-height: 1.5;
 }
 
@@ -497,8 +644,8 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #ffffff;
-  color: #000000;
+  background: var(--login-submit-bg);
+  color: var(--login-submit-text);
   border: none;
   border-radius: 6px;
   font-size: 0.95rem;
@@ -508,9 +655,9 @@
 }
 
 .browser-option-btn:hover {
-  background: #cccccc;
+  background: var(--login-submit-hover-bg);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .browser-option-btn:active {
@@ -521,6 +668,7 @@
   flex-shrink: 0;
 }
 
+/* ==================== Responsive ==================== */
 @media (max-width: 600px) {
   .login-box {
     padding: 32px 24px;
@@ -532,5 +680,26 @@
 
   .subtitle {
     font-size: 14px;
+  }
+
+  .theme-toggle-btn {
+    top: 16px;
+    right: 76px;
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+  }
+
+  .close-btn {
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+  }
+
+  .close-btn img {
+    width: 20px;
+    height: 20px;
   }
 }

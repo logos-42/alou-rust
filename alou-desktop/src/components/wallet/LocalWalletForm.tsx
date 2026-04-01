@@ -1,44 +1,81 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { desktopWalletService } from '@/services/desktopWalletService'
-import { 
-  getDefaultPrivateKey, 
-  hasDefaultPrivateKey, 
+import {
+  getDefaultPrivateKey,
+  hasDefaultPrivateKey,
   maskPrivateKey,
   saveDefaultPrivateKey,
-  saveDefaultWalletAddress 
+  saveDefaultWalletAddress,
+  getMnemonic,
+  getWalletList,
+  removeWalletFromList,
 } from '@/utils/secureStorage'
 import './LocalWalletForm.css'
 
 const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
-  const [inputType, setInputType] = useState('privateKey') // 'privateKey' or 'mnemonic'
+  const [inputType, setInputType] = useState('privateKey')
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [hasDefaultKey, setHasDefaultKey] = useState(false)
   const [showPrivateKey, setShowPrivateKey] = useState(false)
   const [maskedKey, setMaskedKey] = useState('')
+  const [storedMnemonic, setStoredMnemonic] = useState(null)
+  const [walletList, setWalletList] = useState([])
+  const [showWalletList, setShowWalletList] = useState(false)
 
-  // Load default private key on mount
   useEffect(() => {
-    const loadDefaultKey = async () => {
+    const loadData = async () => {
       try {
         const hasDefault = await hasDefaultPrivateKey()
         setHasDefaultKey(hasDefault)
-        
+
         if (hasDefault) {
           const defaultKey = await getDefaultPrivateKey()
           if (defaultKey) {
             setMaskedKey(maskPrivateKey(defaultKey))
-            // Auto-fill for quick login (key is masked in UI)
             setInputValue(defaultKey)
           }
         }
+
+        const mnemonic = await getMnemonic()
+        if (mnemonic) setStoredMnemonic(mnemonic)
+
+        const wallets = await getWalletList()
+        if (wallets.length > 0) setWalletList(wallets)
       } catch (error) {
-        console.error('[LocalWalletForm] Failed to load default key:', error)
+        console.error('[LocalWalletForm] Failed to load data:', error)
       }
     }
-    
-    loadDefaultKey()
+
+    loadData()
   }, [])
+
+  const handleWalletClick = useCallback(async (wallet) => {
+    try {
+      setIsLoading(true)
+
+      if (wallet.chain === 'ethereum') {
+        const result = await desktopWalletService.connectLocalWallet(
+          inputValue.trim(),
+          false
+        )
+        const chainId = await desktopWalletService.getCurrentChainId()
+        await desktopWalletService.saveWalletConnection(result.address, 'local')
+        onConnected({ address: result.address, chainId, walletType: 'local' })
+      } else if (wallet.chain === 'solana') {
+        // Solana login - just pass address
+        onConnected({
+          address: wallet.address,
+          chainId: 'solana',
+          walletType: 'local',
+        })
+      }
+    } catch (error) {
+      onError(error.message || '连接钱包失败')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [inputValue, onConnected, onError])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -51,33 +88,24 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
     try {
       setIsLoading(true)
 
-      // 连接本地钱包
       const result = await desktopWalletService.connectLocalWallet(
         inputValue.trim(),
         inputType === 'mnemonic'
       )
 
       const address = result.address
-
-      // 生成验证消息并签名
       const message = desktopWalletService.generateVerificationMessage(address)
       const signature = await desktopWalletService.signMessage(message)
-
-      // 验证签名
       const isValid = await desktopWalletService.verifySignature(address, message, signature)
 
       if (!isValid) {
         throw new Error('签名验证失败')
       }
 
-      // 保存连接信息
       const chainId = await desktopWalletService.getCurrentChainId()
       await desktopWalletService.saveWalletConnection(address, 'local')
 
-      // 如果是私钥且用户选择保存，保存为默认私钥
       if (inputType === 'privateKey' && !hasDefaultKey) {
-        // 首次登录，询问是否保存
-        // 为了用户体验，自动保存（可以在设置中清除）
         await saveDefaultPrivateKey(inputValue.trim())
         await saveDefaultWalletAddress(address)
         setHasDefaultKey(true)
@@ -97,22 +125,16 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
     try {
       setIsLoading(true)
 
-      // 使用 Agent 创建钱包（Web3 工具）
-      const walletData = await desktopWalletService.agentCreateWallet()
+      const result = await desktopWalletService.agentCreateMultiChainWallet()
 
-      if (!walletData.success || !walletData.address) {
-        throw new Error(walletData.error || '创建钱包失败')
+      if (!result.success) {
+        throw new Error(result.error || '创建钱包失败')
       }
 
-      // 生成验证消息并签名
-      const message = desktopWalletService.generateVerificationMessage(walletData.address)
-      
-      // 使用本地钱包签名（因为刚创建的钱包已经在 desktopWalletService 中）
+      const message = desktopWalletService.generateVerificationMessage(result.ethereum.address)
       const signature = await desktopWalletService.signMessage(message)
-
-      // 验证签名
       const isValid = await desktopWalletService.verifySignature(
-        walletData.address,
+        result.ethereum.address,
         message,
         signature
       )
@@ -121,24 +143,33 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
         throw new Error('签名验证失败')
       }
 
-      // 保存连接信息
       const chainId = await desktopWalletService.getCurrentChainId()
-      await desktopWalletService.saveWalletConnection(walletData.address, 'local')
+      await desktopWalletService.saveWalletConnection(result.ethereum.address, 'local')
 
-      // 将钱包数据传递给父组件（用于显示助记词和私钥）
       onCreateNew({
-        address: walletData.address,
+        address: result.ethereum.address,
         chainId: chainId || '0x1',
         walletType: 'local',
-        mnemonic: walletData.mnemonic,
-        privateKey: walletData.privateKey,
+        mnemonic: result.mnemonic,
+        privateKey: result.ethereum.privateKey,
+        solanaAddress: result.solana.address,
       })
+
+      setStoredMnemonic(result.mnemonic)
+      const wallets = await getWalletList()
+      setWalletList(wallets)
     } catch (error) {
       console.error('Create wallet error:', error)
       onError(error.message || '创建钱包失败')
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleRemoveWallet = async (address) => {
+    await removeWalletFromList(address)
+    const wallets = await getWalletList()
+    setWalletList(wallets)
   }
 
   return (
@@ -148,9 +179,73 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
         <p className="form-subtitle">
           {hasDefaultKey
             ? `已保存默认钱包：${maskedKey}`
+            : storedMnemonic
+            ? '已保存助记词，可创建新链钱包或导入现有钱包'
             : '输入您的私钥或助记词以连接钱包，或创建新的 Agent 钱包'}
         </p>
       </div>
+
+      {walletList.length > 0 && (
+        <div className="wallet-list-section">
+          <button
+            type="button"
+            className="wallet-list-toggle"
+            onClick={() => setShowWalletList(!showWalletList)}
+          >
+            <span>已保存的钱包 ({walletList.length})</span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ transform: showWalletList ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {showWalletList && (
+            <div className="wallet-list">
+              {walletList.map((wallet) => (
+                <div key={wallet.id} className="wallet-list-item">
+                  <div className="wallet-item-info">
+                    <span className={`wallet-chain-badge ${wallet.chain}`}>
+                      {wallet.chain === 'ethereum' ? 'ETH' : 'SOL'}
+                    </span>
+                    <span className="wallet-item-name">{wallet.name}</span>
+                    <span className="wallet-item-address">
+                      {wallet.address.slice(0, 8)}...{wallet.address.slice(-6)}
+                    </span>
+                  </div>
+                  <div className="wallet-item-actions">
+                    <button
+                      type="button"
+                      className="wallet-item-login-btn"
+                      onClick={() => handleWalletClick(wallet)}
+                      disabled={isLoading}
+                    >
+                      登录
+                    </button>
+                    <button
+                      type="button"
+                      className="wallet-item-remove-btn"
+                      onClick={() => handleRemoveWallet(wallet.address)}
+                      title="移除"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="wallet-form">
         <div className="input-type-selector">
@@ -188,8 +283,8 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
               className="wallet-input"
               disabled={isLoading}
               type={inputType === 'privateKey' && !showPrivateKey ? 'password' : 'text'}
-              style={inputType === 'privateKey' ? { 
-                fontFamily: 'monospace', 
+              style={inputType === 'privateKey' ? {
+                fontFamily: 'monospace',
                 letterSpacing: '0.5px',
                 WebkitTextSecurity: showPrivateKey ? 'none' : 'disc'
               } : {}}
@@ -220,6 +315,11 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
               🔒 私钥已安全保存，下次登录将自动填充
             </p>
           )}
+          {storedMnemonic && inputType === 'mnemonic' && (
+            <p className="security-notice-text">
+              🔒 助记词已加密保存
+            </p>
+          )}
         </div>
 
         <div className="form-actions">
@@ -237,16 +337,18 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
           <button
             type="button"
             onClick={async () => {
-              const { clearDefaultPrivateKey } = await import('@/utils/secureStorage')
+              const { clearDefaultPrivateKey, clearMnemonic } = await import('@/utils/secureStorage')
               await clearDefaultPrivateKey()
+              await clearMnemonic()
               setHasDefaultKey(false)
               setMaskedKey('')
+              setStoredMnemonic(null)
               setInputValue('')
               onError('')
             }}
             className="clear-default-btn"
           >
-            清除保存的私钥
+            清除保存的私钥和助记词
           </button>
         </div>
       )}
@@ -261,10 +363,10 @@ const LocalWalletForm = ({ onConnected, onError, onCancel, onCreateNew }) => {
           className="create-btn"
           disabled={isLoading}
         >
-          🤖 Agent 创建钱包
+          🤖 Agent 创建 ETH + SOL 钱包
         </button>
         <p className="create-warning">
-          ⚠️ Agent 将使用 Web3 工具自动创建钱包，请保存好您的助记词和私钥，丢失后将无法恢复！
+          ⚠️ Agent 将自动创建 Ethereum 和 Solana 钱包，请保存好您的助记词和私钥，丢失后将无法恢复！
         </p>
       </div>
     </div>
