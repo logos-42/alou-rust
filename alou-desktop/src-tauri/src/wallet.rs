@@ -74,7 +74,7 @@ fn verify_ethereum_signature(
     let message_hash = ethereum_message_hash(message);
 
     // Recover public key
-    let public_key = VerifyingKey::recover_from_prehash(
+    let public_key = K256VerifyingKey::recover_from_prehash(
         &message_hash,
         &signature,
         k256::ecdsa::RecoveryId::try_from(recovery_id)
@@ -97,7 +97,7 @@ fn ethereum_message_hash(message: &str) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn public_key_to_address(public_key: &VerifyingKey) -> String {
+fn public_key_to_address(public_key: &K256VerifyingKey) -> String {
     let public_key_bytes = public_key.to_sec1_bytes();
     let public_key_slice = &public_key_bytes[1..]; // Skip 0x04 prefix
 
@@ -310,7 +310,7 @@ pub async fn has_secure_storage(
 #[tauri::command]
 pub async fn generate_solana_keypair_from_mnemonic(mnemonic: String) -> Result<serde_json::Value, String> {
     // Parse mnemonic
-    let phrase = Mnemonic::from_phrase(&mnemonic, bip39::Language::English)
+    let phrase = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &mnemonic)
         .map_err(|e| format!("Invalid mnemonic: {}", e))?;
 
     // Generate BIP39 seed (no passphrase)
@@ -328,8 +328,8 @@ pub async fn generate_solana_keypair_from_mnemonic(mnemonic: String) -> Result<s
     let secret_bytes: [u8; 32] = hash[..32].try_into()
         .map_err(|_| "Failed to derive secret key".to_string())?;
 
-    let signing_key = SigningKey::from_bytes(&secret_bytes);
-    let verifying_key = VerifyingKey::from(&signing_key);
+    let signing_key = Ed25519SigningKey::from_bytes(&secret_bytes);
+    let verifying_key = Ed25519VerifyingKey::from(&signing_key);
 
     // Solana address = base58(public_key)
     let address = bs58::encode(verifying_key.to_bytes()).into_string();

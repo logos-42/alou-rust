@@ -87,7 +87,7 @@ impl AgentWalletTool {
 
     fn generate_ethereum_wallet(mnemonic: Option<String>) -> Result<(String, String, String), ToolError> {
         if let Some(m) = mnemonic {
-            let phrase = Mnemonic::from_str(&m)
+            let phrase = Mnemonic::parse_in_normalized(bip39::Language::English, &m)
                 .map_err(|e| ToolError::InternalError(format!("无效助记词: {}", e)))?;
             let seed = phrase.to_seed("");
             let secret_key = SecretKey::from_slice(&seed[0..32])
@@ -111,7 +111,7 @@ impl AgentWalletTool {
             hasher.update(pub_bytes.as_bytes());
             let hash = hasher.finalize();
             let addr = format!("0x{}", hex::encode(&hash[12..]));
-            let mnemonic_phrase = Mnemonic::generate(12)
+            let mnemonic_phrase = Mnemonic::from_entropy(&bytes)
                 .map_err(|e| ToolError::InternalError(format!("助记词生成失败: {}", e)))?;
             Ok((mnemonic_phrase.to_string(), format!("0x{}", hex::encode(secret_key.to_bytes())), addr))
         }
@@ -119,7 +119,7 @@ impl AgentWalletTool {
 
     fn generate_solana_wallet(mnemonic: Option<String>) -> Result<(String, String, String), ToolError> {
         if let Some(m) = mnemonic {
-            let phrase = Mnemonic::from_str(&m)
+            let phrase = Mnemonic::parse_in_normalized(bip39::Language::English, &m)
                 .map_err(|e| ToolError::InternalError(format!("无效助记词: {}", e)))?;
             let seed = phrase.to_seed("");
             let mut hasher = Sha512::new();
@@ -141,7 +141,7 @@ impl AgentWalletTool {
             let verifying_key = VerifyingKey::from(&signing_key);
             let addr = bs58::encode(verifying_key.to_bytes()).into_string();
             let pk = hex::encode(signing_key.to_bytes());
-            let mnemonic_phrase = Mnemonic::generate(12)
+            let mnemonic_phrase = Mnemonic::from_entropy(&secret_bytes)
                 .map_err(|e| ToolError::InternalError(format!("助记词生成失败: {}", e)))?;
             Ok((mnemonic_phrase.to_string(), pk, addr))
         }
