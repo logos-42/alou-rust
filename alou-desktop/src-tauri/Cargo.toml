@@ -57,6 +57,11 @@ rquickjs = { version = "0.10", features = ["full", "parallel"] }
 diap-rs-sdk = { version = "0.2", default-features = false, features = ["embedded-noir"] }
 anyhow = "1"
 
+# Hyperagent (Kappa Loop - 自修复循环)
+hyperagent = { path = "../hyperagent" }
+rig-core = "0.33"
+dotenvy = "0.15"
+
 # Utils
 hex = "0.4"
 sha2 = "0.10"

@@ -61,3 +61,13 @@ rand = "0.10.0"
 # TUI界面
 ratatui = "0.26"
 crossterm = "0.27"
+
+# Hyperagent - Kaizen 自进化循环
+hyperagent = { path = "../alou-desktop/hyperagent" }
+
+# 环境变量
+dotenvy = "0.15"
+
+# 结构化日志
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

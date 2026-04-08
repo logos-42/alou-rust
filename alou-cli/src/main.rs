@@ -11,6 +11,7 @@ mod api;
 mod commands;
 pub mod swarm;
 mod tui;
+mod kaizen;
 
 use std::env;
 
@@ -54,7 +55,15 @@ fn cmd_help() {
     println!("{}自动迭代:{}", CYAN, RESET);
     println!("  auto <任务描述>               自动分析并执行任务");
     println!();
-    
+
+    println!("{}Kaizen 自进化循环:{}", CYAN, RESET);
+    println!("  kaizen evolution [选项]        启动进化引擎");
+    println!("  kaizen research [选项]         启动自动研究 (Karpathy 模式)");
+    println!("  kaizen status                  查看循环状态");
+    println!("  kaizen stop                    停止循环");
+    println!("  kaizen log [行数]              查看实验日志");
+    println!();
+
     println!("{}配置管理:{}", CYAN, RESET);
     println!("  config show                   显示配置");
     println!("  config set <key> <value>     设置配置");
@@ -76,19 +85,29 @@ fn cmd_help() {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     if args.len() < 2 || args[1] != "help" {
         println!();
         println!("{}╔═══════════════════════════════════════╗", CYAN);
         println!("{}║     🤖 Alou CLI - Alou Agent          ║", CYAN);
         println!("{}╚═══════════════════════════════════════╝", CYAN);
     }
-    
+
     if args.len() < 2 {
         cmd_help();
         return;
     }
+
+    // 创建 Tokio 运行时
+    let rt = tokio::runtime::Runtime::new().unwrap();
     
+    // 在运行时中执行异步命令
+    rt.block_on(async {
+        run_main_command(&args).await;
+    });
+}
+
+async fn run_main_command(args: &[String]) {
     match args[1].as_str() {
         // 自主循环
         "start" => cmd_start(),
@@ -176,7 +195,14 @@ fn main() {
                 log_error(&format!("TUI启动失败: {}", e));
             }
         }
-        
+
+        // Kaizen 自进化循环
+        "kaizen" => {
+            if let Err(e) = run_kaizen_command(&args[2..]).await {
+                log_error(&format!("Kaizen 命令执行失败: {}", e));
+            }
+        }
+
         // 帮助
         "help" | "-h" | "--help" => cmd_help(),
 
@@ -280,4 +306,240 @@ fn cmd_config_set(key: &str, value: &str) {
     if let Err(e) = api::save_config(&config) {
         log_error(&format!("保存配置失败: {}", e));
     }
+}
+
+// ============= Kaizen 命令 =============
+
+use kaizen::config::{KaizenConfig, KaizenMode};
+
+async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
+    if args.is_empty() {
+        println!();
+        println!("{}Kaizen 自进化循环命令{}", CYAN, BRIGHT);
+        println!();
+        println!("{}使用: alou kaizen [命令] [选项]{}", YELLOW, RESET);
+        println!();
+        println!("{}命令:{}", CYAN, RESET);
+        println!("  evolution [选项]    启动进化引擎");
+        println!("  research [选项]     启动自动研究 (Karpathy 模式)");
+        println!("  status              查看循环状态");
+        println!("  stop                停止循环");
+        println!("  log [行数]          查看实验日志");
+        println!();
+        println!("{}进化引擎选项:{}", CYAN, RESET);
+        println!("  --iterations <N>    迭代次数 (默认: 5)");
+        println!("  --task <描述>       任务描述");
+        println!();
+        println!("{}自动研究选项:{}", CYAN, RESET);
+        println!("  --iterations <N>    迭代次数 (默认: 5)");
+        println!("  --auto-push         自动推送到 GitHub");
+        println!("  --strict            严格模式");
+        println!("  --dry-run           安全模式 (不实际修改)");
+        println!("  --target <文件>     目标文件 (可多次指定)");
+        println!();
+        println!("{}示例:{}", GREEN, RESET);
+        println!("  alou kaizen evolution --iterations 10 --task \"优化性能\"");
+        println!("  alou kaizen research --auto-push --iterations 5");
+        println!("  alou kaizen status");
+        println!("  alou kaizen log --last 20");
+        return Ok(());
+    }
+
+    match args[0].as_str() {
+        "evolution" => {
+            // 解析参数
+            let mut config = KaizenConfig::load_from_env();
+            config.mode = KaizenMode::Evolution;
+            
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--iterations" | "-n" => {
+                        if i + 1 < args.len() {
+                            config.max_iterations = args[i + 1].parse()
+                                .unwrap_or(config.max_iterations);
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--task" | "-t" => {
+                        if i + 1 < args.len() {
+                            config.task_description = Some(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
+            }
+
+            // 加载持久化配置
+            if let Ok(path) = KaizenConfig::config_path() {
+                if path.exists() {
+                    if let Ok(file_config) = KaizenConfig::load(&path) {
+                        // 合并配置（命令行参数优先）
+                        if config.task_description.is_none() {
+                            config.task_description = file_config.task_description;
+                        }
+                    }
+                }
+            }
+
+            // 检查 API Key
+            if config.llm_api_key.is_empty() {
+                log_error("请先设置 LLM API Key");
+                println!("方法 1: 设置环境变量 LLM_API_KEY=your_key");
+                println!("方法 2: 创建 .env 文件包含 LLM_API_KEY=your_key");
+                return Ok(());
+            }
+
+            println!();
+            log_section("启动 Kaizen 进化引擎");
+            println!("模式: 进化引擎");
+            println!("迭代次数: {}", config.max_iterations);
+            println!("任务: {}", config.task_description.as_deref().unwrap_or("默认任务"));
+            println!("安全模式: {}", if config.dry_run { "是" } else { "否" });
+            println!();
+
+            // 初始化 tracing
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::INFO)
+                .init();
+
+            // 加载环境变量
+            dotenvy::dotenv().ok();
+
+            // 运行进化引擎
+            kaizen::evolution_mode::run_evolution(&config).await?;
+        }
+
+        "research" => {
+            // 解析参数
+            let mut config = KaizenConfig::load_from_env();
+            config.mode = KaizenMode::Research;
+            
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--iterations" | "-n" => {
+                        if i + 1 < args.len() {
+                            config.max_iterations = args[i + 1].parse()
+                                .unwrap_or(config.max_iterations);
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--auto-push" => {
+                        config.auto_push = true;
+                        i += 1;
+                    }
+                    "--strict" => {
+                        config.strict = true;
+                        i += 1;
+                    }
+                    "--dry-run" => {
+                        config.dry_run = true;
+                        i += 1;
+                    }
+                    "--no-dry-run" => {
+                        config.dry_run = false;
+                        i += 1;
+                    }
+                    "--target" => {
+                        if i + 1 < args.len() {
+                            config.target_files.push(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
+            }
+
+            // 检查 API Key
+            if config.llm_api_key.is_empty() {
+                log_error("请先设置 LLM API Key");
+                println!("方法 1: 设置环境变量 LLM_API_KEY=your_key");
+                println!("方法 2: 创建 .env 文件包含 LLM_API_KEY=your_key");
+                return Ok(());
+            }
+
+            println!();
+            log_section("启动 Kaizen 自动研究");
+            println!("模式: 自动研究 (Karpathy 风格)");
+            println!("迭代次数: {}", config.max_iterations);
+            println!("自动推送: {}", if config.auto_push { "是" } else { "否" });
+            println!("严格模式: {}", if config.strict { "是" } else { "否" });
+            println!("安全模式: {}", if config.dry_run { "是" } else { "否" });
+            if !config.target_files.is_empty() {
+                println!("目标文件: {:?}", config.target_files);
+            }
+            println!();
+
+            // 初始化 tracing
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::INFO)
+                .init();
+
+            // 加载环境变量
+            dotenvy::dotenv().ok();
+
+            // 运行自动研究
+            kaizen::research_mode::run_research(&config).await?;
+        }
+
+        "status" => {
+            println!();
+            log_section("Kaizen 循环状态");
+            
+            // 尝试显示两种模式的状态
+            if let Err(e) = kaizen::evolution_mode::show_evolution_status() {
+                tracing::warn!("无法加载进化引擎状态: {}", e);
+            }
+            
+            println!();
+            
+            if let Err(e) = kaizen::research_mode::show_research_status() {
+                tracing::warn!("无法加载自动研究状态: {}", e);
+            }
+        }
+
+        "stop" => {
+            log_info("停止 Kaizen 循环...");
+            
+            // 尝试停止两种模式
+            let _ = kaizen::evolution_mode::stop_evolution();
+            let _ = kaizen::research_mode::stop_research();
+            
+            log_success("循环已停止");
+        }
+
+        "log" => {
+            let last_n = if args.len() > 2 {
+                args[2].parse().unwrap_or(20)
+            } else {
+                20
+            };
+            
+            println!();
+            if let Err(e) = kaizen::research_mode::show_research_log(last_n) {
+                log_error(&format!("查看日志失败: {}", e));
+            }
+        }
+
+        _ => {
+            log_error(&format!("未知 Kaizen 命令: {}", args[0]));
+            println!("运行 {}alou kaizen{} 查看帮助", GREEN, RESET);
+        }
+    }
+
+    Ok(())
 }
