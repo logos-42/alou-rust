@@ -640,8 +640,8 @@ impl SwarmCoordinator {
                     .map(|a| a.id.clone())
             }
             LoadBalancingStrategy::Random => {
-                use rand::seq::IndexedRandom;
-                candidates.choose(&mut rand::rng()).map(|a| a.id.clone())
+                use rand::seq::SliceRandom;
+                candidates.choose(&mut rand::thread_rng()).map(|a| a.id.clone())
             }
         }
     }

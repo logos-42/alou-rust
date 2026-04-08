@@ -2,7 +2,6 @@
 
 use anyhow::{Result, Context};
 use tracing::info;
-use std::path::PathBuf;
 
 use hyperagent::{
     AutoResearch, ResearchConfig,
@@ -73,7 +72,7 @@ pub async fn run_research(config: &KaizenConfig) -> Result<()> {
         max_tokens: Some(2000),
     };
     
-    let client = LLMClientImpl::from_config(&llm_config)?;
+    let client = LLMClientImpl::new(&llm_config)?;
     info!("📡 使用 LLM: {:?}, 模型: {}", client.provider(), client.model());
     
     // 创建自动研究引擎
@@ -98,7 +97,7 @@ pub async fn run_research(config: &KaizenConfig) -> Result<()> {
             hyperagent::auto_research::ExperimentOutcome::Regressed => "regressed",
             _ => "neutral",
         };
-        progress.update_iteration(i + 1, outcome, score);
+        progress.update_iteration(i + 1, outcome, score as f32);
     }
     
     progress.stop();

@@ -36,12 +36,12 @@ pub async fn run_evolution(config: &KaizenConfig) -> Result<()> {
         max_tokens: Some(2000),
     };
     
-    let client = LLMClientImpl::from_config(&llm_config)?;
+    let client = LLMClientImpl::new(&llm_config)?;
     info!("📡 使用 LLM: {:?}, 模型: {}", client.provider(), client.model());
-    
+
     // 配置运行时
     let runtime_config = RuntimeConfig {
-        max_generations: config.max_iterations,
+        max_generations: config.max_iterations as u32,
         population_size: 3,
         top_k_selection: 2,
         checkpoint_interval: 5,
@@ -54,34 +54,34 @@ pub async fn run_evolution(config: &KaizenConfig) -> Result<()> {
         novelty_weight: 0.5,
         diversity_threshold: 0.8,
     };
-    
+
     // 持久化目录
     let persist_dir = super::get_hyperagent_data_dir()?;
-    
+
     // 创建进化循环
     let mut evolution_loop = EvolutionLoop::new(
         client,
         RuntimeState::with_persistence(runtime_config, &persist_dir)
     );
-    
+
     // 任务描述
     let task = config.task_description.as_deref()
         .unwrap_or("Improve the code quality and performance");
-    
+
     info!("📋 任务: {}", task);
-    
+
     // 运行进化循环
     info!("🔄 开始进化循环 ({} 代)...", config.max_iterations);
-    
-    let final_state = evolution_loop.run_with_iterations(task, config.max_iterations)
+
+    let final_state = evolution_loop.run_with_iterations(task, config.max_iterations as usize)
         .await
         .context("进化循环执行失败")?;
-    
+
     // 更新进度
     progress.update_iteration(
         config.max_iterations,
         "completed",
-        final_state.best_score(),
+        final_state.best_score,
     );
     progress.stop();
     progress.save()?;
