@@ -140,7 +140,7 @@ fn cmd_start() {
     state.last_heartbeat = chrono::Utc::now().timestamp();
     save_state(&state);
     log_success("自主循环已启动");
-    log_info!("运行: alou-cli status 查看状态");
+    log_info("运行: alou-cli status 查看状态");
 }
 
 fn cmd_stop() {
@@ -308,9 +308,9 @@ fn main() {
     // 显示横幅
     if args.len() < 2 || args[1] != "help" {
         println!();
-        println!("{}{}╔═══════════════════════════════════════╗{}", CYAN, BRIGHT);
-        println!("{}{}║     🤖 Alou CLI - AI Agent 终端      ║{}", CYAN, BRIGHT);
-        println!("{}{}╚═══════════════════════════════════════╝{}", CYAN, BRIGHT);
+        println!("{}{}╔═══════════════════════════════════════╗{}", CYAN, BRIGHT, RESET);
+        println!("{}{}║     🤖 Alou CLI - AI Agent 终端      ║{}", CYAN, BRIGHT, RESET);
+        println!("{}{}╚═══════════════════════════════════════╝{}", CYAN, BRIGHT, RESET);
         println!("{}", RESET);
     }
     

@@ -145,13 +145,15 @@ impl PolymarketTool {
         let limit_str = limit.to_string();
         let offset_str = offset.to_string();
         let active_str = active_only.to_string();
+        let order_str = "volume24hr".to_string();
+        let asc_str = "false".to_string();
         let resp = self.client.get(&url)
             .query(&[
                 ("limit", &limit_str),
                 ("offset", &offset_str),
                 ("active", &active_str),
-                ("order", "volume24hr"),
-                ("ascending", "false"),
+                ("order", &order_str),
+                ("ascending", &asc_str),
             ])
             .send().await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to list markets: {}", e)))?;

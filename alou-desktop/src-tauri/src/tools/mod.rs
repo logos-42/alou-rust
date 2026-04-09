@@ -324,6 +324,10 @@ pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Erro
     let spec_tool = Arc::new(SpecTool::new());
     registry.register(spec_tool).await?;
 
+    // 注册 Polymarket 预测市场工具
+    let polymarket_tool = Arc::new(crate::tools::polymarket::PolymarketTool::new());
+    registry.register(polymarket_tool).await?;
+
 
     Ok(registry)
 }
