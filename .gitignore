@@ -141,3 +141,6 @@ alou-desktop/src-tauri/build-dmg-manual.sh
 *.zip
 !*.example.tar.gz
 !*.example.zip
+
+# Hyperagent
+.hyperagent/

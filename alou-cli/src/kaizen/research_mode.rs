@@ -20,9 +20,26 @@ pub async fn run_research(config: &KaizenConfig) -> Result<()> {
     progress.start();
     progress.save()?;
     
-    // 确定项目根目录（默认当前目录）
-    let project_root = std::env::current_dir()
+    // 确定项目根目录（自动检测 Tauri 项目结构）
+    let cwd = std::env::current_dir()
         .context("无法获取当前工作目录")?;
+    
+    // Tauri 项目: Cargo.toml 在 src-tauri/ 子目录下
+    let project_root = if cwd.join("src-tauri/Cargo.toml").exists() {
+        cwd.join("src-tauri")
+    } else if cwd.join("Cargo.toml").exists() {
+        cwd.clone()
+    } else if let Some(parent) = cwd.parent() {
+        if parent.join("src-tauri/Cargo.toml").exists() {
+            parent.join("src-tauri")
+        } else if parent.join("Cargo.toml").exists() {
+            parent.to_path_buf()
+        } else {
+            cwd.clone()
+        }
+    } else {
+        cwd.clone()
+    };
     
     info!("📁 项目根目录: {}", project_root.display());
     
