@@ -59,6 +59,7 @@ fn cmd_help() {
     println!("{}Kaizen 自进化循环:{}", CYAN, RESET);
     println!("  kaizen evolution [选项]        启动进化引擎");
     println!("  kaizen research [选项]         启动自动研究 (Karpathy 模式)");
+    println!("  kaizen self-repair [选项]      自修复循环 (check->fix->build->restart)");
     println!("  kaizen status                  查看循环状态");
     println!("  kaizen stop                    停止循环");
     println!("  kaizen log [行数]              查看实验日志");
@@ -343,24 +344,49 @@ async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
         println!("{}命令:{}", CYAN, RESET);
         println!("  evolution [选项]    启动进化引擎");
         println!("  research [选项]     启动自动研究 (Karpathy 模式)");
+        println!("  self-repair [选项]  自修复循环 (check->fix->build->restart)");
         println!("  status              查看循环状态");
         println!("  stop                停止循环");
         println!("  log [行数]          查看实验日志");
+        println!();
+        println!("{}通用选项:{}", CYAN, RESET);
+        println!("  --provider <名称>   LLM 提供商 (见下方列表)");
+        println!("  --model <名称>      LLM 模型名称");
+        println!("  --base-url <URL>    API 端点 (部分提供商自动推断)");
+        println!();
+        println!("{}支持的 Provider:{}", CYAN, RESET);
+        println!("  ollama          Ollama (本地/云端, 无需 API Key)");
+        println!("  openai          OpenAI (gpt-4o, gpt-4-turbo...)");
+        println!("  deepseek        DeepSeek (deepseek-chat, deepseek-coder...)");
+        println!("  glm / zhipuai   智谱 AI (glm-4-plus, glm-5...)");
+        println!("  qwen            通义千问 (qwen-max, qwen-plus...)");
+        println!("  minimax         MiniMax (minimax-text...)");
+        println!("  openrouter      OpenRouter (聚合多种模型)");
+        println!("  openai-compat   任意 OpenAI 兼容 API");
         println!();
         println!("{}进化引擎选项:{}", CYAN, RESET);
         println!("  --iterations <N>    迭代次数 (默认: 5)");
         println!("  --task <描述>       任务描述");
         println!();
-        println!("{}自动研究选项:{}", CYAN, RESET);
+        println!("{}自动研究/自修复选项:{}", CYAN, RESET);
         println!("  --iterations <N>    迭代次数 (默认: 5)");
         println!("  --auto-push         自动推送到 GitHub");
         println!("  --strict            严格模式");
         println!("  --dry-run           安全模式 (不实际修改)");
+        println!("  --no-dry-run        关闭安全模式");
         println!("  --target <文件>     目标文件 (可多次指定)");
         println!();
-        println!("{}示例:{}", GREEN, RESET);
-        println!("  alou kaizen evolution --iterations 10 --task \"优化性能\"");
-        println!("  alou kaizen research --auto-push --iterations 5");
+        println!("{}Ollama 示例 (本地/云端, 无需 API Key):{}", GREEN, RESET);
+        println!("  alou kaizen self-repair --provider ollama --model qwen2.5-coder");
+        println!("  alou kaizen research --provider ollama --model deepseek-coder-v2 --no-dry-run");
+        println!();
+        println!("{}云端模型示例 (需设置 LLM_API_KEY):{}", GREEN, RESET);
+        println!("  alou kaizen self-repair --provider deepseek --model deepseek-chat");
+        println!("  alou kaizen research --provider glm --model glm-4-plus");
+        println!("  alou kaizen evolution --provider qwen --model qwen-max -n 3");
+        println!();
+        println!("{}自定义端点示例:{}", GREEN, RESET);
+        println!("  alou kaizen self-repair --provider openai-compat --model my-model --base-url https://my-api.com/v1");
         println!("  alou kaizen status");
         println!("  alou kaizen log --last 20");
         return Ok(());
@@ -392,6 +418,30 @@ async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
                             i += 1;
                         }
                     }
+                    "--provider" | "-p" => {
+                        if i + 1 < args.len() {
+                            config.llm_provider = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--model" | "-m" => {
+                        if i + 1 < args.len() {
+                            config.llm_model = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--base-url" => {
+                        if i + 1 < args.len() {
+                            config.llm_base_url = Some(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
                     _ => {
                         i += 1;
                     }
@@ -410,12 +460,25 @@ async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
                 }
             }
 
-            // 检查 API Key
-            if config.llm_api_key.is_empty() {
+            // 检查 API Key（Ollama 本地/云端不需要）
+            if config.llm_provider != "ollama" && config.llm_api_key.is_empty() {
                 log_error("请先设置 LLM API Key");
                 println!("方法 1: 设置环境变量 LLM_API_KEY=your_key");
                 println!("方法 2: 创建 .env 文件包含 LLM_API_KEY=your_key");
+                println!("方法 3: 使用 Ollama: alou kaizen evolution --provider ollama --model qwen2.5-coder");
                 return Ok(());
+            }
+
+            // 自动默认模型
+            if config.llm_model == "gpt-4o" {
+                config.llm_model = match config.llm_provider.as_str() {
+                    "ollama" => "qwen2.5-coder".to_string(),
+                    "deepseek" => "deepseek-chat".to_string(),
+                    "glm" | "zhipuai" => "glm-4-plus".to_string(),
+                    "qwen" => "qwen-max".to_string(),
+                    "minimax" => "minimax-text".to_string(),
+                    _ => "gpt-4o".to_string(),
+                };
             }
 
             println!();
@@ -479,18 +542,55 @@ async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
                             i += 1;
                         }
                     }
+                    "--provider" | "-p" => {
+                        if i + 1 < args.len() {
+                            config.llm_provider = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--model" | "-m" => {
+                        if i + 1 < args.len() {
+                            config.llm_model = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--base-url" => {
+                        if i + 1 < args.len() {
+                            config.llm_base_url = Some(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
                     _ => {
                         i += 1;
                     }
                 }
             }
 
-            // 检查 API Key
-            if config.llm_api_key.is_empty() {
+            // 检查 API Key（Ollama 本地/云端不需要）
+            if config.llm_provider != "ollama" && config.llm_api_key.is_empty() {
                 log_error("请先设置 LLM API Key");
                 println!("方法 1: 设置环境变量 LLM_API_KEY=your_key");
                 println!("方法 2: 创建 .env 文件包含 LLM_API_KEY=your_key");
+                println!("方法 3: 使用 Ollama: alou kaizen research --provider ollama --model qwen2.5-coder");
                 return Ok(());
+            }
+
+            // 自动默认模型
+            if config.llm_model == "gpt-4o" {
+                config.llm_model = match config.llm_provider.as_str() {
+                    "ollama" => "qwen2.5-coder".to_string(),
+                    "deepseek" => "deepseek-chat".to_string(),
+                    "glm" | "zhipuai" => "glm-4-plus".to_string(),
+                    "qwen" => "qwen-max".to_string(),
+                    "minimax" => "minimax-text".to_string(),
+                    _ => "gpt-4o".to_string(),
+                };
             }
 
             println!();
@@ -514,6 +614,118 @@ async fn run_kaizen_command(args: &[String]) -> anyhow::Result<()> {
             dotenvy::dotenv().ok();
 
             // 运行自动研究
+            kaizen::research_mode::run_research(&config).await?;
+        }
+
+        "self-repair" | "repair" => {
+            // 解析参数
+            let mut config = KaizenConfig::load_from_env();
+            config.mode = KaizenMode::Research; // 复用 research 模式
+
+            let mut i = 1;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--iterations" | "-n" => {
+                        if i + 1 < args.len() {
+                            config.max_iterations = args[i + 1].parse()
+                                .unwrap_or(config.max_iterations);
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--provider" | "-p" => {
+                        if i + 1 < args.len() {
+                            config.llm_provider = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--model" | "-m" => {
+                        if i + 1 < args.len() {
+                            config.llm_model = args[i + 1].clone();
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--base-url" => {
+                        if i + 1 < args.len() {
+                            config.llm_base_url = Some(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    "--target" => {
+                        if i + 1 < args.len() {
+                            config.target_files.push(args[i + 1].clone());
+                            i += 2;
+                        } else {
+                            i += 1;
+                        }
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
+            }
+
+            // 检查 API Key（Ollama 本地/云端不需要）
+            if config.llm_provider != "ollama" && config.llm_api_key.is_empty() {
+                log_error("请先设置 LLM API Key");
+                println!("方法 1: 设置环境变量 LLM_API_KEY=your_key");
+                println!("方法 2: 创建 .env 文件包含 LLM_API_KEY=your_key");
+                println!("方法 3: 使用 Ollama: alou kaizen self-repair --provider ollama --model qwen2.5-coder");
+                return Ok(());
+            }
+
+            // 自动默认模型
+            if config.llm_model == "gpt-4o" {
+                config.llm_model = match config.llm_provider.as_str() {
+                    "ollama" => "qwen2.5-coder".to_string(),
+                    "deepseek" => "deepseek-chat".to_string(),
+                    "glm" | "zhipuai" => "glm-4-plus".to_string(),
+                    "qwen" => "qwen-max".to_string(),
+                    "minimax" => "minimax-text".to_string(),
+                    _ => "gpt-4o".to_string(),
+                };
+            }
+
+            // 自修复模式：关闭 dry_run，目标文件指向 alou 项目自身
+            config.dry_run = false;
+            config.auto_push = false;
+            config.strict = false;
+
+            // 默认目标：alou-desktop 和 alou-cli 核心文件
+            if config.target_files.is_empty() {
+                config.target_files = vec![
+                    "src-tauri/src/main.rs".to_string(),
+                    "src-tauri/src/tools/self_repair_tool.rs".to_string(),
+                    "src-tauri/src/agent/executor/reasoning.rs".to_string(),
+                    "src-tauri/src/bridges/tool_bridge.rs".to_string(),
+                    "src-tauri/src/kappa_loop/mod.rs".to_string(),
+                ];
+            }
+
+            println!();
+            log_section("启动 Kaizen 自修复循环");
+            println!("模式: 自修复 (Self-Repair)");
+            println!("LLM: {} / {}", config.llm_provider, config.llm_model);
+            println!("迭代次数: {}", config.max_iterations);
+            println!("目标文件: {:?}", config.target_files);
+            println!();
+
+            // 初始化 tracing
+            tracing_subscriber::fmt()
+                .with_max_level(tracing::Level::INFO)
+                .init();
+
+            // 加载环境变量
+            dotenvy::dotenv().ok();
+
+            // 运行自修复（复用 research 模式，但目标是自身代码）
             kaizen::research_mode::run_research(&config).await?;
         }
 

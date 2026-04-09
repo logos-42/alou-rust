@@ -62,12 +62,27 @@ pub async fn run_research(config: &KaizenConfig) -> Result<()> {
             "openai" => LLMProvider::OpenAI,
             "ollama" => LLMProvider::Ollama,
             "qwen" => LLMProvider::Qwen,
+            "glm" | "zhipuai" => LLMProvider::GLM,
+            "minimax" => LLMProvider::MiniMax,
+            // DeepSeek / Claude / Gemini / 其他 OpenAI 兼容 API 走 OpenAI Provider + base_url
+            "deepseek" | "claude" | "gemini" | "openrouter" | "openai-compat" => LLMProvider::OpenAI,
             _ => LLMProvider::OpenAI,
         },
         model: config.llm_model.clone(),
         api_key: config.llm_api_key.clone(),
-        base_url: config.llm_base_url.clone(),
-        max_concurrent: 8,
+        base_url: config.llm_base_url.clone().or_else(|| {
+            // 自动推断 base_url
+            match config.llm_provider.as_str() {
+                "deepseek" => Some("https://api.deepseek.com/v1".to_string()),
+                "glm" | "zhipuai" => Some("https://open.bigmodel.cn/api/paas/v4".to_string()),
+                "minimax" => Some("https://api.minimax.chat/v1".to_string()),
+                "qwen" => Some("https://dashscope.aliyuncs.com/compatible-mode/v1".to_string()),
+                "openrouter" => Some("https://openrouter.ai/api/v1".to_string()),
+                "ollama" => Some("http://localhost:11434".to_string()),
+                _ => None,
+            }
+        }),
+        max_concurrent: if config.llm_provider == "ollama" { 4 } else { 8 },
         temperature: Some(0.7),
         max_tokens: Some(2000),
     };
