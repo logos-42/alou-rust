@@ -54,11 +54,11 @@ impl Default for KappaLoopConfig {
             .and_then(|d| {
                 // 如果当前在 src-tauri/ 内，取父目录
                 if d.file_name().map(|n| n == "src-tauri").unwrap_or(false) {
-                    d.parent().map(|p| p.join("src-tauri")).unwrap_or(d)
+                    d.parent().map(|p| p.join("src-tauri")).map(Some).unwrap_or(None)
                 } else if d.join("src-tauri/Cargo.toml").exists() {
-                    d.join("src-tauri")
+                    Some(d.join("src-tauri"))
                 } else {
-                    d
+                    Some(d)
                 }
             })
             .unwrap_or_else(|| PathBuf::from("."));

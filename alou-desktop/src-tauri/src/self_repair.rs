@@ -167,18 +167,14 @@ pub async fn self_repair_project_info() -> Result<serde_json::Value, String> {
     let mut ts_files = Vec::new();
 
     // 扫描 Rust 文件
-    if let Ok(entries) = walkdir::WalkDir::new(&src_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "rs").unwrap_or(false))
-        .collect::<Vec<_>>()
-    {
-        for entry in entries.iter().take(50) {
+    for entry in walkdir::WalkDir::new(&src_dir).into_iter().filter_map(|e| e.ok()) {
+        if entry.path().extension().map(|ext| ext == "rs").unwrap_or(false) {
             let relative = entry.path().strip_prefix(&project_root)
                 .unwrap_or(entry.path())
                 .to_string_lossy()
                 .to_string();
             rust_files.push(relative);
+            if rust_files.len() >= 50 { break; }
         }
     }
 
@@ -187,18 +183,15 @@ pub async fn self_repair_project_info() -> Result<serde_json::Value, String> {
         .map(|p| p.join("src"))
         .unwrap_or_default();
     if frontend_dir.exists() {
-        if let Ok(entries) = walkdir::WalkDir::new(&frontend_dir)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "tsx" || ext == "ts").unwrap_or(false))
-            .collect::<Vec<_>>()
-        {
-            for entry in entries.iter().take(50) {
+        for entry in walkdir::WalkDir::new(&frontend_dir).into_iter().filter_map(|e| e.ok()) {
+            let ext = entry.path().extension().and_then(|e| e.to_str()).unwrap_or("");
+            if ext == "tsx" || ext == "ts" {
                 let relative = entry.path().strip_prefix(project_root.parent().unwrap_or(project_root.as_path()))
                     .unwrap_or(entry.path())
                     .to_string_lossy()
                     .to_string();
                 ts_files.push(relative);
+                if ts_files.len() >= 50 { break; }
             }
         }
     }
