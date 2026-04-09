@@ -79,23 +79,81 @@
       "supports_tools": false,
       "cost_per_1k_tokens": 0.0008,
       "default_system_prompt": "你是通义千问，由阿里巴巴开发的AI助手。请用中文回答用户的问题，提供专业、准确的建议。"
+    },
+    "glm-5.1": {
+      "provider": "zhipu",
+      "endpoint": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+      "api_key_env": "ZHIPU_API_KEY",
+      "max_tokens": 131072,
+      "supports_system_prompt": true,
+      "supports_tools": true,
+      "cost_per_1k_tokens": 0.0008,
+      "default_system_prompt": "你是智谱AI的GLM-5.1，一个由智谱AI开发的智能助手。请提供有帮助、准确的回应。"
+    },
+    "glm-5": {
+      "provider": "zhipu",
+      "endpoint": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+      "api_key_env": "ZHIPU_API_KEY",
+      "max_tokens": 131072,
+      "supports_system_prompt": true,
+      "supports_tools": true,
+      "cost_per_1k_tokens": 0.0006,
+      "default_system_prompt": "你是智谱AI的GLM-5，一个由智谱AI开发的智能助手。请提供有帮助、准确的回应。"
+    },
+    "glm-4-plus": {
+      "provider": "zhipu",
+      "endpoint": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "api_key_env": "ZHIPU_API_KEY",
+      "max_tokens": 32768,
+      "supports_system_prompt": true,
+      "supports_tools": true,
+      "cost_per_1k_tokens": 0.0001,
+      "default_system_prompt": "你是智谱AI的GLM-4 Plus，一个由智谱AI开发的智能助手。请提供有帮助、准确的回应。"
+    },
+    "seedance-2.0": {
+      "provider": "seedance",
+      "endpoint": "https://visual.volcengineapi.com",
+      "api_key_env": "SEEDANCE_API_KEY",
+      "max_tokens": 4096,
+      "supports_system_prompt": false,
+      "supports_tools": false,
+      "cost_per_1k_tokens": 0.08,
+      "default_system_prompt": "",
+      "video_model": true
+    },
+    "doubao-pro-32k": {
+      "provider": "doubao",
+      "endpoint": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+      "api_key_env": "DOUBAO_API_KEY",
+      "max_tokens": 32768,
+      "supports_system_prompt": true,
+      "supports_tools": true,
+      "cost_per_1k_tokens": 0.0005,
+      "default_system_prompt": "你是豆包，由字节跳动开发的AI助手。请用中文回答用户的问题，提供有帮助的信息。"
     }
   },
   "routing_rules": {
-    "default_model": "deepseek-chat",
+    "default_model": "glm-5.1",
     "model_aliases": {
       "claude-sonnet": "claude-3-5-sonnet-20241022",
       "claude-haiku": "claude-3-haiku-20240307",
       "deepseek": "deepseek-chat",
+      "deepseek-reasoner": "deepseek-reasoner",
       "gpt-4": "gpt-4o",
-      "kimi": "kimi-k2"
+      "kimi": "kimi-k2",
+      "glm": "glm-5.1",
+      "glm-5": "glm-5",
+      "glm-5.1": "glm-5.1",
+      "qwen": "qwen-max",
+      "doubao": "doubao-pro-32k"
     },
     "task_based_routing": {
-      "code_generation": ["claude-3-5-sonnet-20241022", "deepseek-chat"],
-      "reasoning": ["deepseek-reasoner", "claude-3-5-sonnet-20241022"],
-      "creative_writing": ["claude-3-5-sonnet-20241022", "gpt-4o"],
-      "translation": ["deepseek-chat", "kimi-k2"],
-      "analysis": ["deepseek-reasoner", "gpt-4-turbo"]
+      "code_generation": ["glm-5.1", "claude-3-5-sonnet-20241022", "deepseek-chat"],
+      "reasoning": ["deepseek-reasoner", "glm-5.1", "claude-3-5-sonnet-20241022"],
+      "creative_writing": ["claude-3-5-sonnet-20241022", "gpt-4o", "glm-5.1"],
+      "translation": ["deepseek-chat", "kimi-k2", "glm-5.1"],
+      "analysis": ["deepseek-reasoner", "glm-5.1", "gpt-4-turbo"],
+      "video_generation": ["seedance-2.0"]
     },
     "cost_optimization": {
       "enabled": true,

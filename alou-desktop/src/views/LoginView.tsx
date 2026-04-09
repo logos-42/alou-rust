@@ -4,7 +4,7 @@ import useAuthStore from '@/stores/authStore'
 import { walletService } from '@/services/walletService'
 import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
-import BankCardLogin from '@/components/wallet/BankCardLogin'
+// import BankCardLogin from '@/components/wallet/BankCardLogin' // Hidden: Bank card and digital RMB login
 import { useI18n } from '@/hooks/useI18n'
 import { useTheme } from '@/hooks/useTheme'
 import CloseIcon from '@/assets/关闭0.3.png'
@@ -136,7 +136,7 @@ const LoginView = () => {
     return isDesktop ? 'local' : null
   })
   const [newWalletData, setNewWalletData] = useState(null)
-  const [loginCategory, setLoginCategory] = useState('crypto') // 'crypto' or 'bankCard'
+  // const [loginCategory, setLoginCategory] = useState('crypto') // 'crypto' or 'bankCard' - Hidden: Bank card login
 
   useEffect(() => {
     // 延迟检测，确保 Tauri API 已经加载
@@ -450,8 +450,8 @@ const LoginView = () => {
         {/* DEBUG: isDesktop={String(isDesktop)}, connectionMode={connectionMode} */}
         {isDesktop ? (
           <>
-            {/* 登录类别切换：加密钱包 / 银行卡 */}
-            <div className="login-category-switcher">
+            {/* 登录类别切换：加密钱包 / 银行卡 - 银行卡已隐藏 */}
+            {/* <div className="login-category-switcher">
               <button
                 type="button"
                 className={`category-btn ${loginCategory === 'crypto' ? 'active' : ''}`}
@@ -474,9 +474,11 @@ const LoginView = () => {
                 </svg>
                 {t('login.category.bankCard')}
               </button>
-            </div>
+            </div> */}
 
-            {loginCategory === 'crypto' ? (
+            {/* 默认显示加密钱包登录 */}
+            {/* loginCategory === 'crypto' */}
+            <>
               <>
                 {connectionMode === 'walletconnect' ? (
                   <WalletConnectQR
@@ -516,11 +518,12 @@ const LoginView = () => {
                 </div>
               </>
             ) : (
-              <BankCardLogin
+              /* <BankCardLogin
                 onConnected={handleWalletConnected}
                 onError={handleWalletError}
                 onCancel={handleConnectionCancel}
-              />
+              /> */
+              null
             )}
           </>
         ) : (

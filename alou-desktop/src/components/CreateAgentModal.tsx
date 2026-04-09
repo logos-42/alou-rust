@@ -13,10 +13,6 @@ import CopyIcon from '@/assets/复制.png'
 import AgentDocumentsViewer from './AgentDocumentsViewer'
 import './CreateAgentModal.css'
 
-const DEFAULT_MCP_CODE = `{
-  "ports": []
-}`
-
 const DEFAULT_IPFS_API = import.meta.env.VITE_IPFS_API_URL || 'http://127.0.0.1:5001'
 const DEFAULT_IPFS_GATEWAY = import.meta.env.VITE_IPFS_GATEWAY_URL || 'http://127.0.0.1:8080'
 
@@ -26,9 +22,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
   const [roleDescription, setRoleDescription] = useState(t('agent.create.role.default'))
   const [avatarFile, setAvatarFile] = useState(null)
   const [avatarPreview, setAvatarPreview] = useState(null)
-  const [mcpCode, setMcpCode] = useState(DEFAULT_MCP_CODE)
-  const [mcpTools, setMcpTools] = useState([])
-  const [mcpParseError, setMcpParseError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [avatarUploadError, setAvatarUploadError] = useState(null)
@@ -43,93 +36,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
 
   // Dicebear 头像样式选择
   const [showDicebearStyles, setShowDicebearStyles] = useState(false)
-
-  // 解析 MCP 代码并提取工具名称
-  const parseMcpCode = useCallback((code) => {
-    try {
-      setMcpParseError(null)
-
-      // 移除注释、控制字符并修剪空白字符
-      let cleanedCode = code
-        .replace(/\/\/.*$/gm, '')  // 移除单行注释
-        .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除多行注释
-        .trim()  // 移除首尾空白
-
-      // 更彻底地移除控制字符
-      cleanedCode = cleanedCode
-        // 移除所有控制字符（除了换行、回车、制表符）
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-        // 移除零宽字符
-        .replace(/[\u200B-\u200D\uFEFF]/g, '')
-        // 修复可能被破坏的 URL（如果 :// 被分割）
-        .replace(/"endpoint"\s*:\s*"([^"]*):\s*\/\/([^"]*)"/g, '"endpoint": "$1://$2"')
-
-      if (!cleanedCode) {
-        throw new Error('MCP 配置不能为空')
-      }
-
-      let config = null
-
-      // 尝试多种解析方式
-      try {
-        // 首先尝试作为 JSON 解析
-        config = JSON.parse(cleanedCode)
-      } catch (jsonError) {
-        console.log('JSON 解析失败:', jsonError.message)
-        console.log('失败位置:', jsonError)
-
-        // 如果 JSON 解析失败，尝试作为 JavaScript 对象解析
-        try {
-          // 确保代码以有效的 JavaScript 对象开始
-          const jsCode = cleanedCode.trim()
-          // 如果代码不以 { 开头，添加它
-          const finalCode = jsCode.startsWith('{') ? jsCode : `{${jsCode}}`
-          // 使用 Function 构造器来安全执行代码
-          config = new Function('return ' + finalCode)()
-          console.log('JavaScript 解析成功')
-        } catch (jsError) {
-          console.log('JavaScript 解析失败:', jsError.message)
-          throw new Error(`解析失败: ${jsonError.message} (JSON) 或 ${jsError.message} (JS)`)
-        }
-      }
-
-      if (!config || typeof config !== 'object') {
-        throw new Error('配置必须是一个对象')
-      }
-
-      const ports = config.ports || []
-      if (!Array.isArray(ports)) {
-        throw new Error('ports 必须是一个数组')
-      }
-
-      // 提取工具名称（从 label 字段）
-      const tools = ports
-        .filter(port => port && port.label)
-        .map(port => ({
-          name: port.label,
-          endpoint: port.endpoint || '',
-          port: port.port || '',
-          description: port.description || ''
-        }))
-
-      setMcpTools(tools)
-      return { ports, tools }
-    } catch (err) {
-      setMcpParseError(err.message || '解析失败')
-      setMcpTools([])
-      return { ports: [], tools: [] }
-    }
-  }, [])
-
-  // 当 MCP 代码改变时自动解析
-  useEffect(() => {
-    if (mcpCode.trim()) {
-      parseMcpCode(mcpCode)
-    } else {
-      setMcpTools([])
-      setMcpParseError(null)
-    }
-  }, [mcpCode, parseMcpCode])
 
   // 生成文档集合（不依赖 IPFS，AI 生成是核心，IPFS 上传是可选后台操作）
   const generateDocuments = useCallback(async () => {
@@ -151,7 +57,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       //   name: fallbackName,
       //   avatar: avatarPreview,
       //   emoji: '🤖',
-      //   mcpTools: mcpTools.filter(tool => tool.name),
       //   memoryConfig: {
       //     enableLongTerm: true,
       //     enableWorkingMemory: true,
@@ -307,56 +212,12 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
         console.log('[CreateAgentModal] IPFS 不可用，头像将使用 base64 本地存储')
       }
 
-      // 3. 解析 MCP 配置（IPFS 可用则上传，否则只本地保存）
-      let mcpConfigCid = null
-      let filteredPorts = []
-
-      if (mcpCode.trim()) {
-        try {
-          console.log('[CreateAgentModal] 解析 MCP 配置...')
-          const { ports } = parseMcpCode(mcpCode)
-          filteredPorts = ports.filter((port) => port.label?.trim() || port.endpoint?.trim())
-
-          if (filteredPorts.length > 0 && ipfsAvailable) {
-            console.log('[CreateAgentModal] 开始上传 MCP 配置到 IPFS...')
-            const uploadedConfig = await agentAssetsService.uploadMcpConfig(
-              { ports: filteredPorts, generatedAt: Date.now() },
-              { sessionId },
-            )
-            mcpConfigCid = uploadedConfig?.cid || null
-            console.log('[CreateAgentModal] MCP 配置上传成功:', mcpConfigCid)
-          } else if (filteredPorts.length > 0) {
-            console.log('[CreateAgentModal] IPFS 不可用，MCP 配置将本地保存')
-          }
-        } catch (err) {
-          console.error('[CreateAgentModal] MCP 配置处理失败:', err)
-          // 不阻塞创建流程
-        }
-      }
-
-      // 4. 提取文档系统提示词（用于增强智能体的深度）
-      const customPrompt = null
-      const documentsMap = null
-      // TODO: Implement buildSystemPromptFromDocuments() and extractDocumentMap() methods
-      // if (useDocumentBasedCreation && agentDocuments) {
-      //   try {
-      //     customPrompt = agentDocumentService.buildSystemPromptFromDocuments(agentDocuments)
-      //     console.log('[CreateAgentModal] 已从文档集构建 customPrompt，长度:', customPrompt?.length)
-      //     documentsMap = agentDocumentService.extractDocumentMap(agentDocuments)
-      //     console.log('[CreateAgentModal] 已提取文档 map，文档数:', Object.keys(documentsMap).length)
-      //   } catch (promptErr) {
-      //     console.warn('[CreateAgentModal] 构建 customPrompt 失败，将忽略文档内容:', promptErr.message)
-      //   }
-      // }
-
-      // 4. 构建完整的智能体数据（只调用一次onSubmit）
+      // 3. 构建完整的智能体数据（只调用一次onSubmit）
       const agentData = {
         name: fallbackName,
         roleDescription: finalRoleDescription,
         avatar_cid: avatarCid, // IPFS CID（有 IPFS 时使用）
         avatar_url: avatarCid ? null : avatarBase64, // 本地 base64 data URL（无 IPFS 时使用）
-        mcp_config_cid: mcpConfigCid, // 修复：使用下划线命名与agentStore保持一致
-        mcp_ports: filteredPorts, // 修复：使用下划线命名与agentStore保持一致
         // diapIdentity will be added asynchronously after creation
         sessionId,
         // 添加文档化配置
@@ -373,7 +234,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
       console.log('[CreateAgentModal] 提交完整智能体数据:', {
         name: agentData.name,
         hasAvatar: !!avatarCid,
-        hasMcp: !!mcpConfigCid,
         hasDocuments: !!agentData.documentCids,
         sessionId,
         willCreateDiapAsync: shouldCreateDiapAsync
@@ -392,7 +252,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
             name: fallbackName,
             roleDescription: finalRoleDescription,
             avatarCid: avatarCid,
-            mcpConfigCid: mcpConfigCid,
             customPrompt: customPrompt
           },
           {
@@ -592,45 +451,6 @@ function CreateAgentModal({ isOpen, onClose, onSubmit, sessionId, onEarlyChannel
             </div>
           )}
 
-
-          <div className="agent-modal__field">
-            <span>{t('agent.create.mcp.label')}</span>
-            <div className="agent-modal__mcp-hint">
-              💡 <strong>重要提示：</strong>MCP工具是智能体的"能力"，没有工具配置的智能体将无法执行任何操作。
-              请至少配置一个MCP工具端点，或使用默认配置。
-            </div>
-            <textarea
-              className="agent-modal__code-editor"
-              value={mcpCode}
-              onChange={(event) => setMcpCode(event.target.value)}
-              placeholder={DEFAULT_MCP_CODE}
-              rows={12}
-              spellCheck={false}
-            />
-            {mcpParseError && (
-              <div className="agent-modal__mcp-error">{mcpParseError}</div>
-            )}
-            {mcpTools.length > 0 && (
-              <div className="agent-modal__mcp-tools">
-                <div className="agent-modal__mcp-tools-header">
-                  <span>{t('agent.create.mcp.tools')} ({mcpTools.length})</span>
-                </div>
-                <div className="agent-modal__mcp-tools-list">
-                  {mcpTools.map((tool, index) => (
-                    <div key={index} className="agent-modal__mcp-tool-item">
-                      <div className="agent-modal__mcp-tool-name">{tool.name}</div>
-                      {tool.description && (
-                        <div className="agent-modal__mcp-tool-desc">{tool.description}</div>
-                      )}
-                      {tool.endpoint && (
-                        <div className="agent-modal__mcp-tool-endpoint">{tool.endpoint}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
           {error && <div className="agent-modal__error">{error}</div>}
 

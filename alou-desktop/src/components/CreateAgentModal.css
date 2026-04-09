@@ -21,6 +21,13 @@
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.5);
 }
 
+/* Light mode support */
+.agent-modal.light-mode {
+  background: #ffffff;
+  color: #1f2937;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
 .agent-modal__header {
   padding: 20px 28px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
@@ -98,8 +105,13 @@
 }
 
 .agent-modal__field > span {
-  color: #cbd5f5;
+  color: #9ca3af;
   font-size: 14px;
+}
+
+/* Light mode field label */
+.agent-modal.light-mode .agent-modal__field > span {
+  color: #4b5563;
 }
 
 .agent-modal__field input,
@@ -107,9 +119,17 @@
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 10px;
   padding: 10px 14px;
-  background: rgba(15, 23, 42, 0.6);
-  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.6);
+  color: #e5e7eb;
   font-size: 14px;
+}
+
+/* Light mode fields */
+.agent-modal.light-mode .agent-modal__field input,
+.agent-modal.light-mode .agent-modal__field textarea {
+  background: #f9fafb;
+  color: #1f2937;
+  border-color: rgba(0, 0, 0, 0.15);
 }
 
 .agent-modal__avatar-upload {
@@ -143,17 +163,28 @@
   position: relative;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px dashed rgba(99, 102, 241, 0.6);
-  color: #c7d2fe;
+  border: 1px dashed rgba(107, 114, 128, 0.6);
+  color: #9ca3af;
   cursor: pointer;
   font-size: 13px;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(107, 114, 128, 0.1);
   transition: all 0.2s ease;
 }
 
 .agent-modal__upload-button:hover {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.8);
+  background: rgba(107, 114, 128, 0.2);
+  border-color: rgba(107, 114, 128, 0.8);
+}
+
+/* Light mode upload button */
+.agent-modal.light-mode .agent-modal__upload-button {
+  background: rgba(107, 114, 128, 0.05);
+  border-color: rgba(107, 114, 128, 0.4);
+  color: #6b7280;
+}
+
+.agent-modal.light-mode .agent-modal__upload-button:hover {
+  background: rgba(107, 114, 128, 0.1);
 }
 
 .agent-modal__upload-button input {
@@ -169,7 +200,7 @@
   border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   background: rgba(148, 163, 184, 0.1);
-  color: #e2e8f0;
+  color: #e5e7eb;
   cursor: pointer;
   font-size: 13px;
   transition: all 0.2s ease;
@@ -182,6 +213,20 @@
 .agent-modal__avatar-default-btn:hover {
   background: rgba(148, 163, 184, 0.2);
   border-color: rgba(148, 163, 184, 0.5);
+}
+
+/* Light mode avatar buttons */
+.agent-modal.light-mode .agent-modal__avatar-style-btn,
+.agent-modal.light-mode .agent-modal__avatar-default-btn {
+  background: rgba(107, 114, 128, 0.05);
+  border-color: rgba(107, 114, 128, 0.3);
+  color: #4b5563;
+}
+
+.agent-modal.light-mode .agent-modal__avatar-style-btn:hover,
+.agent-modal.light-mode .agent-modal__avatar-default-btn:hover {
+  background: rgba(107, 114, 128, 0.1);
+  border-color: rgba(107, 114, 128, 0.5);
 }
 
 /* Dicebear 风格选择器 */
@@ -238,8 +283,8 @@
 }
 
 .agent-modal__dicebear-style:hover {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(55, 65, 81, 0.8);
+  border-color: rgba(107, 114, 128, 0.5);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -282,16 +327,28 @@
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 10px;
   padding: 14px;
-  background: rgba(15, 23, 42, 0.8);
-  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.8);
+  color: #e5e7eb;
   resize: vertical;
   min-height: 200px;
 }
 
 .agent-modal__code-editor:focus {
   outline: none;
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: rgba(107, 114, 128, 0.6);
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
+}
+
+/* Light mode code editor */
+.agent-modal.light-mode .agent-modal__code-editor {
+  background: #f3f4f6;
+  color: #1f2937;
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+.agent-modal.light-mode .agent-modal__code-editor:focus {
+  border-color: rgba(107, 114, 128, 0.6);
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
 }
 
 .agent-modal__mcp-error {
@@ -394,8 +451,13 @@
 }
 
 .agent-modal__actions button:not(.ghost) {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: linear-gradient(135deg, #4b5563, #6b7280);
   color: white;
+}
+
+/* Light mode submit button */
+.agent-modal.light-mode .agent-modal__actions button:not(.ghost) {
+  background: linear-gradient(135deg, #374151, #4b5563);
 }
 
 .agent-modal__actions button:disabled {
@@ -405,8 +467,8 @@
 
 /* 导入预览样式 */
 .agent-modal__import-preview {
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.3);
   border-radius: 12px;
   padding: 16px;
   margin-top: 8px;
@@ -415,10 +477,10 @@
 .agent-modal__import-preview-header {
   font-size: 15px;
   font-weight: 500;
-  color: #c7d2fe;
+  color: #9ca3af;
   margin-bottom: 12px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
+  border-bottom: 1px solid rgba(107, 114, 128, 0.2);
 }
 
 .agent-modal__import-preview-content {
@@ -435,14 +497,33 @@
 }
 
 .agent-modal__import-preview-row strong {
-  color: #a5b4fc;
+  color: #6b7280;
   min-width: 60px;
   flex-shrink: 0;
 }
 
 .agent-modal__import-preview-row span {
-  color: #e2e8f0;
+  color: #e5e7eb;
   word-break: break-all;
+}
+
+/* Light mode import preview */
+.agent-modal.light-mode .agent-modal__import-preview {
+  background: rgba(107, 114, 128, 0.05);
+  border-color: rgba(107, 114, 128, 0.2);
+}
+
+.agent-modal.light-mode .agent-modal__import-preview-header {
+  color: #4b5563;
+  border-bottom-color: rgba(107, 114, 128, 0.15);
+}
+
+.agent-modal.light-mode .agent-modal__import-preview-row strong {
+  color: #374151;
+}
+
+.agent-modal.light-mode .agent-modal__import-preview-row span {
+  color: #1f2937;
 }
 
 .agent-modal__import-preview-mono {
@@ -472,7 +553,13 @@
 
 .agent-modal__import-preview-actions button.ghost {
   background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  color: #9ca3af;
+}
+
+/* Light mode ghost button */
+.agent-modal.light-mode .agent-modal__import-preview-actions button.ghost {
+  background: rgba(107, 114, 128, 0.1);
+  color: #4b5563;
 }
 
 .agent-modal__import-preview-actions button:not(.ghost) {
@@ -536,8 +623,14 @@
 }
 
 .agent-modal__radio-label:hover {
-  border-color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
+  border-color: #6b7280;
+  background: rgba(107, 114, 128, 0.1);
+}
+
+/* Light mode radio hover */
+.agent-modal.light-mode .agent-modal__radio-label:hover {
+  border-color: #4b5563;
+  background: rgba(107, 114, 128, 0.05);
 }
 
 .agent-modal__radio-label input[type="radio"] {
@@ -545,7 +638,7 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #3b82f6;
+  accent-color: #6b7280;
 }
 
 .agent-modal__radio-content {
@@ -577,7 +670,7 @@
 .agent-modal__generate-docs-btn {
   width: 100%;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -593,7 +686,12 @@
 
 .agent-modal__generate-docs-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+/* Light mode generate docs button */
+.agent-modal.light-mode .agent-modal__generate-docs-btn {
+  background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
 }
 
 .agent-modal__generate-docs-btn:disabled {
@@ -635,7 +733,7 @@
 .agent-modal__preview-btn {
   margin-left: auto;
   padding: 6px 12px;
-  background: #3b82f6;
+  background: #6b7280;
   color: white;
   border: none;
   border-radius: 4px;
@@ -645,7 +743,16 @@
 }
 
 .agent-modal__preview-btn:hover {
-  background: #2563eb;
+  background: #4b5563;
+}
+
+/* Light mode preview button */
+.agent-modal.light-mode .agent-modal__preview-btn {
+  background: #6b7280;
+}
+
+.agent-modal.light-mode .agent-modal__preview-btn:hover {
+  background: #4b5563;
 }
 
 .agent-modal__document-preview {

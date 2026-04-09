@@ -12,7 +12,7 @@ use crate::tools::{
     browser_tool::BrowserTool, agent_creator::AgentCreatorTool, ui_control::UIControlTool,
     spec_tool::SpecTool, agent_wallet::AgentWalletTool, wallet_manager::WalletManagerTool,
     query_blockchain::QueryBlockchainTool, build_transaction::BuildTransactionTool,
-    broadcast_transaction::BroadcastTransactionTool,
+    broadcast_transaction::BroadcastTransactionTool, polymarket::PolymarketTool,
     media_tools::{GenerateImageTool, GenerateAudioTool, GenerateVideoTool, GetVideoStatusTool},
 };
 use crate::agent::providers::ProviderRegistry;
@@ -291,6 +291,10 @@ impl ToolBridge {
         // 注册交易广播工具
         let broadcast_transaction_tool = Arc::new(BroadcastTransactionTool::new());
         self.register_tool(broadcast_transaction_tool).await?;
+
+        // 注册 Polymarket 预测市场工具
+        let polymarket_tool = Arc::new(PolymarketTool::new());
+        self.register_tool(polymarket_tool).await?;
 
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())
