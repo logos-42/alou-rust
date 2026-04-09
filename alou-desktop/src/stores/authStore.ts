@@ -40,6 +40,7 @@ interface AuthState {
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
+  isIdentityVerified: boolean
 }
 
 /**
@@ -54,6 +55,7 @@ interface AuthActions {
   loginWithWallet: (options: WalletLoginOptions) => Promise<AuthResponse>
   loginWithGoogle: () => Promise<void>
   handleGoogleCallback: (code: string, state: string) => Promise<AuthResponse>
+  verifyIdentity: (idCard: string, phone: string) => Promise<boolean>
   checkAuth: () => Promise<boolean>
   fetchUser: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<User>
@@ -109,6 +111,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  isIdentityVerified: typeof window !== 'undefined' ? localStorage.getItem('diap_identity_verified') === 'true' : false,
 }
 
 const useAuthStore = create<AuthStore>((set, get) => ({
@@ -259,6 +262,34 @@ const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  verifyIdentity: async (idCard: string, phone: string): Promise<boolean> => {
+    set({ isLoading: true, error: null })
+    try {
+      // DIAP 协议捕获身份证和手机号进行认证绑定
+      // 当前为占位实现，待 DIAP 更新后接入
+      console.log('[AuthStore] DIAP 实名认证:', { idCard: '***', phone: '***' })
+
+      // 模拟 DIAP 协议处理
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      // 存储认证状态
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('diap_identity_verified', 'true')
+        localStorage.setItem('diap_identity_phone', phone)
+        localStorage.setItem('diap_identity_verified_at', new Date().toISOString())
+      }
+
+      set({ isIdentityVerified: true })
+      return true
+    } catch (error: any) {
+      const message = error?.message || '实名认证失败'
+      set({ error: message })
+      throw error
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
   checkAuth: async (): Promise<boolean> => {
     try {
       const token = Cookies.get('access_token')
@@ -341,7 +372,12 @@ const useAuthStore = create<AuthStore>((set, get) => ({
       Cookies.remove('access_token')
       Cookies.remove('refresh_token')
       clearWalletInfo()
-      set({ ...initialState })
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('diap_identity_verified')
+        localStorage.removeItem('diap_identity_phone')
+        localStorage.removeItem('diap_identity_verified_at')
+      }
+      set({ ...initialState, isIdentityVerified: false })
     }
   },
 

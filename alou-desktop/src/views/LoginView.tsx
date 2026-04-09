@@ -4,6 +4,7 @@ import useAuthStore from '@/stores/authStore'
 import { walletService } from '@/services/walletService'
 import WalletConnectQR from '@/components/wallet/WalletConnectQR'
 import LocalWalletForm from '@/components/wallet/LocalWalletForm'
+import IdentityVerification from '@/components/auth/IdentityVerification'
 // import BankCardLogin from '@/components/wallet/BankCardLogin' // Hidden: Bank card and digital RMB login
 import { useI18n } from '@/hooks/useI18n'
 import { useTheme } from '@/hooks/useTheme'
@@ -137,6 +138,9 @@ const LoginView = () => {
   })
   const [newWalletData, setNewWalletData] = useState(null)
   // const [loginCategory, setLoginCategory] = useState('crypto') // 'crypto' or 'bankCard' - Hidden: Bank card login
+  const [isIdentityVerified, setIsIdentityVerified] = useState(() => {
+    return localStorage.getItem('diap_identity_verified') === 'true'
+  })
 
   useEffect(() => {
     // 延迟检测，确保 Tauri API 已经加载
@@ -493,6 +497,16 @@ const LoginView = () => {
                     onCancel={handleConnectionCancel}
                     onCreateNew={handleNewWalletCreated}
                   />
+                ) : connectionMode === 'identity' ? (
+                  <IdentityVerification
+                    onVerified={() => {
+                      setIsIdentityVerified(true)
+                      // 认证完成后切回本地钱包模式
+                      setConnectionMode('local')
+                    }}
+                    onError={(err) => setError(err)}
+                    onCancel={() => setConnectionMode('local')}
+                  />
                 ) : (
                   <div className="desktop-notice">
                     <p>{t('login.mode.selectHint.new')}</p>
@@ -515,6 +529,13 @@ const LoginView = () => {
                   >
                     {t('login.mode.phoneScan')}
                   </button>
+                  <button
+                    type="button"
+                    className={`mode-btn ${connectionMode === 'identity' ? 'active' : ''}`}
+                    onClick={() => setConnectionMode('identity')}
+                  >
+                    {isIdentityVerified ? t('login.identity.verified') : t('login.identity.button')}
+                  </button>
                 </div>
               </>
             ) : (
@@ -527,55 +548,83 @@ const LoginView = () => {
             )}
           </>
         ) : (
-          /* 浏览器版：显示钱包选项列表 */
+          /* 浏览器版：显示钱包选项列表 或 实名认证 */
           <>
-            <div className="wallet-options">
-              {wallets.map((wallet) => (
-                <button
-                  key={wallet.id}
-                  type="button"
-                  onClick={() => handleWalletClick(wallet.id)}
-                  disabled={isLoading}
-                  className={`wallet-btn${isLoading && currentWallet === wallet.id ? ' loading' : ''}`}
-                >
-                  <div
-                    className={`wallet-icon${wallet.id === 'walletconnect' ? ' wallet-icon-walletconnect' : ''}`}
+            {connectionMode === 'identity' ? (
+              <IdentityVerification
+                onVerified={() => {
+                  setIsIdentityVerified(true)
+                  setConnectionMode(null)
+                }}
+                onError={(err) => setError(err)}
+                onCancel={() => setConnectionMode(null)}
+              />
+            ) : (
+              <>
+                <div className="wallet-options">
+                  {wallets.map((wallet) => (
+                    <button
+                      key={wallet.id}
+                      type="button"
+                      onClick={() => handleWalletClick(wallet.id)}
+                      disabled={isLoading}
+                      className={`wallet-btn${isLoading && currentWallet === wallet.id ? ' loading' : ''}`}
+                    >
+                      <div
+                        className={`wallet-icon${wallet.id === 'walletconnect' ? ' wallet-icon-walletconnect' : ''}`}
+                      >
+                        {wallet.icon}
+                      </div>
+                      <div className="wallet-info">
+                        <div className="wallet-name">{wallet.name}</div>
+                        <div className="wallet-desc">{wallet.description}</div>
+                      </div>
+                      <div className="wallet-arrow">
+                        {isLoading && currentWallet === wallet.id ? (
+                          <div className="spinner" />
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {!hasMetaMask && (
+                  <div className="browser-notice">
+                    <p>{t('login.status.metamaskNotDetected')}</p>
+                    <a
+                      href="https://metamask.io/download/"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="install-link"
+                    >
+                      {t('login.help.downloadMetaMask')}
+                    </a>
+                  </div>
+                )}
+                {hasMetaMask && (
+                  <div className="browser-success">
+                    <p>{t('login.status.metamaskDetected')}</p>
+                  </div>
+                )}
+                <div className="identity-entry">
+                  <button
+                    type="button"
+                    className="identity-entry-btn"
+                    onClick={() => setConnectionMode('identity')}
+                    disabled={isLoading}
                   >
-                    {wallet.icon}
-                  </div>
-                  <div className="wallet-info">
-                    <div className="wallet-name">{wallet.name}</div>
-                    <div className="wallet-desc">{wallet.description}</div>
-                  </div>
-                  <div className="wallet-arrow">
-                    {isLoading && currentWallet === wallet.id ? (
-                      <div className="spinner" />
-                    ) : (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z" />
-                      </svg>
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-            {!hasMetaMask && (
-              <div className="browser-notice">
-                <p>{t('login.status.metamaskNotDetected')}</p>
-                <a
-                  href="https://metamask.io/download/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="install-link"
-                >
-                  {t('login.help.downloadMetaMask')}
-                </a>
-              </div>
-            )}
-            {hasMetaMask && (
-              <div className="browser-success">
-                <p>{t('login.status.metamaskDetected')}</p>
-              </div>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                    <span>{isIdentityVerified ? t('login.identity.verified') : t('login.identity.button')}</span>
+                    <span className="identity-entry-desc">{t('login.identity.button.desc')}</span>
+                  </button>
+                </div>
+              </>
             )}
           </>
         )}

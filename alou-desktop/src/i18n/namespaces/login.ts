@@ -132,6 +132,26 @@ export const login = {
     'login.error.wsConnectionFailed': '无法连接到 WalletConnect 服务器。请检查：\n1. 网络连接是否正常\n2. 防火墙或代理设置\n3. 可以尝试点击"在浏览器中打开"使用浏览器版本\n\n如果问题持续，请检查控制台查看详细错误信息',
     'login.error.qrCodeGenerationFailed': '生成二维码失败：{error}\n\n提示：可以尝试点击"在浏览器中打开"使用浏览器版本',
     'login.error.initWalletConnectFailed': '初始化WalletConnect失败',
+
+    // ==================== 实名认证 ====================
+    'login.identity.title': '实名认证',
+    'login.identity.desc': '通过 DIAP 协议绑定个人身份，认证后创建的 Agent 将被记录并验证为您的签名',
+    'login.identity.idCard': '身份证号',
+    'login.identity.idCard.placeholder': '请输入18位身份证号',
+    'login.identity.phone': '手机号',
+    'login.identity.phone.placeholder': '请输入11位手机号',
+    'login.identity.submit': '认证绑定',
+    'login.identity.verifying': '认证中...',
+    'login.identity.cancel': '取消',
+    'login.identity.notice': '您的身份信息将通过 DIAP 协议加密处理，仅用于认证绑定，不会被存储或泄露',
+    'login.identity.error.idCardRequired': '请输入身份证号',
+    'login.identity.error.idCardInvalid': '身份证号格式不正确',
+    'login.identity.error.phoneRequired': '请输入手机号',
+    'login.identity.error.phoneInvalid': '手机号格式不正确',
+    'login.identity.error.verifyFailed': '认证失败，请稍后重试',
+    'login.identity.verified': '✅ 已完成实名认证',
+    'login.identity.button': '实名认证',
+    'login.identity.button.desc': '通过 DIAP 协议绑定个人身份',
   },
   en: {
     // ==================== Page Title ====================
@@ -262,6 +282,26 @@ export const login = {
     'login.error.wsConnectionFailed': 'Cannot connect to WalletConnect server. Please check:\n1. Network connection\n2. Firewall or proxy settings\n3. Try clicking "Open in Browser" to use browser version\n\nIf issue persists, check console for details',
     'login.error.qrCodeGenerationFailed': 'QR code generation failed: {error}\n\nTip: Try clicking "Open in Browser" to use browser version',
     'login.error.initWalletConnectFailed': 'Failed to initialize WalletConnect',
+
+    // ==================== Identity Verification ====================
+    'login.identity.title': 'Identity Verification',
+    'login.identity.desc': 'Bind your identity via DIAP protocol. Agents you create will be recorded and verified with your signature',
+    'login.identity.idCard': 'ID Card Number',
+    'login.identity.idCard.placeholder': 'Enter your 18-digit ID card number',
+    'login.identity.phone': 'Phone Number',
+    'login.identity.phone.placeholder': 'Enter your 11-digit phone number',
+    'login.identity.submit': 'Verify & Bind',
+    'login.identity.verifying': 'Verifying...',
+    'login.identity.cancel': 'Cancel',
+    'login.identity.notice': 'Your identity info will be encrypted via DIAP protocol and only used for verification. It will not be stored or leaked',
+    'login.identity.error.idCardRequired': 'Please enter your ID card number',
+    'login.identity.error.idCardInvalid': 'Invalid ID card number format',
+    'login.identity.error.phoneRequired': 'Please enter your phone number',
+    'login.identity.error.phoneInvalid': 'Invalid phone number format',
+    'login.identity.error.verifyFailed': 'Verification failed, please try again later',
+    'login.identity.verified': '✅ Identity verified',
+    'login.identity.button': 'Identity Verification',
+    'login.identity.button.desc': 'Bind personal identity via DIAP protocol',
   },
 }
 

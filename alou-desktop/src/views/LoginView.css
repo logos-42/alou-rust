@@ -606,6 +606,57 @@
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 
+/* ==================== Identity Entry Button (Browser) ==================== */
+.identity-entry {
+  margin-top: 12px;
+}
+
+.identity-entry-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--login-btn-bg);
+  border: 2px solid var(--login-btn-border);
+  border-radius: 12px;
+  color: var(--login-text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+}
+
+.identity-entry-btn:hover:not(:disabled) {
+  border-color: var(--login-btn-hover-border);
+  background: var(--login-btn-hover-bg);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.identity-entry-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.identity-entry-btn svg {
+  flex-shrink: 0;
+  color: var(--login-text-secondary);
+}
+
+.identity-entry-btn span:first-of-type {
+  font-weight: 600;
+}
+
+.identity-entry-desc {
+  flex: 1;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--login-text-muted);
+}
+
 .browser-option-content {
   display: flex;
   align-items: flex-start;
