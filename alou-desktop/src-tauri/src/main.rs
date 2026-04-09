@@ -46,6 +46,7 @@ mod tasks;  // 任务管理模块
 mod logs;  // 日志管理模块
 mod agent_runtime;  // Agent Runtime 模块（新增）
 mod kappa_loop;     // Kappa Loop 卡帕斯循环模块（自修复）
+mod self_repair;    // 自修复系统（修改自身代码并验证）
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -861,6 +862,12 @@ fn main() {
             // Agent Document commands
             get_agent_documents_path,
             ensure_agent_document,
+            // Self Repair commands - 自修复系统
+            self_repair::self_repair_check,
+            self_repair::self_repair_build,
+            self_repair::self_repair_restart,
+            self_repair::self_repair_project_info,
+            self_repair::self_repair_full_cycle,
         ])
         
         // Autonomous Loop state

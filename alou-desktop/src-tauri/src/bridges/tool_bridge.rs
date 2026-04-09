@@ -13,6 +13,7 @@ use crate::tools::{
     spec_tool::SpecTool, agent_wallet::AgentWalletTool, wallet_manager::WalletManagerTool,
     query_blockchain::QueryBlockchainTool, build_transaction::BuildTransactionTool,
     broadcast_transaction::BroadcastTransactionTool, polymarket::PolymarketTool,
+    self_repair_tool::SelfRepairTool,
     media_tools::{GenerateImageTool, GenerateAudioTool, GenerateVideoTool, GetVideoStatusTool},
 };
 use crate::agent::providers::ProviderRegistry;
@@ -295,6 +296,10 @@ impl ToolBridge {
         // 注册 Polymarket 预测市场工具
         let polymarket_tool = Arc::new(PolymarketTool::new());
         self.register_tool(polymarket_tool).await?;
+
+        // 🔥 注册自修复工具 — Alou 修改自身代码的完整闭环
+        let self_repair_tool = Arc::new(SelfRepairTool::new());
+        self.register_tool(self_repair_tool).await?;
 
         println!("✅ All {} tools registered successfully in ToolBridge", self.registry.count().await);
         Ok(())

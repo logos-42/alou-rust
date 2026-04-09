@@ -148,6 +148,34 @@ impl ReasoningLayer {
    - 如果需要规划复杂任务 → 创建目标
    - 如果需要更多信息 → 询问用户
 
+## 🔥 自修复能力（核心特性）
+
+你是 Alou —— 一个**可以修改自身代码**的智能体。你可以读取、编辑、构建和重启自己的源代码。
+
+### 自修复循环
+当需要修复自身 bug 或改进功能时，按以下循环操作：
+
+1. **检测问题**：调用 `self_repair_check` 获取编译错误
+2. **定位代码**：使用 `filesystem` (read) 读取出错文件，或 `self_repair_project_info` 了解项目结构
+3. **修复代码**：使用 `filesystem` (edit/write) 修改源文件
+4. **验证修复**：再次调用 `self_repair_check` 确认错误已消除
+5. **构建项目**：调用 `self_repair_build` 编译项目
+6. **重启生效**：调用 `self_repair_restart` 重启应用加载新代码
+
+### 自修复规则
+- 修改代码前，先用 `rollback` 工具创建快照（保护性措施）
+- 每次只修一个错误，修完立即验证
+- 如果修复引入新错误，用 `rollback` 恢复
+- 构建成功后，必须通过 `self_repair_restart` 才能生效
+- 前端文件 (.tsx/.ts) 修改后 Vite 会自动热重载，无需重启
+- Rust 文件 (.rs) 修改后必须 rebuild + restart 才能生效
+
+### 可修改的项目
+- Rust 后端：`src-tauri/src/` 下所有 .rs 文件
+- 前端 UI：`src/` 下所有 .tsx/.ts/.css 文件
+- 工具定义：`src-tauri/src/tools/` 下的工具实现
+- Agent 逻辑：`src-tauri/src/agent/` 下的推理/感知/行动层
+
 ## 响应格式
 
 请直接返回你的分析和决策，如果需要调用工具请使用 function calling。
@@ -309,6 +337,24 @@ impl ReasoningLayer {
                 name: "get_video_status".to_string(),
                 description: "查询异步视频生成任务的状态".to_string(),
                 parameters: Self::get_tool_parameters("get_video_status"),
+            },
+            // 🔥 自修复工具 — Alou 修改自身代码的完整闭环
+            AiTool {
+                name: "self_repair".to_string(),
+                description: "自修复系统：检测编译错误、构建项目、重启应用。让 Alou 修改并验证自身代码的完整闭环".to_string(),
+                parameters: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["check", "build", "restart", "project_info", "full_cycle"],
+                            "description": "操作类型：check=检测编译错误，build=构建项目，restart=请求重启，project_info=获取项目结构，full_cycle=完整修复循环"
+                        },
+                        "profile": { "type": "string", "enum": ["debug", "release"], "description": "构建 profile (build 操作，默认 debug)" },
+                        "auto_restart": { "type": "boolean", "description": "full_cycle 中是否自动重启 (默认 false)" }
+                    },
+                    "required": ["action"]
+                }),
             },
         ]
     }

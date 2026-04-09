@@ -48,17 +48,41 @@ pub struct KappaLoopConfig {
 
 impl Default for KappaLoopConfig {
     fn default() -> Self {
+        // 自动检测项目根目录
+        let project_root = std::env::current_dir()
+            .ok()
+            .and_then(|d| {
+                // 如果当前在 src-tauri/ 内，取父目录
+                if d.file_name().map(|n| n == "src-tauri").unwrap_or(false) {
+                    d.parent().map(|p| p.join("src-tauri")).unwrap_or(d)
+                } else if d.join("src-tauri/Cargo.toml").exists() {
+                    d.join("src-tauri")
+                } else {
+                    d
+                }
+            })
+            .unwrap_or_else(|| PathBuf::from("."));
+
         Self {
-            project_root: PathBuf::from("."),
+            project_root,
             target_files: vec![
-                "autonomous_loop.rs".to_string(),
+                "main.rs".to_string(),
                 "agent/ai_client.rs".to_string(),
-                "agent/executor.rs".to_string(),
-                "bridges/mod.rs".to_string(),
+                "agent/executor/core.rs".to_string(),
+                "agent/executor/reasoning.rs".to_string(),
+                "agent/executor/action.rs".to_string(),
+                "agent/executor/perception.rs".to_string(),
+                "bridges/tool_bridge.rs".to_string(),
                 "tools/mod.rs".to_string(),
+                "tools/polymarket.rs".to_string(),
+                "tools/agent_wallet.rs".to_string(),
+                "tools/bash.rs".to_string(),
+                "tools/filesystem.rs".to_string(),
+                "kappa_loop/mod.rs".to_string(),
+                "self_repair.rs".to_string(),
             ],
             max_iterations: 10,
-            dry_run: true,
+            dry_run: false,      // 🔥 允许实际修改
             strict: false,
             auto_push: false,
             cycle_interval_secs: 300, // 5分钟

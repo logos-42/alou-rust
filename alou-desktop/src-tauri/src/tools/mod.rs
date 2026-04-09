@@ -44,6 +44,7 @@ pub mod build_transaction;        // 交易构建工具
 pub mod broadcast_transaction;    // 交易广播工具
 pub mod meta_tool;                // 元行动工具（记忆、目标管理）
 pub mod polymarket;              // Polymarket 预测市场工具
+pub mod self_repair_tool;        // 自修复工具（检测、构建、重启）
 
 // 重新导出核心类型和接口
 pub use executor::{ToolExecutor, ToolResult, ToolError};
