@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "weight_tests": 0.5,
+  "weight_lines": 0.08,
+  "weight_warnings": 0.1,
+  "weight_complexity": 0.08,
+  "weight_binary_size": 0.05,
+  "lines_improved_threshold": -5,
+  "lines_regressed_threshold": 20,
+  "complexity_improved_threshold": 5.0,
+  "complexity_regressed_threshold": 10.0,
+  "binary_improved_pct": -0.02,
+  "binary_regressed_pct": 0.05,
+  "improved_score_threshold": 0.2,
+  "research_temperature": 0.54999995,
+  "reflection_temperature": 0.3,
+  "target_selection": "RoundRobin",
+  "adaptive_window": 10,
+  "evolution_interval": 5
+}
