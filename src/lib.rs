@@ -16,6 +16,16 @@
 //! - Type-safe message handling
 //! - Comprehensive error handling
 //!
+//! ## Alou-Code Integration
+//!
+//! This crate integrates with alou-code (ultraworkers/alou-code) for:
+//! - Dual Provider support (Anthropic + DeepSeek)
+//! - DIAP Identity System integration
+//! - 40+ built-in tools
+//! - Session management and permissions
+//!
+//! See [alou_integration](crate::alou_integration) for details.
+//!
 //! ## Example
 //!
 //! ```no_run
@@ -28,12 +38,12 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Create a Stdio transport using standard input/output
 //!     let transport = StdioTransport::with_streams(stdin(), stdout())?;
-//!     
+//!
 //!     // Create the client with Arc-wrapped transport
 //!     let client = Client::new(Arc::new(transport));
-//!     
+//!
 //!     // Use the client...
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```
@@ -64,6 +74,12 @@ pub mod transport;
 pub mod types;
 /// Workspace context for managing project directories
 pub mod workspace_context;
+
+/// Alou-Code Integration Module
+///
+/// Provides dual Provider support (Anthropic + DeepSeek), DIAP identity
+/// integration, and access to alou-code's tools and runtime systems.
+pub mod alou_integration;
 
 // Authentication and database modules
 /// Data models for users and sessions

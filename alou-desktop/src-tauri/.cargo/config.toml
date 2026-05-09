@@ -1,0 +1,9 @@
+[env]
+BLAKE3_PURE = "1"
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[build]
+# 使用 jobs 减少并发构建问题
+jobs = 1

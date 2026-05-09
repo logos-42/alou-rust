@@ -1,0 +1,71 @@
+{
+  "productName": "Alou",
+  "version": "0.3.1",
+  "identifier": "com.alou.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Alou",
+        "width": 1400,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "devtools": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://* wss://* ws://* http://localhost:*; img-src 'self' https://* data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';"
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "copyright": "",
+    "category": "Productivity",
+    "shortDescription": "Web3 AI Agent Desktop Application",
+    "longDescription": "Alou Desktop - A desktop application for Web3 AI agents with DIAP integration",
+    "resources": ["kubo/*"],
+    "externalBin": [],
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.plist",
+      "minimumSystemVersion": "10.13"
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "event": {
+      "all": true
+    },
+    "fs": {
+      "requireLiteralLeadingDot": false
+    }
+  }
+}

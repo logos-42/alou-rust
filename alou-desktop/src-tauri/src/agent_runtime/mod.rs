@@ -1,0 +1,171 @@
+//! Agent Runtime - 本地 Agent 运行时
+//!
+//! 包含：
+//! - MessageBus (不丢消息)
+//! - EventRouter (事件路由)
+//! - AgentRegistry (原子更新)
+//! - Agent Actor (顺序处理，集成 RalphLoop)
+//! - Agent Supervisor (崩溃恢复)
+//! - Agent Router (三种路由)
+//! - JS Runtime Pool (沙箱)
+//! - Task Queue (全局任务队列)
+//! - Storage (SQLite)
+//! - Manager (统一管理入口)
+
+pub mod message_bus;
+pub mod event_router;
+pub mod agent_registry;
+pub mod agent_actor;
+pub mod agent_supervisor;
+pub mod agent_router;
+pub mod agent_scheduler;  // Agent 调度器
+pub mod js_runtime;
+pub mod task_queue;
+pub mod storage;
+pub mod group_chat_bridge;
+pub mod manager;  // 统一管理入口
+pub mod commands;  // Tauri 命令
+
+pub use message_bus::*;
+pub use event_router::*;
+pub use agent_registry::*;
+pub use agent_actor::*;
+pub use agent_supervisor::*;
+pub use agent_router::*;
+pub use agent_scheduler::AgentScheduler;
+pub use js_runtime::*;
+pub use task_queue::*;
+pub use storage::*;
+pub use manager::*;
+
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use crate::agent::providers::ProviderRegistry;
+use crate::agent::media_config::MediaApiConfig;
+use crate::agent::ai_client_pool::AiClientPool;
+use crate::agent::perception::{PerceptionEngine};
+use crate::agent::memory::MemoryManager;
+use crate::media_archive::MediaArchiveManager;
+use crate::agent::task::TaskManager;
+use crate::tools::{ToolRegistry, ToolFacade, ToolConfig};
+use crate::tools::executor::ToolExecutionManager;
+use crate::bridges::BridgeManager;
+
+/// Agent Runtime 状态
+pub struct AgentRuntimeState {
+    pub message_bus: MessageBus,
+    pub event_router: EventRouter,
+    pub agent_registry: Arc<AgentRegistry>,
+    pub agent_router: AgentRouter,
+    pub agent_supervisor: AgentSupervisor,
+    pub js_runtime_pool: JsRuntimePool,
+    pub task_queue: TaskQueue,
+    pub storage: Storage,
+    pub provider_registry: Arc<ProviderRegistry>,
+    pub tool_registry: Arc<ToolRegistry>,
+    pub tool_facade: Arc<ToolFacade>,
+    pub bridge_manager: Arc<BridgeManager>,
+    pub ai_client_pool: Arc<AiClientPool>,
+    pub agent_scheduler: Arc<AgentScheduler>,
+    pub perception_engine: Arc<PerceptionEngine>,
+}
+
+impl AgentRuntimeState {
+    pub async fn new(
+        tool_registry: Arc<ToolRegistry>,
+        bridge_manager: Arc<BridgeManager>,
+    ) -> Result<Self, String> {
+        // 加载媒体配置并创建 Provider Registry
+        let media_config = MediaApiConfig::load().unwrap_or_else(|_| MediaApiConfig::default());
+        let provider_registry = Arc::new(
+            ProviderRegistry::new(&media_config)
+                .unwrap_or_else(|e| {
+                    log::warn!("ProviderRegistry 创建失败：{}, 使用空配置", e);
+                    ProviderRegistry::new(&MediaApiConfig::default()).unwrap()
+                })
+        );
+        
+        let message_bus = MessageBus::with_default_capacity();
+        let event_router = EventRouter::new(message_bus.clone()).await;
+        let agent_registry = Arc::new(AgentRegistry::new());
+        let agent_router = AgentRouter::new(agent_registry.clone());
+        
+        // 创建统一工具入口（使用 ToolRegistry 和空的 ToolExecutionManager）
+        let execution_manager = Arc::new(ToolExecutionManager::new(ToolConfig::default()));
+        let tool_facade = Arc::new(ToolFacade::new(tool_registry.clone(), execution_manager));
+
+        // 创建 AI Client Pool
+        let ai_client_pool = Arc::new(AiClientPool::new());
+
+        // 创建 Agent Supervisor
+        let agent_supervisor = AgentSupervisor::new(
+            RestartPolicy::OnFailure(3),
+            tool_facade.clone(),
+            bridge_manager.clone(),
+            ai_client_pool.clone(),
+            tool_registry.clone(),
+        );
+        
+        let js_runtime_pool = JsRuntimePool::new(JsRuntimeConfig::default()).await?;
+        let task_queue = TaskQueue::new();
+        let storage = Storage::new("./alou_runtime.db").await?;
+
+        // 创建 Agent 调度器
+        let agent_scheduler = Arc::new(AgentScheduler::new(3000));
+
+        // 创建智能感知引擎
+        let memory_manager = Arc::new(
+            MemoryManager::new().map_err(|e| format!("MemoryManager 创建失败: {}", e))?
+        );
+        let perception_task_manager = Arc::new(TaskManager::new());
+        let perception_engine = Arc::new(PerceptionEngine::new(
+            memory_manager,
+            perception_task_manager,
+        ));
+
+        Ok(Self {
+            message_bus,
+            event_router,
+            agent_registry,
+            agent_router,
+            agent_supervisor,
+            js_runtime_pool,
+            task_queue,
+            storage,
+            provider_registry,
+            tool_registry,
+            tool_facade,
+            bridge_manager,
+            ai_client_pool,
+            agent_scheduler,
+            perception_engine,
+        })
+    }
+}
+
+/// Agent Runtime
+pub struct AgentRuntime {
+    pub state: Arc<AgentRuntimeState>,
+}
+
+impl AgentRuntime {
+    pub async fn new(
+        tool_registry: Arc<ToolRegistry>,
+        bridge_manager: Arc<BridgeManager>,
+    ) -> Result<Self, String> {
+        let state = Arc::new(AgentRuntimeState::new(tool_registry, bridge_manager).await?);
+        Ok(Self { state })
+    }
+
+    /// 启动运行时
+    pub async fn start(&self) -> Result<(), String> {
+        log::info!("Agent Runtime 启动");
+        Ok(())
+    }
+
+    /// 停止运行时
+    pub async fn stop(&self) -> Result<(), String> {
+        log::info!("Agent Runtime 停止");
+        Ok(())
+    }
+}

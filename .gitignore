@@ -29,7 +29,8 @@ target/
 .idea/**/shelf
 
 
-
+.kilo/
+.spec-workflow
 # AWS User-specific
 .idea/**/aws.xml
 
@@ -99,3 +100,5 @@ fabric.properties
 .idea/caches/build_file_checksums.ser
 .aider*
 .env
+alou-code/
+alou-desktop/node_modules

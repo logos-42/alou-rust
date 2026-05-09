@@ -22,7 +22,7 @@ async-stream = "0.3.6"
 clap = { version = "4.4", features = ["derive"] }
 anyhow = "1.0"
 tracing-subscriber = "0.3"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 dirs = "5.0"
 dotenv = "0.15"
@@ -40,6 +40,18 @@ rand = "0.8.5"
 
 # Claude Agent SDK
 claude-agent-sdk = "0.1.1"
+
+# Alou-Code integration (Dual Provider support: Anthropic + DeepSeek)
+# Using path dependencies to integrate alou-code crates
+api = { path = "alou-code/rust/crates/api" }
+runtime = { path = "alou-code/rust/crates/runtime" }
+tools = { path = "alou-code/rust/crates/tools" }
+commands = { path = "alou-code/rust/crates/commands" }
+plugins = { path = "alou-code/rust/crates/plugins" }
+telemetry = { path = "alou-code/rust/crates/telemetry" }
+
+# DIAP Identity System
+# diap-rs-sdk will be integrated via the identity bridge
 
 
 [[bin]]

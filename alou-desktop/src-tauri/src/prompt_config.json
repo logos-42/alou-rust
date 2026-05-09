@@ -1,0 +1,253 @@
+{
+  "system_prompt": "你是 Alou AI 助手，一个高级智能代理，具备以下能力：\n1. 使用各种工具（浏览器、消息传递、UI 控制等）完成复杂任务\n2. 进行智能决策和规划\n3. 与用户和其他 AI 代理协作\n4. 管理上下文和状态\n\n你的行为准则：\n- 始终考虑用户的意图和目标\n- 有效利用可用工具\n- 保持上下文一致性\n- 做出明智的决策\n- 透明地报告进展和问题",
+  "tasks": [
+    {
+      "id": "web_browsing",
+      "description": "浏览网页并提取信息",
+      "objectives": [
+        "找到特定信息",
+        "保存结果",
+        "验证信息准确性"
+      ],
+      "constraints": [
+        "遵守网站使用条款",
+        "避免过于频繁的请求"
+      ],
+      "priority": "High",
+      "relevant_tools": [
+        "browser"
+      ]
+    },
+    {
+      "id": "message_communication",
+      "description": "通过消息系统与其他代理通信",
+      "objectives": [
+        "发送消息",
+        "接收回复",
+        "处理通信错误"
+      ],
+      "constraints": [
+        "确保消息安全性",
+        "验证消息完整性"
+      ],
+      "priority": "Medium",
+      "relevant_tools": [
+        "message_passing",
+        "pubsub"
+      ]
+    },
+    {
+      "id": "desktop_automation",
+      "description": "自动化桌面应用程序操作",
+      "objectives": [
+        "执行UI操作",
+        "监控应用状态",
+        "处理异常情况"
+      ],
+      "constraints": [
+        "不干扰用户正常操作",
+        "确保操作安全性"
+      ],
+      "priority": "High",
+      "relevant_tools": [
+        "ui_control"
+      ]
+    }
+  ],
+  "tools": {
+    "browser": {
+      "name": "browser",
+      "description": "Web浏览器控制工具",
+      "use_cases": [
+        "网页浏览",
+        "表单填写",
+        "数据提取"
+      ],
+      "guidance": [
+        "使用合适的CSS选择器",
+        "等待页面元素加载完成",
+        "处理可能出现的错误"
+      ],
+      "considerations": [
+        "注意网站加载时间",
+        "处理反爬虫机制",
+        "保护用户隐私"
+      ],
+      "success_criteria": [
+        "页面成功加载",
+        "正确提取所需信息",
+        "无错误发生"
+      ]
+    },
+    "message_passing": {
+      "name": "message_passing",
+      "description": "消息传递工具",
+      "use_cases": [
+        "发送消息",
+        "订阅主题",
+        "获取消息历史"
+      ],
+      "guidance": [
+        "使用有意义的主题名",
+        "确保消息格式正确",
+        "处理通信错误"
+      ],
+      "considerations": [
+        "消息安全性和隐私",
+        "网络连接稳定性",
+        "消息重复和丢失"
+      ],
+      "success_criteria": [
+        "消息成功发送/接收",
+        "通信无错误",
+        "达到预期效果"
+      ]
+    },
+    "pubsub": {
+      "name": "pubsub",
+      "description": "发布-订阅消息系统",
+      "use_cases": [
+        "发布消息",
+        "订阅主题",
+        "管理消息队列"
+      ],
+      "guidance": [
+        "创建有意义的主题",
+        "处理订阅者管理",
+        "监控消息流"
+      ],
+      "considerations": [
+        "消息持久化需求",
+        "订阅者连接管理",
+        "消息顺序保证"
+      ],
+      "success_criteria": [
+        "消息成功发布/订阅",
+        "系统稳定运行",
+        "满足性能要求"
+      ]
+    },
+    "ui_control": {
+      "name": "ui_control",
+      "description": "桌面UI控制工具",
+      "use_cases": [
+        "点击按钮",
+        "输入文本",
+        "控制应用窗口"
+      ],
+      "guidance": [
+        "识别正确的UI元素",
+        "等待元素可用",
+        "验证操作结果"
+      ],
+      "considerations": [
+        "不影响用户正常使用",
+        "处理UI变化",
+        "确保操作安全性"
+      ],
+      "success_criteria": [
+        "UI操作成功执行",
+        "应用状态符合预期",
+        "无意外副作用"
+      ]
+    }
+  },
+  "decision_strategies": [
+    {
+      "name": "Standard Tool Usage",
+      "description": "标准工具使用策略",
+      "conditions": [
+        {
+          "condition_type": "ResourceAvailability",
+          "parameters": {
+            "resource_type": "tool"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "action_type": "UseTool",
+          "parameters": {
+            "max_retries": "3"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Recovery",
+      "description": "错误恢复策略",
+      "conditions": [
+        {
+          "condition_type": "ToolFailure",
+          "parameters": {
+            "failure_type": "transient"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "action_type": "Retry",
+          "parameters": {
+            "delay_seconds": "5"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Critical Failure",
+      "description": "严重故障处理策略",
+      "conditions": [
+        {
+          "condition_type": "ToolFailure",
+          "parameters": {
+            "failure_type": "critical"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "action_type": "Abort",
+          "parameters": {
+            "notify_user": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "risk_assessment": {
+    "level": "Medium",
+    "factors": [
+      {
+        "name": "Data Loss",
+        "impact": 0.8,
+        "probability": 0.1
+      },
+      {
+        "name": "Privacy Breach",
+        "impact": 1.0,
+        "probability": 0.05
+      },
+      {
+        "name": "Resource Exhaustion",
+        "impact": 0.6,
+        "probability": 0.2
+      }
+    ],
+    "mitigation_strategies": [
+      "Implement proper error handling",
+      "Validate all inputs",
+      "Monitor resource usage",
+      "Log all actions for audit trail"
+    ]
+  },
+  "priority_algorithm": {
+    "method": "WeightedSum",
+    "weights": {
+      "Urgency": 0.3,
+      "Importance": 0.3,
+      "ResourceCost": 0.2,
+      "Risk": 0.1,
+      "Dependency": 0.1
+    }
+  }
+}

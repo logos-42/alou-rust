@@ -1,0 +1,356 @@
+//! 工具执行器模块
+//!
+//! 提供丰富的工具生态系统，支持文件操作、终端命令、搜索、计划管理等功能
+
+use std::sync::Arc;
+
+pub mod executor;
+pub mod registry;
+pub mod facade;  // 统一工具入口
+pub mod media_tools;  // 媒体工具
+pub mod bash;
+pub mod filesystem;
+pub mod search;
+pub mod network;
+pub mod system;
+pub mod plan;
+pub mod todolist;
+pub mod agent_skills;
+pub mod tool_creation;
+pub mod tool_parts;
+pub mod iroh_tool;
+pub mod message_passing;
+pub mod pubsub_tool;
+pub mod ui_control;
+pub mod browser_tool;
+pub mod rollback;
+pub mod ipfs_archive;
+pub mod git_helper;
+pub mod agent_creator;
+pub mod task_queue;             // 任务队列系统核心
+pub mod task_queue_tool;        // 任务队列Tauri工具
+pub mod task_system;            // Task 系统（支持 Agent Swarm）
+pub mod skill_auto_selector;      // Skills 自动选择器核心
+pub mod skill_auto_selector_tool; // Skills自动选择器Tauri工具
+pub mod autonomous_executor;       // 自主执行引擎
+pub mod autonomous_executor_tool;  // 自主执行器Tauri工具
+pub mod group_coordinator;         // 群聊协调器（智能体群聊协作）
+pub mod adapters;                  // 群聊适配器模块
+pub mod spec_tool;                 // Spec 规格文档管理工具
+pub mod agent_wallet;             // Agent 钱包工具
+pub mod wallet_manager;           // 钱包管理器工具
+pub mod query_blockchain;         // 区块链查询工具
+pub mod build_transaction;        // 交易构建工具
+pub mod broadcast_transaction;    // 交易广播工具
+pub mod meta_tool;                // 元行动工具（记忆、目标管理）
+pub mod polymarket;              // Polymarket预测市场工具
+pub mod self_repair_tool;        // 自修复工具（检测、构建、重启）
+pub mod aloucode_adapter;        // AlouCode工具适配器
+
+// 重新导出核心类型和接口
+pub use executor::{ToolExecutor, ToolResult, ToolError};
+// ToolCategory is defined in this module, not registry
+pub use registry::ToolRegistry;
+pub use facade::{ToolFacade, ToolInfo};
+pub use filesystem::FileSystemTool;
+pub use search::SearchTool;
+pub use bash::BashTool;
+pub use plan::PlanTool;
+pub use todolist::TodoListTool;
+pub use agent_skills::AgentSkillsTool;
+pub use tool_creation::ToolCreationTool;
+pub use spec_tool::SpecTool;
+// 从 tool_parts 直接导出定义类型和执行器
+pub use tool_parts::executor::DynamicToolExecutor;
+pub use meta_tool::MetaActionTools;  // 导出元行动工具
+pub use aloucode_adapter::{get_aloucode_tool_definitions, get_aloucode_tool_metadata, get_aloucode_tool_map};
+
+// 导出媒体工具
+pub use media_tools::{GenerateImageTool, GenerateAudioTool, GenerateVideoTool, GetVideoStatusTool};
+
+// 导出通知工具类型 - 暂时注释，等待模块创建
+// pub use notification::{NotificationTool, NotificationLevel, NotificationType};
+
+// 工具分类枚举
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum ToolCategory {
+    /// 文件系统操作
+    FileSystem,
+    /// 搜索和查找
+    Search,
+    /// 终端命令执行
+    Terminal,
+    /// 网络操作
+    Network,
+    /// 系统信息
+    System,
+    /// 计划和任务管理
+    Planning,
+    /// 待办事项
+    Todo,
+    /// Skills 系统
+    Skills,
+    /// 智能体自动化
+    Automation,
+    /// 通信协作
+    Communication,
+    /// 开发工具
+    Development,
+    /// Web3 / 区块链操作
+    Web3,
+    /// 其他
+    Other,
+}
+
+impl Default for ToolCategory {
+    fn default() -> Self {
+        ToolCategory::Other
+    }
+}
+
+// 工具优先级
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+pub enum ToolPriority {
+    /// 最高优先级
+    Critical = 0,
+    /// 高优先级
+    High = 1,
+    /// 中等优先级
+    Medium = 2,
+    /// 低优先级
+    Low = 3,
+}
+
+impl Default for ToolPriority {
+    fn default() -> Self {
+        ToolPriority::Medium
+    }
+}
+
+// 工具状态
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ToolStatus {
+    /// 可用
+    Available,
+    /// 不可用
+    Unavailable,
+    /// 需要权限
+    RequiresPermission,
+    /// 正在执行
+    Executing,
+    /// 出错
+    Error,
+    /// 活跃/启用
+    Active,
+}
+
+impl Default for ToolStatus {
+    fn default() -> Self {
+        ToolStatus::Available
+    }
+}
+
+/// 工具元信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct ToolMetadata {
+    /// 工具ID
+    pub id: String,
+    /// 工具名称
+    pub name: String,
+    /// 工具描述
+    pub description: String,
+    /// 工具分类
+    pub category: ToolCategory,
+    /// 工具优先级
+    pub priority: ToolPriority,
+    /// 工具状态
+    pub status: ToolStatus,
+    /// 工具版本
+    pub version: String,
+    /// 作者
+    pub author: String,
+    /// 创建时间
+    #[serde(default)]
+    pub created_at: i64,
+    /// 更新时间
+    #[serde(default)]
+    pub updated_at: i64,
+    /// 依赖项
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    /// 平台兼容性
+    #[serde(default)]
+    pub platforms: Vec<String>,
+    /// 权限要求
+    #[serde(default)]
+    pub permissions: Vec<String>,
+    /// 标签
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// 工具执行上下文
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ExecutionContext {
+    /// 会话ID
+    pub session_id: String,
+    /// 用户ID
+    pub user_id: Option<String>,
+    /// 执行目录
+    pub working_directory: Option<String>,
+    /// 环境变量
+    pub environment: std::collections::HashMap<String, String>,
+    /// 超时时间（秒）
+    pub timeout_seconds: Option<u64>,
+    /// 权限上下文
+    pub permissions: Vec<String>,
+    /// 执行时间戳
+    pub timestamp: i64,
+}
+
+/// 工具配置
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ToolConfig {
+    /// 是否启用工具
+    pub enabled: bool,
+    /// 最大并发执行数
+    pub max_concurrent: usize,
+    /// 默认超时时间
+    pub default_timeout: u64,
+    /// 缓存配置
+    pub cache_enabled: bool,
+    /// 安全模式
+    pub safe_mode: bool,
+    /// 调试模式
+    pub debug_mode: bool,
+}
+
+impl Default for ToolConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_concurrent: 5,
+            default_timeout: 30,
+            cache_enabled: true,
+            safe_mode: true,
+            debug_mode: false,
+        }
+    }
+}
+
+/// 初始化所有工具
+pub async fn initialize_tools() -> Result<ToolRegistry, Box<dyn std::error::Error>> {
+    let mut registry = ToolRegistry::new();
+
+    // 注册文件系统工具
+    let fs_tool = Arc::new(FileSystemTool::new());
+    registry.register(fs_tool).await?;
+
+    // 注册搜索工具
+    let search_tool = Arc::new(SearchTool::new());
+    registry.register(search_tool).await?;
+
+    // 注册Bash工具
+    let bash_tool = Arc::new(BashTool::new());
+    registry.register(bash_tool).await?;
+
+    // 注册计划工具
+    let plan_tool = Arc::new(PlanTool::new());
+    registry.register(plan_tool).await?;
+
+    // 注册待办事项工具
+    let todo_tool = Arc::new(TodoListTool::new());
+    registry.register(todo_tool).await?;
+
+    // 注册Agent Skills工具（替代旧的Skills工具）
+    let agent_skills_tool = Arc::new(AgentSkillsTool::new()?);
+    registry.register(agent_skills_tool).await?;
+
+
+    // 注册工具创建和记录工具
+    let tool_creation_tool = Arc::new(ToolCreationTool::new());
+    registry.register(tool_creation_tool).await?;
+
+    // 注册动态工具执行器
+    let dynamic_tool_executor = Arc::new(DynamicToolExecutor::new());
+    registry.register(dynamic_tool_executor).await?;
+
+    // 注册 Iroh 工具
+    let iroh_tool = Arc::new(crate::tools::iroh_tool::IrohTool::new());
+    registry.register(iroh_tool).await?;
+
+    // 注册消息传递工具
+    let message_passing_tool = Arc::new(crate::tools::message_passing::MessagePassingTool::new());
+    registry.register(message_passing_tool).await?;
+
+    // 注册统一群聊适配器
+    let group_adapter = Arc::new(crate::tools::adapters::GroupAdapter::new());
+    registry.register(group_adapter).await?;
+
+    // 注册 PubSub 工具
+    let pubsub_tool = Arc::new(crate::tools::pubsub_tool::PubSubTool::new());
+    registry.register(pubsub_tool).await?;
+
+    // 注册 UI 控件工具
+    let ui_control_tool = Arc::new(crate::tools::ui_control::UIControlTool::new(None));
+    registry.register(ui_control_tool).await?;
+
+    // 注册浏览器工具
+    let browser_tool = Arc::new(crate::tools::browser_tool::BrowserTool::new());
+    registry.register(browser_tool).await?;
+
+    // 注册 Git 助手工具
+    let git_helper_tool = Arc::new(crate::tools::git_helper::GitHelperTool::new());
+    registry.register(git_helper_tool).await?;
+
+    // 注册回滚工具
+    let rollback_tool = Arc::new(crate::tools::rollback::RollbackTool::new());
+    registry.register(rollback_tool).await?;
+
+    // 注册网络工具
+    let network_tool = Arc::new(crate::tools::network::NetworkTool::new());
+    registry.register(network_tool).await?;
+
+    // 注册系统工具
+    let system_tool = Arc::new(crate::tools::system::SystemTool::new());
+    registry.register(system_tool).await?;
+
+    // 注册 IPFS 归档工具
+    let ipfs_archive_tool = Arc::new(crate::tools::ipfs_archive::IpfsArchiveTool::new());
+    registry.register(ipfs_archive_tool).await?;
+
+    // 注册智能体创建工具
+    let agent_creator_tool = Arc::new(crate::tools::agent_creator::AgentCreatorTool::new());
+    registry.register(agent_creator_tool).await?;
+
+    // 注册 Spec 工具
+    let spec_tool = Arc::new(SpecTool::new());
+    registry.register(spec_tool).await?;
+
+    // 注册 Polymarket 预测市场工具
+    let polymarket_tool = Arc::new(crate::tools::polymarket::PolymarketTool::new());
+    registry.register(polymarket_tool).await?;
+
+
+    Ok(registry)
+}
+
+/// 获取默认工具配置
+pub fn default_tool_config() -> ToolConfig {
+    ToolConfig::default()
+}
+
+/// 创建默认执行上下文
+pub fn create_execution_context(session_id: String) -> ExecutionContext {
+    ExecutionContext {
+        session_id,
+        user_id: None,
+        working_directory: std::env::current_dir()
+            .ok()
+            .and_then(|p| p.to_str().map(|s| s.to_string())),
+        environment: std::env::vars().collect(),
+        timeout_seconds: Some(30),
+        permissions: vec!["read".to_string(), "write".to_string()],
+        timestamp: chrono::Utc::now().timestamp(),
+    }
+}
