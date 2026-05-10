@@ -51,6 +51,9 @@ use crate::tools::{ToolRegistry, ToolFacade, ToolConfig};
 use crate::tools::executor::ToolExecutionManager;
 use crate::bridges::BridgeManager;
 
+// Alou Code Kernel
+use crate::alou_code_bridge::{AlouCodeKernel, ToolAdapter, SessionManager};
+
 /// Agent Runtime 状态
 pub struct AgentRuntimeState {
     pub message_bus: MessageBus,
@@ -68,6 +71,10 @@ pub struct AgentRuntimeState {
     pub ai_client_pool: Arc<AiClientPool>,
     pub agent_scheduler: Arc<AgentScheduler>,
     pub perception_engine: Arc<PerceptionEngine>,
+    // Alou Code Kernel - 核心引擎
+    pub alou_code_kernel: Option<Arc<AlouCodeKernel>>,
+    pub alou_code_tool_adapter: Option<ToolAdapter>,
+    pub alou_code_session_manager: Option<SessionManager>,
 }
 
 impl AgentRuntimeState {
@@ -123,6 +130,23 @@ impl AgentRuntimeState {
             perception_task_manager,
         ));
 
+        // 初始化 Alou Code Kernel (核心引擎)
+        let alou_code_kernel = match AlouCodeKernel::get_or_init() {
+            Ok(kernel) => {
+                log::info!("Alou Code Kernel 初始化成功");
+                Some(kernel)
+            }
+            Err(e) => {
+                log::warn!("Alou Code Kernel 初始化失败: {}，将继续使用桌面工具系统", e);
+                None
+            }
+        };
+        let alou_code_tool_adapter = Some(ToolAdapter::new());
+        let alou_code_session_manager = SessionManager::new().ok().map(|mgr| {
+            log::info!("Alou Code Session Manager 初始化成功");
+            mgr
+        });
+
         Ok(Self {
             message_bus,
             event_router,
@@ -139,6 +163,9 @@ impl AgentRuntimeState {
             ai_client_pool,
             agent_scheduler,
             perception_engine,
+            alou_code_kernel,
+            alou_code_tool_adapter,
+            alou_code_session_manager,
         })
     }
 }

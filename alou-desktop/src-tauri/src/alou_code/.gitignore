@@ -1,0 +1,23 @@
+__pycache__/
+archive/
+.omx/
+.claw/   
+.claude/
+.clawd-agents/
+# Claude Code local artifacts
+.claude/settings.local.json
+.claude/sessions/
+# Alou Code local artifacts
+.alou/settings.local.json
+.alou/sessions/
+**/.alou/
+.clawhip/
+status-help.txt
+
+# Sandbox & build artifacts
+.sandbox-home/
+target/
+*.swp
+*.swo
+.DS_Store
+*.env

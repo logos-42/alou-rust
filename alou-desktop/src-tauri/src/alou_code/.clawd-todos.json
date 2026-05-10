@@ -1,0 +1,17 @@
+[
+  {
+    "content": "Add PolymarketGetOrders tool to tools crate",
+    "activeForm": "Adding PolymarketGetOrders tool",
+    "status": "in_progress"
+  },
+  {
+    "content": "Add PolymarketGetTrades tool to tools crate",
+    "activeForm": "Adding PolymarketGetTrades tool",
+    "status": "pending"
+  },
+  {
+    "content": "Run cargo fmt + clippy + test",
+    "activeForm": "Running verification",
+    "status": "pending"
+  }
+]

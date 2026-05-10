@@ -27,9 +27,10 @@ target/
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
-
-
-
+.kilo
+.spec-workflow
+.vite
+.vscode
 # AWS User-specific
 .idea/**/aws.xml
 

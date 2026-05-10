@@ -15,6 +15,8 @@ mod ipns_verified;  // 新增验证过的IPNS解决方案
 mod runtime;
 use crate::runtime::router::SessionRouter;
 
+// Alou Code Kernel Bridge - 嵌入的 alou-code 引擎
+mod alou_code_bridge;
 
 mod kubo;
 mod kv_commands;  // 新增KV存储模块
@@ -54,6 +56,11 @@ use chrono;
 use tauri::Manager;
 use tauri::Emitter;
 use tauri::menu::{Menu, Submenu, PredefinedMenuItem, MenuItem};
+
+// Alou Code Kernel imports
+use crate::alou_code_bridge::{
+    AlouCodeKernel, ToolAdapter, SessionManager, IdentityHandler,
+};
 
 use crate::ipfs_node::{bootstrap_ipfs, IpfsState};
 use crate::kubo::download_kubo_binary;
