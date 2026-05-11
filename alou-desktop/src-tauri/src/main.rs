@@ -47,7 +47,6 @@ mod scheduler;  // Agent 调度器模块
 mod tasks;  // 任务管理模块
 mod logs;  // 日志管理模块
 mod agent_runtime;  // Agent Runtime 模块（新增）
-// mod kappa_loop;     // Kappa Loop 卡帕斯循环模块（自修复）- DISABLED due to hyperagent dependency
 mod self_repair;    // 自修复系统（修改自身代码并验证）
 
 use std::path::PathBuf;
@@ -159,17 +158,6 @@ use crate::autonomous_loop_commands::{
     get_autonomous_loop_state,
     add_autonomous_task,
 };
-
-// Kappa Loop commands - 卡帕斯循环命令 (DISABLED due to hyperagent dependency)
-// use crate::kappa_loop::commands::{
-//     start_kappa_loop,
-//     stop_kappa_loop,
-//     pause_kappa_loop,
-//     resume_kappa_loop,
-//     get_kappa_loop_state,
-//     trigger_kappa_self_repair,
-//     update_kappa_loop_config,
-// };
 
 // Heartbeat commands - 心跳命令
 use crate::heartbeat::{
@@ -806,14 +794,6 @@ fn main() {
             resume_autonomous_loop,
             get_autonomous_loop_state,
             add_autonomous_task,
-            // Kappa Loop commands - 卡帕斯循环 (DISABLED due to hyperagent dependency)
-            // start_kappa_loop,
-            // stop_kappa_loop,
-            // pause_kappa_loop,
-            // resume_kappa_loop,
-            // get_kappa_loop_state,
-            // trigger_kappa_self_repair,
-            // update_kappa_loop_config,
             // Skill Auto Selector commands
             analyze_and_select_tools,
             generate_execution_plan,
@@ -895,10 +875,6 @@ fn main() {
                 )),
                 std::sync::Arc::new(tokio::sync::Mutex::new(crate::tools::ToolRegistry::new()))
             )
-        )))
-        // Kappa Loop state - 卡帕斯循环状态
-        .manage(std::sync::Arc::new(tokio::sync::Mutex::new(
-            crate::kappa_loop::KappaLoop::new(crate::kappa_loop::KappaLoopConfig::default())
         )))
         .setup(|app| {
             // 初始化 DIAP 文件管理器（用于 DIAP 身份文件存储）

@@ -43,8 +43,8 @@ redis = { version = "1.0.5", features = ["tokio-comp", "json"] }
 # Encryption
 aes-gcm = "0.10"
 
-# IPFS - DISABLED DUE TO DEPENDENCY CONFLICT
-# ipfs-api-backend-hyper = { version = "0.6", features = ["with-send-sync"] }
+# IPFS - using older version to avoid core2 conflict
+ipfs-api-backend-hyper = { version = "0.5", features = ["with-send-sync"] }
 
 # Bot Gateway
 iroh = "0.96"
