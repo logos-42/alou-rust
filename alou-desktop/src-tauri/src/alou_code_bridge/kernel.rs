@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
 
-use runtime::{
+use alou_code_runtime::{
     ConfigLoader,
     SessionStore,
     SessionIdentity,
@@ -44,13 +44,13 @@ impl AlouCodeKernel {
             .cloned()
     }
 
-    pub fn list_tools(&self) -> Vec<tools::ToolDefinition> {
-        let registry = tools::GlobalToolRegistry::builtin();
+    pub fn list_tools(&self) -> Vec<alou_code_tools::ToolDefinition> {
+        let registry = alou_code_tools::GlobalToolRegistry::builtin();
         registry.definitions(None)
     }
 
     pub fn execute_tool(&self, name: &str, input: &serde_json::Value) -> Result<String, String> {
-        let registry = tools::GlobalToolRegistry::builtin();
+        let registry = alou_code_tools::GlobalToolRegistry::builtin();
         registry.execute(name, input)
     }
 }

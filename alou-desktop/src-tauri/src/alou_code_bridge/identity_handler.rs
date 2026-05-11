@@ -50,9 +50,9 @@ impl IdentityHandler {
         self.identity = None;
     }
 
-    pub fn to_session_identity(&self) -> Option<runtime::SessionIdentity> {
+    pub fn to_session_identity(&self) -> Option<alou_code_runtime::SessionIdentity> {
         self.identity.as_ref().map(|id| {
-            runtime::SessionIdentity::new(
+            alou_code_runtime::SessionIdentity::new(
                 format!("Agent-{}", &id.did[..8]),
                 id.session_id.clone(),
                 format!("DID: {}, IPNS: {}", id.did, id.ipns),

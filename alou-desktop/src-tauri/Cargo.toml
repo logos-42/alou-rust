@@ -63,10 +63,11 @@ rig-core = "0.33"
 dotenvy = "0.15"
 
 # Alou Code Kernel (embedded)
-runtime = { path = "./src/alou_code/crates/runtime" }
-tools = { path = "./src/alou_code/crates/tools" }
-api = { path = "./src/alou_code/crates/api" }
-telemetry = { path = "./src/alou_code/crates/telemetry" }
+alou_code_runtime = { path = "./src/alou_code/crates/runtime" }
+alou_code_tools = { path = "./src/alou_code/crates/tools" }
+alou_code_api = { path = "./src/alou_code/crates/api" }
+alou_code_telemetry = { path = "./src/alou_code/crates/telemetry" }
+alou_code_plugins = { path = "./src/alou_code/crates/plugins" }
 
 # Utils
 hex = "0.4"

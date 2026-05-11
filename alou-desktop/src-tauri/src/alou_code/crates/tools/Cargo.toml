@@ -1,23 +1,20 @@
 [package]
-name = "tools"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
+name = "alou_code_tools"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
 
 [dependencies]
-api = { path = "../api" }
-commands = { path = "../commands" }
+api = { package = "alou_code_api", path = "../api" }
+# commands = { path = "../commands" }
 flate2 = "1"
-plugins = { path = "../plugins" }
-runtime = { path = "../runtime" }
+plugins = { package = "alou_code_plugins", path = "../plugins" }
+runtime = { package = "alou_code_runtime", path = "../runtime" }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
-serde_json.workspace = true
+serde_json = "1"
 tokio = { version = "1", features = ["rt-multi-thread"] }
 polymarket-client-sdk = { version = "0.4.4", features = ["clob", "gamma"] }
 num-bigint = "0.4"
 dotenv = "0.15"
-
-[lints]
-workspace = true

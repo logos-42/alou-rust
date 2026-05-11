@@ -2,7 +2,7 @@
 //!
 //! Manages sessions using alou_code's session store.
 
-use runtime::{Session, SessionStore, SessionControlError};
+use alou_code_runtime::{Session, SessionStore, SessionControlError};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
