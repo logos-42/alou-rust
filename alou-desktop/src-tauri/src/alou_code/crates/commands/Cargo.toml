@@ -1,14 +1,11 @@
 [package]
-name = "commands"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
-
-[lints]
-workspace = true
+name = "alou_code_commands"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
 
 [dependencies]
-plugins = { path = "../plugins" }
-runtime = { path = "../runtime" }
-serde_json.workspace = true
+plugins = { package = "alou_code_plugins", path = "../plugins" }
+runtime = { package = "alou_code_runtime", path = "../runtime" }
+serde_json = "1"

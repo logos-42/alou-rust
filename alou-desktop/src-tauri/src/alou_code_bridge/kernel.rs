@@ -5,12 +5,10 @@
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use once_cell::sync::OnceCell;
-use std::path::PathBuf;
 
 use alou_code_runtime::{
     ConfigLoader,
     SessionStore,
-    SessionIdentity,
 };
 
 static KERNEL_INSTANCE: OnceCell<Arc<RwLock<AlouCodeKernel>>> = OnceCell::new();
@@ -44,7 +42,7 @@ impl AlouCodeKernel {
             .cloned()
     }
 
-    pub fn list_tools(&self) -> Vec<alou_code_tools::ToolDefinition> {
+    pub fn list_tools(&self) -> Vec<alou_code_api::types::ToolDefinition> {
         let registry = alou_code_tools::GlobalToolRegistry::builtin();
         registry.definitions(None)
     }

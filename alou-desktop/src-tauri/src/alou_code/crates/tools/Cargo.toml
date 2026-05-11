@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 api = { package = "alou_code_api", path = "../api" }
-# commands = { path = "../commands" }
+alou_code_commands = { path = "../commands" }
 flate2 = "1"
 plugins = { package = "alou_code_plugins", path = "../plugins" }
 runtime = { package = "alou_code_runtime", path = "../runtime" }

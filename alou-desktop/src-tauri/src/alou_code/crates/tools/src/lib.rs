@@ -4,11 +4,12 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use api::{
-    max_tokens_for_model, model_family_identity_for, resolve_model_alias, ApiError,
+    max_tokens_for_model, resolve_model_alias, ApiError,
     ContentBlockDelta, InputContentBlock, InputMessage, MessageRequest, MessageResponse,
     OutputContentBlock, ProviderClient, StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition,
     ToolResultContentBlock,
 };
+use alou_code_commands as commands;
 use plugins::PluginTool;
 use reqwest::blocking::Client;
 use runtime::{
@@ -25,9 +26,9 @@ use runtime::{
     write_file, ApiClient, ApiRequest, AssistantEvent, BashCommandInput, BashCommandOutput,
     BranchFreshness, ConfigLoader, ContentBlock, ConversationMessage, ConversationRuntime,
     GrepSearchInput, LaneCommitProvenance, LaneEvent, LaneEventBlocker, LaneEventName,
-    LaneEventStatus, LaneFailureClass, McpDegradedReport, MessageRole, PermissionMode,
-    PermissionPolicy, PromptCacheEvent, ProviderFallbackConfig, RuntimeError, Session, TaskPacket,
-    ToolError, ToolExecutor,
+    LaneEventStatus, LaneFailureClass, McpDegradedReport, MessageRole, ModelFamilyIdentity,
+    PermissionMode, PermissionPolicy, PromptCacheEvent, ProviderFallbackConfig, RuntimeError, Session,
+    TaskPacket, ToolError, ToolExecutor,
 };
 use serde::{Deserialize, Serialize};
 
@@ -3788,18 +3789,28 @@ fn build_agent_runtime(
 
 fn build_agent_system_prompt(subagent_type: &str, model: &str) -> Result<Vec<String>, String> {
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+    let model_family = model_family_identity_for(model);
     let mut prompt = load_system_prompt(
         cwd,
         DEFAULT_AGENT_SYSTEM_DATE.to_string(),
         std::env::consts::OS,
         "unknown",
-        model_family_identity_for(model),
+        model_family,
     )
     .map_err(|error| error.to_string())?;
     prompt.push(format!(
         "You are a background sub-agent of type `{subagent_type}`. Work only on the delegated task, use only the tools available to you, do not ask the user questions, and finish with a concise result."
     ));
     Ok(prompt)
+}
+
+fn model_family_identity_for(model: &str) -> ModelFamilyIdentity {
+    let resolved = resolve_model_alias(model);
+    if resolved.starts_with("claude") {
+        ModelFamilyIdentity::Claude
+    } else {
+        ModelFamilyIdentity::Generic
+    }
 }
 
 fn resolve_agent_model(model: Option<&str>) -> String {

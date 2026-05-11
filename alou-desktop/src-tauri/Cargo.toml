@@ -54,7 +54,7 @@ iroh-gossip = "0.96"
 rquickjs = { version = "0.10", features = ["full", "parallel"] }
 
 # DIAP SDK
-diap-rs-sdk = { version = "0.2", default-features = false, features = ["embedded-noir"] }
+diap-rs-sdk = { version = "0.2", default-features = false, features = ["embedded-noir", "iroh"] }
 anyhow = "1"
 
 # Hyperagent (Kappa Loop - 自修复循环) - TEMPORARILY DISABLED

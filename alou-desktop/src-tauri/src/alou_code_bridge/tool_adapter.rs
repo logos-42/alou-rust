@@ -2,8 +2,10 @@
 //!
 //! Adapts desktop tools to work with alou_code's tool registry and execution model.
 
-use serde_json::{Value, json};
-use alou_code_tools::{GlobalToolRegistry, RuntimeToolDefinition, ToolDefinition, PermissionMode};
+use serde_json::Value;
+use alou_code_tools::{GlobalToolRegistry, RuntimeToolDefinition};
+use alou_code_api::types::ToolDefinition;
+use alou_code_runtime::permissions::PermissionMode;
 
 pub struct ToolAdapter {
     registry: GlobalToolRegistry,
