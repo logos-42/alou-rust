@@ -219,7 +219,7 @@ async fn execute_tool(
 
     // 记录解析后的参数
     println!("[Tauri] 解析后的参数：{:#}", args_value);
-    
+
     // 检查关键工具的 operation 字段
     if tool_id == "filesystem" || tool_id == "bash" || tool_id == "search" {
         if let Some(operation) = args_value.get("operation") {
@@ -227,7 +227,7 @@ async fn execute_tool(
         } else {
             println!("[Tauri] ⚠️ 警告：{} 工具缺少 operation 字段", tool_id);
         }
-        
+
         // 检查 shell 字段（bash 工具需要）
         if tool_id == "bash" {
             if let Some(shell) = args_value.get("shell") {
@@ -243,7 +243,64 @@ async fn execute_tool(
         }
     }
 
-    // Get tool bridge and execute tool
+    // 尝试使用 alou_code_kernel 执行工具（如果可用）
+    let use_alou_code = match alou_code_bridge::AlouCodeKernel::get_or_init() {
+        Ok(kernel) => {
+            let adapter = alou_code_bridge::AlouCodeKernel::init_tool_adapter();
+            if adapter.get_tool_definition(&tool_id).is_some() {
+                println!("[Tauri] ✓ 工具 {} 在 alou_code kernel 中可用，优先使用", tool_id);
+                true
+            } else {
+                println!("[Tauri] ⚠️ 工具 {} 不在 alou_code kernel 中，使用 bridge_manager", tool_id);
+                false
+            }
+        }
+        Err(e) => {
+            println!("[Tauri] ⚠️ alou_code_kernel 不可用：{}，使用 bridge_manager", e);
+            false
+        }
+    };
+
+    if use_alou_code {
+        match alou_code_bridge::AlouCodeKernel::get_or_init() {
+            Ok(kernel) => {
+                let result = kernel.read().await.execute_tool(&tool_id, &args_value);
+                match result {
+                    Ok(output) => {
+                        println!("[Tauri] ✓ alou_code_kernel 工具执行成功：{}", tool_id);
+                        let output_value: serde_json::Value = serde_json::from_str(&output)
+                            .unwrap_or_else(|_| serde_json::json!({"result": output}));
+                        Ok(serde_json::json!({
+                            "success": true,
+                            "data": output_value,
+                            "execution_time_ms": 100,
+                            "output": format!("Tool '{}' executed via alou_code kernel", tool_id)
+                        }))
+                    }
+                    Err(e) => {
+                        println!("[Tauri] ⚠️ alou_code_kernel 工具执行失败：{}，回退到 bridge_manager", e);
+                        // 回退到 bridge_manager
+                        execute_via_bridge(bridge_manager, tool_id, args_value, timeout, app).await
+                    }
+                }
+            }
+            Err(e) => {
+                println!("[Tauri] ⚠️ alou_code_kernel 获取失败：{}，使用 bridge_manager", e);
+                execute_via_bridge(bridge_manager, tool_id, args_value, timeout, app).await
+            }
+        }
+    } else {
+        execute_via_bridge(bridge_manager, tool_id, args_value, timeout, app).await
+    }
+}
+
+async fn execute_via_bridge(
+    bridge_manager: tauri::State<'_, std::sync::Arc<BridgeManager>>,
+    tool_id: String,
+    args_value: serde_json::Value,
+    timeout: Option<u64>,
+    app: tauri::AppHandle,
+) -> Result<serde_json::Value, String> {
     let tool_bridge = bridge_manager.tool_bridge();
 
     let request = crate::bridges::ToolCallRequest {
@@ -260,7 +317,7 @@ async fn execute_tool(
     };
 
     println!("[Tauri] 调用 tool_bridge.handle_request...");
-    
+
     match tool_bridge.handle_request(request).await {
         Ok(response) => {
             if response.success {
@@ -274,7 +331,7 @@ async fn execute_tool(
                 let data = response.result.as_ref()
                     .map(|r| r.data.clone())
                     .unwrap_or_else(|| serde_json::json!({"status": "success"}));
-                
+
                 // 🔥 如果是 agent_creator create 操作成功，发送 agent:created 事件
                 if tool_id == "agent_creator" {
                     if let Some(action) = args_value.get("action").and_then(|v| v.as_str()) {
@@ -289,13 +346,13 @@ async fn execute_tool(
                                 "avatar": data.get("avatar").and_then(|v| v.as_str()).unwrap_or("🤖"),
                                 "status": "ready",
                             });
-                            
+
                             println!("[Tauri] 发送 agent:created 事件：{:?}", event_payload);
                             let _ = app.emit("agent:created", &event_payload);
                         }
                     }
                 }
-                
+
                 Ok(serde_json::json!({
                     "success": true,
                     "data": data,
@@ -323,7 +380,25 @@ async fn get_tool_list(
 ) -> Result<serde_json::Value, String> {
     // 从 ToolBridge 获取工具列表
     let tools = bridge_manager.tool_bridge().list_tools().await;
-    Ok(serde_json::json!({ "tools": tools }))
+
+    // 尝试合并 alou_code kernel 的工具
+    let mut all_tools = tools;
+    if let Ok(kernel) = alou_code_bridge::AlouCodeKernel::get_or_init() {
+        let kernel_tools = kernel.read().await.list_tools();
+        // 合并工具列表（去重）
+        for tool in kernel_tools {
+            if !all_tools.iter().any(|t: &serde_json::Value| t.get("name") == tool.name) {
+                all_tools.push(serde_json::json!({
+                    "name": tool.name,
+                    "description": tool.description,
+                    "input_schema": tool.input_schema,
+                    "source": "alou_code_kernel"
+                }));
+            }
+        }
+    }
+
+    Ok(serde_json::json!({ "tools": all_tools }))
 }
 
 #[tauri::command]

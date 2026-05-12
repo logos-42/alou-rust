@@ -68,6 +68,8 @@ alou_code_tools = { path = "./src/alou_code/crates/tools" }
 alou_code_api = { path = "./src/alou_code/crates/api" }
 alou_code_telemetry = { path = "./src/alou_code/crates/telemetry" }
 alou_code_plugins = { path = "./src/alou_code/crates/plugins" }
+alou_code_desktop_tools = { path = "./src/alou_code/crates/desktop_tools" }
+alou_code_diap = { path = "./src/alou_code/crates/diap" }
 
 # Utils
 hex = "0.4"

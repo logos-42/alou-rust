@@ -17,6 +17,27 @@ impl ToolAdapter {
         Self { registry }
     }
 
+    pub fn with_desktop_tools() -> Self {
+        let registry = GlobalToolRegistry::builtin();
+        let desktop_defs = alou_code_desktop_tools::get_desktop_tool_definitions();
+
+        let runtime_tools: Vec<RuntimeToolDefinition> = desktop_defs
+            .into_iter()
+            .map(|def| RuntimeToolDefinition {
+                name: def.name,
+                description: def.description,
+                input_schema: def.input_schema,
+                required_permission: PermissionMode::WorkspaceWrite,
+            })
+            .collect();
+
+        let registry = registry
+            .with_runtime_tools(runtime_tools)
+            .expect("Failed to register desktop tools");
+
+        Self { registry }
+    }
+
     pub fn register_desktop_tool(
         &mut self,
         name: String,
@@ -50,6 +71,14 @@ impl ToolAdapter {
 
     pub fn execute_tool(&self, name: &str, input: &Value) -> Result<String, String> {
         self.registry.execute(name, input)
+    }
+
+    pub fn registry(&self) -> &GlobalToolRegistry {
+        &self.registry
+    }
+
+    pub fn list_desktop_tools() -> Vec<ToolDefinition> {
+        alou_code_desktop_tools::get_desktop_tool_definitions()
     }
 }
 

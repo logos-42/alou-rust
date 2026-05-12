@@ -1,0 +1,24 @@
+[package]
+name = "alou_code_diap"
+version = "0.1.0"
+edition = "2021"
+description = "DIAP identity system for alou_code kernel"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
+base64 = "0.22"
+thiserror = "2"
+
+# alou_code dependencies
+alou_code_api = { path = "../api" }
+alou_code_runtime = { path = "../runtime" }
+
+# IPFS
+ipfs-api-backend-hyper = { version = "0.5", features = ["with-send-sync"] }
+
+# DIAP SDK
+diap-rs-sdk = { version = "0.2", default-features = false, features = ["embedded-noir", "iroh"] }

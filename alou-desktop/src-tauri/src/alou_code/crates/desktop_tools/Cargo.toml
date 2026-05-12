@@ -1,0 +1,20 @@
+[package]
+name = "alou_code_desktop_tools"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop tools adapter for alou_code kernel"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+log = "0.4"
+async-trait = "0.1"
+thiserror = "2"
+
+# alou_code dependencies
+alou_code_tools = { path = "../tools" }
+alou_code_api = { path = "../api" }
+alou_code_runtime = { path = "../runtime" }
+
+# Desktop tools dependencies (re-exported)

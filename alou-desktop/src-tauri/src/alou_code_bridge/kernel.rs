@@ -11,7 +11,10 @@ use alou_code_runtime::{
     SessionStore,
 };
 
+use super::tool_adapter::ToolAdapter;
+
 static KERNEL_INSTANCE: OnceCell<Arc<RwLock<AlouCodeKernel>>> = OnceCell::new();
+static TOOL_ADAPTER: OnceCell<ToolAdapter> = OnceCell::new();
 
 pub struct AlouCodeKernel {
     pub config_loader: ConfigLoader,
@@ -42,14 +45,20 @@ impl AlouCodeKernel {
             .cloned()
     }
 
+    pub fn init_tool_adapter() -> &'static ToolAdapter {
+        TOOL_ADAPTER.get_or_init(|| {
+            ToolAdapter::with_desktop_tools()
+        })
+    }
+
     pub fn list_tools(&self) -> Vec<alou_code_api::types::ToolDefinition> {
-        let registry = alou_code_tools::GlobalToolRegistry::builtin();
-        registry.definitions(None)
+        let adapter = Self::init_tool_adapter();
+        adapter.list_tools()
     }
 
     pub fn execute_tool(&self, name: &str, input: &serde_json::Value) -> Result<String, String> {
-        let registry = alou_code_tools::GlobalToolRegistry::builtin();
-        registry.execute(name, input)
+        let adapter = Self::init_tool_adapter();
+        adapter.execute_tool(name, input)
     }
 }
 

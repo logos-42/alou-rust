@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use alou_code_diap::DiapIdentity;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityInfo {
@@ -14,6 +15,19 @@ pub struct IdentityInfo {
     pub session_id: String,
     pub public_key: Option<String>,
     pub gateway_url: Option<String>,
+}
+
+impl From<DiapIdentity> for IdentityInfo {
+    fn from(diap: DiapIdentity) -> Self {
+        Self {
+            did: diap.did,
+            ipns: diap.ipns,
+            cid: diap.cid,
+            session_id: String::new(),
+            public_key: Some(diap.public_key),
+            gateway_url: Some(diap.gateway_url),
+        }
+    }
 }
 
 pub struct IdentityHandler {
@@ -57,6 +71,19 @@ impl IdentityHandler {
                 id.session_id.clone(),
                 format!("DID: {}, IPNS: {}", id.did, id.ipns),
             )
+        })
+    }
+
+    pub fn get_diap_identity(&self) -> Option<DiapIdentity> {
+        self.identity.as_ref().map(|id| DiapIdentity {
+            did: id.did.clone(),
+            ipns: id.ipns.clone(),
+            cid: id.cid.clone(),
+            public_key: id.public_key.clone().unwrap_or_default(),
+            gateway_url: id.gateway_url.clone().unwrap_or_default(),
+            ipns_key: None,
+            encrypted_node_id: None,
+            pubsub_topics: None,
         })
     }
 }

@@ -141,7 +141,7 @@ impl AgentRuntimeState {
                 None
             }
         };
-        let alou_code_tool_adapter = Some(ToolAdapter::new());
+        let alou_code_tool_adapter = Some(ToolAdapter::with_desktop_tools());
         let alou_code_session_manager = SessionManager::new().ok().map(|mgr| {
             log::info!("Alou Code Session Manager 初始化成功");
             mgr
