@@ -688,3 +688,60 @@ pub async fn publish_to_ipns_simple(
     
     Ok(ipns_name)
 }
+
+// ==================== Shared Context IPFS Commands ====================
+
+/// 添加通用数据到IPFS
+#[tauri::command]
+pub async fn add_ipfs_data(
+    data: String,
+    ipfs_api_url: Option<String>,
+) -> Result<String, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let json_value = serde_json::json!(data);
+    let file_name = format!("context_{}.json", Uuid::new_v4());
+    add_json_to_ipfs(&json_value, &file_name, &api_url).await
+}
+
+/// 从IPFS获取数据
+#[tauri::command]
+pub async fn get_ipfs_data(
+    cid: String,
+    ipfs_api_url: Option<String>,
+) -> Result<String, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    let endpoint = format!("{}/api/v0/cat", normalize_base_url(&api_url));
+    
+    let client = create_ipfs_client();
+    let response = client
+        .post(&endpoint)
+        .header("User-Agent", "Alou-Desktop/1.0")
+        .query(&[("arg", &cid)])
+        .send()
+        .await
+        .map_err(|e| format!("IPFS cat 请求失败: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("IPFS cat 失败: {} - {}", status, text));
+    }
+    
+    let text = response
+        .text()
+        .await
+        .map_err(|e| format!("IPFS cat 响应错误: {}", e))?;
+    
+    Ok(text)
+}
+
+/// 发布到IPNS（用于共享上下文）
+#[tauri::command]
+pub async fn publish_ipns(
+    cid: String,
+    key: String,
+    ipfs_api_url: Option<String>,
+) -> Result<String, String> {
+    let api_url = ipfs_api_url.unwrap_or_else(default_ipfs_api_url);
+    publish_to_ipns_simple(&cid, &key, &api_url).await
+}
