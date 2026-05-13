@@ -101,7 +101,7 @@ pub fn tool_spec() -> (
                     "exit_code": exit_code,
                     "stdout": stdout,
                     "stderr": stderr
-                }))?)
+                }).map_err(|e| e.to_string())?))
             }
             Err(e) => Err(format!("Command execution failed: {}", e))
         }

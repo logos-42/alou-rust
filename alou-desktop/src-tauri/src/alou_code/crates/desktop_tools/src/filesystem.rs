@@ -57,7 +57,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "content": content,
                     "path": path
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "write" => {
                 let content = input.get("content")
@@ -81,7 +81,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "bytes_written": content.len(),
                     "path": path
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "edit" => {
                 let old_text = input.get("old_text")
@@ -108,7 +108,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "bytes_replaced": old_text.len(),
                     "path": path
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "list" => {
                 let recursive = input.get("recursive")
@@ -153,7 +153,7 @@ pub fn tool_spec() -> (
                     "path": path,
                     "items": entries,
                     "count": entries.len()
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "copy" => {
                 let src = input.get("src")
@@ -179,7 +179,7 @@ pub fn tool_spec() -> (
                     "bytes_copied": bytes,
                     "src": src,
                     "dest": dest
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "move" => {
                 let src = input.get("src")
@@ -197,7 +197,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "src": src,
                     "dest": dest
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "delete" => {
                 let recursive = input.get("recursive")
@@ -219,7 +219,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&json!({
                     "success": true,
                     "path": path
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "dir" => {
                 let info = runtime.block_on(async {
@@ -235,7 +235,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&json!({
                     "success": true,
                     "info": info
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("Unknown operation: {}", op))
         }
@@ -253,22 +253,27 @@ pub fn tool_definition() -> ToolDefinition {
     }
 }
 
-async fn copy_dir_recursive(src: &str, dest: &str) -> std::io::Result<u64> {
-    fs::create_dir_all(dest).await?;
-    let mut total_bytes = 0u64;
-    let mut entries = fs::read_dir(src).await?;
-    while let Some(entry) = entries.next_entry().await? {
-        let src_path = entry.path();
-        let dest_path = Path::new(dest).join(entry.file_name());
-        let metadata = entry.metadata().await?;
-        if metadata.is_dir() {
-            total_bytes += copy_dir_recursive(
-                src_path.to_str().unwrap(),
-                dest_path.to_str().unwrap()
-            ).await?;
-        } else {
-            total_bytes += fs::copy(&src_path, &dest_path).await?;
+fn copy_dir_recursive(src: &str, dest: &str) -> std::io::Result<u64> {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    runtime.block_on(async {
+        fs::create_dir_all(dest).await?;
+        let mut total_bytes = 0u64;
+        let mut dirs = vec![(src.to_string(), dest.to_string())];
+
+        while let Some((src_dir, dest_dir)) = dirs.pop() {
+            let mut entries = fs::read_dir(&src_dir).await?;
+            while let Some(entry) = entries.next_entry().await? {
+                let src_path = entry.path();
+                let dest_path = Path::new(&dest_dir).join(entry.file_name());
+                let metadata = entry.metadata().await?;
+                if metadata.is_dir() {
+                    fs::create_dir_all(&dest_path).await?;
+                    dirs.push((src_path.to_str().unwrap().to_string(), dest_path.to_str().unwrap().to_string()));
+                } else {
+                    total_bytes += fs::copy(&src_path, &dest_path).await?;
+                }
+            }
         }
-    }
-    Ok(total_bytes)
+        Ok(total_bytes)
+    })
 }

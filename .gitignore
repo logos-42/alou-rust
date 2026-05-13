@@ -77,6 +77,7 @@ out/
 docs/
 # mpeltonen/sbt-idea plugin
 .idea_modules/
+.spec-workflow
 
 # JIRA plugin
 atlassian-ide-plugin.xml
