@@ -41,7 +41,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "chain": chain,
             "message": "Blockchain query - requires RPC endpoint configuration"
-        }))?)
+        }).map_err(|e| e.to_string())?)
     });
 
     (name, description, schema, permission, executor)

@@ -44,7 +44,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&json!({
                     "success": true,
                     "message": format!("Opened URL: {}", url)
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("Browser operation {} not yet implemented via adapter", operation))
         }

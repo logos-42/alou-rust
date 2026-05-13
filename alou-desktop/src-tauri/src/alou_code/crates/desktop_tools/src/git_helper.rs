@@ -86,7 +86,7 @@ pub fn tool_spec() -> (
                     "exit_code": output.status.code().unwrap_or(-1),
                     "stdout": stdout,
                     "stderr": stderr
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             Err(e) => Err(format!("Git command failed: {}", e))
         }

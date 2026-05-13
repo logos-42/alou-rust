@@ -36,7 +36,7 @@ pub fn tool_spec() -> (
             "success": true,
             "operation": operation,
             "message": "Wallet manager - requires secure storage integration"
-        }))?)
+        }).map_err(|e| e.to_string())?)
     });
 
     (name, description, schema, permission, executor)
