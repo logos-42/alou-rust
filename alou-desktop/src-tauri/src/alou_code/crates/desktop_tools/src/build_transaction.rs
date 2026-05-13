@@ -41,7 +41,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "chain": chain,
             "message": "Build transaction - requires wallet integration"
-        }))?)
+        }).map_err(|e| e.to_string())?)
     });
 
     (name, description, schema, permission, executor)
