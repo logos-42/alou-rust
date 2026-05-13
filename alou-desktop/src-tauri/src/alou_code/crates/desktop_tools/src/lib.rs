@@ -9,7 +9,7 @@
 
 use alou_code_api::types::ToolDefinition;
 use alou_code_runtime::permissions::PermissionMode;
-use alou_code_tools::{GlobalToolRegistry, RuntimeToolDefinition, ToolSpec};
+use alou_code_tools::{GlobalToolRegistry, InProcessPluginTool, RuntimeToolDefinition, ToolSpec};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
@@ -189,4 +189,52 @@ pub fn get_desktop_tool_definitions() -> Vec<ToolDefinition> {
         skill_auto_selector::tool_definition(),
         autonomous_executor::tool_definition(),
     ]
+}
+
+pub fn get_in_process_tools() -> Vec<InProcessPluginTool> {
+    let desktop_tools: Vec<(
+        String,
+        String,
+        Value,
+        String,
+        Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync>,
+    )> = vec![
+        filesystem::tool_spec(),
+        bash::tool_spec(),
+        search::tool_spec(),
+        network::tool_spec(),
+        system::tool_spec(),
+        todolist::tool_spec(),
+        plan::tool_spec(),
+        git_helper::tool_spec(),
+        browser_tool::tool_spec(),
+        wallet_manager::tool_spec(),
+        agent_wallet::tool_spec(),
+        query_blockchain::tool_spec(),
+        build_transaction::tool_spec(),
+        broadcast_transaction::tool_spec(),
+        polymarket::tool_spec(),
+        media_tools::tool_spec(),
+        self_repair_tool::tool_spec(),
+        agent_creator::tool_spec(),
+        group_coordinator::tool_spec(),
+        tool_creation::tool_spec(),
+        agent_skills::tool_spec(),
+        spec_tool::tool_spec(),
+        skill_auto_selector::tool_spec(),
+        autonomous_executor::tool_spec(),
+    ];
+
+    desktop_tools
+        .into_iter()
+        .map(|(name, description, input_schema, required_permission, executor)| {
+            InProcessPluginTool::new(
+                name,
+                Some(description),
+                input_schema,
+                required_permission,
+                executor,
+            )
+        })
+        .collect()
 }
