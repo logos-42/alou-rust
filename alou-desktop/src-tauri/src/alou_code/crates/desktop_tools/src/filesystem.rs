@@ -1,10 +1,11 @@
 //! Filesystem Tool Adapter for alou_code Kernel
 
-use alou_code_runtime::permissions::PermissionMode;
-use alou_code_tools::RuntimeToolDefinition;
+use alou_code_api::ToolDefinition;
+use alou_code_runtime::PermissionMode;
 use serde_json::{json, Value};
 use std::path::Path;
 use tokio::fs;
+use walkdir::WalkDir;
 
 pub fn tool_spec() -> (
     String,
@@ -117,7 +118,7 @@ pub fn tool_spec() -> (
                 let entries = runtime.block_on(async {
                     let mut items = Vec::new();
                     if recursive {
-                        let mut walker = walkdir::WalkDir::new(path).into_iter();
+                        let mut walker = WalkDir::new(path).into_iter();
                         while let Some(entry) = walker.next() {
                             if let Ok(entry) = entry {
                                 let metadata = entry.metadata().ok();
@@ -243,9 +244,9 @@ pub fn tool_spec() -> (
     (name, description, schema, permission, executor)
 }
 
-pub fn tool_definition() -> alou_code_api::types::ToolDefinition {
+pub fn tool_definition() -> ToolDefinition {
     let (name, description, schema, _, _) = tool_spec();
-    alou_code_api::types::ToolDefinition {
+    ToolDefinition {
         name,
         description: Some(description),
         input_schema: schema,

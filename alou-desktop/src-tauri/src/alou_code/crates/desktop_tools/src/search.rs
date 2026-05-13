@@ -1,6 +1,7 @@
 //! Search Tool Adapter for alou_code Kernel
 
-use alou_code_runtime::permissions::PermissionMode;
+use alou_code_runtime::PermissionMode;
+use glob;
 use serde_json::{json, Value};
 use regex::Regex;
 use walkdir::WalkDir;
@@ -153,9 +154,9 @@ pub fn tool_spec() -> (
     (name, description, schema, permission, executor)
 }
 
-pub fn tool_definition() -> alou_code_api::types::ToolDefinition {
+pub fn tool_definition() -> ToolDefinition {
     let (name, description, schema, _, _) = tool_spec();
-    alou_code_api::types::ToolDefinition {
+    ToolDefinition {
         name,
         description: Some(description),
         input_schema: schema,
