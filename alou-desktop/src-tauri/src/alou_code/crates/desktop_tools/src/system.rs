@@ -35,10 +35,10 @@ pub fn tool_spec() -> (
                 let sys = sysinfo::System::new_all();
                 Ok(serde_json::to_string(&json!({
                     "success": true,
-                    "os": sys.os_name(),
-                    "hostname": sys.hostname(),
-                    "kernel_version": sys.kernel_version(),
-                }))?)
+                    "os": sys.os_description().to_string(),
+                    "hostname": sys.host_name().unwrap_or_default(),
+                    "kernel_version": sys.kernel_version().unwrap_or_default(),
+                }).map_err(|e| e.to_string())?)
             }
             "cpu" => {
                 let sys = sysinfo::System::new_all();
@@ -55,7 +55,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "cpus": cpu_info,
                     "physical_core_count": sys.physical_core_count(),
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "memory" => {
                 let sys = sysinfo::System::new_all();
@@ -64,7 +64,7 @@ pub fn tool_spec() -> (
                     "total_memory": sys.total_memory(),
                     "used_memory": sys.used_memory(),
                     "available_memory": sys.available_memory(),
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "disk" => {
                 let sys = sysinfo::System::new_all();
@@ -81,13 +81,13 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&json!({
                     "success": true,
                     "disks": disk_info,
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "processes" => {
                 let sys = sysinfo::System::new_all();
                 let processes: Vec<_> = sys.processes().iter().take(10).map(|(pid, process)| {
                     json!({
-                        "pid": pid.as_u64(),
+                        "pid": pid.as_u32(),
                         "name": process.name().to_string_lossy(),
                         "cpu_usage": process.cpu_usage(),
                         "memory": process.memory(),
@@ -97,7 +97,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&json!({
                     "success": true,
                     "processes": processes,
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }

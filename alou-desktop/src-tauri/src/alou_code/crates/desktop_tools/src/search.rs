@@ -118,7 +118,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "matches": matches,
                     "count": matches.len()
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "glob" => {
                 let matches = runtime.block_on(async {
@@ -145,7 +145,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "matches": matches,
                     "count": matches.len()
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }

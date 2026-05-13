@@ -42,7 +42,7 @@ pub fn tool_spec() -> (
             "success": true,
             "operation": operation,
             "message": "Plan tool adapter - requires session storage integration"
-        }))?)
+        }).map_err(|e| e.to_string())?)
     });
 
     (name, description, schema, permission, executor)

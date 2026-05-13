@@ -43,7 +43,7 @@ pub fn tool_spec() -> (
             "success": true,
             "operation": operation,
             "message": "TodoList tool adapter - requires session storage integration"
-        }))?)
+        }).map_err(|e| e.to_string())?)
     });
 
     (name, description, schema, permission, executor)

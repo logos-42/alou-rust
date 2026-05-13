@@ -63,7 +63,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "status": status,
                     "body": body
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             "dns_lookup" => {
                 let host = input.get("host")
@@ -81,7 +81,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "host": host,
                     "result": stdout
-                }))?)
+                }).map_err(|e| e.to_string())?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
