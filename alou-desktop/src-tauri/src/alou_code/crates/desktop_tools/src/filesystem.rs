@@ -57,7 +57,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "content": content,
                     "path": path
-                });
+                }))?);
             }
             "write" => {
                 let content = input.get("content")
@@ -81,7 +81,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "bytes_written": content.len(),
                     "path": path
-                });
+                }))?);
             }
             "edit" => {
                 let old_text = input.get("old_text")
@@ -179,7 +179,7 @@ pub fn tool_spec() -> (
                     "bytes_copied": bytes,
                     "src": src,
                     "dest": dest
-                });
+                }))?);
             }
             "move" => {
                 let src = input.get("src")
@@ -197,7 +197,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "src": src,
                     "dest": dest
-                });
+                }))?);
             }
             "delete" => {
                 let recursive = input.get("recursive")
@@ -219,7 +219,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "path": path
-                });
+                }))?);
             }
             "dir" => {
                 let info = runtime.block_on(async {
