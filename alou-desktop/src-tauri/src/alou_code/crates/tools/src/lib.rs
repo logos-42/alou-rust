@@ -4,13 +4,12 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use api::{
-    max_tokens_for_model, resolve_model_alias, ApiError,
+    max_tokens_for_model, model_family_identity_for, resolve_model_alias, ApiError,
     ContentBlockDelta, InputContentBlock, InputMessage, MessageRequest, MessageResponse,
     OutputContentBlock, ProviderClient, StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition,
     ToolResultContentBlock,
 };
-use alou_code_commands as commands;
-use plugins::{PluginTool, PluginToolDefinition};
+use plugins::PluginTool;
 use reqwest::blocking::Client;
 use runtime::{
     check_freshness, dedupe_superseded_commit_events, edit_file, execute_bash, glob_search,
@@ -26,9 +25,9 @@ use runtime::{
     write_file, ApiClient, ApiRequest, AssistantEvent, BashCommandInput, BashCommandOutput,
     BranchFreshness, ConfigLoader, ContentBlock, ConversationMessage, ConversationRuntime,
     GrepSearchInput, LaneCommitProvenance, LaneEvent, LaneEventBlocker, LaneEventName,
-    LaneEventStatus, LaneFailureClass, McpDegradedReport, MessageRole, ModelFamilyIdentity,
-    PermissionMode, PermissionPolicy, PromptCacheEvent, ProviderFallbackConfig, RuntimeError, Session,
-    TaskPacket, ToolError, ToolExecutor,
+    LaneEventStatus, LaneFailureClass, McpDegradedReport, MessageRole, PermissionMode,
+    PermissionPolicy, PromptCacheEvent, ProviderFallbackConfig, RuntimeError, Session, TaskPacket,
+    ToolError, ToolExecutor,
 };
 use serde::{Deserialize, Serialize};
 
@@ -108,33 +107,11 @@ pub struct ToolSpec {
     pub required_permission: PermissionMode,
 }
 
+#[derive(Debug, Clone)]
 pub struct GlobalToolRegistry {
     plugin_tools: Vec<PluginTool>,
-    in_process_tools: Vec<InProcessPluginTool>,
     runtime_tools: Vec<RuntimeToolDefinition>,
     enforcer: Option<PermissionEnforcer>,
-}
-
-impl std::fmt::Debug for GlobalToolRegistry {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GlobalToolRegistry")
-            .field("plugin_tools", &self.plugin_tools.len())
-            .field("in_process_tools", &self.in_process_tools.len())
-            .field("runtime_tools", &self.runtime_tools.len())
-            .field("enforcer", &self.enforcer)
-            .finish()
-    }
-}
-
-impl Clone for GlobalToolRegistry {
-    fn clone(&self) -> Self {
-        Self {
-            plugin_tools: self.plugin_tools.clone(),
-            in_process_tools: Vec::new(),
-            runtime_tools: self.runtime_tools.clone(),
-            enforcer: self.enforcer.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,54 +122,11 @@ pub struct RuntimeToolDefinition {
     pub required_permission: PermissionMode,
 }
 
-pub struct InProcessPluginTool {
-    name: String,
-    description: Option<String>,
-    input_schema: Value,
-    required_permission: String,
-    executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync>,
-}
-
-impl InProcessPluginTool {
-    pub fn new(
-        name: String,
-        description: Option<String>,
-        input_schema: Value,
-        required_permission: String,
-        executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync>,
-    ) -> Self {
-        Self {
-            name,
-            description,
-            input_schema,
-            required_permission,
-            executor,
-        }
-    }
-
-    pub fn definition(&self) -> PluginToolDefinition {
-        PluginToolDefinition {
-            name: self.name.clone(),
-            description: self.description.clone(),
-            input_schema: self.input_schema.clone(),
-        }
-    }
-
-    pub fn execute(&self, input: &Value) -> Result<String, String> {
-        (self.executor)(input)
-    }
-
-    pub fn required_permission(&self) -> &str {
-        &self.required_permission
-    }
-}
-
 impl GlobalToolRegistry {
     #[must_use]
     pub fn builtin() -> Self {
         Self {
             plugin_tools: Vec::new(),
-            in_process_tools: Vec::new(),
             runtime_tools: Vec::new(),
             enforcer: None,
         }
@@ -219,45 +153,9 @@ impl GlobalToolRegistry {
 
         Ok(Self {
             plugin_tools,
-            in_process_tools: Vec::new(),
             runtime_tools: Vec::new(),
             enforcer: None,
         })
-    }
-
-    pub fn with_in_process_tools(
-        mut self,
-        in_process_tools: Vec<InProcessPluginTool>,
-    ) -> Result<Self, String> {
-        let builtin_names = mvp_tool_specs()
-            .into_iter()
-            .map(|spec| spec.name.to_string())
-            .collect::<BTreeSet<_>>();
-        let mut seen_names = builtin_names;
-
-        for tool in &self.plugin_tools {
-            let name = tool.definition().name.clone();
-            if !seen_names.insert(name.clone()) {
-                return Err(format!("duplicate tool name `{name}`"));
-            }
-        }
-
-        for tool in &self.in_process_tools {
-            let name = tool.definition().name.clone();
-            if !seen_names.insert(name.clone()) {
-                return Err(format!("duplicate tool name `{name}`"));
-            }
-        }
-
-        for tool in in_process_tools {
-            let name = tool.definition().name.clone();
-            if !seen_names.insert(name.clone()) {
-                return Err(format!("duplicate tool name `{name}`"));
-            }
-            self.in_process_tools.push(tool);
-        }
-
-        Ok(self)
     }
 
     pub fn with_runtime_tools(
@@ -269,11 +167,6 @@ impl GlobalToolRegistry {
             .map(|spec| spec.name.to_string())
             .chain(
                 self.plugin_tools
-                    .iter()
-                    .map(|tool| tool.definition().name.clone()),
-            )
-            .chain(
-                self.in_process_tools
                     .iter()
                     .map(|tool| tool.definition().name.clone()),
             )
@@ -312,11 +205,6 @@ impl GlobalToolRegistry {
             .map(|spec| spec.name.to_string())
             .chain(
                 self.plugin_tools
-                    .iter()
-                    .map(|tool| tool.definition().name.clone()),
-            )
-            .chain(
-                self.in_process_tools
                     .iter()
                     .map(|tool| tool.definition().name.clone()),
             )
@@ -395,19 +283,7 @@ impl GlobalToolRegistry {
                 description: tool.definition().description.clone(),
                 input_schema: tool.definition().input_schema.clone(),
             });
-        let in_process = self
-            .in_process_tools
-            .iter()
-            .filter(|tool| {
-                allowed_tools
-                    .is_none_or(|allowed| allowed.contains(tool.definition().name.as_str()))
-            })
-            .map(|tool| ToolDefinition {
-                name: tool.definition().name.clone(),
-                description: tool.definition().description.clone(),
-                input_schema: tool.definition().input_schema.clone(),
-            });
-        builtin.chain(runtime).chain(plugin).chain(in_process).collect()
+        builtin.chain(runtime).chain(plugin).collect()
     }
 
     pub fn permission_specs(
@@ -435,19 +311,7 @@ impl GlobalToolRegistry {
                     .map(|permission| (tool.definition().name.clone(), permission))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let in_process = self
-            .in_process_tools
-            .iter()
-            .filter(|tool| {
-                allowed_tools
-                    .is_none_or(|allowed| allowed.contains(tool.definition().name.as_str()))
-            })
-            .map(|tool| {
-                permission_mode_from_plugin(tool.required_permission())
-                    .map(|permission| (tool.definition().name.clone(), permission))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(builtin.chain(runtime).chain(plugin).chain(in_process).collect())
+        Ok(builtin.chain(runtime).chain(plugin).collect())
     }
 
     #[must_use]
@@ -485,13 +349,12 @@ impl GlobalToolRegistry {
         if mvp_tool_specs().iter().any(|spec| spec.name == name) {
             return execute_tool_with_enforcer(self.enforcer.as_ref(), name, input);
         }
-        if let Some(tool) = self.plugin_tools.iter().find(|tool| tool.definition().name == name) {
-            return tool.execute(input).map_err(|e| e.to_string());
-        }
-        if let Some(tool) = self.in_process_tools.iter().find(|tool| tool.definition().name == name) {
-            return tool.execute(input);
-        }
-        Err(format!("unsupported tool: {name}"))
+        self.plugin_tools
+            .iter()
+            .find(|tool| tool.definition().name == name)
+            .ok_or_else(|| format!("unsupported tool: {name}"))?
+            .execute(input)
+            .map_err(|error| error.to_string())
     }
 
     fn searchable_tool_specs(&self) -> Vec<SearchableToolSpec> {
@@ -509,11 +372,7 @@ impl GlobalToolRegistry {
             name: tool.definition().name.clone(),
             description: tool.definition().description.clone().unwrap_or_default(),
         });
-        let in_process = self.in_process_tools.iter().map(|tool| SearchableToolSpec {
-            name: tool.definition().name.clone(),
-            description: tool.definition().description.clone().unwrap_or_default(),
-        });
-        builtin.chain(runtime).chain(plugin).chain(in_process).collect()
+        builtin.chain(runtime).chain(plugin).collect()
     }
 }
 
@@ -3929,28 +3788,18 @@ fn build_agent_runtime(
 
 fn build_agent_system_prompt(subagent_type: &str, model: &str) -> Result<Vec<String>, String> {
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
-    let model_family = model_family_identity_for(model);
     let mut prompt = load_system_prompt(
         cwd,
         DEFAULT_AGENT_SYSTEM_DATE.to_string(),
         std::env::consts::OS,
         "unknown",
-        model_family,
+        model_family_identity_for(model),
     )
     .map_err(|error| error.to_string())?;
     prompt.push(format!(
         "You are a background sub-agent of type `{subagent_type}`. Work only on the delegated task, use only the tools available to you, do not ask the user questions, and finish with a concise result."
     ));
     Ok(prompt)
-}
-
-fn model_family_identity_for(model: &str) -> ModelFamilyIdentity {
-    let resolved = resolve_model_alias(model);
-    if resolved.starts_with("claude") {
-        ModelFamilyIdentity::Claude
-    } else {
-        ModelFamilyIdentity::Generic
-    }
 }
 
 fn resolve_agent_model(model: Option<&str>) -> String {
