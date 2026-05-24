@@ -4,11 +4,12 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use api::{
-    max_tokens_for_model, model_family_identity_for, resolve_model_alias, ApiError,
+    max_tokens_for_model, resolve_model_alias, ApiError,
     ContentBlockDelta, InputContentBlock, InputMessage, MessageRequest, MessageResponse,
     OutputContentBlock, ProviderClient, StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition,
     ToolResultContentBlock,
 };
+extern crate alou_code_commands;
 use plugins::PluginTool;
 use reqwest::blocking::Client;
 use runtime::{
@@ -3381,7 +3382,7 @@ fn todo_store_path() -> Result<std::path::PathBuf, String> {
 
 fn resolve_skill_path(skill: &str) -> Result<std::path::PathBuf, String> {
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
-    match commands::resolve_skill_path(&cwd, skill) {
+    match alou_code_commands::resolve_skill_path(&cwd, skill) {
         Ok(path) => Ok(path),
         Err(_) => resolve_skill_path_from_compat_roots(skill),
     }
@@ -3788,12 +3789,16 @@ fn build_agent_runtime(
 
 fn build_agent_system_prompt(subagent_type: &str, model: &str) -> Result<Vec<String>, String> {
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+    let model_family = match api::resolve_model_alias(model).to_lowercase().as_str() {
+        "sonnet" | "opus" | "haiku" | "claude" => runtime::ModelFamilyIdentity::Claude,
+        _ => runtime::ModelFamilyIdentity::Generic,
+    };
     let mut prompt = load_system_prompt(
         cwd,
         DEFAULT_AGENT_SYSTEM_DATE.to_string(),
         std::env::consts::OS,
         "unknown",
-        model_family_identity_for(model),
+        model_family,
     )
     .map_err(|error| error.to_string())?;
     prompt.push(format!(
