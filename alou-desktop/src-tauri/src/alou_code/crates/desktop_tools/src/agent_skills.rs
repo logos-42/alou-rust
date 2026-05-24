@@ -31,7 +31,7 @@ pub fn tool_spec() -> (
             .and_then(|v| v.as_str())
             .unwrap_or("list");
 
-        Ok(serde_json::to_string(&json!({
+        Ok(serde_json::to_string(&serde_json::json!({
             "success": true,
             "operation": operation,
             "message": "Agent skills - requires skills registry integration"

@@ -41,10 +41,10 @@ pub fn tool_spec() -> (
                 open::that(url)
                     .map_err(|e| format!("Failed to open browser: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "message": format!("Opened URL: {}", url)
-                }).map_err(|e| e.to_string())?)
+                });
             }
             _ => Err(format!("Browser operation {} not yet implemented via adapter", operation))
         }

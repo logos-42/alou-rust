@@ -81,12 +81,12 @@ pub fn tool_spec() -> (
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": output.status.success(),
                     "exit_code": output.status.code().unwrap_or(-1),
                     "stdout": stdout,
                     "stderr": stderr
-                }).map_err(|e| e.to_string())?)
+                });
             }
             Err(e) => Err(format!("Git command failed: {}", e))
         }

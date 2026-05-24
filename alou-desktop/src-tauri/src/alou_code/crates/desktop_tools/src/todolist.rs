@@ -39,11 +39,11 @@ pub fn tool_spec() -> (
             .and_then(|v| v.as_str())
             .unwrap_or("list");
 
-        Ok(serde_json::to_string(&json!({
+        Ok(serde_json::to_string(&serde_json::json!({
             "success": true,
             "operation": operation,
             "message": "TodoList tool adapter - requires session storage integration"
-        }).map_err(|e| e.to_string())?)
+        });
     });
 
     (name, description, schema, permission, executor)

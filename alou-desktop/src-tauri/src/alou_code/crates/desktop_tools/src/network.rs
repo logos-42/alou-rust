@@ -59,11 +59,11 @@ pub fn tool_spec() -> (
                 let status = response.status().as_u16();
                 let body = response.text().unwrap_or_default();
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "status": status,
                     "body": body
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "dns_lookup" => {
                 let host = input.get("host")
@@ -77,11 +77,11 @@ pub fn tool_spec() -> (
 
                 let stdout = String::from_utf8_lossy(&output.stdout).to_string();
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "host": host,
                     "result": stdout
-                }).map_err(|e| e.to_string())?)
+                });
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }

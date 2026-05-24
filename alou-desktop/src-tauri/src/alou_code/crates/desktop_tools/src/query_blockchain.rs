@@ -36,12 +36,12 @@ pub fn tool_spec() -> (
             .and_then(|v| v.as_str())
             .unwrap_or("ethereum");
 
-        Ok(serde_json::to_string(&json!({
+        Ok(serde_json::to_string(&serde_json::json!({
             "success": true,
             "operation": operation,
             "chain": chain,
             "message": "Blockchain query - requires RPC endpoint configuration"
-        }).map_err(|e| e.to_string())?)
+        });
     });
 
     (name, description, schema, permission, executor)

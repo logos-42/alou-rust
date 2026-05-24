@@ -53,11 +53,11 @@ pub fn tool_spec() -> (
                 let content = runtime.block_on(async {
                     fs::read_to_string(path).await
                 }).map_err(|e| format!("Failed to read file: {}", e))?;
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "content": content,
                     "path": path
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "write" => {
                 let content = input.get("content")
@@ -77,11 +77,11 @@ pub fn tool_spec() -> (
                     fs::write(path, content).await
                 }).map_err(|e| format!("Failed to write file: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "bytes_written": content.len(),
                     "path": path
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "edit" => {
                 let old_text = input.get("old_text")
@@ -104,11 +104,11 @@ pub fn tool_spec() -> (
                     fs::write(path, new_content).await
                 }).map_err(|e| format!("Failed to write file: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "bytes_replaced": old_text.len(),
                     "path": path
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "list" => {
                 let recursive = input.get("recursive")
@@ -148,12 +148,12 @@ pub fn tool_spec() -> (
                     Ok::<_, String>(items)
                 })?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "path": path,
                     "items": entries,
                     "count": entries.len()
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "copy" => {
                 let src = input.get("src")
@@ -174,12 +174,12 @@ pub fn tool_spec() -> (
                     }
                 }).map_err(|e| format!("Failed to copy: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "bytes_copied": bytes,
                     "src": src,
                     "dest": dest
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "move" => {
                 let src = input.get("src")
@@ -193,11 +193,11 @@ pub fn tool_spec() -> (
                     fs::rename(src, dest).await
                 }).map_err(|e| format!("Failed to move: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "src": src,
                     "dest": dest
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "delete" => {
                 let recursive = input.get("recursive")
@@ -216,10 +216,10 @@ pub fn tool_spec() -> (
                     }
                 }).map_err(|e| format!("Failed to delete: {}", e))?;
 
-                Ok(serde_json::to_string(&json!({
+                Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "path": path
-                }).map_err(|e| e.to_string())?)
+                });
             }
             "dir" => {
                 let info = runtime.block_on(async {
@@ -232,10 +232,10 @@ pub fn tool_spec() -> (
                     }))
                 })?;
 
-                Ok(serde_json::to_string(&json!({
+                serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "info": info
-                }).map_err(|e| e.to_string())?)
+                })).map_err(|e| e.to_string())
             }
             _ => Err(format!("Unknown operation: {}", op))
         }
