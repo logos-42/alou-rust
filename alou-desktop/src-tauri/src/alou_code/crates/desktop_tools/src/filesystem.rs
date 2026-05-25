@@ -34,7 +34,7 @@ pub fn tool_spec() -> (
             "depth": { "type": "integer" }
         },
         "required": ["operation", "path"]
-    });
+    });)
     let permission = PermissionMode::WorkspaceWrite;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -108,7 +108,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "bytes_replaced": old_text.len(),
                     "path": path
-                });
+                }))?);
             }
             "list" => {
                 let recursive = input.get("recursive")
@@ -153,7 +153,7 @@ pub fn tool_spec() -> (
                     "path": path,
                     "items": entries,
                     "count": entries.len()
-                });
+                }))?);
             }
             "copy" => {
                 let src = input.get("src")
@@ -239,7 +239,7 @@ pub fn tool_spec() -> (
             }
             _ => Err(format!("Unknown operation: {}", op))
         }
-    });
+    });)
 
     (name, description, schema, permission, executor)
 }

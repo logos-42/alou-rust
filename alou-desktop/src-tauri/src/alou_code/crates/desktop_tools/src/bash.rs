@@ -27,7 +27,7 @@ pub fn tool_spec() -> (
             "timeout_secs": { "type": "integer", "minimum": 1 }
         },
         "required": ["command"]
-    });
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -101,11 +101,11 @@ pub fn tool_spec() -> (
                     "exit_code": exit_code,
                     "stdout": stdout,
                     "stderr": stderr
-                });)
+                }))?);
             }
             Err(e) => Err(format!("Command execution failed: {}", e))
         }
-    });
+    });)
 
     (name, description, schema, permission, executor)
 }

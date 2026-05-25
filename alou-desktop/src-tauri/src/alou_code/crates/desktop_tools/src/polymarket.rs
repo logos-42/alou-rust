@@ -25,7 +25,7 @@ pub fn tool_spec() -> (
             "size": { "type": "number" }
         },
         "required": ["operation"]
-    });
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -38,7 +38,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Polymarket - requires API key configuration"
         }))?)
-    });
+    });)
 
     (name, description, schema, permission, executor)
 }

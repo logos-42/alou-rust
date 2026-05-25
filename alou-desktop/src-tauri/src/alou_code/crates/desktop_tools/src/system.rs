@@ -22,7 +22,7 @@ pub fn tool_spec() -> (
             }
         },
         "required": ["operation"]
-    });
+    });)
     let permission = PermissionMode::ReadOnly;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -38,7 +38,7 @@ pub fn tool_spec() -> (
                     "os": sys.os_description().to_string(),
                     "hostname": sys.host_name().unwrap_or_default(),
                     "kernel_version": sys.kernel_version().unwrap_or_default(),
-                });
+                });)
             }
             "cpu" => {
                 let sys = sysinfo::System::new_all();
@@ -55,7 +55,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "cpus": cpu_info,
                     "physical_core_count": sys.physical_core_count(),
-                });
+                });)
             }
             "memory" => {
                 let sys = sysinfo::System::new_all();
@@ -64,7 +64,7 @@ pub fn tool_spec() -> (
                     "total_memory": sys.total_memory(),
                     "used_memory": sys.used_memory(),
                     "available_memory": sys.available_memory(),
-                });
+                });)
             }
             "disk" => {
                 let sys = sysinfo::System::new_all();
@@ -81,7 +81,7 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "disks": disk_info,
-                });
+                });)
             }
             "processes" => {
                 let sys = sysinfo::System::new_all();
@@ -97,11 +97,11 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "processes": processes,
-                });
+                });)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
-    });
+    });)
 
     (name, description, schema, permission, executor)
 }

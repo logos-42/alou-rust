@@ -24,7 +24,7 @@ pub fn tool_spec() -> (
             "script": { "type": "string" }
         },
         "required": ["operation"]
-    });
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -44,11 +44,11 @@ pub fn tool_spec() -> (
                 Ok(serde_json::to_string(&serde_json::json!({
                     "success": true,
                     "message": format!("Opened URL: {}", url)
-                });
+                });)
             }
             _ => Err(format!("Browser operation {} not yet implemented via adapter", operation))
         }
-    });
+    });)
 
     (name, description, schema, permission, executor)
 }
