@@ -23,7 +23,7 @@ pub fn tool_spec() -> (
             "config": { "type": "object" }
         },
         "required": ["operation"]
-    })
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -36,7 +36,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Autonomous executor - requires task queue integration"
         }))?)
-    })
+    });)
 
     (name, description, schema, permission, executor)
 }

@@ -23,7 +23,7 @@ pub fn tool_spec() -> (
             "signed_tx": { "type": "string" }
         },
         "required": ["operation", "chain", "signed_tx"]
-    })
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -40,7 +40,7 @@ pub fn tool_spec() -> (
             "chain": chain,
             "message": "Broadcast transaction - requires RPC endpoint"
         }))?)
-    })
+    });)
 
     (name, description, schema, permission, executor)
 }

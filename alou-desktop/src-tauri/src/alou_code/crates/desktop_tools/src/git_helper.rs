@@ -24,7 +24,7 @@ pub fn tool_spec() -> (
             "path": { "type": "string" }
         },
         "required": ["operation"]
-    })
+    });)
     let permission = PermissionMode::WorkspaceWrite;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -86,11 +86,11 @@ pub fn tool_spec() -> (
                     "exit_code": output.status.code().unwrap_or(-1),
                     "stdout": stdout,
                     "stderr": stderr
-                })
+                });)
             }
             Err(e) => Err(format!("Git command failed: {}", e))
         }
-    })
+    });)
 
     (name, description, schema, permission, executor)
 }

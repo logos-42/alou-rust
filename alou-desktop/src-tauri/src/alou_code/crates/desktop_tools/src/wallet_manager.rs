@@ -24,7 +24,7 @@ pub fn tool_spec() -> (
             "mnemonic": { "type": "string" }
         },
         "required": ["operation"]
-    })
+    });)
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -36,8 +36,8 @@ pub fn tool_spec() -> (
             "success": true,
             "operation": operation,
             "message": "Wallet manager - requires secure storage integration"
-        })
-    })
+        });)
+    });)
 
     (name, description, schema, permission, executor)
 }
