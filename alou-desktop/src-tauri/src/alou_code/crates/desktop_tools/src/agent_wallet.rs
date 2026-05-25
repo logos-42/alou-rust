@@ -35,7 +35,7 @@ pub fn tool_spec() -> (
             "success": true,
             "operation": operation,
             "message": "Agent wallet - requires secure storage integration"
-        })
+        }))?);
     });
 
     (name, description, schema, permission, executor);

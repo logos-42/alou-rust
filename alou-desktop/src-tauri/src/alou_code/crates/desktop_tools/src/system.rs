@@ -1,5 +1,6 @@
 //! System Tool Adapter for alou_code Kernel
 
+use alou_code_api::ToolDefinition;
 use alou_code_runtime::PermissionMode;
 use sysinfo;
 use serde_json::{json, Value};
@@ -25,7 +26,7 @@ pub fn tool_spec() -> (
     });
     let permission = PermissionMode::ReadOnly;
 
-    let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
+    let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(move |input: &Value| {
         let operation = input.get("operation")
             .and_then(|v| v.as_str())
             .unwrap_or("info");
@@ -33,12 +34,13 @@ pub fn tool_spec() -> (
         match operation {
             "info" => {
                 let sys = sysinfo::System::new_all();
-                Ok(serde_json::to_string(&serde_json::json!({
+                let result = json!({
                     "success": true,
                     "os": sys.os_description().to_string(),
                     "hostname": sys.host_name().unwrap_or_default(),
                     "kernel_version": sys.kernel_version().unwrap_or_default(),
-                })
+                });
+                Ok(serde_json::to_string(&result)?)
             }
             "cpu" => {
                 let sys = sysinfo::System::new_all();
@@ -51,20 +53,22 @@ pub fn tool_spec() -> (
                     })
                 }).collect();
 
-                Ok(serde_json::to_string(&serde_json::json!({
+                let result = json!({
                     "success": true,
                     "cpus": cpu_info,
                     "physical_core_count": sys.physical_core_count(),
-                })
+                });
+                Ok(serde_json::to_string(&result)?)
             }
             "memory" => {
                 let sys = sysinfo::System::new_all();
-                Ok(serde_json::to_string(&serde_json::json!({
+                let result = json!({
                     "success": true,
                     "total_memory": sys.total_memory(),
                     "used_memory": sys.used_memory(),
                     "available_memory": sys.available_memory(),
-                })
+                });
+                Ok(serde_json::to_string(&result)?)
             }
             "disk" => {
                 let sys = sysinfo::System::new_all();
@@ -78,10 +82,11 @@ pub fn tool_spec() -> (
                     })
                 }).collect();
 
-                Ok(serde_json::to_string(&serde_json::json!({
+                let result = json!({
                     "success": true,
                     "disks": disk_info,
-                })
+                });
+                Ok(serde_json::to_string(&result)?)
             }
             "processes" => {
                 let sys = sysinfo::System::new_all();
@@ -94,16 +99,17 @@ pub fn tool_spec() -> (
                     })
                 }).collect();
 
-                Ok(serde_json::to_string(&serde_json::json!({
+                let result = json!({
                     "success": true,
                     "processes": processes,
-                })
+                });
+                Ok(serde_json::to_string(&result)?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
     });
 
-    (name, description, schema, permission, executor);
+    (name, description, schema, permission, executor)
 }
 
 pub fn tool_definition() -> ToolDefinition {
