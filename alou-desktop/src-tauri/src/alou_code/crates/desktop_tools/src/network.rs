@@ -63,7 +63,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "status": status,
                     "body": body
-                })
+                }))?)
             }
             "dns_lookup" => {
                 let host = input.get("host")
@@ -81,13 +81,13 @@ pub fn tool_spec() -> (
                     "success": true,
                     "host": host,
                     "result": stdout
-                })
+                }))?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
     });
 
-    (name, description, schema, permission, executor);
+    (name, description, schema, permission, executor)
 }
 
 pub fn tool_definition() -> ToolDefinition {
