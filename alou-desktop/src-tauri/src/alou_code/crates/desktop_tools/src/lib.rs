@@ -1,22 +1,17 @@
 //! Desktop Tools Adapter for alou_code Kernel
 //!
-//! This crate provides adapters that wrap desktop tools (from `crate::tools`)
-//! and register them with alou_code's GlobalToolRegistry, making them available
-//! through the embedded alou_code kernel.
+//! This crate provides adapters that wrap desktop-specific tools
+//! and register them with alou_code's GlobalToolRegistry.
 
 use alou_code_api::ToolDefinition;
 use alou_code_runtime::PermissionMode;
-use alou_code_tools::{GlobalToolRegistry, InProcessPluginTool, RuntimeToolDefinition};
+use alou_code_tools::{GlobalToolRegistry, InProcessPluginTool};
 use serde_json::Value;
 
-pub mod filesystem;
-pub mod bash;
-pub mod search;
-pub mod network;
+// Desktop-specific tools (not in alou_code kernel)
 pub mod system;
 pub mod todolist;
 pub mod plan;
-pub mod git_helper;
 pub mod browser_tool;
 pub mod wallet_manager;
 pub mod agent_wallet;
@@ -36,14 +31,9 @@ pub mod autonomous_executor;
 
 pub fn get_desktop_tool_definitions() -> Vec<ToolDefinition> {
     vec![
-        filesystem::tool_definition(),
-        bash::tool_definition(),
-        search::tool_definition(),
-        network::tool_definition(),
         system::tool_definition(),
         todolist::tool_definition(),
         plan::tool_definition(),
-        git_helper::tool_definition(),
         browser_tool::tool_definition(),
         wallet_manager::tool_definition(),
         agent_wallet::tool_definition(),
@@ -71,14 +61,9 @@ pub fn get_in_process_tools() -> Vec<InProcessPluginTool> {
         PermissionMode,
         Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync>,
     )> = vec![
-        filesystem::tool_spec(),
-        bash::tool_spec(),
-        search::tool_spec(),
-        network::tool_spec(),
         system::tool_spec(),
         todolist::tool_spec(),
         plan::tool_spec(),
-        git_helper::tool_spec(),
         browser_tool::tool_spec(),
         wallet_manager::tool_spec(),
         agent_wallet::tool_spec(),
