@@ -23,7 +23,7 @@ pub fn tool_spec() -> (
             "context": { "type": "object" }
         },
         "required": ["operation"]
-    })
+    });
     let permission = PermissionMode::ReadOnly;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -36,7 +36,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Skill auto selector - requires skills database"
         }))?)
-    })
+    });
 
     (name, description, schema, permission, executor)
 }

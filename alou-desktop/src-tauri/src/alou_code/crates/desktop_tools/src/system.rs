@@ -22,7 +22,7 @@ pub fn tool_spec() -> (
             }
         },
         "required": ["operation"]
-    })
+    });
     let permission = PermissionMode::ReadOnly;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -101,7 +101,7 @@ pub fn tool_spec() -> (
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
-    })
+    });
 
     (name, description, schema, permission, executor)
 }

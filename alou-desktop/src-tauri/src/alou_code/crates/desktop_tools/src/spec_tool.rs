@@ -29,7 +29,7 @@ pub fn tool_spec() -> (
             }
         },
         "required": ["operation"]
-    })
+    });
     let permission = PermissionMode::WorkspaceWrite;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -42,7 +42,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Spec tool - requires spec storage integration"
         }))?)
-    })
+    });
 
     (name, description, schema, permission, executor)
 }

@@ -23,7 +23,7 @@ pub fn tool_spec() -> (
             "args": { "type": "object" }
         },
         "required": ["operation"]
-    })
+    });
     let permission = PermissionMode::WorkspaceWrite;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -36,7 +36,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Agent skills - requires skills registry integration"
         }))?)
-    })
+    });
 
     (name, description, schema, permission, executor)
 }

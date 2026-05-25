@@ -23,7 +23,7 @@ pub fn tool_spec() -> (
             "data": { "type": "string" }
         },
         "required": ["operation"]
-    })
+    });
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -36,7 +36,7 @@ pub fn tool_spec() -> (
             "operation": operation,
             "message": "Agent wallet - requires secure storage integration"
         })
-    })
+    });
 
     (name, description, schema, permission, executor)
 }

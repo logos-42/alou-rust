@@ -25,7 +25,7 @@ pub fn tool_spec() -> (
             "block_number": { "type": "integer" }
         },
         "required": ["operation", "chain"]
-    })
+    });
     let permission = PermissionMode::ReadOnly;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -42,7 +42,7 @@ pub fn tool_spec() -> (
             "chain": chain,
             "message": "Blockchain query - requires RPC endpoint configuration"
         })
-    })
+    });
 
     (name, description, schema, permission, executor)
 }
