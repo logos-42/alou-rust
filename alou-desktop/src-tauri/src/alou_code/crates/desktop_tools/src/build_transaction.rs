@@ -25,7 +25,7 @@ pub fn tool_spec() -> (
             "data": { "type": "string" }
         },
         "required": ["operation", "chain"]
-    });)
+    })
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -41,8 +41,8 @@ pub fn tool_spec() -> (
             "operation": operation,
             "chain": chain,
             "message": "Build transaction - requires wallet integration"
-        });)
-    });)
+        })
+    })
 
     (name, description, schema, permission, executor)
 }

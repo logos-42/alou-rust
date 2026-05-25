@@ -31,7 +31,7 @@ pub fn tool_spec() -> (
             "max_results": { "type": "integer", "minimum": 1 }
         },
         "required": ["operation", "path"]
-    });)
+    })
     let permission = PermissionMode::ReadOnly;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -149,7 +149,7 @@ pub fn tool_spec() -> (
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
-    });)
+    })
 
     (name, description, schema, permission, executor)
 }
