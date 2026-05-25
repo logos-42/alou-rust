@@ -27,7 +27,7 @@ pub fn tool_spec() -> (
             "host": { "type": "string" }
         },
         "required": ["operation"]
-    });)
+    })
     let permission = PermissionMode::DangerFullAccess;
 
     let executor: Box<dyn Fn(&Value) -> Result<String, String> + Send + Sync> = Box::new(|input: &Value| {
@@ -63,7 +63,7 @@ pub fn tool_spec() -> (
                     "success": true,
                     "status": status,
                     "body": body
-                });)
+                })
             }
             "dns_lookup" => {
                 let host = input.get("host")
@@ -81,11 +81,11 @@ pub fn tool_spec() -> (
                     "success": true,
                     "host": host,
                     "result": stdout
-                });)
+                })
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
-    });)
+    })
 
     (name, description, schema, permission, executor)
 }
