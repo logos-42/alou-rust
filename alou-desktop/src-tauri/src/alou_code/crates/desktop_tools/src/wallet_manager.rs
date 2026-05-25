@@ -39,7 +39,7 @@ pub fn tool_spec() -> (
         })
     });
 
-    (name, description, schema, permission, executor)
+    (name, description, schema, permission, executor);
 }
 
 pub fn tool_definition() -> ToolDefinition {

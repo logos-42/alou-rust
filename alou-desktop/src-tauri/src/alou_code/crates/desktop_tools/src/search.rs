@@ -114,11 +114,12 @@ pub fn tool_spec() -> (
                     Ok::<_, String>(results)
                 })?;
 
-                Ok(serde_json::to_string(&serde_json::json!({
+                let json_result = serde_json::json!({
                     "success": true,
                     "matches": matches,
                     "count": matches.len()
-                }))?;
+                });
+                Ok(serde_json::to_string(&json_result)?)
             }
             "glob" => {
                 let matches = runtime.block_on(async {
@@ -141,17 +142,18 @@ pub fn tool_spec() -> (
                     Ok::<_, String>(results)
                 })?;
 
-                Ok(serde_json::to_string(&serde_json::json!({
+                let json_result = serde_json::json!({
                     "success": true,
                     "matches": matches,
                     "count": matches.len()
-                }))?;
+                });
+                Ok(serde_json::to_string(&json_result)?)
             }
             _ => Err(format!("Unknown operation: {}", operation))
         }
     });
 
-    (name, description, schema, permission, executor)
+    (name, description, schema, permission, executor);
 }
 
 pub fn tool_definition() -> ToolDefinition {
